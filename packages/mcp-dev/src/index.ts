@@ -28,7 +28,8 @@ server.tool(
     const page = await b.newPage({ viewport: { width, height } })
 
     try {
-      await page.goto(fullUrl, { waitUntil: 'networkidle' })
+      await page.goto(fullUrl, { waitUntil: 'load' })
+      await page.waitForTimeout(500)
       const buffer = await page.screenshot({ fullPage, type: 'png' })
 
       // Save to .tmp for reference
