@@ -140,6 +140,11 @@ Each template exports a Zod schema. The CMS converts it to JSON Schema and auto-
 an editor form using react-jsonschema-form. Templates can also export a custom editor via
 the mount function contract `{ mount(el, props), unmount(el) }`.
 
+## Documentation
+
+- **[Getting Started](docs/getting-started.md)** — create a site, write templates, add pages and fragments
+- **[Design](docs/design.md)** — full architecture and design decisions
+
 ## Design
 
 See [docs/design.md](docs/design.md) for the full design document, including:
