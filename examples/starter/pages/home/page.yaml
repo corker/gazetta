@@ -6,4 +6,5 @@ metadata:
 components:
   - "@header"
   - hero
+  - features
   - "@footer"

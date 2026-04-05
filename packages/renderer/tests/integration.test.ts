@@ -76,8 +76,8 @@ describe('starter site', () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
 
-    // page-default wraps: @header, hero, @footer
-    expect(resolved.children).toHaveLength(3)
+    // page-default wraps: @header, hero, features, @footer
+    expect(resolved.children).toHaveLength(4)
 
     // header is composite with logo + nav
     const header = resolved.children[0]
@@ -88,9 +88,28 @@ describe('starter site', () => {
     expect(hero.children).toHaveLength(0)
     expect(hero.content?.title).toBe('Welcome to Gazetta')
 
+    // features is composite with 3 feature cards
+    const features = resolved.children[2]
+    expect(features.children).toHaveLength(3)
+
     // footer is composite with copyright
-    const footer = resolved.children[2]
+    const footer = resolved.children[3]
     expect(footer.children).toHaveLength(1)
+  })
+
+  it('renders React SSR templates (feature cards)', async () => {
+    const site = await loadSite(starterDir, storage)
+    const resolved = await resolvePage('home', site)
+    const html = renderPage(resolved, site.pages.get('home')!.metadata)
+
+    // React-rendered feature cards
+    expect(html).toContain('Why Gazetta')
+    expect(html).toContain('<div class="feature-card">')
+    expect(html).toContain('Fast')
+    expect(html).toContain('Composable')
+    expect(html).toContain('Open Source')
+    // Verify it's server-rendered HTML (not client-side placeholders)
+    expect(html).toContain('Edge composition at request time')
   })
 
   it('discovers nested dynamic route pages', async () => {

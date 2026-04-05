@@ -1,0 +1,5 @@
+template: feature-card
+content:
+  icon: "\U0001F513"
+  title: "Open Source"
+  description: "No vendor lock-in. Use any framework for templates."

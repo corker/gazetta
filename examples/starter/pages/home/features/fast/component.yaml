@@ -1,0 +1,5 @@
+template: feature-card
+content:
+  icon: "\u26A1"
+  title: "Fast"
+  description: "Edge composition at request time. No full rebuilds."

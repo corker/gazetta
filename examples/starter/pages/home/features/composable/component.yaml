@@ -1,0 +1,5 @@
+template: feature-card
+content:
+  icon: "\U0001F9E9"
+  title: "Composable"
+  description: "Build pages from reusable fragments. Recursive composition."

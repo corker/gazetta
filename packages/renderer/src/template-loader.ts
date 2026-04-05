@@ -3,15 +3,24 @@ import type { TemplateFunction, StorageProvider } from '@gazetta/shared'
 
 const cache = new Map<string, TemplateFunction>()
 
+const TEMPLATE_FILES = ['index.ts', 'index.tsx']
+
+async function findTemplateFile(storage: StorageProvider, templatesDir: string, templateName: string): Promise<string | null> {
+  for (const file of TEMPLATE_FILES) {
+    const path = join(templatesDir, templateName, file)
+    if (await storage.exists(path)) return path
+  }
+  return null
+}
+
 export async function loadTemplate(storage: StorageProvider, templatesDir: string, templateName: string): Promise<TemplateFunction> {
   const cached = cache.get(templateName)
   if (cached) return cached
 
-  const templatePath = join(templatesDir, templateName, 'index.ts')
-
-  if (!await storage.exists(templatePath)) {
+  const templatePath = await findTemplateFile(storage, templatesDir, templateName)
+  if (!templatePath) {
     throw new Error(
-      `Template "${templateName}" not found. Expected file at ${templatePath}\n` +
+      `Template "${templateName}" not found. Expected index.ts or index.tsx in ${join(templatesDir, templateName)}\n` +
       `  Available templates are in ${templatesDir}`
     )
   }

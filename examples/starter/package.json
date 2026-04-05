@@ -6,6 +6,10 @@
     "dev": "tsx ../../packages/renderer/src/dev.ts ."
   },
   "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "tsx": "^4.21.0"
   }
 }

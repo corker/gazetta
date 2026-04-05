@@ -61,7 +61,7 @@ async function startServer() {
   for (const [pageName, page] of site.pages) {
     app.get(page.route, async (c) => {
       try {
-        const freshSite = await loadSite(siteDir)
+        const freshSite = await loadSite(siteDir, storage)
         const resolved = await resolvePage(pageName, freshSite)
         const html = renderPage(resolved, page.metadata, c.req.param())
         return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
