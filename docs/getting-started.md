@@ -8,7 +8,7 @@ This guide walks you through creating a Gazetta site from scratch.
 - Clone the repo and install dependencies:
 
 ```bash
-git clone https://github.com/corker/gazetta.git
+git clone https://github.com/gazetta-studio/gazetta.git
 cd gazetta
 npm install
 npm run build
