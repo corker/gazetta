@@ -5,7 +5,8 @@ export const schema = z.object({})
 
 const template: TemplateFunction = ({ children = [] }) => ({
   html: `<div class="site">${children.map(c => c.html).join('\n')}</div>`,
-  css: `*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  css: `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #e4e4e7; background: #09090b; line-height: 1.6; }
 a { color: #a78bfa; text-decoration: none; }
 a:hover { color: #c4b5fd; }

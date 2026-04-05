@@ -14,7 +14,7 @@ const template: TemplateFunction = ({ content = {}, children = [] }) => ({
     <div class="section-content">${children.map(c => c.html).join('\n')}</div>
   </div>
 </section>`,
-  css: `.section { padding: 4rem 2rem; }
+  css: `.section { padding: 3rem 2rem; }
 .section-inner { max-width: 60rem; margin: 0 auto; }
 .section h2 { font-size: 2rem; font-weight: 700; text-align: center; margin-bottom: 0.5rem; }
 .section-sub { text-align: center; color: #a1a1aa; margin-bottom: 2rem; }
