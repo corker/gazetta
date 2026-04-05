@@ -2,11 +2,16 @@
   "name": "@gazetta/shared",
   "version": "0.0.1",
   "type": "module",
+  "license": "MIT",
+  "files": ["dist/"],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "build": "tsc",

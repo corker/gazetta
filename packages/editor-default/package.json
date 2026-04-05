@@ -2,17 +2,23 @@
   "name": "@gazetta/editor-default",
   "version": "0.0.1",
   "type": "module",
+  "license": "MIT",
+  "files": ["dist/"],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run"
   },
   "dependencies": {
+    "@gazetta/shared": "^0.0.1",
     "@rjsf/core": "^6.4.0",
     "@rjsf/utils": "^6.4.0",
     "@rjsf/validator-ajv8": "^6.4.0",
@@ -20,7 +26,6 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@gazetta/shared": "*",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "typescript": "^5.8.0",

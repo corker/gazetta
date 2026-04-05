@@ -13,6 +13,8 @@
   },
   "references": [
     { "path": "packages/shared" },
-    { "path": "packages/renderer" }
+    { "path": "packages/renderer" },
+    { "path": "packages/editor-default" },
+    { "path": "packages/cli" }
   ]
 }

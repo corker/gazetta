@@ -2,16 +2,21 @@
   "name": "gazetta",
   "version": "0.0.1",
   "type": "module",
+  "license": "MIT",
+  "files": ["dist/"],
   "bin": {
     "gazetta": "./dist/index.js"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@gazetta/renderer": "*",
-    "@gazetta/shared": "*",
+    "@gazetta/renderer": "^0.0.1",
+    "@gazetta/shared": "^0.0.1",
     "@hono/node-server": "^1.19.0",
     "hono": "^4.12.0",
     "js-yaml": "^4.1.0"
