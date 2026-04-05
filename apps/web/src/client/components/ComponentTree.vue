@@ -5,10 +5,12 @@ import Button from 'primevue/button'
 import type { TreeNode } from 'primevue/treenode'
 import { useEditorStore } from '../stores/editor.js'
 import { api } from '../api/client.js'
+import AddComponentDialog from './AddComponentDialog.vue'
 
 const editor = useEditorStore()
 const selectedKey = ref<Record<string, boolean>>({})
 const componentNodes = ref<TreeNode[]>([])
+const showAddDialog = ref(false)
 
 const detail = computed(() => editor.pageDetail ?? editor.fragmentDetail)
 const title = computed(() => {
@@ -101,6 +103,12 @@ function onSelect(node: TreeNode) {
       </template>
     </Tree>
     <p v-else class="empty">No components</p>
+
+    <Button icon="pi pi-plus" label="Add component" text size="small" class="add-btn"
+      @click="showAddDialog = true" />
+
+    <AddComponentDialog v-if="showAddDialog" :visible="showAddDialog"
+      @close="showAddDialog = false" />
   </div>
 </template>
 
@@ -115,4 +123,5 @@ function onSelect(node: TreeNode) {
 .node-template { font-size: 0.6875rem; color: #666; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; }
 .node-row:hover .node-actions { opacity: 1; }
+.add-btn { margin-top: 0.5rem; }
 </style>

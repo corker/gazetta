@@ -40,6 +40,7 @@ export const api = {
   updateFragment: (name: string, data: Partial<FragmentDetail>) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
   getComponent: (path: string) => request<Record<string, unknown>>(`/components?path=${encodeURIComponent(path)}`),
   updateComponent: (path: string, data: { content: Record<string, unknown> }) => request<{ ok: boolean }>(`/components?path=${encodeURIComponent(path)}`, { method: 'PUT', body: JSON.stringify(data) }),
+  createComponent: (parentDir: string, name: string, template: string) => request<{ ok: boolean; path: string }>('/components', { method: 'POST', body: JSON.stringify({ parentDir, name, template }) }),
   getTemplates: () => request<TemplateSummary[]>('/templates'),
   getTemplateSchema: (name: string) => request<Record<string, unknown>>(`/templates/${name}/schema`),
   getTargets: () => request<string[]>('/targets'),

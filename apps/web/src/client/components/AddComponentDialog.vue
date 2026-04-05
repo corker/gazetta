@@ -1,0 +1,72 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import Dialog from 'primevue/dialog'
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
+import Listbox from 'primevue/listbox'
+import { api } from '../api/client.js'
+import { useEditorStore } from '../stores/editor.js'
+
+const props = defineProps<{ visible: boolean }>()
+const emit = defineEmits<{ (e: 'close'): void }>()
+
+const editor = useEditorStore()
+const templates = ref<Array<{ name: string }>>([])
+const selectedTemplate = ref<string | null>(null)
+const componentName = ref('')
+const creating = ref(false)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  templates.value = await api.getTemplates()
+})
+
+async function handleCreate() {
+  if (!selectedTemplate.value || !componentName.value.trim()) return
+  creating.value = true
+  error.value = null
+  try {
+    const name = componentName.value.trim().toLowerCase().replace(/\s+/g, '-')
+    await editor.addComponent(name, selectedTemplate.value)
+    emit('close')
+  } catch (err) {
+    error.value = (err as Error).message
+  } finally {
+    creating.value = false
+  }
+}
+</script>
+
+<template>
+  <Dialog :visible="props.visible" @update:visible="emit('close')" modal header="Add Component" :style="{ width: '24rem' }">
+    <div class="add-content">
+      <div class="add-field">
+        <label>Name</label>
+        <InputText v-model="componentName" placeholder="e.g. hero, sidebar, cta" class="add-input" />
+      </div>
+
+      <div class="add-field">
+        <label>Template</label>
+        <Listbox v-model="selectedTemplate" :options="templates" optionLabel="name" optionValue="name"
+          class="add-list" :style="{ maxHeight: '200px' }" />
+      </div>
+
+      <p v-if="error" class="add-error">{{ error }}</p>
+    </div>
+
+    <template #footer>
+      <Button label="Cancel" severity="secondary" text @click="emit('close')" />
+      <Button label="Add" icon="pi pi-plus" :loading="creating"
+        :disabled="!selectedTemplate || !componentName.trim()" @click="handleCreate" />
+    </template>
+  </Dialog>
+</template>
+
+<style scoped>
+.add-content { display: flex; flex-direction: column; gap: 1rem; }
+.add-field { display: flex; flex-direction: column; gap: 0.375rem; }
+.add-field label { font-size: 0.75rem; text-transform: uppercase; color: #888; letter-spacing: 0.03em; }
+.add-input { width: 100%; }
+.add-list { width: 100%; }
+.add-error { color: #f87171; font-size: 0.875rem; }
+</style>

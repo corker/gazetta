@@ -142,10 +142,14 @@ export const useEditorStore = defineStore('editor', () => {
     previewVersion.value++
   }
 
-  async function addComponent(name: string) {
+  async function addComponent(name: string, template: string) {
     const detail = pageDetail.value ?? fragmentDetail.value
     if (!detail) return
 
+    // Create the component on disk
+    await api.createComponent(detail.dir, name, template)
+
+    // Add to manifest
     const components = [...(detail.components ?? []), name]
 
     if (selectionType.value === 'page' && selectionName.value) {
