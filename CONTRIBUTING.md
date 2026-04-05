@@ -6,7 +6,7 @@ that structures websites as composable components.
 ## Getting Started
 
 ```bash
-git clone https://github.com/gazetta-studio/gazetta.git
+git clone https://github.com/gazetta-studio/gazetta-studio.git
 cd gazetta
 npm install
 npm run build
@@ -84,7 +84,7 @@ export const editor = { mount, unmount }        // custom editor (optional)
 
 ### Good First Issues
 
-Look for issues labeled [`good first issue`](https://github.com/gazetta-studio/gazetta/labels/good%20first%20issue).
+Look for issues labeled [`good first issue`](https://github.com/gazetta-studio/gazetta-studio/labels/good%20first%20issue).
 
 ### Areas That Need Help
 
@@ -98,7 +98,7 @@ Look for issues labeled [`good first issue`](https://github.com/gazetta-studio/g
 
 - **Bug reports**: include steps to reproduce, expected vs actual behavior
 - **Feature requests**: describe the use case, not just the solution
-- **Questions**: use [GitHub Discussions](https://github.com/gazetta-studio/gazetta/discussions)
+- **Questions**: use [GitHub Discussions](https://github.com/gazetta-studio/gazetta-studio/discussions)
 
 ## Pull Requests
 
