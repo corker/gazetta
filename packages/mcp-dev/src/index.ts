@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { chromium, type Browser } from 'playwright'
 import { resolve } from 'node:path'
 
-const server = new McpServer({ name: 'gazetta-dev', version: '0.0.1' })
+const server = new McpServer({ name: 'dev', version: '0.0.1' })
 
 let browser: Browser | null = null
 

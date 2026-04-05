@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "gazetta-dev": {
+    "dev": {
       "command": "npx",
       "args": ["tsx", "packages/mcp-dev/src/index.ts"]
     }
