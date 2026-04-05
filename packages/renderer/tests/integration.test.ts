@@ -45,16 +45,10 @@ describe('starter site', () => {
     const html = renderPage(resolved, site.pages.get('about')!.metadata)
 
     expect(html).toContain('<title>About</title>')
-
-    // Same header fragment as home
     expect(html).toContain('Gazetta')
     expect(html).toContain('href="/about"')
-
-    // About text component
     expect(html).toContain('About Gazetta')
     expect(html).toContain('stateless CMS')
-
-    // Same footer fragment as home
     expect(html).toContain('© 2026 Gazetta')
   })
 
@@ -63,13 +57,16 @@ describe('starter site', () => {
     const homeResolved = await resolvePage('home', site)
     const aboutResolved = await resolvePage('about', site)
 
-    const homeHeader = renderComponent(homeResolved.children[0])
-    const aboutHeader = renderComponent(aboutResolved.children[0])
-    expect(homeHeader.html).toBe(aboutHeader.html)
+    // Extract just the text content (stripping scope attributes which may differ)
+    const stripScope = (html: string) => html.replace(/data-gz="[^"]+"/g, 'data-gz=""')
 
-    const homeFooter = renderComponent(homeResolved.children[homeResolved.children.length - 1])
-    const aboutFooter = renderComponent(aboutResolved.children[aboutResolved.children.length - 1])
-    expect(homeFooter.html).toBe(aboutFooter.html)
+    const homeHeader = stripScope(renderComponent(homeResolved.children[0]).html)
+    const aboutHeader = stripScope(renderComponent(aboutResolved.children[0]).html)
+    expect(homeHeader).toBe(aboutHeader)
+
+    const homeFooter = stripScope(renderComponent(homeResolved.children[homeResolved.children.length - 1]).html)
+    const aboutFooter = stripScope(renderComponent(aboutResolved.children[aboutResolved.children.length - 1]).html)
+    expect(homeFooter).toBe(aboutFooter)
   })
 
   it('page has correct component tree structure', async () => {
@@ -93,7 +90,7 @@ describe('starter site', () => {
     expect(footer.children).toHaveLength(1)
   })
 
-  it('renders valid HTML document', async () => {
+  it('renders valid HTML document with scoped CSS', async () => {
     const site = await loadSite(starterDir)
     const resolved = await resolvePage('home', site)
     const html = renderPage(resolved, site.pages.get('home')!.metadata)
@@ -103,5 +100,9 @@ describe('starter site', () => {
     expect(html).toContain('<meta charset="UTF-8">')
     expect(html).toContain('<style>')
     expect(html).toContain('</html>')
+
+    // CSS should be scoped with data-gz attributes
+    expect(html).toContain('[data-gz=')
+    expect(html).toContain('data-gz=')
   })
 })

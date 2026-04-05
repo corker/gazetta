@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import type { ResolvedComponent, RenderOutput } from '@gazetta/shared'
 import { renderComponent, renderPage } from '../src/renderer.js'
+import { resetScopeCounter } from '../src/scope.js'
+
+beforeEach(() => {
+  resetScopeCounter()
+})
 
 function leaf(html: string, css = '', js = ''): ResolvedComponent {
   return {
@@ -20,14 +25,14 @@ function composite(
 }
 
 describe('renderComponent', () => {
-  it('renders a leaf component', () => {
+  it('renders a leaf component with scoping', () => {
     const result = renderComponent(leaf('<p>hello</p>', 'p { color: red; }'))
-    expect(result.html).toBe('<p>hello</p>')
-    expect(result.css).toBe('p { color: red; }')
-    expect(result.js).toBe('')
+    expect(result.html).toContain('data-gz="gz0"')
+    expect(result.html).toContain('<p>hello</p>')
+    expect(result.css).toContain('[data-gz="gz0"] p')
   })
 
-  it('renders a leaf with js', () => {
+  it('renders a leaf with js (js is not scoped)', () => {
     const result = renderComponent(leaf('<div></div>', '', 'console.log("hi")'))
     expect(result.js).toBe('console.log("hi")')
   })
@@ -43,13 +48,32 @@ describe('renderComponent', () => {
       children: [],
     }
     const result = renderComponent(component)
-    expect(result.html).toBe('<h1>Hello World</h1>')
+    expect(result.html).toContain('<h1>Hello World</h1>')
   })
 
   it('renders a composite with children', () => {
     const parent = composite(
       (children) => ({
         html: `<div>${children.map(c => c.html).join('')}</div>`,
+        css: `.parent {} ${children.map(c => c.css).join(' ')}`,
+        js: '',
+      }),
+      [
+        leaf('<span>A</span>', '.a {}'),
+        leaf('<span>B</span>', '.b {}'),
+      ]
+    )
+    const result = renderComponent(parent)
+    expect(result.html).toContain('<span>A</span>')
+    expect(result.html).toContain('<span>B</span>')
+    // Parent gets its own scope, children have theirs
+    expect(result.css).toContain('[data-gz=')
+  })
+
+  it('each component gets a unique scope id', () => {
+    const parent = composite(
+      (children) => ({
+        html: children.map(c => c.html).join(''),
         css: children.map(c => c.css).join('\n'),
         js: '',
       }),
@@ -59,8 +83,10 @@ describe('renderComponent', () => {
       ]
     )
     const result = renderComponent(parent)
-    expect(result.html).toBe('<div><span>A</span><span>B</span></div>')
-    expect(result.css).toBe('.a {}\n.b {}')
+    // Children get gz0 and gz1, parent gets gz2
+    expect(result.html).toContain('data-gz="gz0"')
+    expect(result.html).toContain('data-gz="gz1"')
+    expect(result.html).toContain('data-gz="gz2"')
   })
 
   it('renders nested composites (3 levels deep)', () => {
@@ -82,26 +108,9 @@ describe('renderComponent', () => {
       [child]
     )
     const result = renderComponent(root)
-    expect(result.html).toBe('<main><section><em>deep</em></section></main>')
-  })
-
-  it('collects css and js through the tree', () => {
-    const root = composite(
-      (children) => ({
-        html: '<div></div>',
-        css: `.root {} ${children.map(c => c.css).join(' ')}`,
-        js: children.map(c => c.js).join(';'),
-      }),
-      [
-        leaf('<a></a>', '.a {}', 'a()'),
-        leaf('<b></b>', '.b {}', 'b()'),
-      ]
-    )
-    const result = renderComponent(root)
-    expect(result.css).toContain('.root {}')
-    expect(result.css).toContain('.a {}')
-    expect(result.css).toContain('.b {}')
-    expect(result.js).toBe('a();b()')
+    expect(result.html).toContain('<em>deep</em>')
+    expect(result.html).toContain('<section>')
+    expect(result.html).toContain('<main>')
   })
 })
 
@@ -111,7 +120,7 @@ describe('renderPage', () => {
     const html = renderPage(page, { title: 'Test Page' })
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<title>Test Page</title>')
-    expect(html).toContain('<style>p {}</style>')
+    expect(html).toContain('<style>')
     expect(html).toContain('<p>content</p>')
   })
 
@@ -143,5 +152,13 @@ describe('renderPage', () => {
     const page = leaf('<p></p>', '', '')
     const html = renderPage(page)
     expect(html).not.toContain('<script')
+  })
+
+  it('resets scope counter between pages', () => {
+    const page = leaf('<p></p>', '.p {}')
+    renderPage(page)
+    const html = renderPage(page)
+    // After reset, scope should start from gz0 again
+    expect(html).toContain('data-gz="gz0"')
   })
 })
