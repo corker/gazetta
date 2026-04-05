@@ -171,3 +171,27 @@ React synthetic events don't bubble to host DOM (use native events for cross-bou
 HMR is unreliable across frameworks (full remount on change, acceptable).
 
 **Rejected:** React-only (limits template authors), iframes (poor UX), web components (React has no built-in support).
+
+## 13. Vue 3 + PrimeVue for CMS shell
+
+**Decision:** The CMS admin UI is built with Vue 3 + Vite + PrimeVue. All editors (default
+and custom) mount into DOM elements via the mount function contract.
+
+**Why:** The CMS shell is a layout manager (tree sidebar, editor panel, preview iframe, toolbar).
+PrimeVue is the only component library with all required components built-in: Tree (with DnD),
+Splitter (resizable panels), Drawer (sidebar), Toolbar, MenuBar. It also ships Sakai, a free
+MIT-licensed admin template as a starting point.
+
+Since all editors mount via `mount(el, props)`, the shell framework doesn't need to be React.
+The default editor (@rjsf/core) is wrapped in a mount function and renders inside a Vue-managed div.
+Vue's `onMounted` + template refs make foreign component mounting straightforward.
+
+**Researched alternatives:**
+- React 19 + shadcn/ui: largest contributor pool, but no built-in tree component (critical gap)
+- Svelte 5 + shadcn-svelte: leanest bundle, but ecosystem still maturing post-runes migration
+- Hono + htmx: wrong tool for interactive panel-based UI
+- Lit: small community, Web Awesome still in beta
+- Plain TS: too much from scratch (~2000-3000 lines for shell chrome alone)
+
+**Rejected:** React (missing tree component), Svelte (immature ecosystem for admin UIs),
+htmx (not designed for interactive SPAs), Lit (small community).

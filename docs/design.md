@@ -301,6 +301,41 @@ export const schema = z.object({ title: z.string(), ... })      // Zod schema (r
 export const editor = { mount(el, props), unmount(el) }         // custom editor (optional)
 ```
 
+## CMS Shell
+
+Built with Vue 3 + Vite + PrimeVue. The shell is a layout manager — it does not generate
+forms or render content. All editors mount into DOM elements via the mount function contract.
+
+```
+┌──────────────────────────────────────────────┐
+│ Toolbar (publish, save, settings)            │
+├──────────┬─────────────┬─────────────────────┤
+│ Site     │ Editor      │ Preview             │
+│ Tree     │ (mounted)   │ (iframe → Hono)     │
+│          │             │                     │
+│ pages/   │ @rjsf form  │ rendered page       │
+│ frags/   │ or custom   │                     │
+│          │ editor      │                     │
+└──────────┴─────────────┴─────────────────────┘
+```
+
+### v1 Features
+- Target selector (connect to filesystem target)
+- Site tree (pages + fragments)
+- Component tree within a page
+- Schema-driven content editing (@rjsf mounted via mount function)
+- Live preview (Hono renderer in iframe)
+- Publish page/fragment to target
+- Authentication (token-based)
+
+### v2 Features
+- Multi-target management, compare, promote
+- Draft/published states
+- Fragment dependency view
+- Media library
+- User roles and permissions
+- Device preview (responsive widths)
+
 ## Open Questions
 
 - **Target protocol**: What API do targets expose? REST? Git-based? S3-compatible?

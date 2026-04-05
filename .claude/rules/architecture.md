@@ -35,9 +35,40 @@ CMS (stateless web app)  <---->  Targets (state holders)
 
 | Package | Path | Purpose |
 |---------|------|---------|
-| web | `apps/web/` | CMS frontend — stateless editor UI |
+| web | `apps/web/` | CMS frontend — Vue 3 + PrimeVue shell, editor mounting, preview |
 | renderer | `packages/renderer/` | Hono app — walks component tree, executes templates, composes pages |
 | shared | `packages/shared/` | Shared types: component, fragment, page, target, template models |
+
+## CMS Architecture (apps/web)
+
+The CMS is a shell that manages layout, navigation, and editor mounting.
+Built with Vue 3 + Vite + PrimeVue (Tree, Splitter, Drawer, Toolbar).
+
+All editors (default @rjsf forms and custom template editors) mount into DOM
+elements via the `mount(el, { content, onChange })` / `unmount(el)` contract.
+The shell doesn't render forms — it provides a `<div>` and calls mount.
+
+```
+┌─────────────────────────────────────────────┐
+│ CMS Shell (Vue 3 + PrimeVue)                │
+│ ┌──────────┐ ┌────────────┐ ┌─────────────┐ │
+│ │ Site     │ │ Editor     │ │ Preview     │ │
+│ │ Tree     │ │ Slot       │ │ (iframe)    │ │
+│ │          │ │ ┌────────┐ │ │             │ │
+│ │ pages/   │ │ │mounted │ │ │ Hono        │ │
+│ │ frags/   │ │ │editor  │ │ │ renderer    │ │
+│ │          │ │ └────────┘ │ │             │ │
+│ └──────────┘ └────────────┘ └─────────────┘ │
+└─────────────────────────────────────────────┘
+```
+
+API layer (Hono):
+- `GET /api/pages` — list pages from target
+- `GET /api/pages/:name` — get page manifest
+- `PUT /api/pages/:name` — update page manifest
+- `GET /api/fragments` — list fragments
+- `GET /api/templates/:name/schema` — get template's JSON Schema
+- `GET /api/preview/:route` — render page preview
 
 ## MVP (Phase 1)
 
