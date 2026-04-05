@@ -1,10 +1,9 @@
-import { BlobServiceClient, StorageSharedKeyCredential, type ContainerClient } from '@azure/storage-blob'
+import { BlobServiceClient, type ContainerClient } from '@azure/storage-blob'
 import type { StorageProvider, DirEntry } from '@gazetta/shared'
 
 export interface AzureBlobProviderOptions {
   connectionString: string
   container: string
-  blobEndpoint?: string
 }
 
 async function streamToString(readableStream: NodeJS.ReadableStream): Promise<string> {
@@ -16,18 +15,8 @@ async function streamToString(readableStream: NodeJS.ReadableStream): Promise<st
   })
 }
 
-const AZURITE_ACCOUNT = 'devstoreaccount1'
-const AZURITE_KEY = 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtrKBHBekZYInECw=='
-
 export function createAzureBlobProvider(options: AzureBlobProviderOptions): StorageProvider & { init(): Promise<void> } {
-  let blobServiceClient: BlobServiceClient
-  if (options.blobEndpoint) {
-    // Direct construction with credential (for testcontainers with random ports)
-    const credential = new StorageSharedKeyCredential(AZURITE_ACCOUNT, AZURITE_KEY)
-    blobServiceClient = new BlobServiceClient(options.blobEndpoint, credential, { allowInsecureConnection: true })
-  } else {
-    blobServiceClient = BlobServiceClient.fromConnectionString(options.connectionString)
-  }
+  const blobServiceClient = BlobServiceClient.fromConnectionString(options.connectionString)
   const containerClient: ContainerClient = blobServiceClient.getContainerClient(options.container)
 
   return {
