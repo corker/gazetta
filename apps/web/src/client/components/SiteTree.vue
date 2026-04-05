@@ -7,11 +7,13 @@ import { useSiteStore } from '../stores/site.js'
 import { useEditorStore } from '../stores/editor.js'
 import { api } from '../api/client.js'
 import CreatePageDialog from './CreatePageDialog.vue'
+import CreateFragmentDialog from './CreateFragmentDialog.vue'
 
 const site = useSiteStore()
 const editor = useEditorStore()
 const selectedKey = ref<Record<string, boolean>>({})
 const showCreatePage = ref(false)
+const showCreateFragment = ref(false)
 
 const nodes = computed<TreeNode[]>(() => [
   {
@@ -77,17 +79,23 @@ async function handleDelete(node: TreeNode) {
         </div>
       </template>
     </Tree>
-    <Button icon="pi pi-plus" label="New page" text size="small" class="new-btn"
-      @click="showCreatePage = true" />
+    <div class="new-btns">
+      <Button icon="pi pi-plus" label="New page" text size="small"
+        @click="showCreatePage = true" />
+      <Button icon="pi pi-plus" label="New fragment" text size="small"
+        @click="showCreateFragment = true" />
+    </div>
     <CreatePageDialog v-if="showCreatePage" :visible="showCreatePage"
       @close="showCreatePage = false" />
+    <CreateFragmentDialog v-if="showCreateFragment" :visible="showCreateFragment"
+      @close="showCreateFragment = false" />
   </div>
 </template>
 
 <style scoped>
 .site-tree h3 { font-size: 0.75rem; text-transform: uppercase; color: #888; margin-bottom: 0.5rem; letter-spacing: 0.05em; }
 .tree { font-size: 0.875rem; }
-.new-btn { margin-top: 0.5rem; }
+.new-btns { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 .node-row { display: flex; align-items: center; gap: 0.25rem; width: 100%; }
 .node-label { flex: 1; }
 .node-delete { opacity: 0; transition: opacity 0.15s; }

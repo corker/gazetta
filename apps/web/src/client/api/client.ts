@@ -39,6 +39,7 @@ export const api = {
   updatePage: (name: string, data: Partial<PageDetail>) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
   getFragments: () => request<FragmentSummary[]>('/fragments'),
   getFragment: (name: string) => request<FragmentDetail>(`/fragments/${name}`),
+  createFragment: (data: { name: string; template: string }) => request<{ ok: boolean; name: string }>('/fragments', { method: 'POST', body: JSON.stringify(data) }),
   deleteFragment: (name: string) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'DELETE' }),
   updateFragment: (name: string, data: Partial<FragmentDetail>) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
   getComponent: (path: string) => request<Record<string, unknown>>(`/components?path=${encodeURIComponent(path)}`),

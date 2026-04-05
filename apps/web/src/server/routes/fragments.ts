@@ -16,6 +16,25 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider) {
     return c.json(fragments)
   })
 
+  app.post('/api/fragments', async (c) => {
+    const body = await c.req.json() as { name: string; template: string }
+    if (!body.name || !body.template) {
+      return c.json({ error: 'Missing required fields: name, template' }, 400)
+    }
+
+    const fragDir = join(join(siteDir, 'fragments'), body.name)
+    const manifestPath = join(fragDir, 'fragment.yaml')
+
+    if (await storage.exists(manifestPath)) {
+      return c.json({ error: `Fragment "${body.name}" already exists` }, 409)
+    }
+
+    await storage.mkdir(fragDir)
+    const manifest = { template: body.template, components: [] }
+    await storage.writeFile(manifestPath, yaml.dump(manifest, { quotingType: '"', forceQuotes: false }))
+    return c.json({ ok: true, name: body.name })
+  })
+
   app.get('/api/fragments/:name', async (c) => {
     const name = c.req.param('name')
     const site = await loadSite(siteDir, storage)

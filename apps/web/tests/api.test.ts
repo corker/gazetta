@@ -271,7 +271,59 @@ describe('DELETE /api/pages/:name', () => {
   })
 })
 
+describe('POST /api/fragments (create)', () => {
+  afterAll(async () => {
+    await rm(resolve(starterDir, 'fragments/test-frag'), { recursive: true, force: true })
+  })
+
+  it('creates a new fragment', async () => {
+    const res = await app.request('/api/fragments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'test-frag', template: 'footer-layout' }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+
+    const { body: frags } = await get('/api/fragments')
+    expect(frags.some((f: { name: string }) => f.name === 'test-frag')).toBe(true)
+  })
+
+  it('rejects duplicate fragment', async () => {
+    const res = await app.request('/api/fragments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'test-frag', template: 'footer-layout' }),
+    })
+    expect(res.status).toBe(409)
+  })
+
+  it('rejects missing fields', async () => {
+    const res = await app.request('/api/fragments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'x' }),
+    })
+    expect(res.status).toBe(400)
+  })
+})
+
 describe('DELETE /api/fragments/:name', () => {
+  it('deletes a fragment', async () => {
+    await app.request('/api/fragments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'to-delete-frag', template: 'footer-layout' }),
+    })
+
+    const res = await app.request('/api/fragments/to-delete-frag', { method: 'DELETE' })
+    expect(res.status).toBe(200)
+
+    const { body: frags } = await get('/api/fragments')
+    expect(frags.some((f: { name: string }) => f.name === 'to-delete-frag')).toBe(false)
+  })
+
   it('returns 404 for missing fragment', async () => {
     const res = await app.request('/api/fragments/nonexistent', { method: 'DELETE' })
     expect(res.status).toBe(404)
