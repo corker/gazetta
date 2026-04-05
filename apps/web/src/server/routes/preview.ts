@@ -7,22 +7,19 @@ export function previewRoutes(siteDir: string, storage: StorageProvider) {
 
   app.get('/preview/*', async (c) => {
     const site = await loadSite(siteDir, storage)
-    const url = new URL(c.req.url)
-    const requestPath = url.pathname.replace(/^\/preview/, '') || '/'
+    const requestPath = new URL(c.req.url).pathname.replace(/^\/preview/, '') || '/'
 
     for (const [pageName, page] of site.pages) {
       const params = matchRoute(page.route, requestPath)
       if (params) {
         try {
           const resolved = await resolvePage(pageName, site)
-          const html = renderPage(resolved, page.metadata, params)
-          return c.html(html)
+          return c.html(renderPage(resolved, page.metadata, params))
         } catch (err) {
           return c.html(`<pre style="color:red;padding:2rem">${(err as Error).message}</pre>`, 500)
         }
       }
     }
-
     return c.html('<p>Page not found</p>', 404)
   })
 
