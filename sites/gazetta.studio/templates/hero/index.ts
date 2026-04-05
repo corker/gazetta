@@ -19,7 +19,7 @@ const template: TemplateFunction = ({ content = {} }) => ({
     ${content.cta ? `<a href="${content.ctaHref ?? '#'}" class="hero-cta">${content.cta}</a>` : ''}
   </div>
 </section>`,
-  css: `.hero { padding: 5rem 2rem 3rem; text-align: center; }
+  css: `.hero { padding: 4rem 2rem 2rem; text-align: center; }
 .hero-inner { max-width: 48rem; margin: 0 auto; }
 .hero h1 { font-size: 3.5rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; background: linear-gradient(135deg, #a78bfa, #6d28d9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .hero-sub { font-size: 1.25rem; color: #a1a1aa; margin-top: 1.5rem; max-width: 36rem; margin-left: auto; margin-right: auto; }
