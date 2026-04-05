@@ -70,7 +70,7 @@ export async function resolveComponent(
   ctx.path.pop()
   ctx.visited.delete(key)
 
-  return { template: loaded.render, content: manifest.content, children }
+  return { template: loaded.render, content: manifest.content, children, path: componentDir }
 }
 
 export async function resolvePage(pageName: string, site: Site): Promise<ResolvedComponent> {
@@ -95,5 +95,5 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
     }
   }
 
-  return { template: loaded.render, content: page.content, children }
+  return { template: loaded.render, content: page.content, children, path: page.dir }
 }

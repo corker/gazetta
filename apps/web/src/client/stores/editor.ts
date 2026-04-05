@@ -21,8 +21,7 @@ export const useEditorStore = defineStore('editor', () => {
   const lastSaveSuccess = ref(false)
   const savedContent = ref<Record<string, unknown> | null>(null)
   const previewVersion = ref(0)
-
-  let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+  const draftVersion = ref(0)
 
   const previewRoute = computed(() => {
     if (selectionType.value === 'page' && pageDetail.value) return pageDetail.value.route
@@ -34,22 +33,7 @@ export const useEditorStore = defineStore('editor', () => {
     dirty.value = true
     lastSaveError.value = null
     lastSaveSuccess.value = false
-    scheduleAutoSave()
-  }
-
-  function scheduleAutoSave() {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer)
-    autoSaveTimer = setTimeout(autoSave, 400)
-  }
-
-  async function autoSave() {
-    if (!selectedComponentPath.value || !componentContent.value) return
-    try {
-      await api.updateComponent(selectedComponentPath.value, { content: componentContent.value })
-      previewVersion.value++
-    } catch {
-      // Silent — auto-save failures don't interrupt editing
-    }
+    draftVersion.value++
   }
 
   async function selectPage(name: string) {
@@ -58,6 +42,7 @@ export const useEditorStore = defineStore('editor', () => {
     fragmentDetail.value = null
     clearComponentSelection()
     pageDetail.value = await api.getPage(name)
+    previewVersion.value++
   }
 
   async function selectFragment(name: string) {
@@ -69,7 +54,6 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   function clearComponentSelection() {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer)
     selectedComponentPath.value = null
     componentContent.value = null
     componentTemplate.value = null
@@ -81,7 +65,6 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   async function selectComponent(path: string, template: string) {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer)
     selectedComponentPath.value = path
     componentTemplate.value = template
     dirty.value = false
@@ -96,7 +79,6 @@ export const useEditorStore = defineStore('editor', () => {
 
   async function saveComponent() {
     if (!selectedComponentPath.value || !componentContent.value) return
-    if (autoSaveTimer) clearTimeout(autoSaveTimer)
     saving.value = true
     lastSaveError.value = null
     lastSaveSuccess.value = false
@@ -115,16 +97,10 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   function discardChanges() {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer)
     if (savedContent.value) {
       componentContent.value = deepClone(savedContent.value)
       dirty.value = false
-      // Auto-save the reverted content to disk and refresh preview
-      if (selectedComponentPath.value && componentContent.value) {
-        api.updateComponent(selectedComponentPath.value, { content: componentContent.value })
-          .then(() => { previewVersion.value++ })
-          .catch(() => {})
-      }
+      draftVersion.value++
     }
   }
 
@@ -185,7 +161,7 @@ export const useEditorStore = defineStore('editor', () => {
   return {
     selectionType, selectionName, pageDetail, fragmentDetail,
     selectedComponentPath, componentContent, componentTemplate, templateSchema,
-    previewRoute, previewVersion, saving, dirty, lastSaveError, lastSaveSuccess,
+    previewRoute, previewVersion, draftVersion, saving, dirty, lastSaveError, lastSaveSuccess,
     selectPage, selectFragment, selectComponent, saveComponent,
     markDirty, discardChanges, clearComponentSelection,
     moveComponent, removeComponent, addComponent,

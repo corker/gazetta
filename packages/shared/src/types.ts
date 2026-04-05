@@ -67,4 +67,5 @@ export interface ResolvedComponent {
   template: TemplateFunction
   content?: Record<string, unknown>
   children: ResolvedComponent[]
+  path?: string
 }

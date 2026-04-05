@@ -1,22 +1,63 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useEditorStore } from '../stores/editor.js'
 
 const editor = useEditorStore()
+const previewHtml = ref<string | null>(null)
+const loading = ref(false)
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-const previewUrl = computed(() => {
+const previewPath = computed(() => {
   if (!editor.previewRoute) return null
-  return `/preview${editor.previewRoute}?_v=${editor.previewVersion}`
+  return `/preview${editor.previewRoute}`
 })
+
+// Fetch preview HTML (GET for saved state, POST for draft state)
+async function fetchPreview() {
+  if (!previewPath.value) { previewHtml.value = null; return }
+  loading.value = true
+  try {
+    const hasDraft = editor.dirty && editor.selectedComponentPath && editor.componentContent
+    let res: Response
+    if (hasDraft) {
+      const overrides: Record<string, Record<string, unknown>> = {}
+      overrides[editor.selectedComponentPath!] = editor.componentContent!
+      res = await fetch(previewPath.value, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overrides }),
+      })
+    } else {
+      res = await fetch(previewPath.value)
+    }
+    previewHtml.value = await res.text()
+  } catch {
+    previewHtml.value = '<pre style="color:red;padding:2rem">Failed to load preview</pre>'
+  } finally {
+    loading.value = false
+  }
+}
+
+function debouncedFetchPreview() {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(fetchPreview, 300)
+}
+
+// Refresh on page selection or after save
+watch(() => editor.previewVersion, fetchPreview)
+watch(previewPath, fetchPreview, { immediate: true })
+
+// Live refresh on draft edits (debounced)
+watch(() => editor.draftVersion, debouncedFetchPreview)
 </script>
 
 <template>
   <div class="preview-panel">
-    <div v-if="!previewUrl" class="preview-empty">
+    <div v-if="!previewPath" class="preview-empty">
       <i class="pi pi-eye" style="font-size: 2rem; color: #ddd; margin-bottom: 0.5rem;" />
       <p>Select a page to preview</p>
     </div>
-    <iframe v-else :src="previewUrl" class="preview-iframe" />
+    <iframe v-else :srcdoc="previewHtml ?? ''" class="preview-iframe" />
   </div>
 </template>
 
