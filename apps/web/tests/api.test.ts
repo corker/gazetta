@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Hono } from 'hono'
 import { createFilesystemProvider } from '@gazetta/renderer'
@@ -195,5 +196,126 @@ describe('POST /preview/*', () => {
     expect(res.status).toBe(200)
     const html = await res.text()
     expect(html).toContain('Welcome to Gazetta')
+  })
+})
+
+describe('POST /api/pages (create)', () => {
+  afterAll(async () => {
+    await rm(resolve(starterDir, 'pages/test-page'), { recursive: true, force: true })
+    await rm(resolve(starterDir, 'pages/docs'), { recursive: true, force: true })
+  })
+
+  it('creates a new page', async () => {
+    const res = await app.request('/api/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'test-page', route: '/test-page', template: 'page-default' }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+
+    // Verify it appears in the list
+    const { body: pages } = await get('/api/pages')
+    expect(pages.some((p: { name: string }) => p.name === 'test-page')).toBe(true)
+  })
+
+  it('creates a nested page', async () => {
+    const res = await app.request('/api/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'docs/intro', route: '/docs/intro', template: 'page-default' }),
+    })
+    expect(res.status).toBe(200)
+  })
+
+  it('rejects duplicate page', async () => {
+    const res = await app.request('/api/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'test-page', route: '/test-page', template: 'page-default' }),
+    })
+    expect(res.status).toBe(409)
+  })
+
+  it('rejects missing fields', async () => {
+    const res = await app.request('/api/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'x' }),
+    })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('DELETE /api/pages/:name', () => {
+  it('deletes a page', async () => {
+    // Create first
+    await app.request('/api/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'to-delete', route: '/to-delete', template: 'page-default' }),
+    })
+
+    const res = await app.request('/api/pages/to-delete', { method: 'DELETE' })
+    expect(res.status).toBe(200)
+
+    // Verify gone
+    const { body: pages } = await get('/api/pages')
+    expect(pages.some((p: { name: string }) => p.name === 'to-delete')).toBe(false)
+  })
+
+  it('returns 404 for missing page', async () => {
+    const res = await app.request('/api/pages/nonexistent', { method: 'DELETE' })
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('DELETE /api/fragments/:name', () => {
+  it('returns 404 for missing fragment', async () => {
+    const res = await app.request('/api/fragments/nonexistent', { method: 'DELETE' })
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /api/components (create)', () => {
+  afterAll(async () => {
+    await rm(resolve(starterDir, 'pages/home/test-comp'), { recursive: true, force: true })
+  })
+
+  it('creates a new component', async () => {
+    const parentDir = resolve(starterDir, 'pages/home')
+    const res = await app.request('/api/components', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parentDir, name: 'test-comp', template: 'hero' }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+
+    // Verify it exists
+    const comp = await get(`/api/components?path=${encodeURIComponent(body.path)}`)
+    expect(comp.status).toBe(200)
+    expect(comp.body.template).toBe('hero')
+  })
+
+  it('rejects duplicate component', async () => {
+    const parentDir = resolve(starterDir, 'pages/home')
+    const res = await app.request('/api/components', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parentDir, name: 'test-comp', template: 'hero' }),
+    })
+    expect(res.status).toBe(409)
+  })
+
+  it('rejects missing fields', async () => {
+    const res = await app.request('/api/components', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'x' }),
+    })
+    expect(res.status).toBe(400)
   })
 })
