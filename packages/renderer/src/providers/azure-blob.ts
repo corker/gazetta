@@ -80,6 +80,21 @@ export function createAzureBlobProvider(options: AzureBlobProviderOptions): Stor
       // Azure Blob has no directories — they're implicit from blob name prefixes.
       // Nothing to do.
     },
+
+    async rm(path: string): Promise<void> {
+      const normalized = normalizePath(path)
+      // Try deleting as a single blob
+      const blobClient = containerClient.getBlockBlobClient(normalized)
+      if (await blobClient.exists()) {
+        await blobClient.delete()
+        return
+      }
+      // Delete all blobs with this prefix (directory-like delete)
+      const prefix = normalized + '/'
+      for await (const blob of containerClient.listBlobsFlat({ prefix })) {
+        await containerClient.getBlockBlobClient(blob.name).delete()
+      }
+    },
   }
 }
 

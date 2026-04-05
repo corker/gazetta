@@ -48,5 +48,15 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider) {
     return c.json({ ok: true })
   })
 
+  app.delete('/api/fragments/:name', async (c) => {
+    const name = c.req.param('name')
+    const site = await loadSite(siteDir, storage)
+    const fragment = site.fragments.get(name)
+    if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
+
+    await storage.rm(fragment.dir)
+    return c.json({ ok: true })
+  })
+
   return app
 }

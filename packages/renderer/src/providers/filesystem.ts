@@ -1,4 +1,4 @@
-import { readFile, readdir, writeFile, mkdir, access } from 'node:fs/promises'
+import { readFile, readdir, writeFile, mkdir, access, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { StorageProvider, DirEntry } from '@gazetta/shared'
 
@@ -55,6 +55,15 @@ export function createFilesystemProvider(basePath?: string): StorageProvider {
         await mkdir(fullPath, { recursive: true })
       } catch (err) {
         throw new Error(`Cannot create directory ${fullPath}: ${(err as Error).message}`)
+      }
+    },
+
+    async rm(path: string): Promise<void> {
+      const fullPath = resolvePath(path)
+      try {
+        await rm(fullPath, { recursive: true })
+      } catch (err) {
+        throw new Error(`Cannot delete ${fullPath}: ${(err as Error).message}`)
       }
     },
   }

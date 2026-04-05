@@ -80,5 +80,15 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
     return c.json({ ok: true })
   })
 
+  app.delete('/api/pages/:name{.+}', async (c) => {
+    const name = c.req.param('name')
+    const site = await loadSite(siteDir, storage)
+    const page = site.pages.get(name)
+    if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
+
+    await storage.rm(page.dir)
+    return c.json({ ok: true })
+  })
+
   return app
 }
