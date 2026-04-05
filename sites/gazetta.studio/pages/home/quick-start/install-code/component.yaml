@@ -1,0 +1,9 @@
+template: code-block
+content:
+  language: bash
+  code: |-
+    git clone https://github.com/gazetta-studio/gazetta-studio.git
+    cd gazetta-studio
+    npm install && npm run build
+    npm run dev
+    # → http://localhost:3000

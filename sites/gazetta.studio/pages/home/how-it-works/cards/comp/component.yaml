@@ -1,0 +1,5 @@
+template: feature-card
+content:
+  icon: "\U0001F9E9"
+  title: "Components"
+  description: "Everything is a component. Each has a template, content, and optional children. Templates are pure functions — use React, Svelte, Vue, or plain TypeScript."

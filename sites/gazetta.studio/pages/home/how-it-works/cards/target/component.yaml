@@ -1,0 +1,5 @@
+template: feature-card
+content:
+  icon: "\U0001F3AF"
+  title: "Targets"
+  description: "Content lives in storage targets — S3, Azure Blob, or filesystem. The CMS is stateless and disposable. Lose it, spin up a new one."
