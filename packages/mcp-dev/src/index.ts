@@ -1,16 +1,24 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { chromium, type Browser } from 'playwright'
+import { chromium, type Browser, type Page } from 'playwright'
 import { resolve } from 'node:path'
+import { writeFile, mkdir } from 'node:fs/promises'
 
 const server = new McpServer({ name: 'dev', version: '0.0.1' })
 
 let browser: Browser | null = null
+let page: Page | null = null
+const tmpDir = resolve(process.cwd(), '.tmp')
 
-async function getBrowser(): Promise<Browser> {
+async function getPage(width: number, height: number): Promise<Page> {
   if (!browser) browser = await chromium.launch()
-  return browser
+  if (!page || page.isClosed()) {
+    page = await browser.newPage({ viewport: { width, height } })
+  } else {
+    await page.setViewportSize({ width, height })
+  }
+  return page
 }
 
 server.tool(
@@ -24,29 +32,26 @@ server.tool(
   },
   async ({ url, width, height, fullPage }) => {
     const fullUrl = url.startsWith('http') ? url : `http://localhost:3000${url}`
-    const b = await getBrowser()
-    const page = await b.newPage({ viewport: { width, height } })
+    const p = await getPage(width, height)
 
     try {
-      await page.goto(fullUrl, { waitUntil: 'load' })
-      await page.waitForTimeout(500)
-      const buffer = await page.screenshot({ fullPage, type: 'png' })
+      await p.goto(fullUrl, { waitUntil: 'load' })
+      const buffer = await p.screenshot({ fullPage, type: 'jpeg', quality: 80 })
 
-      // Save to .tmp for reference
-      const filename = `screenshot-${Date.now()}.png`
-      const filepath = resolve(process.cwd(), '.tmp', filename)
-      const { writeFile, mkdir } = await import('node:fs/promises')
-      await mkdir(resolve(process.cwd(), '.tmp'), { recursive: true })
-      await writeFile(filepath, buffer)
+      await mkdir(tmpDir, { recursive: true })
+      const filename = `screenshot-${Date.now()}.jpg`
+      await writeFile(resolve(tmpDir, filename), buffer)
 
       return {
         content: [
-          { type: 'image' as const, data: buffer.toString('base64'), mimeType: 'image/png' as const },
+          { type: 'image' as const, data: buffer.toString('base64'), mimeType: 'image/jpeg' as const },
           { type: 'text' as const, text: `Screenshot saved to .tmp/${filename}` },
         ],
       }
-    } finally {
-      await page.close()
+    } catch (err) {
+      return {
+        content: [{ type: 'text' as const, text: `Screenshot failed: ${(err as Error).message}` }],
+      }
     }
   }
 )
