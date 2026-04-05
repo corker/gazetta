@@ -1,14 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
+import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { loadSite } from '../src/site-loader.js'
 import { resolvePage } from '../src/resolver.js'
 import { renderComponent, renderPage } from '../src/renderer.js'
 
 const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+const storage = createFilesystemProvider()
 
 describe('starter site', () => {
   it('loads the site', async () => {
-    const site = await loadSite(starterDir)
+    const site = await loadSite(starterDir, storage)
     expect(site.manifest.name).toBe('Gazetta Starter')
     expect(site.pages.size).toBe(3)
     expect(site.fragments.size).toBe(2)
@@ -20,7 +22,7 @@ describe('starter site', () => {
   })
 
   it('resolves and renders the home page', async () => {
-    const site = await loadSite(starterDir)
+    const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
     const html = renderPage(resolved, site.pages.get('home')!.metadata)
 
@@ -41,7 +43,7 @@ describe('starter site', () => {
   })
 
   it('resolves and renders the about page', async () => {
-    const site = await loadSite(starterDir)
+    const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('about', site)
     const html = renderPage(resolved, site.pages.get('about')!.metadata)
 
@@ -54,7 +56,7 @@ describe('starter site', () => {
   })
 
   it('shared fragments produce identical output across pages', async () => {
-    const site = await loadSite(starterDir)
+    const site = await loadSite(starterDir, storage)
     const homeResolved = await resolvePage('home', site)
     const aboutResolved = await resolvePage('about', site)
 
@@ -71,7 +73,7 @@ describe('starter site', () => {
   })
 
   it('page has correct component tree structure', async () => {
-    const site = await loadSite(starterDir)
+    const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
 
     // page-default wraps: @header, hero, @footer
@@ -92,14 +94,14 @@ describe('starter site', () => {
   })
 
   it('discovers nested dynamic route pages', async () => {
-    const site = await loadSite(starterDir)
+    const site = await loadSite(starterDir, storage)
     const blogPage = site.pages.get('blog/[slug]')
     expect(blogPage).toBeDefined()
     expect(blogPage!.route).toBe('/blog/:slug')
   })
 
   it('resolves and renders blog page with route params', async () => {
-    const site = await loadSite(starterDir)
+    const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('blog/[slug]', site)
     const html = renderPage(resolved, site.pages.get('blog/[slug]')!.metadata, { slug: 'hello-world' })
 
@@ -112,7 +114,7 @@ describe('starter site', () => {
   })
 
   it('renders valid HTML document with scoped CSS', async () => {
-    const site = await loadSite(starterDir)
+    const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
     const html = renderPage(resolved, site.pages.get('home')!.metadata)
 

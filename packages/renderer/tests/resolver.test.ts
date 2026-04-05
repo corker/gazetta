@@ -3,16 +3,12 @@ import { writeFile, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { TemplateFunction } from '@gazetta/shared'
+import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { resolvePage } from '../src/resolver.js'
 import { loadSite } from '../src/site-loader.js'
 
 const testDir = join(tmpdir(), 'gazetta-resolver-test')
-
-const echoTemplate: TemplateFunction = ({ content, children }) => ({
-  html: `<div>${content?.text ?? ''}${(children ?? []).map(c => c.html).join('')}</div>`,
-  css: '',
-  js: '',
-})
+const storage = createFilesystemProvider()
 
 async function writeSite(files: Record<string, string>) {
   await rm(testDir, { recursive: true, force: true })
@@ -42,7 +38,6 @@ afterEach(async () => {
 
 describe('resolvePage', () => {
   beforeEach(() => {
-    // Suppress expected warnings from loadSite when test sites are incomplete
     vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
@@ -54,7 +49,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     const resolved = await resolvePage('home', site)
 
     expect(resolved.children).toHaveLength(1)
@@ -69,7 +64,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     const resolved = await resolvePage('home', site)
 
     expect(resolved.children).toHaveLength(1)
@@ -85,7 +80,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     const resolved = await resolvePage('home', site)
 
     expect(resolved.children).toHaveLength(1)
@@ -96,7 +91,7 @@ describe('resolvePage', () => {
 
   it('throws on missing page', async () => {
     await writeSite({ 'site.yaml': 'name: "Test"' })
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     await expect(resolvePage('nope', site)).rejects.toThrow('Page "nope" not found')
   })
 
@@ -107,7 +102,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     await expect(resolvePage('home', site)).rejects.toThrow('Fragment "@missing" not found')
   })
 
@@ -118,7 +113,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     await expect(resolvePage('home', site)).rejects.toThrow('Component "nope" not found')
   })
 
@@ -128,7 +123,7 @@ describe('resolvePage', () => {
       'pages/home/page.yaml': 'route: /\ntemplate: nonexistent',
     })
 
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     await expect(resolvePage('home', site)).rejects.toThrow('Template "nonexistent" not found')
   })
 
@@ -141,7 +136,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     try {
       await resolvePage('home', site)
       expect.fail('should have thrown')
@@ -160,7 +155,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir)
+    const site = await loadSite(testDir, storage)
     try {
       await resolvePage('home', site)
       expect.fail('should have thrown')

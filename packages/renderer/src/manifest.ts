@@ -1,18 +1,7 @@
-import { readFile } from 'node:fs/promises'
-import { access } from 'node:fs/promises'
 import yaml from 'js-yaml'
-import type { ComponentManifest, FragmentManifest, PageManifest, SiteManifest } from '@gazetta/shared'
+import type { ComponentManifest, FragmentManifest, PageManifest, SiteManifest, StorageProvider } from '@gazetta/shared'
 
-async function readYaml(filePath: string): Promise<Record<string, unknown>> {
-  let content: string
-  try {
-    content = await readFile(filePath, 'utf-8')
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code
-    if (code === 'ENOENT') throw new Error(`File not found: ${filePath}`)
-    throw new Error(`Cannot read ${filePath}: ${(err as Error).message}`)
-  }
-
+function parseYaml(content: string, filePath: string): Record<string, unknown> {
   try {
     const parsed = yaml.load(content)
     if (!parsed || typeof parsed !== 'object') {
@@ -27,25 +16,16 @@ async function readYaml(filePath: string): Promise<Record<string, unknown>> {
   }
 }
 
-export async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath)
-    return true
-  } catch {
-    return false
-  }
-}
-
-export async function parseSiteManifest(filePath: string): Promise<SiteManifest> {
-  const raw = await readYaml(filePath)
+export async function parseSiteManifest(storage: StorageProvider, filePath: string): Promise<SiteManifest> {
+  const raw = parseYaml(await storage.readFile(filePath), filePath)
   if (typeof raw.name !== 'string') {
     throw new Error(`Invalid site.yaml at ${filePath}: missing required "name" field`)
   }
   return { name: raw.name, version: raw.version as string | undefined }
 }
 
-export async function parsePageManifest(filePath: string): Promise<PageManifest> {
-  const raw = await readYaml(filePath)
+export async function parsePageManifest(storage: StorageProvider, filePath: string): Promise<PageManifest> {
+  const raw = parseYaml(await storage.readFile(filePath), filePath)
   const missing: string[] = []
   if (typeof raw.route !== 'string') missing.push('route')
   if (typeof raw.template !== 'string') missing.push('template')
@@ -61,8 +41,8 @@ export async function parsePageManifest(filePath: string): Promise<PageManifest>
   }
 }
 
-export async function parseFragmentManifest(filePath: string): Promise<FragmentManifest> {
-  const raw = await readYaml(filePath)
+export async function parseFragmentManifest(storage: StorageProvider, filePath: string): Promise<FragmentManifest> {
+  const raw = parseYaml(await storage.readFile(filePath), filePath)
   if (typeof raw.template !== 'string') {
     throw new Error(`Invalid fragment.yaml at ${filePath}: missing required "template" field`)
   }
@@ -73,8 +53,8 @@ export async function parseFragmentManifest(filePath: string): Promise<FragmentM
   }
 }
 
-export async function parseComponentManifest(filePath: string): Promise<ComponentManifest> {
-  const raw = await readYaml(filePath)
+export async function parseComponentManifest(storage: StorageProvider, filePath: string): Promise<ComponentManifest> {
+  const raw = parseYaml(await storage.readFile(filePath), filePath)
   if (typeof raw.template !== 'string') {
     throw new Error(`Invalid component.yaml at ${filePath}: missing required "template" field`)
   }

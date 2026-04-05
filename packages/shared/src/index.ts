@@ -6,4 +6,6 @@ export type {
   PageManifest,
   SiteManifest,
   ResolvedComponent,
+  DirEntry,
+  StorageProvider,
 } from './types.js'

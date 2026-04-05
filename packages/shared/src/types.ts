@@ -34,6 +34,19 @@ export interface SiteManifest {
   version?: string
 }
 
+/** Directory entry returned by StorageProvider.readDir */
+export interface DirEntry {
+  name: string
+  isDirectory: boolean
+}
+
+/** Storage abstraction — filesystem, S3, Azure Blob, etc. */
+export interface StorageProvider {
+  readFile(path: string): Promise<string>
+  readDir(path: string): Promise<DirEntry[]>
+  exists(path: string): Promise<boolean>
+}
+
 /** Resolved component ready for rendering */
 export interface ResolvedComponent {
   template: TemplateFunction

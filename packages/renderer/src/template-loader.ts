@@ -1,16 +1,15 @@
 import { join } from 'node:path'
-import type { TemplateFunction } from '@gazetta/shared'
-import { fileExists } from './manifest.js'
+import type { TemplateFunction, StorageProvider } from '@gazetta/shared'
 
 const cache = new Map<string, TemplateFunction>()
 
-export async function loadTemplate(templatesDir: string, templateName: string): Promise<TemplateFunction> {
+export async function loadTemplate(storage: StorageProvider, templatesDir: string, templateName: string): Promise<TemplateFunction> {
   const cached = cache.get(templateName)
   if (cached) return cached
 
   const templatePath = join(templatesDir, templateName, 'index.ts')
 
-  if (!await fileExists(templatePath)) {
+  if (!await storage.exists(templatePath)) {
     throw new Error(
       `Template "${templateName}" not found. Expected file at ${templatePath}\n` +
       `  Available templates are in ${templatesDir}`

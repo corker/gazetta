@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { ResolvedComponent, ComponentManifest } from '@gazetta/shared'
-import { parseComponentManifest, fileExists } from './manifest.js'
+import { parseComponentManifest } from './manifest.js'
 import { loadTemplate } from './template-loader.js'
 import type { Site } from './site-loader.js'
 
@@ -30,6 +30,7 @@ export async function resolveComponent(
 
   let manifest: ComponentManifest
   let componentDir: string
+  const { storage } = ctx.site
 
   if (isFragment) {
     const fragmentName = name.slice(1)
@@ -47,17 +48,17 @@ export async function resolveComponent(
   } else {
     componentDir = join(parentDir, name)
     const manifestPath = join(componentDir, 'component.yaml')
-    if (!await fileExists(manifestPath)) {
+    if (!await storage.exists(manifestPath)) {
       throw new Error(
         `Component "${name}" not found. Expected manifest at ${manifestPath}\n` +
         `  Referenced in: ${ctx.path.slice(0, -1).join(' → ') || 'page root'}\n` +
         `  Parent directory: ${parentDir}`
       )
     }
-    manifest = await parseComponentManifest(manifestPath)
+    manifest = await parseComponentManifest(storage, manifestPath)
   }
 
-  const template = await loadTemplate(ctx.templatesDir, manifest.template)
+  const template = await loadTemplate(storage, ctx.templatesDir, manifest.template)
 
   const children: ResolvedComponent[] = []
   if (manifest.components) {
@@ -85,7 +86,7 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
   const templatesDir = join(site.siteDir, 'templates')
   const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: [pageName] }
 
-  const template = await loadTemplate(templatesDir, page.template)
+  const template = await loadTemplate(site.storage, templatesDir, page.template)
 
   const children: ResolvedComponent[] = []
   if (page.components) {

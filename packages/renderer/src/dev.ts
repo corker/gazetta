@@ -7,8 +7,10 @@ import { loadSite } from './site-loader.js'
 import { resolvePage } from './resolver.js'
 import { renderPage } from './renderer.js'
 import { invalidateTemplate, invalidateAllTemplates } from './template-loader.js'
+import { createFilesystemProvider } from './providers/filesystem.js'
 
 const siteDir = resolve(process.argv[2] ?? '.')
+const storage = createFilesystemProvider()
 const port = parseInt(process.env.PORT ?? '3000', 10)
 
 let reloadId = 0
@@ -32,7 +34,7 @@ function formatError(err: unknown): { message: string; stack: string } {
 
 async function startServer() {
   console.log(`\n  Loading site from ${siteDir}...`)
-  const site = await loadSite(siteDir)
+  const site = await loadSite(siteDir, storage)
   const app = new Hono()
 
   // SSE endpoint for live reload
