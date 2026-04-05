@@ -1,0 +1,18 @@
+{
+  "name": "@gazetta/root",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/shared && npm run build -w packages/renderer",
+    "dev": "npm run build -w packages/shared && npm run dev -w examples/starter",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

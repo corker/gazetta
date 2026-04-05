@@ -1,0 +1,9 @@
+route: /
+template: page-default
+metadata:
+  title: "Home"
+  description: "Welcome to Gazetta"
+components:
+  - "@header"
+  - hero
+  - "@footer"

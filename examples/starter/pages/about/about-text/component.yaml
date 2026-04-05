@@ -1,0 +1,4 @@
+template: text-block
+content:
+  heading: "About Gazetta"
+  body: "Gazetta is a stateless CMS that structures websites as composable components. No database, no build step — just templates, fragments, and pages composed at serve time."

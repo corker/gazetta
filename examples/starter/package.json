@@ -1,0 +1,11 @@
+{
+  "name": "@gazetta/starter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx ../../packages/renderer/src/dev.ts ."
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}
