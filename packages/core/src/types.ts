@@ -3,6 +3,7 @@ export interface RenderOutput {
   html: string
   css: string
   js: string
+  head?: string
 }
 
 /** Template function signature */

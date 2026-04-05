@@ -6,10 +6,17 @@ export function renderComponent(component: ResolvedComponent, routeParams?: Reco
   const output = component.template({ content: component.content, children, params: routeParams })
 
   const scopeId = generateScopeId()
+  // Collect head from children + this component
+  const headParts = [
+    ...children.map(c => c.head).filter(Boolean),
+    output.head,
+  ].filter(Boolean)
+
   return {
     html: scopeHtml(output.html, scopeId),
     css: scopeCss(output.css, scopeId),
     js: output.js,
+    head: headParts.length ? headParts.join('\n') : undefined,
   }
 }
 
@@ -25,18 +32,17 @@ export function renderPage(
   const output = component.template({ content: component.content, children, params: routeParams })
   const title = (metadata?.title as string) ?? 'Gazetta'
   const description = metadata?.description as string | undefined
-  const head = metadata?.head as string | undefined
-  const favicon = metadata?.favicon as string | undefined
-  const ogImage = metadata?.['og:image'] as string | undefined
-  const ogTitle = metadata?.['og:title'] as string | undefined
 
-  const headTags = [
+  // Collect head tags from: page metadata + page template + all components
+  const componentHead = [
+    ...children.map(c => c.head).filter(Boolean),
+    output.head,
+  ].filter(Boolean).join('\n  ')
+
+  const metaHead = [
     description ? `<meta name="description" content="${description}">` : '',
-    ogImage ? `<meta property="og:image" content="${ogImage}">` : '',
-    ogTitle ? `<meta property="og:title" content="${ogTitle}">` : title ? `<meta property="og:title" content="${title}">` : '',
     description ? `<meta property="og:description" content="${description}">` : '',
-    favicon ? `<link rel="icon" href="${favicon}">` : '',
-    head ?? '',
+    title ? `<meta property="og:title" content="${title}">` : '',
   ].filter(Boolean).join('\n  ')
 
   return `<!DOCTYPE html>
@@ -45,7 +51,8 @@ export function renderPage(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
-  ${headTags}
+  ${metaHead}
+  ${componentHead}
   <style>${output.css}</style>
 </head>
 <body>
