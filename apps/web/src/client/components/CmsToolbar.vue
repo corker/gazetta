@@ -1,11 +1,18 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
 import { useEditorStore } from '../stores/editor.js'
+import PublishDialog from './PublishDialog.vue'
 
 const site = useSiteStore()
 const editor = useEditorStore()
+const showPublish = ref(false)
+
+const publishItemType = computed(() => editor.selectionType === 'page' ? 'pages' : 'fragments')
+const publishItemName = computed(() => editor.selectionName ?? '')
+const canPublish = computed(() => editor.selectionName && !editor.dirty)
 </script>
 
 <template>
@@ -35,8 +42,13 @@ const editor = useEditorStore()
         @click="editor.discardChanges()" size="small" class="cms-btn" />
       <Button label="Save" icon="pi pi-save" severity="primary" :loading="editor.saving"
         :disabled="!editor.dirty" @click="editor.saveComponent()" size="small" class="cms-btn" />
+      <Button label="Publish" icon="pi pi-cloud-upload" severity="success"
+        :disabled="!canPublish" @click="showPublish = true" size="small" class="cms-btn" />
     </template>
   </Toolbar>
+
+  <PublishDialog v-if="showPublish" :visible="showPublish" :itemType="publishItemType"
+    :itemName="publishItemName" @close="showPublish = false" />
 </template>
 
 <style scoped>

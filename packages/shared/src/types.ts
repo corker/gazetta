@@ -41,10 +41,19 @@ export interface PageManifest extends ComponentManifest {
   metadata?: Record<string, unknown>
 }
 
+/** Target configuration in site.yaml */
+export interface TargetConfig {
+  type: 'filesystem' | 'azure-blob'
+  path?: string
+  connectionString?: string
+  container?: string
+}
+
 /** Site manifest (site.yaml) */
 export interface SiteManifest {
   name: string
   version?: string
+  targets?: Record<string, TargetConfig>
 }
 
 /** Directory entry returned by StorageProvider.readDir */

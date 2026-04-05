@@ -42,4 +42,6 @@ export const api = {
   updateComponent: (path: string, data: { content: Record<string, unknown> }) => request<{ ok: boolean }>(`/components?path=${encodeURIComponent(path)}`, { method: 'PUT', body: JSON.stringify(data) }),
   getTemplates: () => request<TemplateSummary[]>('/templates'),
   getTemplateSchema: (name: string) => request<Record<string, unknown>>(`/templates/${name}/schema`),
+  getTargets: () => request<string[]>('/targets'),
+  publish: (items: string[], targets: string[]) => request<{ results: Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
 }

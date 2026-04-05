@@ -1,32 +1,39 @@
 import { readFile, readdir, writeFile, mkdir, access } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { StorageProvider, DirEntry } from '@gazetta/shared'
 
-export function createFilesystemProvider(): StorageProvider {
+export function createFilesystemProvider(basePath?: string): StorageProvider {
+  function resolvePath(path: string): string {
+    return basePath ? join(basePath, path) : path
+  }
+
   return {
     async readFile(path: string): Promise<string> {
+      const fullPath = resolvePath(path)
       try {
-        return await readFile(path, 'utf-8')
+        return await readFile(fullPath, 'utf-8')
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code
-        if (code === 'ENOENT') throw new Error(`File not found: ${path}`)
-        throw new Error(`Cannot read ${path}: ${(err as Error).message}`)
+        if (code === 'ENOENT') throw new Error(`File not found: ${fullPath}`)
+        throw new Error(`Cannot read ${fullPath}: ${(err as Error).message}`)
       }
     },
 
     async readDir(path: string): Promise<DirEntry[]> {
+      const fullPath = resolvePath(path)
       try {
-        const entries = await readdir(path, { withFileTypes: true })
+        const entries = await readdir(fullPath, { withFileTypes: true })
         return entries.map(e => ({ name: e.name, isDirectory: e.isDirectory() }))
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code
-        if (code === 'ENOENT') throw new Error(`Directory not found: ${path}`)
-        throw new Error(`Cannot read directory ${path}: ${(err as Error).message}`)
+        if (code === 'ENOENT') throw new Error(`Directory not found: ${fullPath}`)
+        throw new Error(`Cannot read directory ${fullPath}: ${(err as Error).message}`)
       }
     },
 
     async exists(path: string): Promise<boolean> {
       try {
-        await access(path)
+        await access(resolvePath(path))
         return true
       } catch {
         return false
@@ -34,18 +41,20 @@ export function createFilesystemProvider(): StorageProvider {
     },
 
     async writeFile(path: string, content: string): Promise<void> {
+      const fullPath = resolvePath(path)
       try {
-        await writeFile(path, content, 'utf-8')
+        await writeFile(fullPath, content, 'utf-8')
       } catch (err) {
-        throw new Error(`Cannot write ${path}: ${(err as Error).message}`)
+        throw new Error(`Cannot write ${fullPath}: ${(err as Error).message}`)
       }
     },
 
     async mkdir(path: string): Promise<void> {
+      const fullPath = resolvePath(path)
       try {
-        await mkdir(path, { recursive: true })
+        await mkdir(fullPath, { recursive: true })
       } catch (err) {
-        throw new Error(`Cannot create directory ${path}: ${(err as Error).message}`)
+        throw new Error(`Cannot create directory ${fullPath}: ${(err as Error).message}`)
       }
     },
   }
