@@ -1,8 +1,8 @@
 route: /about
 template: page-default
 metadata:
-  title: "About"
-  description: "About Gazetta"
+  title: About
+  description: About Gazetta
 components:
   - "@header"
   - about-text

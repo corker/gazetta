@@ -34,6 +34,7 @@ export const api = {
   getSite: () => request<SiteManifest>('/site'),
   getPages: () => request<PageSummary[]>('/pages'),
   getPage: (name: string) => request<PageDetail>(`/pages/${name}`),
+  createPage: (data: { name: string; route: string; template: string; metadata?: Record<string, unknown> }) => request<{ ok: boolean; name: string }>('/pages', { method: 'POST', body: JSON.stringify(data) }),
   updatePage: (name: string, data: Partial<PageDetail>) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
   getFragments: () => request<FragmentSummary[]>('/fragments'),
   getFragment: (name: string) => request<FragmentDetail>(`/fragments/${name}`),

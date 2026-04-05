@@ -18,6 +18,32 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
     return c.json(pages)
   })
 
+  // Create a new page
+  app.post('/api/pages', async (c) => {
+    const body = await c.req.json() as { name: string; route: string; template: string; metadata?: Record<string, unknown> }
+    if (!body.name || !body.route || !body.template) {
+      return c.json({ error: 'Missing required fields: name, route, template' }, 400)
+    }
+
+    const pageDir = join(join(siteDir, 'pages'), body.name)
+    const manifestPath = join(pageDir, 'page.yaml')
+
+    if (await storage.exists(manifestPath)) {
+      return c.json({ error: `Page "${body.name}" already exists` }, 409)
+    }
+
+    await storage.mkdir(pageDir)
+    const manifest = {
+      route: body.route,
+      template: body.template,
+      metadata: body.metadata ?? { title: body.name },
+      components: [],
+    }
+    const yamlContent = yaml.dump(manifest, { quotingType: '"', forceQuotes: false })
+    await storage.writeFile(manifestPath, yamlContent)
+    return c.json({ ok: true, name: body.name })
+  })
+
   app.get('/api/pages/:name{.+}', async (c) => {
     const name = c.req.param('name')
     const site = await loadSite(siteDir, storage)
