@@ -1,0 +1,33 @@
+import { Hono } from 'hono'
+import { join } from 'node:path'
+import { z } from 'zod'
+import type { StorageProvider } from '@gazetta/shared'
+import { loadTemplate } from '@gazetta/renderer'
+
+export function templateRoutes(siteDir: string, storage: StorageProvider) {
+  const app = new Hono()
+
+  app.get('/api/templates', async (c) => {
+    const templatesDir = join(siteDir, 'templates')
+    if (!await storage.exists(templatesDir)) return c.json([])
+
+    const entries = await storage.readDir(templatesDir)
+    const templates = entries.filter(e => e.isDirectory).map(e => ({ name: e.name }))
+    return c.json(templates)
+  })
+
+  app.get('/api/templates/:name/schema', async (c) => {
+    const name = c.req.param('name')
+    const templatesDir = join(siteDir, 'templates')
+
+    try {
+      const loaded = await loadTemplate(storage, templatesDir, name)
+      const jsonSchema = z.toJSONSchema(loaded.schema as z.ZodType)
+      return c.json(jsonSchema)
+    } catch (err) {
+      return c.json({ error: `Failed to load schema for template "${name}": ${(err as Error).message}` }, 500)
+    }
+  })
+
+  return app
+}

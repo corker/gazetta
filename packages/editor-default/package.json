@@ -1,0 +1,29 @@
+{
+  "name": "@gazetta/editor-default",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rjsf/core": "^6.4.0",
+    "@rjsf/utils": "^6.4.0",
+    "@rjsf/validator-ajv8": "^6.4.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@gazetta/shared": "*",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.0"
+  }
+}

@@ -41,15 +41,15 @@ async function startServer() {
   app.get('/__reload', (c) => {
     return streamSSE(c, async (stream) => {
       let lastId = reloadId
-      const check = () => {
+      const check = async () => {
         if (reloadId !== lastId) {
           lastId = reloadId
-          stream.writeSSE({ data: 'reload', event: 'message' })
+          await stream.writeSSE({ data: 'reload', event: 'message' })
         }
       }
       const listener = check
       reloadListeners.add(listener)
-      stream.onAbort(() => reloadListeners.delete(listener))
+      stream.onAbort(() => { reloadListeners.delete(listener) })
       while (true) {
         await stream.sleep(500)
         check()

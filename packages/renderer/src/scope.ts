@@ -1,4 +1,5 @@
 import postcss from 'postcss'
+// @ts-expect-error no type declarations available
 import prefixer from 'postcss-prefix-selector'
 
 let counter = 0
@@ -28,7 +29,7 @@ export function scopeCss(css: string, scopeId: string): string {
 
   const prefix = `[data-gz="${scopeId}"]`
   const result = postcss([
-    prefixer({ prefix, transform: (_prefix, selector) => `${prefix} ${selector}` }),
+    prefixer({ prefix, transform: (_prefix: string, selector: string) => `${prefix} ${selector}` }),
   ]).process(css).css
 
   return result

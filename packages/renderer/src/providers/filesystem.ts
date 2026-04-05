@@ -1,4 +1,4 @@
-import { readFile, readdir, access } from 'node:fs/promises'
+import { readFile, readdir, writeFile, mkdir, access } from 'node:fs/promises'
 import type { StorageProvider, DirEntry } from '@gazetta/shared'
 
 export function createFilesystemProvider(): StorageProvider {
@@ -30,6 +30,22 @@ export function createFilesystemProvider(): StorageProvider {
         return true
       } catch {
         return false
+      }
+    },
+
+    async writeFile(path: string, content: string): Promise<void> {
+      try {
+        await writeFile(path, content, 'utf-8')
+      } catch (err) {
+        throw new Error(`Cannot write ${path}: ${(err as Error).message}`)
+      }
+    },
+
+    async mkdir(path: string): Promise<void> {
+      try {
+        await mkdir(path, { recursive: true })
+      } catch (err) {
+        throw new Error(`Cannot create directory ${path}: ${(err as Error).message}`)
       }
     },
   }

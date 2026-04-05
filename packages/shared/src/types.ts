@@ -58,6 +58,8 @@ export interface StorageProvider {
   readFile(path: string): Promise<string>
   readDir(path: string): Promise<DirEntry[]>
   exists(path: string): Promise<boolean>
+  writeFile(path: string, content: string): Promise<void>
+  mkdir(path: string): Promise<void>
 }
 
 /** Resolved component ready for rendering */
