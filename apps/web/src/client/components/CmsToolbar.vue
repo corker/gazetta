@@ -5,10 +5,12 @@ import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
 import { useEditorStore } from '../stores/editor.js'
 import PublishDialog from './PublishDialog.vue'
+import FetchDialog from './FetchDialog.vue'
 
 const site = useSiteStore()
 const editor = useEditorStore()
 const showPublish = ref(false)
+const showFetch = ref(false)
 
 const publishItemType = computed(() => editor.selectionType === 'page' ? 'pages' : 'fragments')
 const publishItemName = computed(() => editor.selectionName ?? '')
@@ -42,6 +44,8 @@ const canPublish = computed(() => editor.selectionName && !editor.dirty)
         @click="editor.discardChanges()" size="small" class="cms-btn" />
       <Button label="Save" icon="pi pi-save" severity="primary" :loading="editor.saving"
         :disabled="!editor.dirty" @click="editor.saveComponent()" size="small" class="cms-btn" />
+      <Button label="Fetch" icon="pi pi-cloud-download" severity="info"
+        @click="showFetch = true" size="small" class="cms-btn" />
       <Button label="Publish" icon="pi pi-cloud-upload" severity="success"
         :disabled="!canPublish" @click="showPublish = true" size="small" class="cms-btn" />
     </template>
@@ -49,6 +53,7 @@ const canPublish = computed(() => editor.selectionName && !editor.dirty)
 
   <PublishDialog v-if="showPublish" :visible="showPublish" :itemType="publishItemType"
     :itemName="publishItemName" @close="showPublish = false" />
+  <FetchDialog v-if="showFetch" :visible="showFetch" @close="showFetch = false" />
 </template>
 
 <style scoped>

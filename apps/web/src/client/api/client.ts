@@ -46,4 +46,5 @@ export const api = {
   getTemplateSchema: (name: string) => request<Record<string, unknown>>(`/templates/${name}/schema`),
   getTargets: () => request<string[]>('/targets'),
   publish: (items: string[], targets: string[]) => request<{ results: Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
+  fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),
 }

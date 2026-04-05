@@ -51,5 +51,59 @@ export function publishRoutes(
     return c.json({ results }, allSuccess ? 200 : 207)
   })
 
+  // Fetch: copy from a target to the working copy
+  app.post('/api/fetch', async (c) => {
+    const body = await c.req.json() as { source: string; items?: string[] }
+    if (!body.source) return c.json({ error: 'Missing "source" target name' }, 400)
+
+    const targetStorage = targets.get(body.source)
+    if (!targetStorage) return c.json({ error: `Unknown target: ${body.source}` }, 400)
+
+    let items: string[]
+    if (body.items?.length) {
+      items = body.items
+    } else {
+      // Fetch everything — discover pages and fragments from the target
+      items = []
+      try {
+        if (await targetStorage.exists('pages')) {
+          const pages = await targetStorage.readDir('pages')
+          for (const p of pages) {
+            if (p.isDirectory) items.push(`pages/${p.name}`)
+          }
+        }
+        if (await targetStorage.exists('fragments')) {
+          const frags = await targetStorage.readDir('fragments')
+          for (const f of frags) {
+            if (f.isDirectory) items.push(`fragments/${f.name}`)
+          }
+        }
+        if (await targetStorage.exists('templates')) {
+          const tmpls = await targetStorage.readDir('templates')
+          for (const t of tmpls) {
+            if (t.isDirectory) items.push(`templates/${t.name}`)
+          }
+        }
+      } catch (err) {
+        return c.json({ error: `Failed to list target contents: ${(err as Error).message}` }, 500)
+      }
+    }
+
+    if (items.length === 0) return c.json({ error: 'No content found on target' }, 404)
+
+    console.log(`  Fetching ${items.length} items from "${body.source}":`)
+    console.log(`    Items: ${items.join(', ')}`)
+
+    try {
+      const { copiedFiles } = await publishItems(targetStorage, '', sourceStorage, siteDir, items)
+      console.log(`    ${copiedFiles} files copied to working copy`)
+      return c.json({ success: true, copiedFiles, items })
+    } catch (err) {
+      const error = (err as Error).message
+      console.error(`    FAILED — ${error}`)
+      return c.json({ error }, 500)
+    }
+  })
+
   return app
 }
