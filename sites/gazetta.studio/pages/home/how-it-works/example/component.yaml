@@ -1,0 +1,17 @@
+template: code-block
+content:
+  language: TypeScript
+  code: |-
+    // templates/hero/index.ts
+    import { z } from 'zod'
+
+    export const schema = z.object({
+      title: z.string(),
+      subtitle: z.string().optional(),
+    })
+
+    export default ({ content }) => ({
+      html: `<h1>${content.title}</h1>`,
+      css: `h1 { font-size: 3rem; }`,
+      js: '',
+    })

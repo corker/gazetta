@@ -4,3 +4,4 @@ content:
   subheading: "Three concepts. That's it."
 components:
   - cards
+  - example
