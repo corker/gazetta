@@ -1,0 +1,6 @@
+template: section
+content:
+  heading: "Introducing Gazetta"
+  subheading: "April 2026"
+components:
+  - body

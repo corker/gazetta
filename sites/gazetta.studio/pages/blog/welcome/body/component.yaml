@@ -1,0 +1,9 @@
+template: text
+content:
+  body: |
+    <p>We're excited to introduce <strong>Gazetta</strong> — a stateless CMS that rethinks how websites are built and published.</p>
+    <p>Traditional CMSes couple content authoring with a database that must be maintained, backed up, and deployed. Gazetta takes a different approach: <strong>the CMS stores nothing</strong>. All content lives in targets — S3, Azure Blob, or plain files on disk.</p>
+    <p>Pages are composed from <strong>reusable components</strong> at serve time. Update a shared header fragment once, and every page reflects it instantly — no rebuild needed.</p>
+    <p>Templates are pure functions that return HTML, CSS, and JS. Use any framework — React, Svelte, Vue, or plain TypeScript. The template contract is the boundary.</p>
+    <p>Gazetta is open source under the MIT license. We'd love your feedback and contributions.</p>
+    <p><a href="https://github.com/gazetta-studio/gazetta-studio">View on GitHub →</a></p>

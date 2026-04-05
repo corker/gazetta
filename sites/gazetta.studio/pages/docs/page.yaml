@@ -1,0 +1,9 @@
+route: /docs
+template: site-layout
+metadata:
+  title: "Documentation — Gazetta"
+  description: "Learn how to build composable websites with Gazetta."
+components:
+  - "@header"
+  - intro
+  - "@footer"
