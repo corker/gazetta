@@ -19,7 +19,10 @@ export function renderPage(
   routeParams?: Record<string, string>
 ): string {
   resetScopeCounter()
-  const output = renderComponent(component, routeParams)
+  // Page-level template CSS is not scoped (allows body/html/global styles)
+  // Children are still scoped individually
+  const children = component.children.map(c => renderComponent(c, routeParams))
+  const output = component.template({ content: component.content, children, params: routeParams })
   const title = (metadata?.title as string) ?? 'Gazetta'
   const description = metadata?.description as string | undefined
 
