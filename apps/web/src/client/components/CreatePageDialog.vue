@@ -18,7 +18,10 @@ const pageRoute = ref('')
 const creating = ref(false)
 const error = ref<string | null>(null)
 
-const autoRoute = computed(() => `/${pageName.value.trim().toLowerCase().replace(/\s+/g, '-')}`)
+const autoRoute = computed(() => {
+  const name = pageName.value.trim().toLowerCase().replace(/\s+/g, '-')
+  return name ? `/${name}` : '/'
+})
 
 onMounted(async () => {
   templates.value = await api.getTemplates()
@@ -29,7 +32,7 @@ async function handleCreate() {
   creating.value = true
   error.value = null
   try {
-    const name = pageName.value.trim().toLowerCase().replace(/\s+/g, '-')
+    const name = pageName.value.trim().toLowerCase().replace(/\s+/g, '-').replace(/\/+/g, '/')
     const route = pageRoute.value.trim() || autoRoute.value
     await api.createPage({ name, route, template: selectedTemplate.value, metadata: { title: pageName.value.trim() } })
     await site.load()
@@ -47,7 +50,7 @@ async function handleCreate() {
     <div class="create-content">
       <div class="create-field">
         <label>Page name</label>
-        <InputText v-model="pageName" placeholder="e.g. Contact" class="create-input" />
+        <InputText v-model="pageName" placeholder="e.g. contact or blog/my-post" class="create-input" />
       </div>
 
       <div class="create-field">
