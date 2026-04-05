@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { writeFile, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -37,9 +37,15 @@ export default ({ content, children }) => ({
 
 afterEach(async () => {
   await rm(testDir, { recursive: true, force: true })
+  vi.restoreAllMocks()
 })
 
 describe('resolvePage', () => {
+  beforeEach(() => {
+    // Suppress expected warnings from loadSite when test sites are incomplete
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
   it('resolves a simple page with local components', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
