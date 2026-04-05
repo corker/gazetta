@@ -13,7 +13,7 @@ a:hover { color: #c4b5fd; }
 .site { min-height: 100vh; display: flex; flex-direction: column; }
 ${children.map(c => c.css).join('\n')}`,
   js: children.map(c => c.js).filter(Boolean).join('\n'),
-  head: `<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%237c3aed'/><text x='50' y='72' font-size='70' font-weight='bold' fill='white' text-anchor='middle' font-family='sans-serif'>G</text></svg>">
+  head: `<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%238b5cf6'/><text x='50' y='76' font-size='80' font-weight='800' fill='white' text-anchor='middle' font-family='system-ui,sans-serif'>G</text></svg>">
   ${children.map(c => c.head).filter(Boolean).join('\n  ')}`,
 })
 
