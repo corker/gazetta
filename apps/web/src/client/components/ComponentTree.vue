@@ -33,11 +33,11 @@ async function buildComponentNode(name: string, parentDir: string, index: number
         key: `frag:${fragName}:${index}`,
         label: name,
         icon: 'pi pi-share-alt',
-        data: { isFragment: true, fragName, index },
+        data: { isFragment: true, fragName, index, isTopLevel: true },
         children,
       }
     } catch {
-      return { key: `frag:${fragName}:${index}`, label: name, icon: 'pi pi-share-alt', data: { isFragment: true, index } }
+      return { key: `frag:${fragName}:${index}`, label: name, icon: 'pi pi-share-alt', data: { isFragment: true, index, isTopLevel: true } }
     }
   }
 
@@ -58,8 +58,8 @@ async function buildComponentNode(name: string, parentDir: string, index: number
     key: `comp:${path}:${index}`,
     label: name,
     icon: 'pi pi-box',
-    data: { path, template, isFragment: false, index },
-    children,
+    data: { path, template, isFragment: false, index, isTopLevel: true },
+    children: children.map(c => ({ ...c, data: { ...c.data, isTopLevel: false } })),
   }
 }
 
@@ -81,20 +81,25 @@ function onSelect(node: TreeNode) {
     <h3>{{ title }}</h3>
     <p class="component-template">Template: {{ detail.template }}</p>
 
-    <div v-if="componentNodes.length" class="component-list">
-      <div v-for="(node, index) in componentNodes" :key="node.key" class="component-item">
-        <Tree :value="[node]" v-model:selectionKeys="selectedKey"
-          selectionMode="single" @node-select="onSelect" class="tree" />
-        <div class="component-actions">
-          <Button icon="pi pi-arrow-up" text rounded size="small"
-            :disabled="index === 0" @click="editor.moveComponent(index, -1)" />
-          <Button icon="pi pi-arrow-down" text rounded size="small"
-            :disabled="index === componentCount - 1" @click="editor.moveComponent(index, 1)" />
-          <Button icon="pi pi-trash" text rounded size="small" severity="danger"
-            @click="editor.removeComponent(index)" />
+    <Tree v-if="componentNodes.length" :value="componentNodes" v-model:selectionKeys="selectedKey"
+      selectionMode="single" @node-select="onSelect" class="tree">
+      <template #default="{ node }">
+        <div class="node-row">
+          <span class="node-label">{{ node.label }}</span>
+          <span v-if="node.data?.template" class="node-template">{{ node.data.template }}</span>
+          <span v-if="node.data?.isTopLevel" class="node-actions">
+            <Button icon="pi pi-arrow-up" text rounded size="small"
+              :disabled="node.data.index === 0"
+              @click.stop="editor.moveComponent(node.data.index, -1)" />
+            <Button icon="pi pi-arrow-down" text rounded size="small"
+              :disabled="node.data.index === componentCount - 1"
+              @click.stop="editor.moveComponent(node.data.index, 1)" />
+            <Button icon="pi pi-trash" text rounded size="small" severity="danger"
+              @click.stop="editor.removeComponent(node.data.index)" />
+          </span>
         </div>
-      </div>
-    </div>
+      </template>
+    </Tree>
     <p v-else class="empty">No components</p>
   </div>
 </template>
@@ -103,10 +108,11 @@ function onSelect(node: TreeNode) {
 .component-tree { margin-top: 1.5rem; }
 .component-tree h3 { font-size: 0.75rem; text-transform: uppercase; color: #888; margin-bottom: 0.5rem; letter-spacing: 0.05em; }
 .component-template { font-size: 0.75rem; color: #aaa; margin-bottom: 0.5rem; }
-.component-list { display: flex; flex-direction: column; gap: 0.125rem; }
-.component-item { display: flex; align-items: flex-start; gap: 0.25rem; }
-.component-item .tree { flex: 1; }
-.component-actions { display: flex; flex-direction: column; padding-top: 0.25rem; }
 .tree { font-size: 0.875rem; }
 .empty { font-size: 0.875rem; color: #aaa; }
+.node-row { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
+.node-label { flex: 1; }
+.node-template { font-size: 0.6875rem; color: #666; }
+.node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; }
+.node-row:hover .node-actions { opacity: 1; }
 </style>
