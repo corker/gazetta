@@ -8,7 +8,8 @@
   "workspaces": [
     "packages/*",
     "apps/*",
-    "examples/*"
+    "examples/*",
+    "sites/*"
   ],
   "scripts": {
     "build": "npm run build -w packages/shared && npm run build -w packages/renderer",

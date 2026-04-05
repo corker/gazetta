@@ -1,0 +1,16 @@
+{
+  "name": "@gazetta/website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx ../../packages/cli/src/index.ts dev .",
+    "cms:api": "tsx ../../apps/web/src/server/dev.ts .",
+    "cms:ui": "cd ../../apps/web && npx vite --port 5173"
+  },
+  "devDependencies": {
+    "@gazetta/shared": "*",
+    "@gazetta/renderer": "*",
+    "tsx": "^4.21.0",
+    "zod": "^4.3.6"
+  }
+}

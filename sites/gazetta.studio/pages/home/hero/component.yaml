@@ -1,0 +1,6 @@
+template: hero
+content:
+  title: "The CMS that stores nothing"
+  subtitle: "Gazetta is a stateless CMS where pages are composed from reusable components. No database, no build step. Content lives in targets — S3, Azure Blob, or plain files."
+  cta: "Get Started"
+  ctaHref: "/docs"
