@@ -3,6 +3,7 @@ template: site-layout
 metadata:
   title: "Blog — Gazetta"
   description: "News, tutorials, and updates from the Gazetta team."
+  favicon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>G</text></svg>"
 components:
   - "@header"
   - welcome

@@ -25,13 +25,27 @@ export function renderPage(
   const output = component.template({ content: component.content, children, params: routeParams })
   const title = (metadata?.title as string) ?? 'Gazetta'
   const description = metadata?.description as string | undefined
+  const head = metadata?.head as string | undefined
+  const favicon = metadata?.favicon as string | undefined
+  const ogImage = metadata?.['og:image'] as string | undefined
+  const ogTitle = metadata?.['og:title'] as string | undefined
+
+  const headTags = [
+    description ? `<meta name="description" content="${description}">` : '',
+    ogImage ? `<meta property="og:image" content="${ogImage}">` : '',
+    ogTitle ? `<meta property="og:title" content="${ogTitle}">` : title ? `<meta property="og:title" content="${title}">` : '',
+    description ? `<meta property="og:description" content="${description}">` : '',
+    favicon ? `<link rel="icon" href="${favicon}">` : '',
+    head ?? '',
+  ].filter(Boolean).join('\n  ')
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>${description ? `\n  <meta name="description" content="${description}">` : ''}
+  <title>${title}</title>
+  ${headTags}
   <style>${output.css}</style>
 </head>
 <body>

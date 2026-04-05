@@ -3,6 +3,8 @@ template: site-layout
 metadata:
   title: "Gazetta — Stateless CMS for Composable Websites"
   description: "No database. No build step. Pages composed from reusable components at serve time."
+  favicon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>G</text></svg>"
+  og:title: "Gazetta — The CMS that stores nothing"
 components:
   - "@header"
   - hero
