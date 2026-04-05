@@ -134,3 +134,40 @@ only loads the frameworks it actually needs.
 
 **Rejected:** Bundling deps per-island (duplicates frameworks), global bundle (ships unused JS),
 CDN externals (external dependency).
+
+## 11. JSON Schema for content schemas, @rjsf for form generation
+
+**Decision:** Component content is described by JSON Schema. The CMS auto-generates editor
+forms using @rjsf/core (react-jsonschema-form). Templates can declare schemas in YAML
+(as JSON Schema) or in code (as Zod, converted via zod-to-json-schema).
+
+**Why:** JSON Schema is a standard — validators, form generators, and documentation tools all
+support it. @rjsf has 882K weekly downloads, supports shadcn theming, custom widgets, and
+uiSchema for layout control. Covers 90% of editing needs without custom code.
+
+**Researched alternatives:**
+- @jsonforms/react: powerful renderer system but more boilerplate per custom field
+- @autoform/zod: generates forms from Zod directly, but young (13K downloads)
+- Custom form builder: maximum control but enormous effort
+
+**Rejected:** Custom-only editors (too much work per template), no schema (no validation, no auto-generation).
+
+## 12. Mount function for framework-agnostic custom editors
+
+**Decision:** Custom editors use the single-spa micro-frontend lifecycle pattern:
+`mount(el, { content, onChange })` / `unmount(el)`. Any framework can implement this.
+
+**Why:** Templates can use any framework for rendering — editors should have the same freedom.
+The mount function is the industry standard for framework-agnostic component mounting (proven
+by single-spa). React editors use `createRoot`, Svelte 5 uses `mount()`, Vue 3 uses `createApp`.
+
+**Researched alternatives:**
+- React-only editors: simpler, every CMS does this, but locks template authors to React for editing
+- Web Components: built-in support in Svelte/Vue but not React, Shadow DOM complicates theming
+- iframes: total isolation but poor UX (focus, scrolling, DnD don't cross boundaries)
+
+**Known trade-offs:** CSS can leak between editor and host (mitigate with scoped styles).
+React synthetic events don't bubble to host DOM (use native events for cross-boundary communication).
+HMR is unreliable across frameworks (full remount on change, acceptable).
+
+**Rejected:** React-only (limits template authors), iframes (poor UX), web components (React has no built-in support).

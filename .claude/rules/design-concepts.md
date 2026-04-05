@@ -81,6 +81,43 @@ templates/
 | Developer | Templates | Structure, style, behavior (any framework) |
 | Content author | Components (pages + fragments) | Data, content, ordering |
 
+## Template Exports
+
+A template can export up to three things:
+
+```ts
+// Required: renderer
+export default (params: { content, children?, params? }) => { html, css, js }
+
+// Optional: content schema (Zod → converted to JSON Schema for form generation)
+export const schema = z.object({ title: z.string(), ... })
+
+// Optional: custom editor (mount function — framework-agnostic)
+export const editor = {
+  mount(el: HTMLElement, props: { content, onChange }): void
+  unmount(el: HTMLElement): void
+}
+```
+
+## CMS Editor Model
+
+The CMS auto-generates editor UIs from component schemas using JSON Schema form generation
+(@rjsf). Templates can override with a custom editor via the mount function pattern.
+
+Editor priority:
+1. **Custom editor** — if template exports `editor`, mount it (framework-agnostic)
+2. **Schema-driven form** — if schema exists (Zod export or JSON Schema in YAML), auto-generate form
+3. **Raw YAML editor** — fallback for components with no schema
+
+The mount function contract follows the single-spa micro-frontend pattern:
+- `mount(el, { content, onChange })` — render editor into the provided DOM element
+- `unmount(el)` — clean up (remove listeners, destroy framework instance)
+- Works with React (`createRoot`), Svelte 5 (`mount`), Vue 3 (`createApp`), or vanilla JS
+
+Content schema can be declared in two places:
+- In `component.yaml` as JSON Schema (for content authors)
+- As a Zod `export const schema` in the template (for developers, converted via zod-to-json-schema)
+
 ## Component Rendering Types
 
 Every component has a rendering type that determines where and when it renders:

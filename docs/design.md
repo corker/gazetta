@@ -280,9 +280,28 @@ npm run dev          # starts local Hono server
 | 4 | Islands (client hydration + import maps) |
 | 5 | Storage providers (S3, Azure Blob) |
 | 6 | Edge deployment (Cloudflare Workers, Deno Deploy) |
-| 7 | CMS editor UI |
+| 7 | CMS editor UI (JSON Schema forms + mount function editors) |
 | 8 | Publish/fetch/promote operations |
 | 9 | Bidirectional target sync |
+
+## CMS Editor Model
+
+The CMS generates editor UIs automatically from component schemas:
+
+1. **Schema-driven forms** — components declare a JSON Schema (in YAML or via Zod export).
+   The CMS renders an editor form using @rjsf (react-jsonschema-form) with shadcn theming.
+2. **Custom editors** — templates can export a `mount(el, { content, onChange })` /
+   `unmount(el)` function. Any framework — React, Svelte, Vue, vanilla JS.
+3. **Fallback** — raw YAML editor for components without a schema.
+
+Priority: custom editor > schema-driven form > raw YAML.
+
+```ts
+// Template exports (all optional except default renderer)
+export default (params) => { html, css, js }                    // renderer (required)
+export const schema = z.object({ title: z.string(), ... })      // Zod schema (optional)
+export const editor = { mount(el, props), unmount(el) }         // custom editor (optional)
+```
 
 ## Open Questions
 
