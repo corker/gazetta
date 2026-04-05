@@ -288,18 +288,16 @@ npm run dev          # starts local Hono server
 
 The CMS generates editor UIs automatically from component schemas:
 
-1. **Schema-driven forms** — components declare a JSON Schema (in YAML or via Zod export).
-   The CMS renders an editor form using @rjsf (react-jsonschema-form) with shadcn theming.
+1. **Schema-driven forms** — every template exports a Zod schema. The CMS converts it to
+   JSON Schema and renders an editor form using @rjsf (react-jsonschema-form) with shadcn theming.
 2. **Custom editors** — templates can export a `mount(el, { content, onChange })` /
    `unmount(el)` function. Any framework — React, Svelte, Vue, vanilla JS.
-3. **Fallback** — raw YAML editor for components without a schema.
-
-Priority: custom editor > schema-driven form > raw YAML.
+Priority: custom editor > schema-driven form.
 
 ```ts
 // Template exports (all optional except default renderer)
 export default (params) => { html, css, js }                    // renderer (required)
-export const schema = z.object({ title: z.string(), ... })      // Zod schema (optional)
+export const schema = z.object({ title: z.string(), ... })      // Zod schema (required)
 export const editor = { mount(el, props), unmount(el) }         // custom editor (optional)
 ```
 

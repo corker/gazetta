@@ -137,9 +137,9 @@ CDN externals (external dependency).
 
 ## 11. JSON Schema for content schemas, @rjsf for form generation
 
-**Decision:** Component content is described by JSON Schema. The CMS auto-generates editor
-forms using @rjsf/core (react-jsonschema-form). Templates can declare schemas in YAML
-(as JSON Schema) or in code (as Zod, converted via zod-to-json-schema).
+**Decision:** Every template exports a Zod schema defining its content shape. The CMS converts
+it to JSON Schema (via zod-to-json-schema) and auto-generates editor forms using @rjsf/core
+(react-jsonschema-form).
 
 **Why:** JSON Schema is a standard — validators, form generators, and documentation tools all
 support it. @rjsf has 882K weekly downloads, supports shadcn theming, custom widgets, and
