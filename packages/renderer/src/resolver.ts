@@ -58,7 +58,7 @@ export async function resolveComponent(
     manifest = await parseComponentManifest(storage, manifestPath)
   }
 
-  const template = await loadTemplate(storage, ctx.templatesDir, manifest.template)
+  const loaded = await loadTemplate(storage, ctx.templatesDir, manifest.template)
 
   const children: ResolvedComponent[] = []
   if (manifest.components) {
@@ -70,7 +70,7 @@ export async function resolveComponent(
   ctx.path.pop()
   ctx.visited.delete(key)
 
-  return { template, content: manifest.content, children }
+  return { template: loaded.render, content: manifest.content, children }
 }
 
 export async function resolvePage(pageName: string, site: Site): Promise<ResolvedComponent> {
@@ -86,7 +86,7 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
   const templatesDir = join(site.siteDir, 'templates')
   const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: [pageName] }
 
-  const template = await loadTemplate(site.storage, templatesDir, page.template)
+  const loaded = await loadTemplate(site.storage, templatesDir, page.template)
 
   const children: ResolvedComponent[] = []
   if (page.components) {
@@ -95,5 +95,5 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
     }
   }
 
-  return { template, content: page.content, children }
+  return { template: loaded.render, content: page.content, children }
 }

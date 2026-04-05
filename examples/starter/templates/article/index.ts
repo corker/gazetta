@@ -1,4 +1,11 @@
+import { z } from 'zod'
 import type { TemplateFunction } from '@gazetta/shared'
+
+export const schema = z.object({
+  title: z.string().describe('Article title'),
+  author: z.string().optional().describe('Author name'),
+  body: z.string().describe('Article body'),
+})
 
 const template: TemplateFunction = ({ content = {}, params = {} }) => ({
   html: `<article class="article">

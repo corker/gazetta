@@ -1,12 +1,15 @@
+import { z } from 'zod'
 import type { TemplateFunction } from '@gazetta/shared'
 
-interface NavLink {
-  label: string
-  href: string
-}
+export const schema = z.object({
+  links: z.array(z.object({
+    label: z.string().describe('Link text'),
+    href: z.string().describe('URL'),
+  })).describe('Navigation links'),
+})
 
 const template: TemplateFunction = ({ content = {} }) => {
-  const links = (content.links ?? []) as NavLink[]
+  const links = (content.links ?? []) as Array<{ label: string; href: string }>
   return {
     html: `<nav class="site-nav">${links.map(l => `<a href="${l.href}">${l.label}</a>`).join('\n')}</nav>`,
     css: `.site-nav { display: flex; gap: 1.5rem; }

@@ -1,7 +1,13 @@
 import { join } from 'node:path'
-import type { TemplateFunction, StorageProvider } from '@gazetta/shared'
+import type { TemplateFunction, TemplateModule, StorageProvider } from '@gazetta/shared'
 
-const cache = new Map<string, TemplateFunction>()
+interface LoadedTemplate {
+  render: TemplateFunction
+  schema: unknown
+  editor?: TemplateModule['editor']
+}
+
+const cache = new Map<string, LoadedTemplate>()
 
 const TEMPLATE_FILES = ['index.ts', 'index.tsx']
 
@@ -13,7 +19,7 @@ async function findTemplateFile(storage: StorageProvider, templatesDir: string, 
   return null
 }
 
-export async function loadTemplate(storage: StorageProvider, templatesDir: string, templateName: string): Promise<TemplateFunction> {
+export async function loadTemplate(storage: StorageProvider, templatesDir: string, templateName: string): Promise<LoadedTemplate> {
   const cached = cache.get(templateName)
   if (cached) return cached
 
@@ -34,16 +40,29 @@ export async function loadTemplate(storage: StorageProvider, templatesDir: strin
     )
   }
 
-  const fn = mod.default as TemplateFunction
-  if (typeof fn !== 'function') {
+  const render = mod.default as TemplateFunction
+  if (typeof render !== 'function') {
     throw new Error(
       `Template "${templateName}" at ${templatePath} does not export a default function. ` +
-      `Got ${typeof fn}. Templates must: export default (params) => ({ html, css, js })`
+      `Got ${typeof render}. Templates must: export default (params) => ({ html, css, js })`
     )
   }
 
-  cache.set(templateName, fn)
-  return fn
+  if (!mod.schema) {
+    throw new Error(
+      `Template "${templateName}" at ${templatePath} does not export a schema. ` +
+      `Templates must: export const schema = z.object({ ... })`
+    )
+  }
+
+  const loaded: LoadedTemplate = {
+    render,
+    schema: mod.schema,
+    editor: mod.editor as TemplateModule['editor'],
+  }
+
+  cache.set(templateName, loaded)
+  return loaded
 }
 
 export function invalidateTemplate(templateName: string): void {

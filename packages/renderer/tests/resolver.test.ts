@@ -23,6 +23,8 @@ async function writeTemplate(name: string) {
   const dir = join(testDir, 'templates', name)
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, 'index.ts'), `
+import { z } from 'zod'
+export const schema = z.object({ text: z.string().optional() })
 export default ({ content, children }) => ({
   html: '<div>' + (content?.text ?? '') + (children ?? []).map(c => c.html).join('') + '</div>',
   css: '',

@@ -1,6 +1,13 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { z } from 'zod'
 import type { TemplateFunction } from '@gazetta/shared'
+
+export const schema = z.object({
+  icon: z.string().describe('Emoji icon'),
+  title: z.string().describe('Card title'),
+  description: z.string().describe('Card description'),
+})
 
 interface FeatureCardProps {
   icon: string

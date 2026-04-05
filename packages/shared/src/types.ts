@@ -12,6 +12,19 @@ export type TemplateFunction = (params: {
   params?: Record<string, string>
 }) => RenderOutput
 
+/** Mount function for framework-agnostic custom editors */
+export interface EditorMount {
+  mount(el: HTMLElement, props: { content: Record<string, unknown>; onChange: (content: Record<string, unknown>) => void }): void
+  unmount(el: HTMLElement): void
+}
+
+/** Template module — what a template file exports */
+export interface TemplateModule {
+  default: TemplateFunction
+  schema: unknown // ZodType — kept as unknown to avoid zod dependency in shared
+  editor?: EditorMount
+}
+
 /** Component manifest (base) */
 export interface ComponentManifest {
   template: string

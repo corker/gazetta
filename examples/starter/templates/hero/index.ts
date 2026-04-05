@@ -1,4 +1,10 @@
+import { z } from 'zod'
 import type { TemplateFunction } from '@gazetta/shared'
+
+export const schema = z.object({
+  title: z.string().describe('Title'),
+  subtitle: z.string().optional().describe('Subtitle'),
+})
 
 const template: TemplateFunction = ({ content = {} }) => ({
   html: `<section class="hero">

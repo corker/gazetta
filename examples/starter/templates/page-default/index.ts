@@ -1,4 +1,7 @@
+import { z } from 'zod'
 import type { TemplateFunction } from '@gazetta/shared'
+
+export const schema = z.object({})
 
 const template: TemplateFunction = ({ children = [] }) => ({
   html: `<main>${children.map(c => c.html).join('\n')}</main>`,

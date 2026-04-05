@@ -1,4 +1,10 @@
+import { z } from 'zod'
 import type { TemplateFunction } from '@gazetta/shared'
+
+export const schema = z.object({
+  text: z.string().describe('Logo text'),
+  href: z.string().optional().describe('Link URL'),
+})
 
 const template: TemplateFunction = ({ content = {} }) => ({
   html: content.href

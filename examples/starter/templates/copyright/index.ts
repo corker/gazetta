@@ -1,4 +1,9 @@
+import { z } from 'zod'
 import type { TemplateFunction } from '@gazetta/shared'
+
+export const schema = z.object({
+  text: z.string().describe('Copyright text'),
+})
 
 const template: TemplateFunction = ({ content = {} }) => ({
   html: `<p class="copyright">${content.text ?? ''}</p>`,
