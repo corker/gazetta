@@ -6,5 +6,5 @@ targets:
     path: ./dist/staging
   production:
     type: azure-blob
-    connectionString: "${AZURE_STORAGE_CONNECTION_STRING}"
+    connectionString: "UseDevelopmentStorage=true"
     container: "gazetta-production"

@@ -13,7 +13,7 @@ const storage = createFilesystemProvider()
 
 // Load targets from site.yaml
 const siteYaml = yaml.load(await readFile(join(siteDir, 'site.yaml'), 'utf-8')) as SiteManifest
-const targets = siteYaml.targets ? createTargetRegistry(siteYaml.targets, siteDir) : new Map()
+const targets = siteYaml.targets ? await createTargetRegistry(siteYaml.targets, siteDir) : new Map()
 
 const app = createCmsApp(siteDir, storage, targets)
 

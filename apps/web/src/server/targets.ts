@@ -23,10 +23,15 @@ export function createTargetProvider(config: TargetConfig, siteDir: string): Sto
   }
 }
 
-export function createTargetRegistry(targets: Record<string, TargetConfig>, siteDir: string): Map<string, StorageProvider> {
+export async function createTargetRegistry(targets: Record<string, TargetConfig>, siteDir: string): Promise<Map<string, StorageProvider>> {
   const registry = new Map<string, StorageProvider>()
   for (const [name, config] of Object.entries(targets)) {
-    registry.set(name, createTargetProvider(config, siteDir))
+    const provider = createTargetProvider(config, siteDir)
+    // Initialize providers that need it (e.g., create Azure Blob containers)
+    if ('init' in provider && typeof provider.init === 'function') {
+      await (provider as StorageProvider & { init(): Promise<void> }).init()
+    }
+    registry.set(name, provider)
   }
   return registry
 }
