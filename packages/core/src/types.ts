@@ -44,10 +44,15 @@ export interface PageManifest extends ComponentManifest {
 
 /** Target configuration in site.yaml */
 export interface TargetConfig {
-  type: 'filesystem' | 'azure-blob'
+  type: 'filesystem' | 'azure-blob' | 's3'
   path?: string
   connectionString?: string
   container?: string
+  endpoint?: string
+  bucket?: string
+  accessKeyId?: string
+  secretAccessKey?: string
+  region?: string
 }
 
 /** Site manifest (site.yaml) */

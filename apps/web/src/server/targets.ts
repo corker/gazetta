@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import type { StorageProvider, TargetConfig } from '@gazetta/core'
-import { createFilesystemProvider, createAzureBlobProvider } from '@gazetta/renderer'
+import { createFilesystemProvider, createAzureBlobProvider, createS3Provider } from '@gazetta/renderer'
 
 function resolveEnvVars(value: string | undefined): string | undefined {
   if (!value) return value
@@ -17,6 +17,18 @@ export function createTargetProvider(config: TargetConfig, siteDir: string): Sto
       if (!connectionString) throw new Error('Azure Blob target requires "connectionString"')
       if (!config.container) throw new Error('Azure Blob target requires "container"')
       return createAzureBlobProvider({ connectionString, container: config.container })
+    }
+    case 's3': {
+      const endpoint = resolveEnvVars(config.endpoint)
+      if (!endpoint) throw new Error('S3 target requires "endpoint"')
+      if (!config.bucket) throw new Error('S3 target requires "bucket"')
+      return createS3Provider({
+        endpoint,
+        bucket: config.bucket,
+        accessKeyId: resolveEnvVars(config.accessKeyId) ?? 'minioadmin',
+        secretAccessKey: resolveEnvVars(config.secretAccessKey) ?? 'minioadmin',
+        region: config.region,
+      })
     }
     default:
       throw new Error(`Unknown target type: ${config.type}`)

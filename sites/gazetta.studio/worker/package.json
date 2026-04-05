@@ -1,0 +1,21 @@
+{
+  "name": "@gazetta/website-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --ip 0.0.0.0 --port 8787",
+    "deploy": "wrangler deploy",
+    "seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "@gazetta/core": "*",
+    "@gazetta/renderer": "*",
+    "hono": "^4.12.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250401.0",
+    "wrangler": "^4.14.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.0"
+  }
+}

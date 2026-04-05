@@ -8,3 +8,5 @@ export { scopeHtml, scopeCss, generateScopeId, resetScopeCounter } from './scope
 export { createFilesystemProvider } from './providers/filesystem.js'
 export { createAzureBlobProvider } from './providers/azure-blob.js'
 export type { AzureBlobProviderOptions } from './providers/azure-blob.js'
+export { createS3Provider } from './providers/s3.js'
+export type { S3ProviderOptions } from './providers/s3.js'
