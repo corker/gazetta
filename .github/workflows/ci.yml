@@ -21,8 +21,5 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      - name: Run unit and integration tests
-        run: npx vitest run --exclude '**/publish.test.ts'
-
-      - name: Run publish tests (requires Docker)
-        run: npx vitest run apps/web/tests/publish.test.ts
+      - name: Run all tests
+        run: npx vitest run
