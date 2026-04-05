@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { StorageProvider } from '@gazetta/shared'
+import type { StorageProvider } from '@gazetta/core'
 import { loadSite } from '@gazetta/renderer'
 
 export function siteRoutes(siteDir: string, storage: StorageProvider) {

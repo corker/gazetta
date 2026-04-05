@@ -1,4 +1,4 @@
-import type { RenderOutput, ResolvedComponent } from '@gazetta/shared'
+import type { RenderOutput, ResolvedComponent } from '@gazetta/core'
 import { generateScopeId, scopeHtml, scopeCss, resetScopeCounter } from './scope.js'
 
 export function renderComponent(component: ResolvedComponent, routeParams?: Record<string, string>): RenderOutput {

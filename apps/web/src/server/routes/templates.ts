@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import { z } from 'zod'
-import type { StorageProvider } from '@gazetta/shared'
+import type { StorageProvider } from '@gazetta/core'
 import { loadTemplate } from '@gazetta/renderer'
 
 export function templateRoutes(siteDir: string, storage: StorageProvider) {

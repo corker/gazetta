@@ -5,7 +5,7 @@ Stateless CMS that structures websites as composable fragments. All state lives 
 ## Structure
 
 - `apps/web/` — CMS frontend (stateless editor UI)
-- `packages/shared/` — Shared types and utilities (fragment, page, target models)
+- `packages/core/` — Shared types and utilities (fragment, page, target models)
 - `packages/renderer/` — Hono-based renderer (site loader, resolver, renderer, dev server)
 - `examples/starter/` — Sample site with templates, fragments, pages
 - `docs/design.md` — Human-readable design document

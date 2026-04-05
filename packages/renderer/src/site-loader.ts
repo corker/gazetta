@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { PageManifest, FragmentManifest, SiteManifest, StorageProvider } from '@gazetta/shared'
+import type { PageManifest, FragmentManifest, SiteManifest, StorageProvider } from '@gazetta/core'
 import { parseSiteManifest, parsePageManifest, parseFragmentManifest } from './manifest.js'
 
 export interface Site {

@@ -1,5 +1,5 @@
 import yaml from 'js-yaml'
-import type { ComponentManifest, FragmentManifest, PageManifest, SiteManifest, StorageProvider } from '@gazetta/shared'
+import type { ComponentManifest, FragmentManifest, PageManifest, SiteManifest, StorageProvider } from '@gazetta/core'
 
 function parseYaml(content: string, filePath: string): Record<string, unknown> {
   try {

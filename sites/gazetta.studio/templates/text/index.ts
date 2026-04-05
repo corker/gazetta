@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/shared'
+import type { TemplateFunction } from '@gazetta/core'
 
 export const schema = z.object({
   body: z.string().describe('Text content (HTML allowed)'),

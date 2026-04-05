@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import type { ResolvedComponent, RenderOutput } from '@gazetta/shared'
+import type { ResolvedComponent, RenderOutput } from '@gazetta/core'
 import { renderComponent, renderPage } from '../src/renderer.js'
 import { resetScopeCounter } from '../src/scope.js'
 

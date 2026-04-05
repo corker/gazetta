@@ -90,7 +90,7 @@ A template is a pure function that returns HTML, CSS, and JS:
 
 ```ts
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/shared'
+import type { TemplateFunction } from '@gazetta/core'
 
 export const schema = z.object({
   title: z.string().describe('Title'),

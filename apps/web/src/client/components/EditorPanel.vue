@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useEditorStore } from '../stores/editor.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from '@gazetta/editor-default'
-import type { EditorMount } from '@gazetta/shared'
+import type { EditorMount } from '@gazetta/core'
 
 const editor = useEditorStore()
 const containerRef = ref<HTMLElement | null>(null)

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import yaml from 'js-yaml'
-import type { StorageProvider } from '@gazetta/shared'
+import type { StorageProvider } from '@gazetta/core'
 import { loadSite } from '@gazetta/renderer'
 
 export function pageRoutes(siteDir: string, storage: StorageProvider) {

@@ -53,7 +53,7 @@ mkdir my-site/templates/hero
 ```ts
 // my-site/templates/hero/index.ts
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/shared'
+import type { TemplateFunction } from '@gazetta/core'
 
 export const schema = z.object({
   title: z.string().describe('Heading'),
@@ -96,7 +96,7 @@ mkdir my-site/templates/page-layout
 ```ts
 // my-site/templates/page-layout/index.ts
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/shared'
+import type { TemplateFunction } from '@gazetta/core'
 
 export const schema = z.object({})
 
@@ -164,7 +164,7 @@ mkdir -p my-site/fragments/footer/copyright
 ```ts
 // my-site/templates/footer-layout/index.ts
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/shared'
+import type { TemplateFunction } from '@gazetta/core'
 
 export const schema = z.object({})
 
@@ -186,7 +186,7 @@ mkdir my-site/templates/text
 ```ts
 // my-site/templates/text/index.ts
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/shared'
+import type { TemplateFunction } from '@gazetta/core'
 
 export const schema = z.object({
   text: z.string().describe('Text content'),
@@ -245,7 +245,7 @@ mkdir my-site/templates/card
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/shared'
+import type { TemplateFunction } from '@gazetta/core'
 
 export const schema = z.object({
   title: z.string().describe('Card title'),

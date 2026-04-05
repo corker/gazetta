@@ -1,4 +1,4 @@
-# @gazetta/shared
+# @gazetta/core
 
 Shared TypeScript types for the Gazetta CMS ecosystem.
 

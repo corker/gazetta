@@ -2,7 +2,7 @@ import React from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import Form from '@rjsf/core'
 import validator from '@rjsf/validator-ajv8'
-import type { EditorMount } from '@gazetta/shared'
+import type { EditorMount } from '@gazetta/core'
 import type { IChangeEvent } from '@rjsf/core'
 import type { UiSchema } from '@rjsf/utils'
 

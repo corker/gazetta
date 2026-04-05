@@ -8,7 +8,7 @@
     "cms:ui": "cd ../../apps/web && npx vite --port 5173"
   },
   "devDependencies": {
-    "@gazetta/shared": "*",
+    "@gazetta/core": "*",
     "@gazetta/renderer": "*",
     "tsx": "^4.21.0",
     "zod": "^4.3.6"

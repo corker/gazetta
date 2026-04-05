@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { StorageProvider } from '@gazetta/shared'
+import type { StorageProvider } from '@gazetta/core'
 import { loadSite } from './site-loader.js'
 import { resolvePage } from './resolver.js'
 import { renderPage } from './renderer.js'

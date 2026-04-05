@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import yaml from 'js-yaml'
 import { serve } from '@hono/node-server'
 import { createFilesystemProvider } from '@gazetta/renderer'
-import type { SiteManifest } from '@gazetta/shared'
+import type { SiteManifest } from '@gazetta/core'
 import { createCmsApp } from './index.js'
 import { createTargetRegistry } from './targets.js'
 

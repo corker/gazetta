@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { ResolvedComponent, ComponentManifest } from '@gazetta/shared'
+import type { ResolvedComponent, ComponentManifest } from '@gazetta/core'
 import { parseComponentManifest } from './manifest.js'
 import { loadTemplate } from './template-loader.js'
 import type { Site } from './site-loader.js'

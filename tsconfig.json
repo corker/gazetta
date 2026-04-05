@@ -12,7 +12,7 @@
     "forceConsistentCasingInFileNames": true
   },
   "references": [
-    { "path": "packages/shared" },
+    { "path": "packages/core" },
     { "path": "packages/renderer" },
     { "path": "packages/editor-default" },
     { "path": "packages/cli" }

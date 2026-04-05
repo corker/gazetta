@@ -37,7 +37,7 @@ CMS (stateless web app)  <---->  Targets (state holders)
 |---------|------|---------|
 | web | `apps/web/` | CMS frontend — Vue 3 + PrimeVue shell, editor mounting, preview |
 | renderer | `packages/renderer/` | Hono app — walks component tree, executes templates, composes pages |
-| shared | `packages/shared/` | Shared types: component, fragment, page, target, template models |
+| shared | `packages/core/` | Shared types: component, fragment, page, target, template models |
 
 ## CMS Architecture (apps/web)
 
@@ -76,7 +76,7 @@ Local dev server that proves the core concept:
 
 ```
 packages/renderer/       — Hono app, reads site from filesystem, renders pages
-packages/shared/         — TypeScript types
+packages/core/         — TypeScript types
 examples/starter/        — sample site with templates, fragments, pages
 ```
 

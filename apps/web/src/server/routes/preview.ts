@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { StorageProvider, ResolvedComponent } from '@gazetta/shared'
+import type { StorageProvider, ResolvedComponent } from '@gazetta/core'
 import { loadSite, resolvePage, renderPage } from '@gazetta/renderer'
 
 export function previewRoutes(siteDir: string, storage: StorageProvider) {

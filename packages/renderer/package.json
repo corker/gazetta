@@ -19,7 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@gazetta/shared": "^0.0.1",
+    "@gazetta/core": "^0.0.1",
     "@azure/storage-blob": "^12.31.0",
     "@hono/node-server": "^1.19.0",
     "hono": "^4.12.0",

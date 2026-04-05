@@ -1,6 +1,6 @@
 import { readFile, readdir, writeFile, mkdir, access, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { StorageProvider, DirEntry } from '@gazetta/shared'
+import type { StorageProvider, DirEntry } from '@gazetta/core'
 
 export function createFilesystemProvider(basePath?: string): StorageProvider {
   function resolvePath(path: string): string {

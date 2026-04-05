@@ -13,7 +13,7 @@
   "dependencies": {
     "@gazetta/editor-default": "*",
     "@gazetta/renderer": "*",
-    "@gazetta/shared": "*",
+    "@gazetta/core": "*",
     "@hono/node-server": "^1.19.0",
     "@primevue/themes": "^4.5.0",
     "hono": "^4.12.0",

@@ -18,7 +18,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@gazetta/shared": "^0.0.1",
+    "@gazetta/core": "^0.0.1",
     "@rjsf/core": "^6.4.0",
     "@rjsf/utils": "^6.4.0",
     "@rjsf/validator-ajv8": "^6.4.0",

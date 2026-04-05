@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { TemplateFunction, TemplateModule, StorageProvider } from '@gazetta/shared'
+import type { TemplateFunction, TemplateModule, StorageProvider } from '@gazetta/core'
 
 interface LoadedTemplate {
   render: TemplateFunction

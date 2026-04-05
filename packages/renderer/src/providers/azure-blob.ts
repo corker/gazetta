@@ -1,5 +1,5 @@
 import { BlobServiceClient, type ContainerClient } from '@azure/storage-blob'
-import type { StorageProvider, DirEntry } from '@gazetta/shared'
+import type { StorageProvider, DirEntry } from '@gazetta/core'
 
 export interface AzureBlobProviderOptions {
   connectionString: string
