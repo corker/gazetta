@@ -61,7 +61,7 @@ async function startServer() {
       try {
         const freshSite = await loadSite(siteDir)
         const resolved = await resolvePage(pageName, freshSite)
-        const html = renderPage(resolved, page.metadata)
+        const html = renderPage(resolved, page.metadata, c.req.param())
         return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
       } catch (err) {
         const { message, stack } = formatError(err)

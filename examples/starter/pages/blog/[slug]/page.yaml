@@ -1,0 +1,8 @@
+route: /blog/:slug
+template: page-default
+metadata:
+  title: "Blog Post"
+components:
+  - "@header"
+  - article
+  - "@footer"

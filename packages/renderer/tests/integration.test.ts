@@ -10,10 +10,11 @@ describe('starter site', () => {
   it('loads the site', async () => {
     const site = await loadSite(starterDir)
     expect(site.manifest.name).toBe('Gazetta Starter')
-    expect(site.pages.size).toBe(2)
+    expect(site.pages.size).toBe(3)
     expect(site.fragments.size).toBe(2)
     expect(site.pages.has('home')).toBe(true)
     expect(site.pages.has('about')).toBe(true)
+    expect(site.pages.has('blog/[slug]')).toBe(true)
     expect(site.fragments.has('header')).toBe(true)
     expect(site.fragments.has('footer')).toBe(true)
   })
@@ -88,6 +89,26 @@ describe('starter site', () => {
     // footer is composite with copyright
     const footer = resolved.children[2]
     expect(footer.children).toHaveLength(1)
+  })
+
+  it('discovers nested dynamic route pages', async () => {
+    const site = await loadSite(starterDir)
+    const blogPage = site.pages.get('blog/[slug]')
+    expect(blogPage).toBeDefined()
+    expect(blogPage!.route).toBe('/blog/:slug')
+  })
+
+  it('resolves and renders blog page with route params', async () => {
+    const site = await loadSite(starterDir)
+    const resolved = await resolvePage('blog/[slug]', site)
+    const html = renderPage(resolved, site.pages.get('blog/[slug]')!.metadata, { slug: 'hello-world' })
+
+    expect(html).toContain('<title>Blog Post</title>')
+    expect(html).toContain('Hello from Gazetta')
+    expect(html).toContain('The Gazetta Team')
+    // Shared header/footer fragments work in blog page too
+    expect(html).toContain('Gazetta')
+    expect(html).toContain('© 2026 Gazetta')
   })
 
   it('renders valid HTML document with scoped CSS', async () => {

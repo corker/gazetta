@@ -5,3 +5,5 @@ content:
       href: "/"
     - label: "About"
       href: "/about"
+    - label: "Blog"
+      href: "/blog/hello-world"

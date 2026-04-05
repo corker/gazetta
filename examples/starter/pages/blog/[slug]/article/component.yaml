@@ -1,0 +1,5 @@
+template: article
+content:
+  title: "Hello from Gazetta"
+  author: "The Gazetta Team"
+  body: "This is a blog post rendered with dynamic routes. The slug from the URL is available to templates via route params."

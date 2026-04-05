@@ -19,27 +19,34 @@ async function dirExists(path: string): Promise<boolean> {
   }
 }
 
-async function discoverPages(pagesDir: string): Promise<Map<string, PageManifest & { dir: string }>> {
-  const pages = new Map<string, PageManifest & { dir: string }>()
+async function discoverPages(
+  pagesDir: string,
+  pages: Map<string, PageManifest & { dir: string }> = new Map(),
+  prefix = ''
+): Promise<Map<string, PageManifest & { dir: string }>> {
   if (!await dirExists(pagesDir)) {
-    console.warn(`  Warning: pages/ directory not found at ${pagesDir}`)
+    if (!prefix) console.warn(`  Warning: pages/ directory not found at ${pagesDir}`)
     return pages
   }
 
   const entries = await readdir(pagesDir, { withFileTypes: true })
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    const pageDir = join(pagesDir, entry.name)
-    const manifestPath = join(pageDir, 'page.yaml')
+    const dir = join(pagesDir, entry.name)
+    const name = prefix ? `${prefix}/${entry.name}` : entry.name
+    const manifestPath = join(dir, 'page.yaml')
 
-    if (!await fileExists(manifestPath)) continue
-
-    try {
-      const manifest = await parsePageManifest(manifestPath)
-      pages.set(entry.name, { ...manifest, dir: pageDir })
-    } catch (err) {
-      console.warn(`  Warning: skipping page "${entry.name}": ${(err as Error).message}`)
+    if (await fileExists(manifestPath)) {
+      try {
+        const manifest = await parsePageManifest(manifestPath)
+        pages.set(name, { ...manifest, dir })
+      } catch (err) {
+        console.warn(`  Warning: skipping page "${name}": ${(err as Error).message}`)
+      }
     }
+
+    // Recurse into subdirectories to find nested pages (e.g., blog/[slug])
+    await discoverPages(dir, pages, name)
   }
   return pages
 }

@@ -9,6 +9,7 @@ export interface RenderOutput {
 export type TemplateFunction = (params: {
   content?: Record<string, unknown>
   children?: RenderOutput[]
+  params?: Record<string, string>
 }) => RenderOutput
 
 /** Component manifest (base) */

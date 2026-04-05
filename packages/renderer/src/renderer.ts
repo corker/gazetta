@@ -1,9 +1,9 @@
 import type { RenderOutput, ResolvedComponent } from '@gazetta/shared'
 import { generateScopeId, scopeHtml, scopeCss, resetScopeCounter } from './scope.js'
 
-export function renderComponent(component: ResolvedComponent): RenderOutput {
-  const children = component.children.map(renderComponent)
-  const output = component.template({ content: component.content, children })
+export function renderComponent(component: ResolvedComponent, routeParams?: Record<string, string>): RenderOutput {
+  const children = component.children.map(c => renderComponent(c, routeParams))
+  const output = component.template({ content: component.content, children, params: routeParams })
 
   const scopeId = generateScopeId()
   return {
@@ -13,9 +13,13 @@ export function renderComponent(component: ResolvedComponent): RenderOutput {
   }
 }
 
-export function renderPage(component: ResolvedComponent, metadata?: Record<string, unknown>): string {
+export function renderPage(
+  component: ResolvedComponent,
+  metadata?: Record<string, unknown>,
+  routeParams?: Record<string, string>
+): string {
   resetScopeCounter()
-  const output = renderComponent(component)
+  const output = renderComponent(component, routeParams)
   const title = (metadata?.title as string) ?? 'Gazetta'
   const description = metadata?.description as string | undefined
 

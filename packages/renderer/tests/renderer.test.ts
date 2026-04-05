@@ -89,6 +89,36 @@ describe('renderComponent', () => {
     expect(result.html).toContain('data-gz="gz2"')
   })
 
+  it('passes route params to templates', () => {
+    const component: ResolvedComponent = {
+      template: ({ params }) => ({
+        html: `<h1>${params?.slug ?? 'no slug'}</h1>`,
+        css: '',
+        js: '',
+      }),
+      children: [],
+    }
+    const result = renderComponent(component, { slug: 'hello-world' })
+    expect(result.html).toContain('hello-world')
+  })
+
+  it('passes route params through to children', () => {
+    const child: ResolvedComponent = {
+      template: ({ params }) => ({
+        html: `<span>${params?.id ?? 'no id'}</span>`,
+        css: '',
+        js: '',
+      }),
+      children: [],
+    }
+    const parent = composite(
+      (children) => ({ html: children.map(c => c.html).join(''), css: '', js: '' }),
+      [child]
+    )
+    const result = renderComponent(parent, { id: '42' })
+    expect(result.html).toContain('42')
+  })
+
   it('renders nested composites (3 levels deep)', () => {
     const grandchild = leaf('<em>deep</em>')
     const child = composite(
