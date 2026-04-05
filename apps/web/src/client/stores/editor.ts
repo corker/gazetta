@@ -1,3 +1,5 @@
+function deepClone<T>(obj: T): T { return JSON.parse(JSON.stringify(obj)) }
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api, type PageDetail, type FragmentDetail } from '../api/client.js'
@@ -67,7 +69,7 @@ export const useEditorStore = defineStore('editor', () => {
     const comp = await api.getComponent(path)
     const content = (comp.content as Record<string, unknown>) ?? {}
     componentContent.value = content
-    savedContent.value = structuredClone(content)
+    savedContent.value = deepClone(content)
     templateSchema.value = await api.getTemplateSchema(template)
   }
 
@@ -78,7 +80,7 @@ export const useEditorStore = defineStore('editor', () => {
     lastSaveSuccess.value = false
     try {
       await api.updateComponent(selectedComponentPath.value, { content: componentContent.value })
-      savedContent.value = structuredClone(componentContent.value)
+      savedContent.value = deepClone(componentContent.value)
       dirty.value = false
       lastSaveSuccess.value = true
       setTimeout(() => { lastSaveSuccess.value = false }, 3000)
@@ -91,7 +93,7 @@ export const useEditorStore = defineStore('editor', () => {
 
   function discardChanges() {
     if (savedContent.value) {
-      componentContent.value = structuredClone(savedContent.value)
+      componentContent.value = deepClone(savedContent.value)
       dirty.value = false
     }
   }
