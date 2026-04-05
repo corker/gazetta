@@ -13,7 +13,7 @@ const template: TemplateFunction = ({ content = {} }) => ({
   <h3>${content.title ?? ''}</h3>
   <p>${content.description ?? ''}</p>
 </div>`,
-  css: `.fcard { padding: 1.5rem; background: #18181b; border: 1px solid #27272a; border-radius: 12px; }
+  css: `.fcard { padding: 1.5rem; background: #18181b; border: 1px solid #27272a; border-radius: 12px; height: 100%; display: flex; flex-direction: column; }
 .fcard-icon { font-size: 1.5rem; display: block; margin-bottom: 0.75rem; }
 .fcard h3 { font-size: 1rem; font-weight: 600; color: #e4e4e7; margin-bottom: 0.5rem; }
 .fcard p { font-size: 0.875rem; color: #71717a; line-height: 1.6; }`,
