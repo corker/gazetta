@@ -99,7 +99,18 @@ export async function publishPageRendered(
   ].filter(Boolean).join('\n  ')
 
   const bodyContent = bodyParts.join('\n')
-  const jsTag = localJsParts.length ? `\n<script type="module">${localJsParts.join('\n')}</script>` : ''
+
+  // Write page JS as hashed file (if any)
+  const pageJs = localJsParts.join('\n')
+  let pageJsTag = ''
+  if (pageJs) {
+    const hash = contentHash(pageJs)
+    const jsPath = `${pageDir}/script.${hash}.js`
+    await targetStorage.mkdir(pageDir)
+    await targetStorage.writeFile(jsPath, pageJs)
+    pageJsTag = `\n<script type="module" src="/${jsPath}"></script>`
+    fileCount++
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -107,7 +118,7 @@ export async function publishPageRendered(
   ${headContent}
 </head>
 <body>
-${bodyContent}${jsTag}
+${bodyContent}${pageJsTag}
 </body>
 </html>`
 
