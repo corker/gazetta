@@ -41,8 +41,10 @@ export async function publishPageRendered(
       head: rendered.head,
     }
 
-    await targetStorage.mkdir('components')
-    await targetStorage.writeFile(`components/${key}.json`, JSON.stringify(json))
+    const componentPath = `components/${key}.json`
+    const parentDir = componentPath.split('/').slice(0, -1).join('/')
+    await targetStorage.mkdir(parentDir)
+    await targetStorage.writeFile(componentPath, JSON.stringify(json))
     componentKeys.push(key)
     fileCount++
   }

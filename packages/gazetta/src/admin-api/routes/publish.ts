@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies } from '../../publish.js'
 import type { PublishResult } from '../../publish.js'
+import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createWorkerPurge } from '../../publish-rendered.js'
 
 export function publishRoutes(
   siteDir: string,
@@ -11,7 +12,7 @@ export function publishRoutes(
 ) {
   const app = new Hono()
 
-  // Background target initialization — starts immediately, doesn't block startup
+  // Background target initialization
   let targets: Map<string, StorageProvider> | null = preInitTargets ?? null
   const initPromise: Promise<Map<string, StorageProvider>> = preInitTargets
     ? Promise.resolve(preInitTargets)
@@ -23,7 +24,6 @@ export function publishRoutes(
           return targets
         })()
 
-  // If no pre-init targets, start background init and store result when done
   if (!preInitTargets) {
     initPromise.then(t => { targets = t }).catch(() => { targets = new Map() })
   }
@@ -31,6 +31,10 @@ export function publishRoutes(
   async function getTargets(): Promise<Map<string, StorageProvider>> {
     if (targets) return targets
     return initPromise
+  }
+
+  function getTargetConfig(name: string): TargetConfig | undefined {
+    return targetConfigs?.[name]
   }
 
   app.get('/api/targets', async (c) => {
@@ -49,18 +53,51 @@ export function publishRoutes(
       if (!t.has(name)) return c.json({ error: `Unknown target: ${name}` }, 400)
     }
 
+    // Resolve all dependencies (templates, fragments referenced by pages)
     const allItems = await resolveDependencies(sourceStorage, siteDir, body.items)
-    console.log(`  Publishing ${allItems.length} items to ${body.targets.length} target(s):`)
-    console.log(`    Items: ${allItems.join(', ')}`)
+
+    console.log(`  Publishing to ${body.targets.length} target(s):`)
+    console.log(`    Items: ${body.items.join(', ')} (+ ${allItems.length - body.items.length} dependencies)`)
     console.log(`    Targets: ${body.targets.join(', ')}`)
 
     const results: PublishResult[] = []
     for (const targetName of body.targets) {
       const targetStorage = t.get(targetName)!
       try {
+        let totalFiles = 0
+
+        // 1. Copy source files (YAML, templates) — target is a full copy
         const { copiedFiles } = await publishItems(sourceStorage, siteDir, targetStorage, '', allItems)
-        results.push({ target: targetName, success: true, copiedFiles })
-        console.log(`    ${targetName}: ${copiedFiles} files copied`)
+        totalFiles += copiedFiles
+
+        // 2. Pre-render pages and fragments → JSON for edge composition
+        for (const item of body.items) {
+          if (item.startsWith('pages/')) {
+            const pageName = item.replace('pages/', '')
+            const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage)
+            totalFiles += files
+          } else if (item.startsWith('fragments/')) {
+            const fragName = item.replace('fragments/', '')
+            const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage)
+            totalFiles += files
+          }
+        }
+
+        // 3. Site manifest + fragment index
+        await publishSiteManifest(sourceStorage, siteDir, targetStorage)
+        await publishFragmentIndex(sourceStorage, siteDir, targetStorage)
+        totalFiles += 2
+
+        // 4. Purge edge cache if worker URL configured
+        const config = getTargetConfig(targetName)
+        if (config?.workerUrl) {
+          const purge = createWorkerPurge(config.workerUrl)
+          await purge.purgeAll()
+          console.log(`    ${targetName}: cache purged`)
+        }
+
+        results.push({ target: targetName, success: true, copiedFiles: totalFiles })
+        console.log(`    ${targetName}: ${totalFiles} files`)
       } catch (err) {
         const error = (err as Error).message
         results.push({ target: targetName, success: false, error, copiedFiles: 0 })
