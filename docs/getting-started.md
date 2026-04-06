@@ -145,7 +145,7 @@ content:
 ## 5. Run the Dev Server
 
 ```bash
-npx tsx packages/renderer/src/dev.ts my-site
+npx tsx packages/cli/src/index.ts dev my-site
 ```
 
 Open http://localhost:3000 — you should see your page.
@@ -315,7 +315,7 @@ Every template file must export:
 
 | Export | Required | Type |
 |--------|----------|------|
-| `default` | Yes | `(params: { content?, children?, params? }) => { html, css, js }` |
+| `default` | Yes | `(params: { content?, children?, params? }) => { html, css, js, head? }` |
 | `schema` | Yes | Zod schema (e.g., `z.object({ title: z.string() })`) |
 | `editor` | No | `{ mount(el, { content, onChange }), unmount(el) }` |
 

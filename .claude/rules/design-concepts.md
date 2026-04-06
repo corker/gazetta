@@ -54,12 +54,16 @@ A template is an independent script with its own dependencies. Developers choose
 Every template must conform to the same contract:
 
 ```ts
-export default (params: { content, children? }) => {
+export default (params: { content, children?, params? }) => {
   html: string,
   css: string,
-  js: string
+  js: string,
+  head?: string
 }
 ```
+
+The `head` field allows any component to contribute to the HTML `<head>` — favicons,
+fonts, meta tags, external scripts. The renderer collects `head` from all components.
 
 Each template is a self-contained package:
 
@@ -87,7 +91,7 @@ A template can export up to three things:
 
 ```ts
 // Required: renderer
-export default (params: { content, children?, params? }) => { html, css, js }
+export default (params: { content, children?, params? }) => { html, css, js, head? }
 
 // Required: content schema (Zod → converted to JSON Schema for CMS form generation)
 export const schema = z.object({ title: z.string(), ... })

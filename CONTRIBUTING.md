@@ -18,14 +18,17 @@ npm test             # run all tests
 
 ```
 packages/
-  shared/           TypeScript types (Component, Fragment, Page, StorageProvider)
+  core/             TypeScript types (Component, Fragment, Page, StorageProvider)
   renderer/         Hono-based renderer (site loader, resolver, CSS scoping)
   editor-default/   Default editor (@rjsf form wrapped in mount function)
   cli/              CLI tool (gazetta dev)
+  mcp-dev/          MCP dev server (screenshot tool for Claude Code)
 apps/
   web/              CMS frontend (Vue 3 + PrimeVue) + backend API (Hono)
 examples/
   starter/          Sample site with templates, fragments, and pages
+sites/
+  gazetta.studio/   The gazetta.studio website (dogfooding)
 ```
 
 ## Development Workflow

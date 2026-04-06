@@ -37,7 +37,10 @@ CMS (stateless web app)  <---->  Targets (state holders)
 |---------|------|---------|
 | web | `apps/web/` | CMS frontend — Vue 3 + PrimeVue shell, editor mounting, preview |
 | renderer | `packages/renderer/` | Hono app — walks component tree, executes templates, composes pages |
-| shared | `packages/core/` | Shared types: component, fragment, page, target, template models |
+| core | `packages/core/` | TypeScript types: component, fragment, page, target, template models |
+| editor-default | `packages/editor-default/` | Default editor — @rjsf form wrapped in mount function |
+| cli | `packages/cli/` | CLI tool (gazetta dev) |
+| mcp-dev | `packages/mcp-dev/` | MCP dev server (screenshot tool for Claude Code) |
 
 ## CMS Architecture (apps/web)
 
@@ -70,20 +73,19 @@ API layer (Hono):
 - `GET /api/templates/:name/schema` — get template's JSON Schema
 - `GET /api/preview/:route` — render page preview
 
-## MVP (Phase 1)
+## Storage Providers
 
-Local dev server that proves the core concept:
+| Provider | Package | Use case |
+|----------|---------|----------|
+| Filesystem | `packages/renderer/` | Local dev, filesystem targets |
+| Azure Blob | `packages/renderer/` | Azure storage targets |
+| S3 | `packages/renderer/` | AWS S3, Cloudflare R2, MinIO |
 
-```
-packages/renderer/       — Hono app, reads site from filesystem, renders pages
-packages/core/         — TypeScript types
-examples/starter/        — sample site with templates, fragments, pages
-```
+## Publishing
 
-- Plain TS templates only (React/Svelte/Vue later)
-- Filesystem storage only (S3/Azure Blob later)
-- Static components only (dynamic SSR + islands later)
-- `npm run dev` → local server with hot reload
+Two modes:
+- **Raw publish** — copies files between storage providers (for dev/backup)
+- **Rendered publish** — SSR's components at publish time, stores pre-rendered JSON in S3. Worker assembles pages from pre-rendered components at request time.
 
 ## Dependency direction
 

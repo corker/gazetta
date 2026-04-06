@@ -67,11 +67,11 @@ components:
 
 ### Template
 
-An independent script created by developers: `(params) => { html, css, js }`.
+An independent script created by developers: `(params) => { html, css, js, head? }`.
 Returns only what the browser understands — no custom abstractions.
 
 Each template is a self-contained package with its own dependencies. Developers choose the
-framework — React, Svelte, Vue, plain TS, anything that can SSR to `{ html, css, js }`.
+framework — React, Svelte, Vue, plain TS, anything that can SSR to `{ html, css, js, head? }`.
 
 ```
 templates/
@@ -271,18 +271,26 @@ npm run dev          # starts local Hono server
 - Templates as pure functions work
 - Filesystem-based site structure works
 
-### What comes after
+### What's been built
 
-| Phase | Adds |
-|-------|------|
-| 2 | React/Svelte/Vue templates (pre-built with Vite) |
-| 3 | Dynamic components (SSR at request time) |
-| 4 | Islands (client hydration + import maps) |
-| 5 | Storage providers (S3, Azure Blob) |
-| 6 | Edge deployment (Cloudflare Workers, Deno Deploy) |
-| 7 | CMS editor UI (JSON Schema forms + mount function editors) |
-| 8 | Publish/fetch/promote operations |
-| 9 | Bidirectional target sync |
+| Feature | Status |
+|---------|--------|
+| React templates (multi-framework SSR) | Done |
+| Storage providers (Filesystem, Azure Blob, S3) | Done |
+| CMS editor UI (Vue + PrimeVue, schema-driven forms) | Done |
+| Publish/fetch between targets | Done |
+| Rendered publish (SSR at publish time, assembly at serve time) | Done |
+| Edge caching with purge strategies | Done |
+| CLI tool (`gazetta dev`) | Done |
+
+### What's next
+
+| Feature | Status |
+|---------|--------|
+| Deploy to Cloudflare Workers + R2 | Planned |
+| Dynamic components (SSR at request time) | Planned |
+| Islands (client hydration + import maps) | Planned |
+| Compare targets (diff before publishing) | Planned |
 
 ## CMS Editor Model
 
@@ -296,7 +304,7 @@ Priority: custom editor > schema-driven form.
 
 ```ts
 // Template exports (all optional except default renderer)
-export default (params) => { html, css, js }                    // renderer (required)
+export default (params) => { html, css, js, head? }                    // renderer (required)
 export const schema = z.object({ title: z.string(), ... })      // Zod schema (required)
 export const editor = { mount(el, props), unmount(el) }         // custom editor (optional)
 ```
