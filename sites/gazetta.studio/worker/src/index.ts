@@ -45,6 +45,16 @@ app.post('/purge/urls', async (c) => {
   return c.json({ purged })
 })
 
+// ---- www redirect ----
+
+app.use('*', async (c, next) => {
+  const url = new URL(c.req.url)
+  if (url.hostname === 'www.gazetta.studio') {
+    return c.redirect(`https://gazetta.studio${url.pathname}`, 301)
+  }
+  return next()
+})
+
 // ---- Page serving ----
 
 app.get('*', async (c) => {
