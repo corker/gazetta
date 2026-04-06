@@ -2,7 +2,7 @@
 
 import { resolve, join } from 'node:path'
 import { watch, existsSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
@@ -20,7 +20,7 @@ function printHelp() {
   gazetta - Stateless CMS for composable websites
 
   Usage:
-    gazetta dev [site-dir]    Start dev server with CMS at /admin
+    gazetta dev [site-dir]    Start dev server + CMS at /admin
     gazetta help              Show this help message
 
   Options:
@@ -48,8 +48,6 @@ function parseArgs(input: string[]): { siteDir: string; port?: number } {
 
 async function runDev(siteDir: string, port: number) {
   const storage = createFilesystemProvider()
-  const cmsApiPort = port + 100
-  const cmsUiPort = port + 101
 
   console.log(`\n  Loading site from ${siteDir}...`)
   const site = await loadSite(siteDir, storage)
@@ -75,80 +73,6 @@ async function runDev(siteDir: string, port: number) {
     })
   })
 
-  // ---- Proxy /api/* and /preview/* to CMS API server ----
-  app.all('/api/*', async (c) => {
-    try {
-      const url = new URL(c.req.url)
-      url.port = String(cmsApiPort)
-      const res = await fetch(url.toString(), {
-        method: c.req.method,
-        headers: c.req.raw.headers,
-        body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
-        // @ts-expect-error duplex needed for streaming body
-        duplex: 'half',
-      })
-      return new Response(res.body, { status: res.status, headers: res.headers })
-    } catch {
-      return c.json({ error: 'CMS API not ready' }, 502)
-    }
-  })
-
-  app.all('/preview/*', async (c) => {
-    try {
-      const url = new URL(c.req.url)
-      url.port = String(cmsApiPort)
-      const res = await fetch(url.toString(), {
-        method: c.req.method,
-        headers: c.req.raw.headers,
-        body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
-        // @ts-expect-error duplex needed for streaming body
-        duplex: 'half',
-      })
-      return new Response(res.body, { status: res.status, headers: res.headers })
-    } catch {
-      return c.text('Preview not ready', 502)
-    }
-  })
-
-  // ---- Proxy /admin to Vite dev server ----
-  app.all('/admin', async (c) => {
-    try {
-      const res = await fetch(`http://localhost:${cmsUiPort}/`)
-      return new Response(res.body, { status: res.status, headers: res.headers })
-    } catch {
-      return c.html('<p>CMS UI loading... <a href="/admin">refresh</a></p>')
-    }
-  })
-
-  app.all('/admin/*', async (c) => {
-    try {
-      const path = new URL(c.req.url).pathname.replace('/admin', '') || '/'
-      const res = await fetch(`http://localhost:${cmsUiPort}${path}`)
-      return new Response(res.body, { status: res.status, headers: res.headers })
-    } catch {
-      // Fall through to Vite's SPA routing
-      try {
-        const res = await fetch(`http://localhost:${cmsUiPort}/`)
-        return new Response(res.body, { status: res.status, headers: res.headers })
-      } catch {
-        return c.html('<p>CMS UI loading... <a href="/admin">refresh</a></p>')
-      }
-    }
-  })
-
-  // ---- Proxy Vite assets (/@vite, /src, /node_modules) ----
-  for (const prefix of ['/@vite', '/@fs', '/@id', '/src/client', '/node_modules']) {
-    app.all(`${prefix}/*`, async (c) => {
-      try {
-        const path = new URL(c.req.url).pathname
-        const res = await fetch(`http://localhost:${cmsUiPort}${path}`)
-        return new Response(res.body, { status: res.status, headers: res.headers })
-      } catch {
-        return c.text('Not ready', 502)
-      }
-    })
-  }
-
   // ---- Site page routes ----
   for (const [pageName, page] of site.pages) {
     app.get(page.route, async (c) => {
@@ -163,47 +87,109 @@ async function runDev(siteDir: string, port: number) {
     })
   }
 
+  // ---- CMS API proxy (/admin/api/*, /admin/preview/*) ----
+  const apiPort = port + 100
+
+  for (const prefix of ['/admin/api', '/admin/preview']) {
+    app.all(`${prefix}/*`, async (c) => {
+      try {
+        const path = new URL(c.req.url).pathname.replace('/admin', '')
+        const targetUrl = `http://localhost:${apiPort}${path}`
+        const res = await fetch(targetUrl, {
+          method: c.req.method,
+          headers: c.req.raw.headers,
+          body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
+          // @ts-expect-error duplex needed for streaming body
+          duplex: 'half',
+        })
+        return new Response(res.body, { status: res.status, headers: res.headers })
+      } catch {
+        return c.json({ error: 'CMS API not ready' }, 502)
+      }
+    })
+  }
+
   // ---- 404 ----
   app.notFound((c) => {
     const routes = [...site.pages.entries()].map(([n, p]) => `  ${p.route} → ${n}`).join('\n')
     return c.html(`<pre style="padding:2rem">Page not found: ${c.req.path}\n\nAvailable:\n${routes}\n  /admin → CMS editor</pre>`, 404)
   })
 
-  // ---- Start CMS API server (hidden port) ----
+  // ---- Start CMS API (hidden port) ----
+  let apiProc: ChildProcess | null = null
   const cmsWebDir = findCmsDir()
+
   if (cmsWebDir) {
-    const apiProc = spawn('npx', ['tsx', join(cmsWebDir, 'src/server/dev.ts'), siteDir], {
-      env: { ...process.env, API_PORT: String(cmsApiPort) },
+    apiProc = spawn('npx', ['tsx', join(cmsWebDir, 'src/server/dev.ts'), siteDir], {
+      env: { ...process.env, API_PORT: String(apiPort) },
       stdio: 'pipe',
     })
     apiProc.stderr?.on('data', (d: Buffer) => {
       const msg = d.toString().trim()
       if (msg) console.error(`  [cms-api] ${msg}`)
     })
-
-    // Start Vite for CMS UI (hidden port)
-    const viteProc = spawn('npx', ['vite', '--port', String(cmsUiPort), '--strictPort'], {
-      cwd: cmsWebDir,
-      env: { ...process.env, VITE_PORT: String(cmsUiPort), VITE_HMR_PORT: String(cmsUiPort), API_PORT: String(cmsApiPort) },
-      stdio: 'pipe',
-    })
-    viteProc.stderr?.on('data', (d: Buffer) => {
-      const msg = d.toString().trim()
-      if (msg && !msg.includes('VITE')) console.error(`  [cms-ui] ${msg}`)
-    })
-
-    process.on('exit', () => { apiProc.kill(); viteProc.kill() })
-    process.on('SIGINT', () => { apiProc.kill(); viteProc.kill(); process.exit(0) })
   }
 
-  // ---- Start main server ----
-  serve({ fetch: app.fetch, port }, () => {
+  // ---- Start Node server with Vite middleware ----
+  const nodeServer = serve({ fetch: app.fetch, port }, async () => {
     console.log(`\n  Gazetta running at http://localhost:${port}\n`)
     console.log(`  Site: ${site.manifest.name}`)
     console.log(`  Pages:`)
     for (const [name, page] of site.pages) console.log(`    ${page.route} → ${name}`)
-    if (cmsWebDir) console.log(`  CMS:  http://localhost:${port}/admin`)
+    console.log(`  Fragments: ${[...site.fragments.keys()].join(', ') || '(none)'}`)
+
+    // Mount Vite middleware for /admin after server starts
+    if (cmsWebDir) {
+      try {
+        const { createServer: createViteServer } = await import('vite')
+
+        const vite = await createViteServer({
+          configFile: join(cmsWebDir, 'vite.config.ts'),
+          root: cmsWebDir,
+          base: '/admin/',
+          server: {
+            middlewareMode: true,
+            hmr: { server: nodeServer as unknown as import('node:http').Server },
+          },
+        })
+
+        // Attach Vite middleware to the Node server for /admin paths
+        const httpServer = nodeServer as unknown as import('node:http').Server
+        const originalListeners = httpServer.listeners('request').slice()
+        httpServer.removeAllListeners('request')
+
+        const honoHandler = (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
+          for (const listener of originalListeners) {
+            (listener as (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void)(req, res)
+          }
+        }
+
+        httpServer.on('request', (req, res) => {
+          const url = req.url ?? ''
+          // API and preview routes go to Hono (which proxies to CMS API)
+          if (url.startsWith('/admin/api') || url.startsWith('/admin/preview')) {
+            honoHandler(req, res)
+          // Vite handles CMS UI and its assets
+          } else if (url.startsWith('/admin') || url.startsWith('/@')) {
+            vite.middlewares(req, res, () => honoHandler(req, res))
+          // Everything else (site pages) goes to Hono
+          } else {
+            honoHandler(req, res)
+          }
+        })
+
+        console.log(`  CMS:  http://localhost:${port}/admin`)
+      } catch (err) {
+        console.warn(`  Warning: CMS UI failed to start: ${(err as Error).message}`)
+      }
+    }
     console.log()
+  })
+
+  // ---- Cleanup ----
+  process.on('SIGINT', () => {
+    apiProc?.kill()
+    process.exit(0)
   })
 
   // ---- File watching ----

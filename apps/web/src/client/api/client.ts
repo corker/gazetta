@@ -1,4 +1,5 @@
-const BASE = '/api'
+// API is relative to the CMS base path: /admin/api, /cms/api, or /api
+const BASE = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') + '/api'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem('gazetta_token')

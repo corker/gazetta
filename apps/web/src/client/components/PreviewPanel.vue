@@ -7,9 +7,10 @@ const previewHtml = ref<string | null>(null)
 const loading = ref(false)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
+const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
 const previewPath = computed(() => {
   if (!editor.previewRoute) return null
-  return `/preview${editor.previewRoute}`
+  return `${basePath}/preview${editor.previewRoute}`
 })
 
 // Fetch preview HTML (GET for saved state, POST for draft state)
