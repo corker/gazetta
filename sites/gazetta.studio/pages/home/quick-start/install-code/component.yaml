@@ -1,10 +1,21 @@
-template: code-block
+template: terminal
 content:
-  language: bash
-  code: |-
-    npx gazetta init my-site
-    cd my-site
-    npm install
-    npx gazetta dev
-    # → http://localhost:3000 (site)
-    # → http://localhost:3000/admin (CMS editor)
+  title: "~/projects"
+  lines:
+    - command: "npx gazetta init my-site"
+      delay: 300
+    - output: "  Created site in /projects/my-site"
+      delay: 400
+    - command: "cd my-site && npm install"
+      delay: 500
+    - output: "  added 42 packages in 3s"
+      delay: 800
+    - command: "npx gazetta dev"
+      delay: 500
+    - output: "  Gazetta running at http://localhost:3000"
+      delay: 300
+    - output: ""
+    - output: "  Site: my-site"
+    - output: "  Pages:"
+    - output: "    / → home"
+    - output: "  CMS:  http://localhost:3000/admin"
