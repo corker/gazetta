@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Hono } from 'hono'
-import { createFilesystemProvider } from '@gazetta/renderer'
+import { createFilesystemProvider } from 'gazetta'
 import { createCmsApp } from '../src/server/index.js'
 
 const starterDir = resolve(import.meta.dirname, '../../../examples/starter')

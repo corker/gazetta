@@ -12,8 +12,8 @@
     "sites/*"
   ],
   "scripts": {
-    "build": "npm run build -w packages/core && npm run build -w packages/renderer",
-    "dev": "npm run build -w packages/core && npm run dev -w examples/starter",
+    "build": "npm run build -w packages/gazetta",
+    "dev": "npm run build && npm run dev -w examples/starter",
     "dev:cms": "npm run build && npm run dev:api -w apps/web & npm run dev:ui -w apps/web",
     "test": "npm run test --workspaces --if-present"
   },

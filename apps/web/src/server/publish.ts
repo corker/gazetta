@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { StorageProvider } from '@gazetta/core'
+import type { StorageProvider } from 'gazetta'
 
 export interface PublishRequest {
   source: string

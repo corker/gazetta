@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { createS3Provider } from '@gazetta/renderer'
-import type { StorageProvider } from '@gazetta/core'
+import { createS3Provider } from 'gazetta'
+import type { StorageProvider } from 'gazetta'
 
 interface Env {
   S3_ENDPOINT: string

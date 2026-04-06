@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import type { StorageProvider } from '@gazetta/core'
-import { loadSite } from '@gazetta/renderer'
+import type { StorageProvider } from 'gazetta'
+import { loadSite } from 'gazetta'
 
 export function siteRoutes(siteDir: string, storage: StorageProvider) {
   const app = new Hono()

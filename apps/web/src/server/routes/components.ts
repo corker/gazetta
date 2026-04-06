@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import yaml from 'js-yaml'
-import type { StorageProvider } from '@gazetta/core'
+import type { StorageProvider } from 'gazetta'
 
 export function componentRoutes(siteDir: string, storage: StorageProvider) {
   const app = new Hono()

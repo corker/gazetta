@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/core'
+import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
   rows: z.array(z.object({

@@ -1,0 +1,60 @@
+{
+  "name": "gazetta",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist/"
+  ],
+  "bin": {
+    "gazetta": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@rjsf/core": "^6.4.0",
+    "@rjsf/utils": "^6.4.0",
+    "@rjsf/validator-ajv8": "^6.4.0",
+    "hono": "^4.12.0",
+    "js-yaml": "^4.1.0",
+    "postcss": "^8.5.8",
+    "postcss-prefix-selector": "^2.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "peerDependencies": {
+    "@aws-sdk/client-s3": ">=3",
+    "@azure/storage-blob": ">=12"
+  },
+  "peerDependenciesMeta": {
+    "@aws-sdk/client-s3": {
+      "optional": true
+    },
+    "@azure/storage-blob": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1024.0",
+    "@azure/storage-blob": "^12.31.0",
+    "@types/js-yaml": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.0"
+  }
+}

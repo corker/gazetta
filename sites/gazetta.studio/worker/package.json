@@ -8,9 +8,8 @@
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {
-    "@gazetta/core": "*",
-    "@gazetta/renderer": "*",
-    "hono": "^4.12.0"
+    "hono": "^4.12.0",
+    "gazetta": "*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250401.0",

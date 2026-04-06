@@ -2,10 +2,10 @@ import { resolve, join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import yaml from 'js-yaml'
 import { serve } from '@hono/node-server'
-import { createFilesystemProvider } from '@gazetta/renderer'
-import type { SiteManifest } from '@gazetta/core'
+import { createFilesystemProvider } from 'gazetta'
+import type { SiteManifest } from 'gazetta'
 import { createCmsApp } from './index.js'
-import { createTargetRegistry } from '@gazetta/renderer'
+import { createTargetRegistry } from 'gazetta'
 
 const siteDir = resolve(process.argv[2] ?? '../../examples/starter')
 const port = parseInt(process.env.API_PORT ?? '4000', 10)

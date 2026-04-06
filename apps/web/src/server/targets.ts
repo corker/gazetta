@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
-import type { StorageProvider, TargetConfig } from '@gazetta/core'
-import { createFilesystemProvider, createAzureBlobProvider, createS3Provider } from '@gazetta/renderer'
+import type { StorageProvider, TargetConfig } from 'gazetta'
+import { createFilesystemProvider, createAzureBlobProvider, createS3Provider } from 'gazetta'
 
 function resolveEnvVars(value: string | undefined): string | undefined {
   if (!value) return value

@@ -1,7 +1,7 @@
 import { join } from 'node:path'
-import type { StorageProvider, RenderOutput } from '@gazetta/core'
-import { loadSite, resolvePage, renderComponent, resetScopeCounter } from '@gazetta/renderer'
-import type { Site } from '@gazetta/renderer'
+import type { StorageProvider, RenderOutput } from 'gazetta'
+import { loadSite, resolvePage, renderComponent, resetScopeCounter } from 'gazetta'
+import type { Site } from 'gazetta'
 
 /** Published page manifest — stored in S3 as pages/<name>.json */
 export interface PublishedPageManifest {

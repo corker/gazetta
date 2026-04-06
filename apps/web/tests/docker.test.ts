@@ -5,8 +5,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { resolve } from 'node:path'
 import { DockerComposeEnvironment, type StartedDockerComposeEnvironment } from 'testcontainers'
-import { createFilesystemProvider, createS3Provider, createAzureBlobProvider } from '@gazetta/renderer'
-import { publishItems, resolveDependencies } from '@gazetta/renderer'
+import { createFilesystemProvider, createS3Provider, createAzureBlobProvider } from 'gazetta'
+import { publishItems, resolveDependencies } from 'gazetta'
 import {
   publishPageRendered,
   publishFragmentRendered,
@@ -14,7 +14,7 @@ import {
   publishFragmentIndex,
   type PublishedPageManifest,
   type PublishedComponent,
-} from '@gazetta/renderer'
+} from 'gazetta'
 
 const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
 const composeDir = resolve(import.meta.dirname, '../../..')
