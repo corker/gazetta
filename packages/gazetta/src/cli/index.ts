@@ -1,19 +1,16 @@
 #!/usr/bin/env node
 
 import { resolve, join } from 'node:path'
-import { readFile } from 'node:fs/promises'
-import { watch } from 'node:fs'
+import { watch, existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import yaml from 'js-yaml'
 import {
   loadSite, resolvePage, renderPage,
-  createFilesystemProvider, createTargetRegistry,
+  createFilesystemProvider,
   invalidateTemplate, invalidateAllTemplates,
 } from '../index.js'
-import type { SiteManifest, StorageProvider } from '../types.js'
 
 const args = process.argv.slice(2)
 const command = args[0]
@@ -173,7 +170,7 @@ async function runDev(siteDir: string, port: number) {
   })
 
   // ---- Start CMS API server (hidden port) ----
-  const cmsWebDir = await findCmsDir()
+  const cmsWebDir = findCmsDir()
   if (cmsWebDir) {
     const apiProc = spawn('npx', ['tsx', join(cmsWebDir, 'src/server/dev.ts'), siteDir], {
       env: { ...process.env, API_PORT: String(cmsApiPort) },
@@ -187,7 +184,7 @@ async function runDev(siteDir: string, port: number) {
     // Start Vite for CMS UI (hidden port)
     const viteProc = spawn('npx', ['vite', '--port', String(cmsUiPort), '--strictPort'], {
       cwd: cmsWebDir,
-      env: { ...process.env, VITE_PORT: String(cmsUiPort), API_PORT: String(cmsApiPort) },
+      env: { ...process.env, VITE_PORT: String(cmsUiPort), VITE_HMR_PORT: String(cmsUiPort), API_PORT: String(cmsApiPort) },
       stdio: 'pipe',
     })
     viteProc.stderr?.on('data', (d: Buffer) => {
@@ -227,16 +224,14 @@ async function runDev(siteDir: string, port: number) {
   })
 }
 
-async function findCmsDir(): Promise<string | null> {
-  const { access } = await import('node:fs/promises')
-  const exists = async (p: string) => { try { await access(p); return true } catch { return false } }
+function findCmsDir(): string | null {
   const candidates = [
-    resolve('apps/web'),                                     // cwd-relative (monorepo root)
-    resolve(import.meta.dirname, '../../../../apps/web'),    // relative to CLI source
+    resolve('apps/web'),
+    resolve(import.meta.dirname, '../../../../apps/web'),
     resolve(import.meta.dirname, '../../../apps/web'),
   ]
   for (const dir of candidates) {
-    if (await exists(join(dir, 'src/server/dev.ts'))) return dir
+    if (existsSync(join(dir, 'src/server/dev.ts'))) return dir
   }
   return null
 }
