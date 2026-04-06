@@ -138,27 +138,41 @@ async function assembleEsi(bucket: R2Bucket, html: string): Promise<string> {
     fragments.set(path, parsed)
   }
 
-  // Collect and deduplicate head content from all esi-head tags
-  const headLines = new Set<string>()
+  // Collect CSS and JS separately from fragment heads, deduplicate each
+  const cssLinks = new Set<string>()
+  const jsScripts = new Set<string>()
+  const otherHead = new Set<string>()
+
   for (const path of fragmentPaths) {
     const frag = fragments.get(path)
-    if (frag?.head) {
-      for (const line of frag.head.split('\n').map(l => l.trim()).filter(Boolean)) {
-        headLines.add(line)
+    if (!frag?.head) continue
+    for (const line of frag.head.split('\n').map(l => l.trim()).filter(Boolean)) {
+      if (line.includes('rel="stylesheet"') || line.includes("rel='stylesheet'")) {
+        cssLinks.add(line)
+      } else if (line.startsWith('<script')) {
+        jsScripts.add(line)
+      } else {
+        otherHead.add(line)
       }
     }
   }
 
-  // Replace first esi-head tag with collected heads, remove the rest
-  let headInserted = false
-  const collectedHead = [...headLines].join('\n  ')
+  // Replace first esi-head with CSS, remove the rest — JS goes before </head>
+  const collectedCss = [...otherHead, ...cssLinks].join('\n  ')
+  const collectedJs = [...jsScripts].join('\n  ')
+  let cssInserted = false
   html = html.replace(esiHeadRegex, () => {
-    if (!headInserted && collectedHead) {
-      headInserted = true
-      return collectedHead
+    if (!cssInserted && collectedCss) {
+      cssInserted = true
+      return collectedCss
     }
     return ''
   })
+
+  // Insert JS before </head> (after all CSS)
+  if (collectedJs) {
+    html = html.replace('</head>', `  ${collectedJs}\n</head>`)
+  }
 
   // Replace esi body tags with fragment body content
   html = html.replace(esiBodyRegex, (_match, path: string) => {
