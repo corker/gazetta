@@ -1,5 +1,5 @@
 import { watch, onBeforeUnmount, type Ref } from 'vue'
-import type { EditorMount } from 'gazetta'
+import type { EditorMount } from 'gazetta/types'
 
 export function useEditorMount(
   containerRef: Ref<HTMLElement | null>,

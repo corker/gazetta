@@ -140,7 +140,7 @@ async function runDev(siteDir: string, port: number) {
   })
 
   // ---- Proxy Vite assets (/@vite, /src, /node_modules) ----
-  for (const prefix of ['/@vite', '/@fs', '/src/client', '/node_modules']) {
+  for (const prefix of ['/@vite', '/@fs', '/@id', '/src/client', '/node_modules']) {
     app.all(`${prefix}/*`, async (c) => {
       try {
         const path = new URL(c.req.url).pathname
@@ -187,7 +187,7 @@ async function runDev(siteDir: string, port: number) {
     // Start Vite for CMS UI (hidden port)
     const viteProc = spawn('npx', ['vite', '--port', String(cmsUiPort), '--strictPort'], {
       cwd: cmsWebDir,
-      env: { ...process.env },
+      env: { ...process.env, VITE_PORT: String(cmsUiPort), API_PORT: String(cmsApiPort) },
       stdio: 'pipe',
     })
     viteProc.stderr?.on('data', (d: Buffer) => {

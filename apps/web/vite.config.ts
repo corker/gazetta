@@ -6,8 +6,8 @@ export default defineConfig({
   root: '.',
   server: {
     proxy: {
-      '/api': 'http://localhost:4000',
-      '/preview': 'http://localhost:4000',
+      '/api': `http://localhost:${process.env.API_PORT ?? '4000'}`,
+      '/preview': `http://localhost:${process.env.API_PORT ?? '4000'}`,
     },
   },
 })

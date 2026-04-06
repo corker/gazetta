@@ -2,8 +2,8 @@
 import { ref, computed } from 'vue'
 import { useEditorStore } from '../stores/editor.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
-import { createEditorMount } from 'gazetta'
-import type { EditorMount } from 'gazetta'
+import { createEditorMount } from 'gazetta/editor'
+import type { EditorMount } from 'gazetta/types'
 
 const editor = useEditorStore()
 const containerRef = ref<HTMLElement | null>(null)
