@@ -185,10 +185,13 @@ describe('renderPage', () => {
   })
 
   it('resets scope counter between pages', () => {
-    const page = leaf('<p></p>', '.p {}')
+    const page = composite(
+      (children) => ({ html: children.map(c => c.html).join(''), css: children.map(c => c.css).join(''), js: '' }),
+      [leaf('<p>child</p>', '.p {}')]
+    )
     renderPage(page)
     const html = renderPage(page)
-    // After reset, scope should start from gz0 again
+    // After reset, child scope should start from gz0 again
     expect(html).toContain('data-gz="gz0"')
   })
 })
