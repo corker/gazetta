@@ -120,11 +120,50 @@ const template: TemplateFunction = ({ content = {} }) => ({
 export default template
 `,
 
+    'templates/nav/index.ts': `import { z } from 'zod'
+import type { TemplateFunction } from 'gazetta'
+
+export const schema = z.object({
+  brand: z.string().describe('Site name'),
+  links: z.array(z.object({
+    label: z.string(),
+    href: z.string(),
+  })).describe('Navigation links'),
+})
+
+const template: TemplateFunction = ({ content = {} }) => {
+  const links = (content.links ?? []) as Array<{ label: string; href: string }>
+  return {
+    html: \`<nav class="nav">
+  <a class="nav-brand" href="/">\${content.brand ?? ''}</a>
+  <div class="nav-links">\${links.map(l => \`<a href="\${l.href}">\${l.label}</a>\`).join('\\n    ')}</div>
+</nav>\`,
+    css: \`.nav { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid #eee; }
+.nav-brand { font-weight: 700; font-size: 1.125rem; text-decoration: none; color: #1a1a1a; }
+.nav-links { display: flex; gap: 1.5rem; }
+.nav-links a { text-decoration: none; color: #555; font-size: 0.875rem; }
+.nav-links a:hover { color: #1a1a1a; }\`,
+    js: '',
+  }
+}
+
+export default template
+`,
+
+    'fragments/header/fragment.yaml': `template: nav
+content:
+  brand: ${name}
+  links:
+    - label: Home
+      href: /
+`,
+
     'pages/home/page.yaml': `route: /
 template: page-layout
 metadata:
   title: ${name}
 components:
+  - "@header"
   - hero
   - intro
 `,
@@ -139,8 +178,6 @@ content:
 content:
   body: "<p>Edit this content in the CMS at <a href='/admin'>/admin</a>.</p>"
 `,
-
-    'fragments/.gitkeep': '',
 
     'package.json': JSON.stringify({
       name,
