@@ -1,13 +1,7 @@
 import { Hono } from 'hono'
-import { createS3Provider } from 'gazetta'
-import type { StorageProvider } from 'gazetta'
 
 interface Env {
-  S3_ENDPOINT: string
-  S3_BUCKET: string
-  S3_ACCESS_KEY_ID: string
-  S3_SECRET_ACCESS_KEY: string
-  S3_REGION?: string
+  SITE_BUCKET: R2Bucket
   PURGE_TOKEN?: string
 }
 
@@ -24,144 +18,111 @@ interface RenderedComponent {
   head?: string
 }
 
-// In-memory cache for Node.js (local dev). On Cloudflare, use Cache API instead.
-const memoryCache = new Map<string, { html: string; cachedAt: number }>()
-const CACHE_TTL = 86400 * 1000 // 24 hours in ms
-
-function getEnv(c: { env: Env }): Record<string, string> {
-  try {
-    const g = globalThis as Record<string, unknown>
-    if (g['process'] && typeof (g['process'] as Record<string, unknown>).env === 'object') {
-      return { ...(g['process'] as { env: Record<string, string> }).env, ...c.env } as Record<string, string>
-    }
-  } catch { /* Workers runtime — no process */ }
-  return c.env as unknown as Record<string, string>
-}
-
-function getStorage(env: Record<string, string>): StorageProvider {
-  return createS3Provider({
-    endpoint: env.S3_ENDPOINT ?? 'http://localhost:9000',
-    bucket: env.S3_BUCKET ?? 'gazetta-rendered',
-    accessKeyId: env.S3_ACCESS_KEY_ID ?? 'minioadmin',
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY ?? 'minioadmin',
-    region: env.S3_REGION ?? 'us-east-1',
-  })
-}
+// In-memory cache — Workers have per-isolate memory, cleared on deploy
+const cache = new Map<string, { html: string; at: number }>()
+const TTL = 86400_000 // 24h
 
 const app = new Hono<{ Bindings: Env }>()
 
 // ---- Purge endpoints ----
 
-// Purge all cached pages
 app.post('/purge/all', async (c) => {
-  const env = getEnv(c)
-  const token = c.req.header('Authorization')?.replace('Bearer ', '')
-  if (env.PURGE_TOKEN && token !== env.PURGE_TOKEN) {
+  if (c.env.PURGE_TOKEN && c.req.header('Authorization')?.replace('Bearer ', '') !== c.env.PURGE_TOKEN) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-
-  memoryCache.clear()
-  return c.json({ purged: 'all', count: memoryCache.size })
+  cache.clear()
+  return c.json({ purged: 'all' })
 })
 
-// Purge specific URLs (for page publish or pro-tier fragment publish)
 app.post('/purge/urls', async (c) => {
-  const env = getEnv(c)
-  const token = c.req.header('Authorization')?.replace('Bearer ', '')
-  if (env.PURGE_TOKEN && token !== env.PURGE_TOKEN) {
+  if (c.env.PURGE_TOKEN && c.req.header('Authorization')?.replace('Bearer ', '') !== c.env.PURGE_TOKEN) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-
-  const body = await c.req.json() as { urls: string[] }
-  if (!body.urls?.length) return c.json({ error: 'No URLs provided' }, 400)
-
+  const { urls } = await c.req.json() as { urls: string[] }
+  if (!urls?.length) return c.json({ error: 'No URLs' }, 400)
   let purged = 0
-  for (const url of body.urls) {
-    if (memoryCache.delete(url)) purged++
-  }
-  return c.json({ purged, total: body.urls.length })
+  for (const url of urls) { if (cache.delete(url)) purged++ }
+  return c.json({ purged })
 })
 
-// ---- Page serving with cache ----
+// ---- Page serving ----
 
 app.get('*', async (c) => {
-  const requestPath = new URL(c.req.url).pathname
+  const path = new URL(c.req.url).pathname
 
   // Check cache
-  const cached = memoryCache.get(requestPath)
-  if (cached && Date.now() - cached.cachedAt < CACHE_TTL) {
-    return c.html(cached.html, 200, {
-      'Cache-Control': 'public, s-maxage=86400',
-      'X-Cache': 'HIT',
-    })
+  const hit = cache.get(path)
+  if (hit && Date.now() - hit.at < TTL) {
+    return c.html(hit.html, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'HIT' })
   }
 
-  // Cache miss — assemble from S3
-  const env = getEnv(c)
-  const storage = getStorage(env)
-
-  const html = await assemblePage(storage, requestPath)
+  // Assemble from R2
+  const html = await assemblePage(c.env.SITE_BUCKET, path)
   if (!html) return c.html('<h1>404 — Page not found</h1>', 404)
 
-  // Cache the assembled page
-  memoryCache.set(requestPath, { html, cachedAt: Date.now() })
-
-  return c.html(html, 200, {
-    'Cache-Control': 'public, s-maxage=86400',
-    'X-Cache': 'MISS',
-  })
+  cache.set(path, { html, at: Date.now() })
+  return c.html(html, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'MISS' })
 })
 
-async function assemblePage(storage: StorageProvider, requestPath: string): Promise<string | null> {
-  let pageEntries: Array<{ name: string }>
-  try {
-    pageEntries = await storage.readDir('pages')
-  } catch {
-    return null
-  }
+async function r2Read(bucket: R2Bucket, key: string): Promise<string | null> {
+  const obj = await bucket.get(key)
+  return obj ? await obj.text() : null
+}
 
-  for (const entry of pageEntries) {
-    if (!entry.name.endsWith('.json') || entry.name.endsWith('.layout.json')) continue
-    const pageName = entry.name.replace('.json', '')
+async function r2List(bucket: R2Bucket, prefix: string): Promise<string[]> {
+  const listed = await bucket.list({ prefix })
+  return listed.objects.map(o => o.key)
+}
+
+async function assemblePage(bucket: R2Bucket, requestPath: string): Promise<string | null> {
+  const pageKeys = await r2List(bucket, 'pages/')
+  const manifests = pageKeys.filter(k => k.endsWith('.json') && !k.endsWith('.layout.json'))
+
+  for (const key of manifests) {
+    const raw = await r2Read(bucket, key)
+    if (!raw) continue
 
     let manifest: PageManifest
-    try {
-      manifest = JSON.parse(await storage.readFile(`pages/${entry.name}`))
-    } catch { continue }
+    try { manifest = JSON.parse(raw) } catch { continue }
 
     const params = matchRoute(manifest.route, requestPath)
     if (!params) continue
 
-    try {
-      const components: RenderedComponent[] = []
-      for (const key of manifest.components) {
-        const json = await storage.readFile(`components/${key}.json`)
-        components.push(JSON.parse(json))
-      }
+    const pageName = key.replace('pages/', '').replace('.json', '')
 
-      let layoutCss = ''
-      let layoutHead = ''
-      try {
-        const layout = JSON.parse(await storage.readFile(`pages/${pageName}.layout.json`))
-        layoutCss = layout.css ?? ''
-        layoutHead = layout.head ?? ''
-      } catch { /* layout optional */ }
+    // Fetch all components
+    const components: RenderedComponent[] = []
+    for (const compKey of manifest.components) {
+      const json = await r2Read(bucket, `components/${compKey}.json`)
+      if (!json) return null
+      components.push(JSON.parse(json))
+    }
 
-      const title = (manifest.metadata?.title as string) ?? 'Gazetta'
-      const description = manifest.metadata?.description as string | undefined
+    // Fetch layout (optional)
+    let layoutCss = ''
+    let layoutHead = ''
+    const layoutJson = await r2Read(bucket, `pages/${pageName}.layout.json`)
+    if (layoutJson) {
+      const layout = JSON.parse(layoutJson)
+      layoutCss = layout.css ?? ''
+      layoutHead = layout.head ?? ''
+    }
 
-      const allHtml = components.map(c => c.html).join('\n')
-      const allCss = [layoutCss, ...components.map(c => c.css)].filter(Boolean).join('\n')
-      const allJs = components.map(c => c.js).filter(Boolean).join('\n')
-      const allHead = [layoutHead, ...components.map(c => c.head).filter(Boolean)].join('\n  ')
+    const title = (manifest.metadata?.title as string) ?? 'Gazetta'
+    const description = manifest.metadata?.description as string | undefined
 
-      const metaHead = [
-        description ? `<meta name="description" content="${description}">` : '',
-        title ? `<meta property="og:title" content="${title}">` : '',
-        description ? `<meta property="og:description" content="${description}">` : '',
-      ].filter(Boolean).join('\n  ')
+    const allHtml = components.map(c => c.html).join('\n')
+    const allCss = [layoutCss, ...components.map(c => c.css)].filter(Boolean).join('\n')
+    const allJs = components.map(c => c.js).filter(Boolean).join('\n')
+    const allHead = [layoutHead, ...components.map(c => c.head).filter(Boolean)].join('\n  ')
 
-      return `<!DOCTYPE html>
+    const metaHead = [
+      description ? `<meta name="description" content="${description}">` : '',
+      title ? `<meta property="og:title" content="${title}">` : '',
+      description ? `<meta property="og:description" content="${description}">` : '',
+    ].filter(Boolean).join('\n  ')
+
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -175,9 +136,6 @@ async function assemblePage(storage: StorageProvider, requestPath: string): Prom
 ${allHtml}${allJs ? `\n<script type="module">${allJs}</script>` : ''}
 </body>
 </html>`
-    } catch {
-      return null
-    }
   }
 
   return null

@@ -3,6 +3,8 @@ dist/
 admin-dist/
 *.tsbuildinfo
 .tmp/
+.wrangler/
+.seed-output/
 .env
 .env.*
 .claude/settings.local.json
