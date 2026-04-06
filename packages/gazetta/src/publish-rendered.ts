@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type { StorageProvider, PurgeStrategy } from './types.js'
 import { loadSite } from './site-loader.js'
-import type { Site } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent } from './renderer.js'
 import { resetScopeCounter } from './scope.js'
@@ -106,9 +105,10 @@ export async function publishPageRendered(
     `<title>${title}</title>`,
     metaTags,
     ...localHeadParts,
+    // CSS first, then ESI heads (fragment CSS + JS), then page JS
     pageCssLink,
-    pageJsLink,
     ...esiHeadTags,
+    pageJsLink,
   ].filter(Boolean).join('\n  ')
 
   const bodyContent = bodyParts.join('\n')
