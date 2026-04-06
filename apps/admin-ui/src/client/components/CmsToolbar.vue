@@ -4,11 +4,13 @@ import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
 import { useEditorStore } from '../stores/editor.js'
+import { useThemeStore } from '../stores/theme.js'
 import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
 
 const site = useSiteStore()
 const editor = useEditorStore()
+const theme = useThemeStore()
 const showPublish = ref(false)
 const showFetch = ref(false)
 
@@ -40,14 +42,16 @@ const canPublish = computed(() => editor.selectionName && !editor.dirty)
       </Transition>
     </template>
     <template #end>
+      <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
+        data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
       <Button v-if="editor.dirty" label="Discard" icon="pi pi-undo" severity="secondary" text
-        @click="editor.discardChanges()" size="small" class="cms-btn" />
+        data-testid="discard-btn" @click="editor.discardChanges()" size="small" class="cms-btn" />
       <Button label="Save" icon="pi pi-save" severity="primary" :loading="editor.saving"
-        :disabled="!editor.dirty" @click="editor.saveComponent()" size="small" class="cms-btn" />
+        data-testid="save-btn" :disabled="!editor.dirty" @click="editor.saveComponent()" size="small" class="cms-btn" />
       <Button label="Fetch" icon="pi pi-cloud-download" severity="info"
-        @click="showFetch = true" size="small" class="cms-btn" />
+        data-testid="fetch-btn" @click="showFetch = true" size="small" class="cms-btn" />
       <Button label="Publish" icon="pi pi-cloud-upload" severity="success"
-        :disabled="!canPublish" @click="showPublish = true" size="small" class="cms-btn" />
+        data-testid="publish-btn" :disabled="!canPublish" @click="showPublish = true" size="small" class="cms-btn" />
     </template>
   </Toolbar>
 

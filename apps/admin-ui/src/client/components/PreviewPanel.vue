@@ -53,12 +53,12 @@ watch(() => editor.draftVersion, debouncedFetchPreview)
 </script>
 
 <template>
-  <div class="preview-panel">
-    <div v-if="!previewPath" class="preview-empty">
+  <div class="preview-panel" data-testid="preview-panel">
+    <div v-if="!previewPath" class="preview-empty" data-testid="preview-empty">
       <i class="pi pi-eye" style="font-size: 2rem; color: #ddd; margin-bottom: 0.5rem;" />
       <p>Select a page to preview</p>
     </div>
-    <iframe v-else :srcdoc="previewHtml ?? ''" class="preview-iframe" />
+    <iframe v-else :srcdoc="previewHtml ?? ''" class="preview-iframe" data-testid="preview-iframe" />
   </div>
 </template>
 

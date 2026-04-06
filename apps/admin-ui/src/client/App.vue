@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useSiteStore } from './stores/site.js'
+import { useThemeStore } from './stores/theme.js'
 import Toolbar from './components/CmsToolbar.vue'
 
 const site = useSiteStore()
-onMounted(() => site.load())
+const theme = useThemeStore()
+onMounted(() => {
+  site.load()
+  theme.init()
+})
 </script>
 
 <template>
@@ -19,7 +24,8 @@ onMounted(() => site.load())
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #app, .cms-app { height: 100%; }
-body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; }
+body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; background: #fff; }
+.dark body { color: #e4e4e7; background: #09090b; }
 .cms-error { padding: 2rem; color: #c00; }
 .cms-loading { padding: 2rem; color: #666; }
 </style>

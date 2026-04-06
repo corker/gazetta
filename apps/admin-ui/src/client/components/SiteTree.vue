@@ -12,6 +12,7 @@ import CreateFragmentDialog from './CreateFragmentDialog.vue'
 const site = useSiteStore()
 const editor = useEditorStore()
 const selectedKey = ref<Record<string, boolean>>({})
+const expandedKeys = ref<Record<string, boolean>>({ pages: true, fragments: true })
 const showCreatePage = ref(false)
 const showCreateFragment = ref(false)
 
@@ -69,21 +70,22 @@ async function handleDelete(node: TreeNode) {
 <template>
   <div class="site-tree">
     <h3>Site</h3>
-    <Tree :value="nodes" v-model:selectionKeys="selectedKey" selectionMode="single"
-      @node-select="onSelect" class="tree">
+    <Tree :value="nodes" v-model:selectionKeys="selectedKey" v-model:expandedKeys="expandedKeys"
+      selectionMode="single" @node-select="onSelect" class="tree">
       <template #default="{ node }">
-        <div class="node-row">
+        <div class="node-row" :data-testid="node.data ? `site-${node.data.type}-${node.data.name}` : `site-group-${node.key}`">
           <span class="node-label">{{ node.label }}</span>
           <Button v-if="node.data" icon="pi pi-trash" text rounded size="small" severity="danger"
-            class="node-delete" @click.stop="handleDelete(node)" />
+            class="node-delete" :data-testid="`delete-${node.data.type}-${node.data.name}`"
+            @click.stop="handleDelete(node)" />
         </div>
       </template>
     </Tree>
     <div class="new-btns">
       <Button icon="pi pi-plus" label="New page" text size="small"
-        @click="showCreatePage = true" />
+        data-testid="new-page" @click="showCreatePage = true" />
       <Button icon="pi pi-plus" label="New fragment" text size="small"
-        @click="showCreateFragment = true" />
+        data-testid="new-fragment" @click="showCreateFragment = true" />
     </div>
     <CreatePageDialog v-if="showCreatePage" :visible="showCreatePage"
       @close="showCreatePage = false" />

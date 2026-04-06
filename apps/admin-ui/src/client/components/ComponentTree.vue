@@ -72,8 +72,17 @@ watch(detail, async (d) => {
   )
 }, { immediate: true })
 
+const expandedKeys = ref<Record<string, boolean>>({})
+
 function onSelect(node: TreeNode) {
-  if (!node.data || node.data.isFragment || !node.data.path || !node.data.template) return
+  if (!node.data) return
+  // Fragments have no editor form — toggle expand instead
+  if (node.data.isFragment) {
+    const key = node.key as string
+    expandedKeys.value = { ...expandedKeys.value, [key]: !expandedKeys.value[key] }
+    return
+  }
+  if (!node.data.path || !node.data.template) return
   editor.selectComponent(node.data.path, node.data.template)
 }
 </script>
@@ -84,19 +93,23 @@ function onSelect(node: TreeNode) {
     <p class="component-template">Template: {{ detail.template }}</p>
 
     <Tree v-if="componentNodes.length" :value="componentNodes" v-model:selectionKeys="selectedKey"
+      v-model:expandedKeys="expandedKeys"
       selectionMode="single" @node-select="onSelect" class="tree">
       <template #default="{ node }">
-        <div class="node-row">
+        <div class="node-row" :data-testid="`component-${node.data?.isFragment ? node.data.fragName : node.label}`">
           <span class="node-label">{{ node.label }}</span>
           <span v-if="node.data?.template" class="node-template">{{ node.data.template }}</span>
           <span v-if="node.data?.isTopLevel" class="node-actions">
             <Button icon="pi pi-arrow-up" text rounded size="small"
+              :data-testid="`move-up-${node.label}`"
               :disabled="node.data.index === 0"
               @click.stop="editor.moveComponent(node.data.index, -1)" />
             <Button icon="pi pi-arrow-down" text rounded size="small"
+              :data-testid="`move-down-${node.label}`"
               :disabled="node.data.index === componentCount - 1"
               @click.stop="editor.moveComponent(node.data.index, 1)" />
             <Button icon="pi pi-trash" text rounded size="small" severity="danger"
+              :data-testid="`remove-${node.label}`"
               @click.stop="editor.removeComponent(node.data.index)" />
           </span>
         </div>
@@ -105,7 +118,7 @@ function onSelect(node: TreeNode) {
     <p v-else class="empty">No components</p>
 
     <Button icon="pi pi-plus" label="Add component" text size="small" class="add-btn"
-      @click="showAddDialog = true" />
+      data-testid="add-component" @click="showAddDialog = true" />
 
     <AddComponentDialog v-if="showAddDialog" :visible="showAddDialog"
       @close="showAddDialog = false" />

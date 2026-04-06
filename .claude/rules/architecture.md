@@ -19,11 +19,11 @@ Component (base)
 
 ```
 CMS (stateless web app)  <---->  Targets (state holders)
-  apps/web/                        Storage + Hono runtime
+  apps/admin-ui/                   Storage + Hono runtime
         \                          /
          \                        /
           +-- Renderer (Hono) ---+
-              packages/renderer/
+              packages/gazetta/
 ```
 
 - CMS is a web editor UI with no persistent storage
@@ -35,14 +35,11 @@ CMS (stateless web app)  <---->  Targets (state holders)
 
 | Package | Path | Purpose |
 |---------|------|---------|
-| web | `apps/web/` | CMS frontend — Vue 3 + PrimeVue shell, editor mounting, preview |
-| renderer | `packages/renderer/` | Hono app — walks component tree, executes templates, composes pages |
-| core | `packages/core/` | TypeScript types: component, fragment, page, target, template models |
-| editor-default | `packages/editor-default/` | Default editor — @rjsf form wrapped in mount function |
-| cli | `packages/cli/` | CLI tool (gazetta dev) |
+| admin-ui | `apps/admin-ui/` | Admin frontend — Vue 3 + PrimeVue shell, editor mounting, preview |
+| gazetta | `packages/gazetta/` | Core — renderer, CLI, admin API, editor, storage providers, types |
 | mcp-dev | `packages/mcp-dev/` | MCP dev server (screenshot tool for Claude Code) |
 
-## CMS Architecture (apps/web)
+## Admin UI Architecture (apps/admin-ui)
 
 The CMS is a shell that manages layout, navigation, and editor mounting.
 Built with Vue 3 + Vite + PrimeVue (Tree, Splitter, Drawer, Toolbar).
@@ -77,9 +74,9 @@ API layer (Hono):
 
 | Provider | Package | Use case |
 |----------|---------|----------|
-| Filesystem | `packages/renderer/` | Local dev, filesystem targets |
-| Azure Blob | `packages/renderer/` | Azure storage targets |
-| S3 | `packages/renderer/` | AWS S3, Cloudflare R2, MinIO |
+| Filesystem | `packages/gazetta/` | Local dev, filesystem targets |
+| Azure Blob | `packages/gazetta/` | Azure storage targets |
+| S3 | `packages/gazetta/` | AWS S3, Cloudflare R2, MinIO |
 
 ## Publishing
 

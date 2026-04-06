@@ -23,14 +23,14 @@ useEditorMount(containerRef, editorMountRef, contentRef, handleChange)
 </script>
 
 <template>
-  <div class="editor-panel">
-    <div v-if="!editor.selectedComponentPath" class="editor-empty">
+  <div class="editor-panel" data-testid="editor-panel">
+    <div v-if="!editor.selectedComponentPath" class="editor-empty" data-testid="editor-empty">
       <i class="pi pi-pencil" style="font-size: 2rem; color: #ddd; margin-bottom: 0.5rem;" />
       <p>Select a component to edit</p>
     </div>
     <div v-else>
       <h3>{{ editor.componentTemplate }}</h3>
-      <div ref="containerRef" class="editor-container" :key="editor.selectedComponentPath" />
+      <div ref="containerRef" class="editor-container" data-testid="editor-container" :key="editor.selectedComponentPath" />
     </div>
   </div>
 </template>

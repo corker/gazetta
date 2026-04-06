@@ -14,7 +14,7 @@
   "scripts": {
     "build": "npm run build -w packages/gazetta",
     "dev": "npm run build && npm run dev -w examples/starter",
-    "dev:cms": "npm run build && npm run dev:api -w apps/web & npm run dev:ui -w apps/web",
+    "dev:admin": "npm run build && npm run dev:api -w @gazetta/admin-ui & npm run dev:ui -w @gazetta/admin-ui",
     "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
