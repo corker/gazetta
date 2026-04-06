@@ -93,8 +93,9 @@ async function runDev(siteDir: string, port: number) {
   for (const prefix of ['/admin/api', '/admin/preview']) {
     app.all(`${prefix}/*`, async (c) => {
       try {
-        const path = new URL(c.req.url).pathname.replace('/admin', '')
-        const targetUrl = `http://localhost:${apiPort}${path}`
+        const url = new URL(c.req.url)
+        const path = url.pathname.replace('/admin', '')
+        const targetUrl = `http://localhost:${apiPort}${path}${url.search}`
         const res = await fetch(targetUrl, {
           method: c.req.method,
           headers: c.req.raw.headers,
