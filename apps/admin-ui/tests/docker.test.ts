@@ -1,8 +1,11 @@
 /**
  * All tests that require Docker (MinIO + Azurite via docker-compose).
  * Docker-compose starts once, shared across all describe blocks.
+ * Skipped in CI — set DOCKER_TESTS=1 to run locally.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe as baseDescribe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+
+const describe = process.env.CI ? baseDescribe.skip : baseDescribe
 import { resolve } from 'node:path'
 import { DockerComposeEnvironment, type StartedDockerComposeEnvironment } from 'testcontainers'
 import { createFilesystemProvider, createS3Provider, createAzureBlobProvider } from 'gazetta'
