@@ -1,10 +1,12 @@
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
   lines: z.array(z.object({
-    command: z.string().optional().describe('Command to type (with $ prefix)'),
-    output: z.string().optional().describe('Command output (not typed, appears instantly)'),
+    command: z.string().optional().describe('Command to type'),
+    output: z.string().optional().describe('Output (appears instantly)'),
     delay: z.number().optional().describe('Delay before this line in ms'),
   })).describe('Terminal lines'),
   title: z.string().optional().describe('Window title'),
@@ -12,34 +14,54 @@ export const schema = z.object({
 
 type Content = z.infer<typeof schema>
 
+function TerminalBar({ title }: { title: string }) {
+  return (
+    <div className="term-bar">
+      <span className="term-dot term-dot-red" />
+      <span className="term-dot term-dot-yellow" />
+      <span className="term-dot term-dot-green" />
+      <span className="term-title">{title}</span>
+    </div>
+  )
+}
+
+function TerminalLine({ line, idx }: { line: Content['lines'][number]; idx: number }) {
+  if (line.command) {
+    return (
+      <div className="term-line" data-idx={idx} data-type="command" style={{ opacity: 0 }}>
+        <span className="term-prompt">$</span>{' '}
+        <span className="term-cmd" />
+        <span className="term-cursor">▋</span>
+      </div>
+    )
+  }
+  return (
+    <div className="term-line" data-idx={idx} data-type="output" style={{ opacity: 0 }}>
+      <span className="term-output" />
+    </div>
+  )
+}
+
+function Terminal({ id, title, lines }: { id: string; title: string; lines: Content['lines'] }) {
+  return (
+    <div className="terminal" id={id}>
+      <TerminalBar title={title} />
+      <div className="term-body">
+        {lines.map((line, i) => <TerminalLine key={i} line={line} idx={i} />)}
+      </div>
+    </div>
+  )
+}
+
 const template: TemplateFunction<Content> = ({ content }) => {
   const { lines = [], title = 'Terminal' } = content ?? {}
   const id = `term-${Math.random().toString(36).slice(2, 8)}`
 
-  const linesHtml = lines.map((line, i) => {
-    if (line.command) {
-      return `<div class="term-line" data-idx="${i}" data-type="command" style="opacity:0"><span class="term-prompt">$</span> <span class="term-cmd"></span><span class="term-cursor">▋</span></div>`
-    }
-    return `<div class="term-line" data-idx="${i}" data-type="output" style="opacity:0"><span class="term-output"></span></div>`
-  }).join('\n')
-
-  const linesJson = JSON.stringify(lines)
-
   return {
-    html: `<div class="terminal" id="${id}">
-  <div class="term-bar">
-    <span class="term-dot term-dot-red"></span>
-    <span class="term-dot term-dot-yellow"></span>
-    <span class="term-dot term-dot-green"></span>
-    <span class="term-title">${title}</span>
-  </div>
-  <div class="term-body">
-${linesHtml}
-  </div>
-</div>`,
+    html: renderToStaticMarkup(<Terminal id={id} title={title} lines={lines} />),
     css: `.terminal { max-width: 40rem; margin: 0 auto; border-radius: 8px; overflow: hidden; border: 1px solid #27272a; background: #0a0a0a; }
 .term-bar { display: flex; align-items: center; gap: 6px; padding: 0.75rem 1rem; background: #18181b; border-bottom: 1px solid #27272a; }
-.term-dot { width: 10px; height: 10px; border-radius: 50%; }
+.term-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .term-dot-red { background: #ef4444; }
 .term-dot-yellow { background: #eab308; }
 .term-dot-green { background: #22c55e; }
@@ -53,8 +75,7 @@ ${linesHtml}
 @keyframes blink { 50% { opacity: 0; } }`,
     js: `{
   const el = document.getElementById('${id}')
-  const lines = ${linesJson}
-  let lineIdx = 0
+  const lines = ${JSON.stringify(lines)}
 
   async function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
@@ -71,8 +92,7 @@ ${linesHtml}
 
   async function showOutput(lineEl, text) {
     lineEl.style.opacity = '1'
-    const outEl = lineEl.querySelector('.term-output')
-    outEl.textContent = text
+    lineEl.querySelector('.term-output').textContent = text
   }
 
   async function run() {
@@ -82,21 +102,14 @@ ${linesHtml}
       const lineEl = el.querySelector('[data-idx="' + i + '"]')
       if (!lineEl) continue
       if (line.delay) await sleep(line.delay)
-      if (line.command) {
-        await typeLine(lineEl, line.command)
-        await sleep(200)
-      } else if (line.output) {
-        await showOutput(lineEl, line.output)
-        await sleep(100)
-      }
+      if (line.command) { await typeLine(lineEl, line.command); await sleep(200) }
+      else if (line.output) { await showOutput(lineEl, line.output); await sleep(100) }
     }
   }
 
-  // Start when visible
-  const observer = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) { observer.disconnect(); run() }
-  }, { threshold: 0.3 })
-  observer.observe(el)
+  new IntersectionObserver((entries, obs) => {
+    if (entries[0].isIntersecting) { obs.disconnect(); run() }
+  }, { threshold: 0.3 }).observe(el)
 }`,
   }
 }
