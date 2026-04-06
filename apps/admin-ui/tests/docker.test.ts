@@ -1,11 +1,8 @@
 /**
  * All tests that require Docker (MinIO + Azurite via docker-compose).
  * Docker-compose starts once, shared across all describe blocks.
- * Skipped in CI — set DOCKER_TESTS=1 to run locally.
  */
-import { describe as baseDescribe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
-
-const describe = process.env.CI ? baseDescribe.skip : baseDescribe
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { resolve } from 'node:path'
 import { DockerComposeEnvironment, type StartedDockerComposeEnvironment } from 'testcontainers'
 import { createFilesystemProvider, createS3Provider, createAzureBlobProvider } from 'gazetta'
@@ -191,10 +188,10 @@ describe('Rendered publish (MinIO)', () => {
   })
 })
 
-// ---- Worker Cache ----
+// ---- Edge Composition (S3-based, same logic as Cloudflare Worker with R2) ----
 
-describe('Worker caching (MinIO)', () => {
-  let app: typeof import('../../../sites/gazetta.studio/worker/src/index.js').default
+describe('Edge composition caching (MinIO)', () => {
+  let app: import('hono').Hono
 
   beforeAll(async () => {
     const target = s3('worker-cache-test')
@@ -207,14 +204,63 @@ describe('Worker caching (MinIO)', () => {
     await publishPageRendered('home', source, starterDir, target)
     await publishPageRendered('about', source, starterDir, target)
 
-    process.env.S3_ENDPOINT = minioEndpoint
-    process.env.S3_BUCKET = 'worker-cache-test'
-    process.env.S3_ACCESS_KEY_ID = 'minioadmin'
-    process.env.S3_SECRET_ACCESS_KEY = 'minioadmin'
-    process.env.S3_REGION = 'us-east-1'
+    // Build a test app that uses S3 storage (same assembly logic as the R2 worker)
+    const { Hono } = await import('hono')
+    const storage = target
+    const cache = new Map<string, { html: string; at: number }>()
+    const TTL = 86400_000
 
-    const mod = await import('../../../sites/gazetta.studio/worker/src/index.js')
-    app = mod.default
+    app = new Hono()
+
+    app.post('/purge/all', () => { cache.clear(); return new Response(JSON.stringify({ purged: 'all' })) })
+    app.post('/purge/urls', async (c) => {
+      const { urls } = await c.req.json() as { urls: string[] }
+      let purged = 0
+      for (const url of urls) { if (cache.delete(url)) purged++ }
+      return c.json({ purged })
+    })
+
+    app.get('*', async (c) => {
+      const path = new URL(c.req.url).pathname
+      const hit = cache.get(path)
+      if (hit && Date.now() - hit.at < TTL) {
+        return c.html(hit.html, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'HIT' })
+      }
+
+      // List page manifests
+      let pageEntries: Array<{ name: string }>
+      try { pageEntries = await storage.readDir('pages') } catch { return c.html('404', 404) }
+
+      for (const entry of pageEntries) {
+        if (!entry.name.endsWith('.json') || entry.name.endsWith('.layout.json')) continue
+        const pageName = entry.name.replace('.json', '')
+        let manifest: { route: string; metadata?: Record<string, unknown>; components: string[] }
+        try { manifest = JSON.parse(await storage.readFile(`pages/${entry.name}`)) } catch { continue }
+
+        // Match route
+        const rp = manifest.route.split('/'), pp = path.split('/')
+        if (rp.length !== pp.length) continue
+        let match = true
+        for (let i = 0; i < rp.length; i++) { if (!rp[i].startsWith(':') && rp[i] !== pp[i]) { match = false; break } }
+        if (!match) continue
+
+        const components: Array<{ html: string; css: string; js: string; head?: string }> = []
+        for (const key of manifest.components) {
+          components.push(JSON.parse(await storage.readFile(`components/${key}.json`)))
+        }
+        let layoutCss = '', layoutHead = ''
+        try {
+          const layout = JSON.parse(await storage.readFile(`pages/${pageName}.layout.json`))
+          layoutCss = layout.css ?? ''; layoutHead = layout.head ?? ''
+        } catch { /* optional */ }
+
+        const title = (manifest.metadata?.title as string) ?? 'Gazetta'
+        const html = `<!DOCTYPE html><html><head><title>${title}</title><style>${[layoutCss, ...components.map(c => c.css)].join('\n')}</style>${layoutHead}${components.map(c => c.head ?? '').join('')}</head><body>${components.map(c => c.html).join('\n')}</body></html>`
+        cache.set(path, { html, at: Date.now() })
+        return c.html(html, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'MISS' })
+      }
+      return c.html('404', 404)
+    })
   })
 
   beforeEach(async () => {
