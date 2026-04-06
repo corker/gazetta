@@ -28,6 +28,11 @@
       "import": "./dist/admin-api/index.js"
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gazetta-studio/gazetta-studio",
+    "directory": "packages/gazetta"
+  },
   "publishConfig": {
     "access": "public"
   },
