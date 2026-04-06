@@ -11,7 +11,7 @@ export async function createApp(siteDir: string, storage: StorageProvider): Prom
   for (const [pageName, page] of site.pages) {
     app.get(page.route, async (c) => {
       const resolved = await resolvePage(pageName, site)
-      const html = renderPage(resolved, page.metadata, c.req.param())
+      const html = await renderPage(resolved, page.metadata, c.req.param())
       return c.html(html)
     })
   }

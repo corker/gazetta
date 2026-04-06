@@ -25,19 +25,19 @@ function composite(
 }
 
 describe('renderComponent', () => {
-  it('renders a leaf component with scoping', () => {
-    const result = renderComponent(leaf('<p>hello</p>', 'p { color: red; }'))
+  it('renders a leaf component with scoping', async () => {
+    const result = await renderComponent(leaf('<p>hello</p>', 'p { color: red; }'))
     expect(result.html).toContain('data-gz="gz0"')
     expect(result.html).toContain('<p>hello</p>')
     expect(result.css).toContain('[data-gz="gz0"] p')
   })
 
-  it('renders a leaf with js (js is not scoped)', () => {
-    const result = renderComponent(leaf('<div></div>', '', 'console.log("hi")'))
+  it('renders a leaf with js (js is not scoped)', async () => {
+    const result = await renderComponent(leaf('<div></div>', '', 'console.log("hi")'))
     expect(result.js).toBe('console.log("hi")')
   })
 
-  it('passes content to template', () => {
+  it('passes content to template', async () => {
     const component: ResolvedComponent = {
       template: ({ content }) => ({
         html: `<h1>${content?.title}</h1>`,
@@ -47,11 +47,11 @@ describe('renderComponent', () => {
       content: { title: 'Hello World' },
       children: [],
     }
-    const result = renderComponent(component)
+    const result = await renderComponent(component)
     expect(result.html).toContain('<h1>Hello World</h1>')
   })
 
-  it('renders a composite with children', () => {
+  it('renders a composite with children', async () => {
     const parent = composite(
       (children) => ({
         html: `<div>${children.map(c => c.html).join('')}</div>`,
@@ -63,14 +63,13 @@ describe('renderComponent', () => {
         leaf('<span>B</span>', '.b {}'),
       ]
     )
-    const result = renderComponent(parent)
+    const result = await renderComponent(parent)
     expect(result.html).toContain('<span>A</span>')
     expect(result.html).toContain('<span>B</span>')
-    // Parent gets its own scope, children have theirs
     expect(result.css).toContain('[data-gz=')
   })
 
-  it('each component gets a unique scope id', () => {
+  it('each component gets a unique scope id', async () => {
     const parent = composite(
       (children) => ({
         html: children.map(c => c.html).join(''),
@@ -82,14 +81,13 @@ describe('renderComponent', () => {
         leaf('<span>B</span>', '.b {}'),
       ]
     )
-    const result = renderComponent(parent)
-    // Children get gz0 and gz1, parent gets gz2
+    const result = await renderComponent(parent)
     expect(result.html).toContain('data-gz="gz0"')
     expect(result.html).toContain('data-gz="gz1"')
     expect(result.html).toContain('data-gz="gz2"')
   })
 
-  it('passes route params to templates', () => {
+  it('passes route params to templates', async () => {
     const component: ResolvedComponent = {
       template: ({ params }) => ({
         html: `<h1>${params?.slug ?? 'no slug'}</h1>`,
@@ -98,11 +96,11 @@ describe('renderComponent', () => {
       }),
       children: [],
     }
-    const result = renderComponent(component, { slug: 'hello-world' })
+    const result = await renderComponent(component, { slug: 'hello-world' })
     expect(result.html).toContain('hello-world')
   })
 
-  it('passes route params through to children', () => {
+  it('passes route params through to children', async () => {
     const child: ResolvedComponent = {
       template: ({ params }) => ({
         html: `<span>${params?.id ?? 'no id'}</span>`,
@@ -115,11 +113,11 @@ describe('renderComponent', () => {
       (children) => ({ html: children.map(c => c.html).join(''), css: '', js: '' }),
       [child]
     )
-    const result = renderComponent(parent, { id: '42' })
+    const result = await renderComponent(parent, { id: '42' })
     expect(result.html).toContain('42')
   })
 
-  it('renders nested composites (3 levels deep)', () => {
+  it('renders nested composites (3 levels deep)', async () => {
     const grandchild = leaf('<em>deep</em>')
     const child = composite(
       (children) => ({
@@ -137,61 +135,74 @@ describe('renderComponent', () => {
       }),
       [child]
     )
-    const result = renderComponent(root)
+    const result = await renderComponent(root)
     expect(result.html).toContain('<em>deep</em>')
     expect(result.html).toContain('<section>')
     expect(result.html).toContain('<main>')
   })
+
+  it('supports async templates', async () => {
+    const component: ResolvedComponent = {
+      template: async ({ content }) => ({
+        html: `<h1>${content?.title}</h1>`,
+        css: '',
+        js: '',
+      }),
+      content: { title: 'Async Template' },
+      children: [],
+    }
+    const result = await renderComponent(component)
+    expect(result.html).toContain('<h1>Async Template</h1>')
+  })
 })
 
 describe('renderPage', () => {
-  it('wraps output in HTML document', () => {
+  it('wraps output in HTML document', async () => {
     const page = leaf('<p>content</p>', 'p {}')
-    const html = renderPage(page, { title: 'Test Page' })
+    const html = await renderPage(page, { title: 'Test Page' })
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<title>Test Page</title>')
     expect(html).toContain('<style>')
     expect(html).toContain('<p>content</p>')
   })
 
-  it('includes description meta tag when provided', () => {
+  it('includes description meta tag when provided', async () => {
     const page = leaf('<p></p>')
-    const html = renderPage(page, { title: 'T', description: 'My description' })
+    const html = await renderPage(page, { title: 'T', description: 'My description' })
     expect(html).toContain('<meta name="description" content="My description">')
   })
 
-  it('omits description meta tag when not provided', () => {
+  it('omits description meta tag when not provided', async () => {
     const page = leaf('<p></p>')
-    const html = renderPage(page, { title: 'T' })
+    const html = await renderPage(page, { title: 'T' })
     expect(html).not.toContain('meta name="description"')
   })
 
-  it('defaults title to Gazetta', () => {
+  it('defaults title to Gazetta', async () => {
     const page = leaf('<p></p>')
-    const html = renderPage(page)
+    const html = await renderPage(page)
     expect(html).toContain('<title>Gazetta</title>')
   })
 
-  it('includes script tag when js is present', () => {
+  it('includes script tag when js is present', async () => {
     const page = leaf('<p></p>', '', 'alert(1)')
-    const html = renderPage(page)
+    const html = await renderPage(page)
     expect(html).toContain('<script type="module">alert(1)</script>')
   })
 
-  it('omits script tag when js is empty', () => {
+  it('omits script tag when js is empty', async () => {
     const page = leaf('<p></p>', '', '')
-    const html = renderPage(page)
+    const html = await renderPage(page)
     expect(html).not.toContain('<script')
   })
 
-  it('resets scope counter between pages', () => {
+  it('resets scope counter between pages', async () => {
     const page = composite(
       (children) => ({ html: children.map(c => c.html).join(''), css: children.map(c => c.css).join(''), js: '' }),
       [leaf('<p>child</p>', '.p {}')]
     )
-    renderPage(page)
-    const html = renderPage(page)
-    // After reset, child scope should start from gz0 again
+    await renderPage(page)
+    const html = await renderPage(page)
     expect(html).toContain('data-gz="gz0"')
   })
 })

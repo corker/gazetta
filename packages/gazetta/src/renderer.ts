@@ -1,12 +1,11 @@
 import type { RenderOutput, ResolvedComponent } from './types.js'
 import { generateScopeId, scopeHtml, scopeCss, resetScopeCounter } from './scope.js'
 
-export function renderComponent(component: ResolvedComponent, routeParams?: Record<string, string>): RenderOutput {
-  const children = component.children.map(c => renderComponent(c, routeParams))
-  const output = component.template({ content: component.content, children, params: routeParams })
+export async function renderComponent(component: ResolvedComponent, routeParams?: Record<string, string>): Promise<RenderOutput> {
+  const children = await Promise.all(component.children.map(c => renderComponent(c, routeParams)))
+  const output = await component.template({ content: component.content, children, params: routeParams })
 
   const scopeId = generateScopeId()
-  // Collect head from children + this component
   const headParts = [
     ...children.map(c => c.head).filter(Boolean),
     output.head,
@@ -20,20 +19,17 @@ export function renderComponent(component: ResolvedComponent, routeParams?: Reco
   }
 }
 
-export function renderPage(
+export async function renderPage(
   component: ResolvedComponent,
   metadata?: Record<string, unknown>,
   routeParams?: Record<string, string>
-): string {
+): Promise<string> {
   resetScopeCounter()
-  // Page-level template CSS is not scoped (allows body/html/global styles)
-  // Children are still scoped individually
-  const children = component.children.map(c => renderComponent(c, routeParams))
-  const output = component.template({ content: component.content, children, params: routeParams })
+  const children = await Promise.all(component.children.map(c => renderComponent(c, routeParams)))
+  const output = await component.template({ content: component.content, children, params: routeParams })
   const title = (metadata?.title as string) ?? 'Gazetta'
   const description = metadata?.description as string | undefined
 
-  // Collect head tags from: page metadata + page template + all components
   const componentHead = [
     ...children.map(c => c.head).filter(Boolean),
     output.head,

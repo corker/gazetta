@@ -199,7 +199,7 @@ async function runDev(siteDir: string, port: number) {
       try {
         const freshSite = await loadSite(siteDir, storage)
         const resolved = await resolvePage(pageName, freshSite)
-        const html = renderPage(resolved, page.metadata, c.req.param())
+        const html = await renderPage(resolved, page.metadata, c.req.param())
         return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
       } catch (err) {
         return c.html(`<pre style="color:red;padding:2rem">${(err as Error).message}</pre>`, 500)

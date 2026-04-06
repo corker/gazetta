@@ -34,7 +34,7 @@ async function renderPreview(
       try {
         const resolved = await resolvePage(pageName, site)
         if (overrides) applyOverrides(resolved, overrides)
-        return c.html(renderPage(resolved, page.metadata, params))
+        return c.html(await renderPage(resolved, page.metadata, params))
       } catch (err) {
         return c.html(`<pre style="color:red;padding:2rem">${(err as Error).message}</pre>`, 500)
       }

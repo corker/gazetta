@@ -6,12 +6,12 @@ export interface RenderOutput {
   head?: string
 }
 
-/** Template function signature */
-export type TemplateFunction = (params: {
-  content?: Record<string, unknown>
+/** Template function signature — generic over content type */
+export type TemplateFunction<T extends Record<string, unknown> = Record<string, unknown>> = (params: {
+  content?: T
   children?: RenderOutput[]
   params?: Record<string, string>
-}) => RenderOutput
+}) => RenderOutput | Promise<RenderOutput>
 
 /** Mount function for framework-agnostic custom editors */
 export interface EditorMount {

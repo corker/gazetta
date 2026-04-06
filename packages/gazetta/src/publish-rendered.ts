@@ -33,7 +33,7 @@ export async function publishPageRendered(
     const childName = page.components![i]
     const key = childName.startsWith('@') ? childName : `${pageName}/${childName}`
 
-    const rendered = renderComponent(child)
+    const rendered = await renderComponent(child)
     const json: PublishedComponent = {
       html: rendered.html,
       css: rendered.css,
@@ -59,7 +59,8 @@ export async function publishPageRendered(
   fileCount++
 
   // Store the page-level template output (global CSS, etc.)
-  const pageOutput = resolved.template({ content: resolved.content, children: resolved.children.map(c => renderComponent(c)) })
+  const childOutputs = await Promise.all(resolved.children.map(c => renderComponent(c)))
+  const pageOutput = await resolved.template({ content: resolved.content, children: childOutputs })
   await targetStorage.writeFile(`pages/${pageName}.layout.json`, JSON.stringify({
     css: pageOutput.css,
     head: pageOutput.head,
@@ -90,7 +91,7 @@ export async function publishFragmentRendered(
   const resolved = await resolveComponent(`@${fragmentName}`, '', ctx)
 
   resetScopeCounter()
-  const rendered = renderComponent(resolved)
+  const rendered = await renderComponent(resolved)
   const json: PublishedComponent = {
     html: rendered.html,
     css: rendered.css,
