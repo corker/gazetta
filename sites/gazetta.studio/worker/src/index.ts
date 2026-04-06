@@ -140,21 +140,25 @@ async function assembleEsi(bucket: R2Bucket, html: string): Promise<string> {
 
   // Collect and deduplicate head content from all esi-head tags
   const headLines = new Set<string>()
-  html = html.replace(esiHeadRegex, (_match, path: string) => {
+  for (const path of fragmentPaths) {
     const frag = fragments.get(path)
     if (frag?.head) {
       for (const line of frag.head.split('\n').map(l => l.trim()).filter(Boolean)) {
         headLines.add(line)
       }
     }
-    return '' // Remove the esi-head tag
-  })
-
-  // Insert collected heads before </head>
-  if (headLines.size > 0) {
-    const headInsert = [...headLines].join('\n  ')
-    html = html.replace('</head>', `  ${headInsert}\n</head>`)
   }
+
+  // Replace first esi-head tag with collected heads, remove the rest
+  let headInserted = false
+  const collectedHead = [...headLines].join('\n  ')
+  html = html.replace(esiHeadRegex, () => {
+    if (!headInserted && collectedHead) {
+      headInserted = true
+      return collectedHead
+    }
+    return ''
+  })
 
   // Replace esi body tags with fragment body content
   html = html.replace(esiBodyRegex, (_match, path: string) => {
