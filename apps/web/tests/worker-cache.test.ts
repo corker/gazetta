@@ -40,7 +40,7 @@ describe('Worker caching', () => {
     await publishPageRendered('home', source, starterDir, target)
     await publishPageRendered('about', source, starterDir, target)
 
-    const mod = await import('../../sites/gazetta.studio/worker/src/index.js')
+    const mod = await import('../../../sites/gazetta.studio/worker/src/index.js')
     app = mod.default
   }, 120000)
 
