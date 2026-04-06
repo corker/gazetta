@@ -138,28 +138,37 @@ async function assembleEsi(bucket: R2Bucket, html: string): Promise<string> {
     fragments.set(path, parsed)
   }
 
-  // Collect CSS and JS separately from fragment heads, deduplicate each
-  const cssLinks = new Set<string>()
-  const jsScripts = new Set<string>()
-  const otherHead = new Set<string>()
+  // Collect CSS and JS separately, preserving fragment order, deduplicating
+  const esiHeadOrder: string[] = []
+  let m2
+  const esiHeadRegex2 = /<!--esi-head:(\/[^>]+)-->/g
+  while ((m2 = esiHeadRegex2.exec(html)) !== null) {
+    if (!esiHeadOrder.includes(m2[1])) esiHeadOrder.push(m2[1])
+  }
 
-  for (const path of fragmentPaths) {
+  const cssLines: string[] = []
+  const jsLines: string[] = []
+  const otherLines: string[] = []
+  const seen = new Set<string>()
+
+  for (const path of esiHeadOrder) {
     const frag = fragments.get(path)
     if (!frag?.head) continue
     for (const line of frag.head.split('\n').map(l => l.trim()).filter(Boolean)) {
+      if (seen.has(line)) continue
+      seen.add(line)
       if (line.includes('rel="stylesheet"') || line.includes("rel='stylesheet'")) {
-        cssLinks.add(line)
+        cssLines.push(line)
       } else if (line.startsWith('<script')) {
-        jsScripts.add(line)
+        jsLines.push(line)
       } else {
-        otherHead.add(line)
+        otherLines.push(line)
       }
     }
   }
 
-  // Replace first esi-head with CSS, remove the rest — JS goes before </head>
-  const collectedCss = [...otherHead, ...cssLinks].join('\n  ')
-  const collectedJs = [...jsScripts].join('\n  ')
+  // Replace first esi-head with other + CSS, remove the rest
+  const collectedCss = [...otherLines, ...cssLines].join('\n  ')
   let cssInserted = false
   html = html.replace(esiHeadRegex, () => {
     if (!cssInserted && collectedCss) {
@@ -169,9 +178,9 @@ async function assembleEsi(bucket: R2Bucket, html: string): Promise<string> {
     return ''
   })
 
-  // Insert JS before </head> (after all CSS)
-  if (collectedJs) {
-    html = html.replace('</head>', `  ${collectedJs}\n</head>`)
+  // Insert JS before </head> (after all CSS, preserving fragment order)
+  if (jsLines.length > 0) {
+    html = html.replace('</head>', `  ${jsLines.join('\n  ')}\n</head>`)
   }
 
   // Replace esi body tags with fragment body content
