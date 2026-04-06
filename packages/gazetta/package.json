@@ -1,6 +1,9 @@
 {
   "name": "gazetta",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "description": "Stateless CMS for composable websites",
+  "keywords": ["cms", "stateless", "composable", "hono", "templates", "fragments", "ssr"],
+  "homepage": "https://gazetta.studio",
   "type": "module",
   "license": "MIT",
   "files": [
