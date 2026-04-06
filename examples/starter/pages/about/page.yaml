@@ -6,4 +6,5 @@ metadata:
 components:
   - "@header"
   - about-text
+  - testimonial
   - "@footer"
