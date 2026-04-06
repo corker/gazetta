@@ -2,8 +2,9 @@ template: code-block
 content:
   language: bash
   code: |-
-    git clone https://github.com/gazetta-studio/gazetta-studio.git
-    cd gazetta-studio
-    npm install && npm run build
-    npm run dev
-    # → http://localhost:3000
+    npx gazetta init my-site
+    cd my-site
+    npm install
+    npx gazetta dev
+    # → http://localhost:3000 (site)
+    # → http://localhost:3000/admin (CMS editor)

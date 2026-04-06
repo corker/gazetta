@@ -6,4 +6,5 @@ metadata:
 components:
   - "@header"
   - intro
+  - templates
   - "@footer"

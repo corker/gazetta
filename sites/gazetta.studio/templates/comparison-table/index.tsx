@@ -11,13 +11,9 @@ export const schema = z.object({
   })).describe('Comparison rows'),
 })
 
-interface Row {
-  label: string
-  traditional: string
-  gazetta: string
-}
+type Content = z.infer<typeof schema>
 
-function ComparisonTable({ rows }: { rows: Row[] }) {
+function ComparisonTable({ rows }: Content) {
   return (
     <table className="cmp-table">
       <thead>
@@ -40,18 +36,15 @@ function ComparisonTable({ rows }: { rows: Row[] }) {
   )
 }
 
-const template: TemplateFunction = ({ content = {} }) => {
-  const rows = (content.rows ?? []) as Row[]
-  return {
-    html: renderToStaticMarkup(<ComparisonTable rows={rows} />),
-    css: `.cmp-table { width: 100%; max-width: 48rem; margin: 0 auto; border-collapse: collapse; font-size: 0.875rem; }
+const template: TemplateFunction<Content> = ({ content }) => ({
+  html: renderToStaticMarkup(<ComparisonTable rows={content?.rows ?? []} />),
+  css: `.cmp-table { width: 100%; max-width: 48rem; margin: 0 auto; border-collapse: collapse; font-size: 0.875rem; }
 .cmp-table th, .cmp-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #1c1c1f; }
 .cmp-table thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; font-weight: 600; }
 .cmp-label { color: #a1a1aa; font-weight: 500; }
 .cmp-old { color: #71717a; }
 .cmp-new { color: #a78bfa; font-weight: 500; }`,
-    js: '',
-  }
-}
+  js: '',
+})
 
 export default template

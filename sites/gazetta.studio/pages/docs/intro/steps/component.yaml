@@ -1,14 +1,15 @@
 template: text
 content:
   body: |
-    <p><strong>1. Clone and install</strong></p>
-    <p><code>git clone https://github.com/gazetta-studio/gazetta-studio.git && cd gazetta-studio && npm install && npm run build</code></p>
+    <p><strong>1. Create a site</strong></p>
+    <p><code>npx gazetta init my-site && cd my-site && npm install</code></p>
+    <p>This scaffolds a site with a home page, a hero template, and a text block template.</p>
     <p><strong>2. Start the dev server</strong></p>
-    <p><code>npm run dev</code> — opens at <a href="http://localhost:3000">localhost:3000</a></p>
+    <p><code>npx gazetta dev</code> — site at <a href="http://localhost:3000">localhost:3000</a>, CMS editor at <a href="http://localhost:3000/admin">localhost:3000/admin</a></p>
     <p><strong>3. Create a template</strong></p>
-    <p>A template is a pure function: <code>(params) => { html, css, js }</code>. Every template exports a Zod schema for its content shape.</p>
+    <p>A template is a pure function: <code>(params) =&gt; { html, css, js }</code>. Every template exports a Zod schema for its content shape. Use any framework — React, Svelte, Vue, or plain TypeScript.</p>
     <p><strong>4. Create a page</strong></p>
-    <p>A page is a folder with a <code>page.yaml</code> manifest listing its route, template, and components.</p>
+    <p>A page is a folder with a <code>page.yaml</code> manifest listing its route, template, and components. Or use the CMS editor to create pages visually.</p>
     <p><strong>5. Add shared fragments</strong></p>
-    <p>Fragments live in <code>fragments/</code> and are referenced with <code>@</code> — like <code>"@header"</code>. Update once, every page reflects it.</p>
+    <p>Fragments live in <code>fragments/</code> and are referenced with <code>"@"</code> — like <code>"@header"</code>. Update once, every page reflects it instantly.</p>
     <p>See the full <a href="https://github.com/gazetta-studio/gazetta-studio/blob/main/docs/getting-started.md">getting started guide</a> for detailed instructions.</p>
