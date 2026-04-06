@@ -1,4 +1,4 @@
 template: hero
 content:
-  title: "Welcome to Gazetta"
-  subtitle: "A stateless CMS that composes pages from reusable components"
+  title: Welcome to Gazetta
+  subtitle: A stateless CMS that composes pages from reusable components
