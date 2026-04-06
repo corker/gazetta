@@ -85,3 +85,24 @@ export interface ResolvedComponent {
   children: ResolvedComponent[]
   path?: string
 }
+
+/** Published page manifest — stored in S3 as pages/<name>.json */
+export interface PublishedPageManifest {
+  route: string
+  metadata?: Record<string, unknown>
+  components: string[]
+}
+
+/** Published component — stored in S3 as components/<key>.json */
+export interface PublishedComponent {
+  html: string
+  css: string
+  js: string
+  head?: string
+}
+
+/** Purge strategy for cache invalidation */
+export interface PurgeStrategy {
+  purgeAll(): Promise<void>
+  purgeUrls(urls: string[]): Promise<void>
+}

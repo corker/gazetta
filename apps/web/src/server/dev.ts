@@ -5,7 +5,7 @@ import { serve } from '@hono/node-server'
 import { createFilesystemProvider } from '@gazetta/renderer'
 import type { SiteManifest } from '@gazetta/core'
 import { createCmsApp } from './index.js'
-import { createTargetRegistry } from './targets.js'
+import { createTargetRegistry } from '@gazetta/renderer'
 
 const siteDir = resolve(process.argv[2] ?? '../../examples/starter')
 const port = parseInt(process.env.API_PORT ?? '4000', 10)

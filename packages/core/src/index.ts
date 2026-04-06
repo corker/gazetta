@@ -11,4 +11,7 @@ export type {
   TargetConfig,
   DirEntry,
   StorageProvider,
+  PublishedPageManifest,
+  PublishedComponent,
+  PurgeStrategy,
 } from './types.js'

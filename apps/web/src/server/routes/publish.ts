@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { StorageProvider } from '@gazetta/core'
 import { loadSite } from '@gazetta/renderer'
-import { publishItems, resolveDependencies, type PublishResult } from '../publish.js'
+import { publishItems, resolveDependencies, type PublishResult } from '@gazetta/renderer'
 
 export function publishRoutes(
   siteDir: string,
