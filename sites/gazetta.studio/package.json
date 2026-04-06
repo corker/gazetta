@@ -3,17 +3,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx ../../packages/cli/src/index.ts dev .",
-    "cms:api": "tsx ../../apps/web/src/server/dev.ts .",
-    "cms:ui": "cd ../../apps/web && npx vite --port 5173"
+    "dev": "tsx ../../packages/gazetta/src/cli/index.ts dev ."
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "gazetta": "*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tsx": "^4.21.0",
-    "zod": "^4.3.6",
-    "gazetta": "*"
+    "zod": "^4.3.6"
+  },
+  "dependencies": {
+    "shiki": "^4.0.2"
   }
 }

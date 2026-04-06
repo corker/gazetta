@@ -14,6 +14,7 @@
   "scripts": {
     "build": "npm run build -w packages/gazetta",
     "dev": "npm run build && npm run dev -w examples/starter",
+    "dev:site": "npm run build && npm run dev -w @gazetta/website",
     "dev:admin": "npm run build && npm run dev:api -w @gazetta/admin-ui & npm run dev:ui -w @gazetta/admin-ui",
     "test": "npm run test --workspaces --if-present"
   },
