@@ -1,0 +1,5 @@
+template: section
+content:
+  heading: "Why not a traditional CMS?"
+components:
+  - table

@@ -7,5 +7,6 @@ components:
   - "@header"
   - hero
   - how-it-works
+  - comparison
   - quick-start
   - "@footer"
