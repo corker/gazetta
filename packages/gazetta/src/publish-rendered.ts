@@ -1,13 +1,20 @@
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import type { StorageProvider, PublishedPageManifest, PublishedComponent, PurgeStrategy } from './types.js'
+import type { StorageProvider, PurgeStrategy } from './types.js'
 import { loadSite } from './site-loader.js'
 import type { Site } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent } from './renderer.js'
 import { resetScopeCounter } from './scope.js'
 
+function contentHash(content: string): string {
+  return createHash('md5').update(content).digest('hex').slice(0, 8)
+}
+
 /**
- * Publish a page: SSR all components and store pre-rendered output + manifest in target.
+ * Publish a page as HTML with ESI placeholders for fragments.
+ * Local components are baked in. Fragment markup is replaced at request time by the worker.
+ * CSS is stored as separate hashed files for immutable caching.
  */
 export async function publishPageRendered(
   pageName: string,
@@ -20,61 +27,100 @@ export async function publishPageRendered(
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
   resetScopeCounter()
-
-  // Resolve and render the full page tree
   const resolved = await resolvePage(pageName, site)
 
-  // Render each top-level child component and store individually
-  const componentKeys: string[] = []
-  let fileCount = 0
+  // Render each child — fragments become ESI placeholders, local components baked in
+  const bodyParts: string[] = []
+  const localCssParts: string[] = []
+  const localJsParts: string[] = []
+  const localHeadParts: string[] = []
+  const esiHeadTags: string[] = []
 
   for (let i = 0; i < resolved.children.length; i++) {
-    const child = resolved.children[i]
     const childName = page.components![i]
-    const key = childName.startsWith('@') ? childName : `${pageName}/${childName}`
+    const isFragment = childName.startsWith('@')
 
-    const rendered = await renderComponent(child)
-    const json: PublishedComponent = {
-      html: rendered.html,
-      css: rendered.css,
-      js: rendered.js,
-      head: rendered.head,
+    if (isFragment) {
+      const fragName = childName.slice(1)
+      const fragPath = `fragments/${fragName}/index.html`
+      esiHeadTags.push(`<!--esi-head:/${fragPath}-->`)
+      bodyParts.push(`<!--esi:/${fragPath}-->`)
+    } else {
+      const rendered = await renderComponent(resolved.children[i])
+      bodyParts.push(rendered.html)
+      if (rendered.css) localCssParts.push(rendered.css)
+      if (rendered.js) localJsParts.push(rendered.js)
+      if (rendered.head) localHeadParts.push(rendered.head)
     }
+  }
 
-    const componentPath = `components/${key}.json`
-    const parentDir = componentPath.split('/').slice(0, -1).join('/')
-    await targetStorage.mkdir(parentDir)
-    await targetStorage.writeFile(componentPath, JSON.stringify(json))
-    componentKeys.push(key)
+  // Render page-level template (layout CSS, head tags)
+  const childOutputs = await Promise.all(resolved.children.map(c => renderComponent(c)))
+  const pageOutput = await resolved.template({ content: resolved.content, children: childOutputs })
+  if (pageOutput.css) localCssParts.unshift(pageOutput.css)
+  if (pageOutput.head) localHeadParts.unshift(pageOutput.head)
+
+  // Determine page path from route
+  const routePath = page.route === '/' ? 'home' : page.route.replace(/^\//, '')
+  const pageDir = `pages/${routePath}`
+
+  let fileCount = 0
+
+  // Write page CSS as hashed file
+  const pageCss = localCssParts.join('\n')
+  let pageCssLink = ''
+  if (pageCss) {
+    const hash = contentHash(pageCss)
+    const cssPath = `${pageDir}/styles.${hash}.css`
+    await targetStorage.mkdir(pageDir)
+    await targetStorage.writeFile(cssPath, pageCss)
+    pageCssLink = `<link rel="stylesheet" href="/${cssPath}">`
     fileCount++
   }
 
-  // Store the page manifest
-  const manifest: PublishedPageManifest = {
-    route: page.route,
-    metadata: page.metadata,
-    components: componentKeys,
-  }
+  // Build page HTML
+  const title = (page.metadata?.title as string) ?? 'Gazetta'
+  const description = page.metadata?.description as string | undefined
 
-  await targetStorage.mkdir('pages')
-  await targetStorage.writeFile(`pages/${pageName}.json`, JSON.stringify(manifest))
-  fileCount++
+  const metaTags = [
+    description ? `<meta name="description" content="${description}">` : '',
+    title ? `<meta property="og:title" content="${title}">` : '',
+    description ? `<meta property="og:description" content="${description}">` : '',
+  ].filter(Boolean).join('\n  ')
 
-  // Store the page-level template output (global CSS, etc.)
-  const childOutputs = await Promise.all(resolved.children.map(c => renderComponent(c)))
-  const pageOutput = await resolved.template({ content: resolved.content, children: childOutputs })
-  await targetStorage.writeFile(`pages/${pageName}.layout.json`, JSON.stringify({
-    css: pageOutput.css,
-    head: pageOutput.head,
-  }))
+  const headContent = [
+    `<meta charset="UTF-8">`,
+    `<meta name="viewport" content="width=device-width, initial-scale=1.0">`,
+    `<title>${title}</title>`,
+    metaTags,
+    ...localHeadParts,
+    pageCssLink,
+    ...esiHeadTags,
+  ].filter(Boolean).join('\n  ')
+
+  const bodyContent = bodyParts.join('\n')
+  const jsTag = localJsParts.length ? `\n<script type="module">${localJsParts.join('\n')}</script>` : ''
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  ${headContent}
+</head>
+<body>
+${bodyContent}${jsTag}
+</body>
+</html>`
+
+  await targetStorage.mkdir(pageDir)
+  await targetStorage.writeFile(`${pageDir}/index.html`, html)
   fileCount++
 
   return { files: fileCount }
 }
 
 /**
- * Publish a fragment: SSR it and store pre-rendered output in target.
- * All pages referencing this fragment get the update on next request.
+ * Publish a fragment as HTML with a <head> section for CSS/JS.
+ * The worker injects <head> content before </head> and body content at the ESI placeholder.
  */
 export async function publishFragmentRendered(
   fragmentName: string,
@@ -86,29 +132,54 @@ export async function publishFragmentRendered(
   const fragment = site.fragments.get(fragmentName)
   if (!fragment) throw new Error(`Fragment "${fragmentName}" not found`)
 
-  // Build a minimal resolved component for the fragment
-  const { resolveComponent } = await import('./resolver.js')
   const templatesDir = join(sourceDir, 'templates')
   const ctx = { site, templatesDir, visited: new Set<string>(), path: [`@${fragmentName}`] }
   const resolved = await resolveComponent(`@${fragmentName}`, '', ctx)
 
   resetScopeCounter()
   const rendered = await renderComponent(resolved)
-  const json: PublishedComponent = {
-    html: rendered.html,
-    css: rendered.css,
-    js: rendered.js,
-    head: rendered.head,
+
+  const fragDir = `fragments/${fragmentName}`
+  let fileCount = 0
+
+  // Write fragment CSS as hashed file
+  const headParts: string[] = []
+  if (rendered.css) {
+    const hash = contentHash(rendered.css)
+    const cssPath = `${fragDir}/styles.${hash}.css`
+    await targetStorage.mkdir(fragDir)
+    await targetStorage.writeFile(cssPath, rendered.css)
+    headParts.push(`<link rel="stylesheet" href="/${cssPath}">`)
+    fileCount++
   }
 
-  await targetStorage.mkdir('components')
-  await targetStorage.writeFile(`components/@${fragmentName}.json`, JSON.stringify(json))
+  // Write fragment JS as hashed file (if any)
+  if (rendered.js) {
+    const hash = contentHash(rendered.js)
+    const jsPath = `${fragDir}/script.${hash}.js`
+    await targetStorage.mkdir(fragDir)
+    await targetStorage.writeFile(jsPath, rendered.js)
+    headParts.push(`<script type="module" src="/${jsPath}"></script>`)
+    fileCount++
+  }
 
-  return { files: 1 }
+  if (rendered.head) {
+    headParts.push(rendered.head)
+  }
+
+  // Build fragment HTML
+  const headSection = headParts.length ? `<head>\n${headParts.join('\n')}\n</head>\n` : ''
+  const fragmentHtml = `${headSection}${rendered.html}`
+
+  await targetStorage.mkdir(fragDir)
+  await targetStorage.writeFile(`${fragDir}/index.html`, fragmentHtml)
+  fileCount++
+
+  return { files: fileCount }
 }
 
 /**
- * Publish site.yaml (stripped of targets config — not needed on the target)
+ * Publish site manifest (stripped of targets config).
  */
 export async function publishSiteManifest(
   sourceStorage: StorageProvider,
@@ -123,7 +194,6 @@ export async function publishSiteManifest(
 /**
  * Build and store reverse fragment index.
  * Maps each fragment to the list of page routes that use it.
- * Used by purge-by-URL strategy to know which pages to invalidate.
  */
 export async function publishFragmentIndex(
   sourceStorage: StorageProvider,
@@ -148,7 +218,6 @@ export async function publishFragmentIndex(
   return index
 }
 
-
 /** Purge via Worker's /purge endpoints */
 export function createWorkerPurge(workerUrl: string, token?: string): PurgeStrategy {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -166,8 +235,6 @@ export function createWorkerPurge(workerUrl: string, token?: string): PurgeStrat
 
 /**
  * Publish a fragment and purge affected pages.
- * - purge: 'all' → purge entire cache (free tier)
- * - purge: 'url' → read reverse index, purge only affected page URLs (pro tier)
  */
 export async function publishFragmentWithPurge(
   fragmentName: string,
@@ -184,7 +251,6 @@ export async function publishFragmentWithPurge(
     return { ...result, purgedUrls: ['*'] }
   }
 
-  // Read reverse index to find affected pages
   let index: Record<string, string[]> = {}
   try {
     index = JSON.parse(await targetStorage.readFile('index/fragments.json'))
@@ -209,12 +275,11 @@ export async function publishPageWithPurge(
 ): Promise<{ files: number; purgedUrls: string[] }> {
   const result = await publishPageRendered(pageName, sourceStorage, sourceDir, targetStorage)
 
-  // Read the page manifest to get its route
-  const manifest: PublishedPageManifest = JSON.parse(await targetStorage.readFile(`pages/${pageName}.json`))
-  await purge.purgeUrls([manifest.route])
+  const site = await loadSite(sourceDir, sourceStorage)
+  const page = site.pages.get(pageName)
+  if (page) await purge.purgeUrls([page.route])
 
-  // Update the fragment index
   await publishFragmentIndex(sourceStorage, sourceDir, targetStorage)
 
-  return { ...result, purgedUrls: [manifest.route] }
+  return { ...result, purgedUrls: page ? [page.route] : [] }
 }

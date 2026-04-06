@@ -157,26 +157,25 @@ describe('Rendered publish (MinIO)', () => {
     expect(json.name).toBe('Gazetta Starter')
   })
 
-  it('publishes a fragment as pre-rendered JSON', async () => {
+  it('publishes a fragment as HTML with hashed CSS', async () => {
     const result = await publishFragmentRendered('header', source, starterDir, target)
-    expect(result.files).toBe(1)
-    const json: PublishedComponent = JSON.parse(await target.readFile('components/@header.json'))
-    expect(json.html).toContain('Gazetta')
-    expect(json.css.length).toBeGreaterThan(0)
+    expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
+    const html = await target.readFile('fragments/header/index.html')
+    expect(html).toContain('<head>')
+    expect(html).toContain('stylesheet')
+    expect(html).toContain('Gazetta') // body markup
   })
 
-  it('publishes a page with pre-rendered components', async () => {
+  it('publishes a page as HTML with ESI placeholders', async () => {
     await publishFragmentRendered('footer', source, starterDir, target)
     const result = await publishPageRendered('home', source, starterDir, target)
-    expect(result.files).toBeGreaterThan(3)
+    expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
-    const manifest: PublishedPageManifest = JSON.parse(await target.readFile('pages/home.json'))
-    expect(manifest.route).toBe('/')
-    expect(manifest.components).toContain('@header')
-
-    const heroKey = manifest.components.find(c => c.includes('hero'))!
-    const hero: PublishedComponent = JSON.parse(await target.readFile(`components/${heroKey}.json`))
-    expect(hero.html).toContain('Welcome to Gazetta')
+    const html = await target.readFile('pages/home/index.html')
+    expect(html).toContain('<!DOCTYPE html>')
+    expect(html).toContain('<!--esi:/fragments/header/index.html-->')
+    expect(html).toContain('<!--esi-head:/fragments/header/index.html-->')
+    expect(html).toContain('Welcome to Gazetta') // local component baked in
   })
 
   it('builds reverse fragment index', async () => {
@@ -204,7 +203,7 @@ describe('Edge composition caching (MinIO)', () => {
     await publishPageRendered('home', source, starterDir, target)
     await publishPageRendered('about', source, starterDir, target)
 
-    // Build a test app that uses S3 storage (same assembly logic as the R2 worker)
+    // Build a test app with ESI assembly (same logic as the Cloudflare Worker)
     const { Hono } = await import('hono')
     const storage = target
     const cache = new Map<string, { html: string; at: number }>()
@@ -227,39 +226,43 @@ describe('Edge composition caching (MinIO)', () => {
         return c.html(hit.html, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'HIT' })
       }
 
-      // List page manifests
-      let pageEntries: Array<{ name: string }>
-      try { pageEntries = await storage.readDir('pages') } catch { return c.html('404', 404) }
+      // Find page by URL convention
+      const pagePath = path === '/' ? 'pages/home/index.html' : `pages${path}/index.html`
+      let pageHtml: string
+      try { pageHtml = await storage.readFile(pagePath) } catch { return c.html('404', 404) }
 
-      for (const entry of pageEntries) {
-        if (!entry.name.endsWith('.json') || entry.name.endsWith('.layout.json')) continue
-        const pageName = entry.name.replace('.json', '')
-        let manifest: { route: string; metadata?: Record<string, unknown>; components: string[] }
-        try { manifest = JSON.parse(await storage.readFile(`pages/${entry.name}`)) } catch { continue }
+      // ESI assembly: collect esi-head tags, read fragments, replace
+      const esiHeadRegex = /<!--esi-head:(\/[^>]+)-->/g
+      const esiBodyRegex = /<!--esi:(\/[^>]+)-->/g
+      const fragmentPaths = new Set<string>()
+      let m
+      while ((m = esiHeadRegex.exec(pageHtml)) !== null) fragmentPaths.add(m[1])
+      while ((m = esiBodyRegex.exec(pageHtml)) !== null) fragmentPaths.add(m[1])
 
-        // Match route
-        const rp = manifest.route.split('/'), pp = path.split('/')
-        if (rp.length !== pp.length) continue
-        let match = true
-        for (let i = 0; i < rp.length; i++) { if (!rp[i].startsWith(':') && rp[i] !== pp[i]) { match = false; break } }
-        if (!match) continue
-
-        const components: Array<{ html: string; css: string; js: string; head?: string }> = []
-        for (const key of manifest.components) {
-          components.push(JSON.parse(await storage.readFile(`components/${key}.json`)))
-        }
-        let layoutCss = '', layoutHead = ''
+      const fragments = new Map<string, { head: string; body: string }>()
+      for (const fp of fragmentPaths) {
         try {
-          const layout = JSON.parse(await storage.readFile(`pages/${pageName}.layout.json`))
-          layoutCss = layout.css ?? ''; layoutHead = layout.head ?? ''
-        } catch { /* optional */ }
-
-        const title = (manifest.metadata?.title as string) ?? 'Gazetta'
-        const html = `<!DOCTYPE html><html><head><title>${title}</title><style>${[layoutCss, ...components.map(c => c.css)].join('\n')}</style>${layoutHead}${components.map(c => c.head ?? '').join('')}</head><body>${components.map(c => c.html).join('\n')}</body></html>`
-        cache.set(path, { html, at: Date.now() })
-        return c.html(html, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'MISS' })
+          const fragHtml = await storage.readFile(fp.slice(1))
+          const hs = fragHtml.indexOf('<head>'), he = fragHtml.indexOf('</head>')
+          if (hs !== -1 && he !== -1) {
+            fragments.set(fp, { head: fragHtml.slice(hs + 6, he).trim(), body: (fragHtml.slice(0, hs) + fragHtml.slice(he + 7)).trim() })
+          } else {
+            fragments.set(fp, { head: '', body: fragHtml })
+          }
+        } catch { fragments.set(fp, { head: '', body: `<!-- not found: ${fp} -->` }) }
       }
-      return c.html('404', 404)
+
+      const headLines = new Set<string>()
+      let html = pageHtml.replace(/<!--esi-head:(\/[^>]+)-->/g, (_m, p: string) => {
+        const frag = fragments.get(p)
+        if (frag?.head) for (const line of frag.head.split('\n').map((l: string) => l.trim()).filter(Boolean)) headLines.add(line)
+        return ''
+      })
+      if (headLines.size > 0) html = html.replace('</head>', `  ${[...headLines].join('\n  ')}\n</head>`)
+      html = html.replace(/<!--esi:(\/[^>]+)-->/g, (_m, p: string) => fragments.get(p)?.body ?? '')
+
+      cache.set(path, { html, at: Date.now() })
+      return c.html(html, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'MISS' })
     })
   })
 

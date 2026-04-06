@@ -1,15 +1,13 @@
 /**
  * Seed script: pre-renders the gazetta.studio site and uploads to R2.
- * Usage: npx tsx src/seed.ts
- *
- * Uses wrangler r2 object put to upload files to the R2 bucket.
+ * Usage: cd sites/gazetta.studio/worker && npx tsx src/seed.ts
  */
 
 import { resolve, join } from 'node:path'
 import { execSync } from 'node:child_process'
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
-import { createFilesystemProvider, loadSite, resolvePage, renderComponent, resetScopeCounter } from 'gazetta'
-import type { StorageProvider } from 'gazetta'
+import { createFilesystemProvider, loadSite } from 'gazetta'
+import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } from 'gazetta'
 
 const siteDir = resolve(import.meta.dirname, '../..')
 const tmpDir = resolve(import.meta.dirname, '../.seed-output')
@@ -17,85 +15,68 @@ const bucketName = 'gazetta-studio-site'
 
 async function seed() {
   const storage = createFilesystemProvider()
-  const site = await loadSite(siteDir, storage)
 
-  // Clean tmp dir
+  // Use a local filesystem provider as the target — we'll upload files to R2 after
   rmSync(tmpDir, { recursive: true, force: true })
   mkdirSync(tmpDir, { recursive: true })
+  const targetStorage = createFilesystemProvider(tmpDir)
+
+  const site = await loadSite(siteDir, storage)
 
   console.log(`\n  Pre-rendering ${site.manifest.name}...`)
   console.log(`  Pages: ${[...site.pages.keys()].join(', ')}`)
   console.log(`  Fragments: ${[...site.fragments.keys()].join(', ')}\n`)
 
-  const files: Array<{ key: string; content: string }> = []
-
-  for (const [pageName, page] of site.pages) {
-    console.log(`  Rendering page: ${pageName}`)
-    resetScopeCounter()
-    const resolved = await resolvePage(pageName, site)
-
-    // Render each top-level child component
-    const componentKeys: string[] = []
-    for (let i = 0; i < resolved.children.length; i++) {
-      const child = resolved.children[i]
-      const childName = page.components![i]
-      const key = childName.startsWith('@') ? childName : `${pageName}/${childName}`
-
-      const rendered = await renderComponent(child)
-      files.push({ key: `components/${key}.json`, content: JSON.stringify({
-        html: rendered.html,
-        css: rendered.css,
-        js: rendered.js,
-        head: rendered.head,
-      }) })
-      componentKeys.push(key)
-      console.log(`    component: ${key}`)
-    }
-
-    // Page manifest
-    files.push({ key: `pages/${pageName}.json`, content: JSON.stringify({
-      route: page.route,
-      metadata: page.metadata,
-      components: componentKeys,
-    }) })
-
-    // Page layout (global CSS from page template)
-    const childOutputs = await Promise.all(resolved.children.map(c => renderComponent(c)))
-    const pageOutput = await resolved.template({ content: resolved.content, children: childOutputs })
-    files.push({ key: `pages/${pageName}.layout.json`, content: JSON.stringify({
-      css: pageOutput.css,
-      head: pageOutput.head,
-    }) })
+  // Publish all fragments
+  for (const fragName of site.fragments.keys()) {
+    const { files } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage)
+    console.log(`  fragment: ${fragName} (${files} files)`)
   }
 
-  // Site manifest
-  files.push({ key: 'site.json', content: JSON.stringify({
-    name: site.manifest.name,
-    version: site.manifest.version,
-  }) })
+  // Publish all pages
+  for (const pageName of site.pages.keys()) {
+    const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage)
+    console.log(`  page: ${pageName} (${files} files)`)
+  }
 
+  // Publish site manifest + fragment index
+  await publishSiteManifest(storage, siteDir, targetStorage)
+  await publishFragmentIndex(storage, siteDir, targetStorage)
+  console.log(`  site.json + fragment index`)
+
+  // Upload all files to R2
+  const files = collectFiles(tmpDir, '')
   console.log(`\n  ${files.length} files to upload\n`)
 
-  // Write to tmp dir, then upload with wrangler
-  for (const { key, content } of files) {
-    const filePath = join(tmpDir, key)
-    mkdirSync(join(filePath, '..'), { recursive: true })
-    writeFileSync(filePath, content)
-
+  for (const { key, localPath } of files) {
     console.log(`  uploading: ${key}`)
-    execSync(`npx wrangler r2 object put "${bucketName}/${key}" --file "${filePath}" --remote`, {
+    execSync(`npx wrangler r2 object put "${bucketName}/${key}" --file "${localPath}" --remote`, {
       cwd: resolve(import.meta.dirname, '..'),
       stdio: 'pipe',
     })
   }
 
-  // Clean up
   rmSync(tmpDir, { recursive: true, force: true })
-
   console.log(`\n  Done! ${files.length} files uploaded to R2 bucket "${bucketName}"\n`)
 }
 
+import { readdirSync, statSync } from 'node:fs'
+
+function collectFiles(dir: string, prefix: string): Array<{ key: string; localPath: string }> {
+  const files: Array<{ key: string; localPath: string }> = []
+  for (const entry of readdirSync(dir)) {
+    const fullPath = join(dir, entry)
+    const key = prefix ? `${prefix}/${entry}` : entry
+    if (statSync(fullPath).isDirectory()) {
+      files.push(...collectFiles(fullPath, key))
+    } else {
+      files.push({ key, localPath: fullPath })
+    }
+  }
+  return files
+}
+
 seed().catch(err => {
-  console.error(`\n  Error: ${err.message}\n`)
+  console.error(`\n  Error: ${err.message}\n${err.stack}\n`)
   process.exit(1)
 })

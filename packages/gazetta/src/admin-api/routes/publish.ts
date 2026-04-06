@@ -70,8 +70,8 @@ export function publishRoutes(
         const { copiedFiles } = await publishItems(sourceStorage, siteDir, targetStorage, '', allItems)
         totalFiles += copiedFiles
 
-        // 2. Pre-render pages and fragments → JSON for edge composition
-        for (const item of body.items) {
+        // 2. Pre-render pages and fragments (including dependencies)
+        for (const item of allItems) {
           if (item.startsWith('pages/')) {
             const pageName = item.replace('pages/', '')
             const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage)
