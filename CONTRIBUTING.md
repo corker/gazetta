@@ -6,11 +6,11 @@ that structures websites as composable components.
 ## Getting Started
 
 ```bash
-git clone https://github.com/gazetta-studio/gazetta-studio.git
+git clone https://github.com/corker/gazetta.git
 cd gazetta
 npm install
 npm run build
-npm run dev          # dev server on http://localhost:3000
+npm run dev          # site + CMS on http://localhost:3000
 npm test             # run all tests
 ```
 
@@ -18,13 +18,10 @@ npm test             # run all tests
 
 ```
 packages/
-  core/             TypeScript types (Component, Fragment, Page, StorageProvider)
-  renderer/         Hono-based renderer (site loader, resolver, CSS scoping)
-  editor-default/   Default editor (@rjsf form wrapped in mount function)
-  cli/              CLI tool (gazetta dev)
+  gazetta/          Core — renderer, CLI, admin API, editor, storage providers
   mcp-dev/          MCP dev server (screenshot tool for Claude Code)
 apps/
-  web/              CMS frontend (Vue 3 + PrimeVue) + backend API (Hono)
+  admin-ui/         CMS admin frontend (Vue 3 + PrimeVue)
 examples/
   starter/          Sample site with templates, fragments, and pages
 sites/
@@ -45,8 +42,8 @@ sites/
 npm test                          # all tests (excluding Docker-dependent)
 npm test -- --reporter verbose    # verbose output
 
-# Publish tests require Docker (Azurite for Azure Blob):
-npx vitest run apps/web/tests/publish.test.ts
+# Docker integration tests (S3/MinIO, Azure Blob/Azurite):
+npm test -w @gazetta/admin-ui -- tests/docker.test.ts
 ```
 
 ## Code Conventions
@@ -85,23 +82,11 @@ export const editor = { mount, unmount }        // custom editor (optional)
 
 ## Areas to Contribute
 
-### Good First Issues
-
-Look for issues labeled [`good first issue`](https://github.com/gazetta-studio/gazetta-studio/labels/good%20first%20issue).
-
-### Areas That Need Help
-
-- **Storage providers** — S3, Google Cloud Storage, Git-based providers
+- **Storage providers** — Google Cloud Storage, Git-based providers
 - **Templates** — more starter templates (blog layout, card grid, hero variants)
-- **CMS UI** — better error states, keyboard shortcuts, accessibility
+- **Admin UI** — better error states, keyboard shortcuts, accessibility
 - **Documentation** — tutorials, API docs, template authoring guide
-- **Testing** — more edge cases, E2E tests for the CMS UI
-
-## Submitting Issues
-
-- **Bug reports**: include steps to reproduce, expected vs actual behavior
-- **Feature requests**: describe the use case, not just the solution
-- **Questions**: use [GitHub Discussions](https://github.com/gazetta-studio/gazetta-studio/discussions)
+- **Testing** — E2E tests for the admin UI
 
 ## Pull Requests
 

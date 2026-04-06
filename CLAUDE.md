@@ -4,11 +4,8 @@ Stateless CMS that structures websites as composable fragments. All state lives 
 
 ## Structure
 
-- `apps/web/` — CMS frontend (stateless editor UI)
-- `packages/core/` — TypeScript types (Component, Fragment, Page, StorageProvider)
-- `packages/renderer/` — Hono-based renderer (site loader, resolver, renderer, dev server)
-- `packages/editor-default/` — Default editor (@rjsf form wrapped in mount function)
-- `packages/cli/` — CLI tool (gazetta dev)
+- `apps/admin-ui/` — CMS admin frontend (Vue 3 + PrimeVue editor shell)
+- `packages/gazetta/` — Core package (renderer, CLI, admin API, editor, storage providers)
 - `packages/mcp-dev/` — MCP dev server (screenshot tool)
 - `examples/starter/` — Sample site with templates, fragments, pages
 - `sites/gazetta.studio/` — The gazetta.studio website (dogfooding)

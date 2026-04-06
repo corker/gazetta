@@ -20,38 +20,19 @@ The CMS stores nothing — all content lives in targets (filesystem, S3, Azure B
 npm install
 npm run build
 npm run dev
-# Open http://localhost:3000
+# Open http://localhost:3000 (site) and http://localhost:3000/admin (CMS editor)
 ```
 
-This starts the renderer dev server with the starter example site.
-
-## CMS Editor
-
-```bash
-npm run build
-npx tsx apps/web/src/server/dev.ts examples/starter &
-cd apps/web && npx vite --port 5173 &
-# Open http://localhost:5173
-```
-
-The CMS editor provides:
-- Site tree — browse pages and fragments
-- Component tree — view and edit components within a page
-- Schema-driven editor — forms auto-generated from Zod schemas
-- Live preview — updates as you edit, without saving
-- Save — writes changes to the target
+This starts the dev server with the starter example site and CMS admin UI.
 
 ## Project Structure
 
 ```
 packages/
-  core/             TypeScript types (Component, Fragment, Page, Template, StorageProvider)
-  renderer/         Hono-based renderer (site loader, resolver, CSS scoping, dev server)
-  editor-default/   Default editor — @rjsf form wrapped in mount function
-  cli/              CLI tool (gazetta dev)
+  gazetta/          Core package — renderer, CLI, admin API, editor, storage providers
   mcp-dev/          MCP dev server (screenshot tool for Claude Code)
 apps/
-  web/              CMS frontend (Vue 3 + PrimeVue) + backend API (Hono)
+  admin-ui/         CMS admin frontend (Vue 3 + PrimeVue)
 examples/
   starter/          Sample site with templates, fragments, and pages
 sites/
@@ -94,7 +75,7 @@ A template is a pure function that returns HTML, CSS, and JS:
 
 ```ts
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/core'
+import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
   title: z.string().describe('Title'),
@@ -144,19 +125,19 @@ Each template exports a Zod schema. The CMS converts it to JSON Schema and auto-
 an editor form using react-jsonschema-form. Templates can also export a custom editor via
 the mount function contract `{ mount(el, props), unmount(el) }`.
 
+## Development
+
+```bash
+npm run dev              # site + CMS on http://localhost:3000
+npm run dev:admin        # admin UI with standalone Vite (HMR)
+npm test                 # run all tests
+npm run build            # build all packages
+```
+
 ## Documentation
 
 - **[Getting Started](docs/getting-started.md)** — create a site, write templates, add pages and fragments
 - **[Design](docs/design.md)** — full architecture and design decisions
-
-## Design
-
-See [docs/design.md](docs/design.md) for the full design document, including:
-- Component/Fragment/Page hierarchy
-- Stateless CMS with bidirectional target sync
-- Static vs Dynamic vs Island components
-- Edge runtime composition (Hono on WinterTC)
-- Publishing model
 
 ## License
 
