@@ -67,7 +67,8 @@ describe('starter site', () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
 
-    expect(resolved.children).toHaveLength(4)
+    // @header, hero, features, demo, @footer
+    expect(resolved.children).toHaveLength(5)
 
     const header = resolved.children[0]
     expect(header.children).toHaveLength(2)
@@ -79,7 +80,11 @@ describe('starter site', () => {
     const features = resolved.children[2]
     expect(features.children).toHaveLength(3)
 
-    const footer = resolved.children[3]
+    // demo (counter) is a leaf
+    const demo = resolved.children[3]
+    expect(demo.children).toHaveLength(0)
+
+    const footer = resolved.children[4]
     expect(footer.children).toHaveLength(1)
   })
 
