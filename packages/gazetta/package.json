@@ -4,7 +4,8 @@
   "type": "module",
   "license": "MIT",
   "files": [
-    "dist/"
+    "dist/",
+    "admin-dist/"
   ],
   "bin": {
     "gazetta": "./dist/cli/index.js"
@@ -21,6 +22,10 @@
     "./editor": {
       "types": "./dist/editor/mount.d.ts",
       "import": "./dist/editor/mount.js"
+    },
+    "./admin-api": {
+      "types": "./dist/admin-api/index.d.ts",
+      "import": "./dist/admin-api/index.js"
     }
   },
   "publishConfig": {
@@ -28,6 +33,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:admin": "vite build -c ../../apps/admin-ui/vite.config.ts --base /admin/ --outDir ../../packages/gazetta/admin-dist --emptyOutDir ../../apps/admin-ui",
     "test": "vitest run"
   },
   "dependencies": {
@@ -40,7 +46,8 @@
     "postcss": "^8.5.8",
     "postcss-prefix-selector": "^2.1.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "zod": "^4.3.6"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": ">=3",

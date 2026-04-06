@@ -1,15 +1,13 @@
 import { resolve } from 'node:path'
 import type { StorageProvider, TargetConfig } from './types.js'
 import { createFilesystemProvider } from './providers/filesystem.js'
-import { createAzureBlobProvider } from './providers/azure-blob.js'
-import { createS3Provider } from './providers/s3.js'
 
 function resolveEnvVars(value: string | undefined): string | undefined {
   if (!value) return value
   return value.replace(/\$\{(\w+)\}/g, (_, name) => process.env[name] ?? '')
 }
 
-export function createTargetProvider(config: TargetConfig, siteDir: string): StorageProvider {
+export async function createTargetProvider(config: TargetConfig, siteDir: string): Promise<StorageProvider> {
   switch (config.type) {
     case 'filesystem':
       if (!config.path) throw new Error('Filesystem target requires "path"')
@@ -18,19 +16,29 @@ export function createTargetProvider(config: TargetConfig, siteDir: string): Sto
       const connectionString = resolveEnvVars(config.connectionString)
       if (!connectionString) throw new Error('Azure Blob target requires "connectionString"')
       if (!config.container) throw new Error('Azure Blob target requires "container"')
-      return createAzureBlobProvider({ connectionString, container: config.container })
+      try {
+        const { createAzureBlobProvider } = await import('./providers/azure-blob.js')
+        return createAzureBlobProvider({ connectionString, container: config.container })
+      } catch {
+        throw new Error('Azure Blob target requires @azure/storage-blob. Install it: npm install @azure/storage-blob')
+      }
     }
     case 's3': {
       const endpoint = resolveEnvVars(config.endpoint)
       if (!endpoint) throw new Error('S3 target requires "endpoint"')
       if (!config.bucket) throw new Error('S3 target requires "bucket"')
-      return createS3Provider({
-        endpoint,
-        bucket: config.bucket,
-        accessKeyId: resolveEnvVars(config.accessKeyId) ?? 'minioadmin',
-        secretAccessKey: resolveEnvVars(config.secretAccessKey) ?? 'minioadmin',
-        region: config.region,
-      })
+      try {
+        const { createS3Provider } = await import('./providers/s3.js')
+        return createS3Provider({
+          endpoint,
+          bucket: config.bucket,
+          accessKeyId: resolveEnvVars(config.accessKeyId) ?? 'minioadmin',
+          secretAccessKey: resolveEnvVars(config.secretAccessKey) ?? 'minioadmin',
+          region: config.region,
+        })
+      } catch {
+        throw new Error('S3 target requires @aws-sdk/client-s3. Install it: npm install @aws-sdk/client-s3')
+      }
     }
     default:
       throw new Error(`Unknown target type: ${config.type}`)
@@ -41,8 +49,7 @@ export async function createTargetRegistry(targets: Record<string, TargetConfig>
   const registry = new Map<string, StorageProvider>()
   for (const [name, config] of Object.entries(targets)) {
     try {
-      const provider = createTargetProvider(config, siteDir)
-      // Initialize providers that need it (e.g., create Azure Blob containers)
+      const provider = await createTargetProvider(config, siteDir)
       if ('init' in provider && typeof provider.init === 'function') {
         await (provider as StorageProvider & { init(): Promise<void> }).init()
       }
