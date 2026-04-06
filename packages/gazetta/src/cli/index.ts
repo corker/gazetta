@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { watch } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { loadSite, resolvePage, renderPage, createFilesystemProvider, invalidateTemplate, invalidateAllTemplates } from '../index.js'
+import yaml from 'js-yaml'
+import {
+  loadSite, resolvePage, renderPage,
+  createFilesystemProvider, createTargetRegistry,
+  invalidateTemplate, invalidateAllTemplates,
+} from '../index.js'
+import type { SiteManifest, StorageProvider } from '../types.js'
 
 const args = process.argv.slice(2)
 const command = args[0]
@@ -15,15 +23,15 @@ function printHelp() {
   gazetta - Stateless CMS for composable websites
 
   Usage:
-    gazetta dev [site-dir]    Start the dev server
+    gazetta dev [site-dir]    Start dev server with CMS at /admin
     gazetta help              Show this help message
 
   Options:
     --port, -p <port>         Server port (default: 3000)
 
   Examples:
-    gazetta dev                     # dev server for current directory
-    gazetta dev ./my-site           # dev server for a specific site
+    gazetta dev                     # dev server + CMS
+    gazetta dev ./my-site           # specific site directory
     gazetta dev --port 8080         # custom port
 `)
 }
@@ -31,7 +39,6 @@ function printHelp() {
 function parseArgs(input: string[]): { siteDir: string; port?: number } {
   let siteDir = '.'
   let port: number | undefined
-
   for (let i = 0; i < input.length; i++) {
     if (input[i] === '--port' || input[i] === '-p') {
       port = parseInt(input[++i], 10)
@@ -39,17 +46,20 @@ function parseArgs(input: string[]): { siteDir: string; port?: number } {
       siteDir = input[i]
     }
   }
-
   return { siteDir: resolve(siteDir), port }
 }
 
 async function runDev(siteDir: string, port: number) {
   const storage = createFilesystemProvider()
+  const cmsApiPort = port + 100
+  const cmsUiPort = port + 101
 
   console.log(`\n  Loading site from ${siteDir}...`)
   const site = await loadSite(siteDir, storage)
+
   const app = new Hono()
 
+  // ---- Live reload (SSE) ----
   let reloadId = 0
   const reloadListeners = new Set<() => void>()
   function notifyReload() { reloadId++; for (const l of reloadListeners) l() }
@@ -68,6 +78,81 @@ async function runDev(siteDir: string, port: number) {
     })
   })
 
+  // ---- Proxy /api/* and /preview/* to CMS API server ----
+  app.all('/api/*', async (c) => {
+    try {
+      const url = new URL(c.req.url)
+      url.port = String(cmsApiPort)
+      const res = await fetch(url.toString(), {
+        method: c.req.method,
+        headers: c.req.raw.headers,
+        body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
+        // @ts-expect-error duplex needed for streaming body
+        duplex: 'half',
+      })
+      return new Response(res.body, { status: res.status, headers: res.headers })
+    } catch {
+      return c.json({ error: 'CMS API not ready' }, 502)
+    }
+  })
+
+  app.all('/preview/*', async (c) => {
+    try {
+      const url = new URL(c.req.url)
+      url.port = String(cmsApiPort)
+      const res = await fetch(url.toString(), {
+        method: c.req.method,
+        headers: c.req.raw.headers,
+        body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
+        // @ts-expect-error duplex needed for streaming body
+        duplex: 'half',
+      })
+      return new Response(res.body, { status: res.status, headers: res.headers })
+    } catch {
+      return c.text('Preview not ready', 502)
+    }
+  })
+
+  // ---- Proxy /admin to Vite dev server ----
+  app.all('/admin', async (c) => {
+    try {
+      const res = await fetch(`http://localhost:${cmsUiPort}/`)
+      return new Response(res.body, { status: res.status, headers: res.headers })
+    } catch {
+      return c.html('<p>CMS UI loading... <a href="/admin">refresh</a></p>')
+    }
+  })
+
+  app.all('/admin/*', async (c) => {
+    try {
+      const path = new URL(c.req.url).pathname.replace('/admin', '') || '/'
+      const res = await fetch(`http://localhost:${cmsUiPort}${path}`)
+      return new Response(res.body, { status: res.status, headers: res.headers })
+    } catch {
+      // Fall through to Vite's SPA routing
+      try {
+        const res = await fetch(`http://localhost:${cmsUiPort}/`)
+        return new Response(res.body, { status: res.status, headers: res.headers })
+      } catch {
+        return c.html('<p>CMS UI loading... <a href="/admin">refresh</a></p>')
+      }
+    }
+  })
+
+  // ---- Proxy Vite assets (/@vite, /src, /node_modules) ----
+  for (const prefix of ['/@vite', '/@fs', '/src/client', '/node_modules']) {
+    app.all(`${prefix}/*`, async (c) => {
+      try {
+        const path = new URL(c.req.url).pathname
+        const res = await fetch(`http://localhost:${cmsUiPort}${path}`)
+        return new Response(res.body, { status: res.status, headers: res.headers })
+      } catch {
+        return c.text('Not ready', 502)
+      }
+    })
+  }
+
+  // ---- Site page routes ----
   for (const [pageName, page] of site.pages) {
     app.get(page.route, async (c) => {
       try {
@@ -81,18 +166,50 @@ async function runDev(siteDir: string, port: number) {
     })
   }
 
+  // ---- 404 ----
   app.notFound((c) => {
     const routes = [...site.pages.entries()].map(([n, p]) => `  ${p.route} → ${n}`).join('\n')
-    return c.html(`<pre style="padding:2rem">Page not found: ${c.req.path}\n\nAvailable:\n${routes}</pre>`, 404)
+    return c.html(`<pre style="padding:2rem">Page not found: ${c.req.path}\n\nAvailable:\n${routes}\n  /admin → CMS editor</pre>`, 404)
   })
 
+  // ---- Start CMS API server (hidden port) ----
+  const cmsWebDir = await findCmsDir()
+  if (cmsWebDir) {
+    const apiProc = spawn('npx', ['tsx', join(cmsWebDir, 'src/server/dev.ts'), siteDir], {
+      env: { ...process.env, API_PORT: String(cmsApiPort) },
+      stdio: 'pipe',
+    })
+    apiProc.stderr?.on('data', (d: Buffer) => {
+      const msg = d.toString().trim()
+      if (msg) console.error(`  [cms-api] ${msg}`)
+    })
+
+    // Start Vite for CMS UI (hidden port)
+    const viteProc = spawn('npx', ['vite', '--port', String(cmsUiPort), '--strictPort'], {
+      cwd: cmsWebDir,
+      env: { ...process.env },
+      stdio: 'pipe',
+    })
+    viteProc.stderr?.on('data', (d: Buffer) => {
+      const msg = d.toString().trim()
+      if (msg && !msg.includes('VITE')) console.error(`  [cms-ui] ${msg}`)
+    })
+
+    process.on('exit', () => { apiProc.kill(); viteProc.kill() })
+    process.on('SIGINT', () => { apiProc.kill(); viteProc.kill(); process.exit(0) })
+  }
+
+  // ---- Start main server ----
   serve({ fetch: app.fetch, port }, () => {
-    console.log(`\n  Gazetta dev server running at http://localhost:${port}\n`)
+    console.log(`\n  Gazetta running at http://localhost:${port}\n`)
     console.log(`  Site: ${site.manifest.name}`)
+    console.log(`  Pages:`)
     for (const [name, page] of site.pages) console.log(`    ${page.route} → ${name}`)
-    console.log(`  Fragments: ${[...site.fragments.keys()].join(', ') || '(none)'}\n`)
+    if (cmsWebDir) console.log(`  CMS:  http://localhost:${port}/admin`)
+    console.log()
   })
 
+  // ---- File watching ----
   watch(siteDir, { recursive: true }, (_event, filename) => {
     if (!filename) return
     if (filename.endsWith('.ts') && filename.includes('templates/')) {
@@ -105,11 +222,23 @@ async function runDev(siteDir: string, port: number) {
     } else if (filename.endsWith('.yaml')) {
       console.log(`  Manifest changed: ${filename}`)
       invalidateAllTemplates()
-    } else {
-      return
-    }
+    } else return
     notifyReload()
   })
+}
+
+async function findCmsDir(): Promise<string | null> {
+  const { access } = await import('node:fs/promises')
+  const exists = async (p: string) => { try { await access(p); return true } catch { return false } }
+  const candidates = [
+    resolve('apps/web'),                                     // cwd-relative (monorepo root)
+    resolve(import.meta.dirname, '../../../../apps/web'),    // relative to CLI source
+    resolve(import.meta.dirname, '../../../apps/web'),
+  ]
+  for (const dir of candidates) {
+    if (await exists(join(dir, 'src/server/dev.ts'))) return dir
+  }
+  return null
 }
 
 async function main() {
