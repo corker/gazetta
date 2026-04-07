@@ -131,12 +131,11 @@ async function assembleEsi(bucket: R2Bucket, html: string): Promise<string> {
   while ((match = esiHeadRegex.exec(html)) !== null) fragmentPaths.add(match[1])
   while ((match = esiBodyRegex.exec(html)) !== null) fragmentPaths.add(match[1])
 
-  // Read all unique fragments (with caching)
-  const fragments = new Map<string, { head: string; body: string }>()
-  for (const path of fragmentPaths) {
-    const parsed = await readFragment(bucket, path)
-    fragments.set(path, parsed)
-  }
+  // Read all unique fragments in parallel (with per-fragment caching)
+  const fragmentEntries = await Promise.all(
+    [...fragmentPaths].map(async (path) => [path, await readFragment(bucket, path)] as const)
+  )
+  const fragments = new Map(fragmentEntries)
 
   // Collect CSS and JS separately, preserving fragment order, deduplicating
   const esiHeadOrder: string[] = []
