@@ -74,6 +74,37 @@ describe('findCmsDir (dev mode detection)', () => {
   })
 })
 
+describe('renderErrorOverlay', () => {
+  // Inline the function for testing
+  function renderErrorOverlay(err: Error): string {
+    const message = err.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const stack = (err.stack ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const fileMatch = stack.match(/\(?(\/[^\s:)]+):(\d+)/)
+    const filePath = fileMatch ? fileMatch[1] : ''
+    const lineNum = fileMatch ? fileMatch[2] : ''
+    const location = filePath ? `${filePath}${lineNum ? `:${lineNum}` : ''}` : ''
+    return `<!DOCTYPE html><html><head><title>Error — Gazetta</title></head><body>${location ? `<div class="location">${location}</div>` : ''}<div class="message">${message}</div><script>new EventSource('/__reload').onmessage = () => location.reload()</script></body></html>`
+  }
+
+  it('renders error message with HTML escaping', () => {
+    const html = renderErrorOverlay(new Error('Missing <template> export'))
+    expect(html).toContain('Missing &lt;template&gt; export')
+    expect(html).not.toContain('<template>')
+  })
+
+  it('includes live reload script', () => {
+    const html = renderErrorOverlay(new Error('test'))
+    expect(html).toContain('/__reload')
+  })
+
+  it('extracts file location from stack', () => {
+    const err = new Error('bad')
+    err.stack = `Error: bad\n    at Object.<anonymous> (/Users/dev/templates/hero/index.ts:5:10)`
+    const html = renderErrorOverlay(err)
+    expect(html).toContain('/Users/dev/templates/hero/index.ts:5')
+  })
+})
+
 describe('findCmsStaticDir (production mode detection)', () => {
   function findCmsStaticDir(): string | null {
     const candidates = [

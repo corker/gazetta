@@ -296,6 +296,54 @@ async function runBuild(siteDir: string, targetName?: string) {
   console.log(`  Done!\n`)
 }
 
+function renderErrorOverlay(err: Error): string {
+  const message = err.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const stack = (err.stack ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  // Extract file path from error message or stack
+  const fileMatch = stack.match(/\(?(\/[^\s:)]+):(\d+)/)
+  const filePath = fileMatch ? fileMatch[1] : ''
+  const lineNum = fileMatch ? fileMatch[2] : ''
+  const location = filePath ? `${filePath}${lineNum ? `:${lineNum}` : ''}` : ''
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Error — Gazetta</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #1a1a2e; color: #e4e4e7; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .overlay { max-width: 48rem; width: 100%; margin: 2rem; }
+    .header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .header svg { flex-shrink: 0; }
+    .header h1 { font-size: 1.25rem; font-weight: 600; color: #f87171; }
+    .message { background: #0f0f1a; border: 1px solid #27272a; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.875rem; line-height: 1.7; white-space: pre-wrap; word-break: break-word; color: #fca5a5; }
+    .location { font-size: 0.8125rem; color: #71717a; margin-bottom: 1rem; }
+    .location span { color: #a78bfa; }
+    .stack { background: #0f0f1a; border: 1px solid #27272a; border-radius: 8px; padding: 1.5rem; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.7; white-space: pre-wrap; word-break: break-word; color: #52525b; max-height: 20rem; overflow: auto; }
+    .hint { margin-top: 1.5rem; font-size: 0.8125rem; color: #52525b; }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <div class="header">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <h1>Template Error</h1>
+    </div>
+    ${location ? `<div class="location">File: <span>${location}</span></div>` : ''}
+    <div class="message">${message}</div>
+    <details>
+      <summary style="color:#52525b;font-size:0.8125rem;cursor:pointer;margin-bottom:0.5rem">Stack trace</summary>
+      <div class="stack">${stack}</div>
+    </details>
+    <div class="hint">Fix the error and save — the page will reload automatically.</div>
+  </div>
+  <script>new EventSource('/__reload').onmessage = () => location.reload()</script>
+</body>
+</html>`
+}
+
 async function runDev(siteDir: string, port: number) {
   const storage = createFilesystemProvider()
 
@@ -332,7 +380,7 @@ async function runDev(siteDir: string, port: number) {
         const html = await renderPage(resolved, page.metadata, c.req.param())
         return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
       } catch (err) {
-        return c.html(`<pre style="color:red;padding:2rem">${(err as Error).message}</pre>`, 500)
+        return c.html(renderErrorOverlay(err as Error), 500)
       }
     })
   }
