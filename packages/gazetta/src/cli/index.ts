@@ -27,30 +27,37 @@ function printHelp() {
   Usage:
     gazetta init [dir]        Create a new site
     gazetta dev [site-dir]    Start dev server + CMS at /admin
+    gazetta build [site-dir]  Pre-render and publish to targets
     gazetta help              Show this help message
 
   Options:
     --port, -p <port>         Server port (default: 3000)
+    --target, -t <name>       Target to publish to (default: all)
 
   Examples:
     gazetta init my-site            # scaffold a new site
     gazetta dev                     # dev server + CMS
     gazetta dev ./my-site           # specific site directory
     gazetta dev --port 8080         # custom port
+    gazetta build                   # publish to all targets
+    gazetta build -t production     # publish to specific target
 `)
 }
 
-function parseArgs(input: string[]): { siteDir: string; port?: number } {
+function parseArgs(input: string[]): { siteDir: string; port?: number; target?: string } {
   let siteDir = '.'
   let port: number | undefined
+  let target: string | undefined
   for (let i = 0; i < input.length; i++) {
     if (input[i] === '--port' || input[i] === '-p') {
       port = parseInt(input[++i], 10)
+    } else if (input[i] === '--target' || input[i] === '-t') {
+      target = input[++i]
     } else if (!input[i].startsWith('-')) {
       siteDir = input[i]
     }
   }
-  return { siteDir: resolve(siteDir), port }
+  return { siteDir: resolve(siteDir), port, target }
 }
 
 async function runInit(dir: string) {
@@ -201,6 +208,90 @@ content:
   console.log(`    npm install`)
   console.log(`    npx gazetta dev`)
   console.log()
+}
+
+async function runBuild(siteDir: string, targetName?: string) {
+  const storage = createFilesystemProvider()
+
+  console.log(`\n  Loading site from ${siteDir}...`)
+  const site = await loadSite(siteDir, storage)
+
+  // Load target configs from site.yaml
+  const siteYamlPath = join(siteDir, 'site.yaml')
+  if (!existsSync(siteYamlPath)) {
+    console.error(`\n  Error: No site.yaml found at ${siteDir}\n`)
+    process.exit(1)
+  }
+  const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as import('../types.js').SiteManifest
+  if (!siteYaml.targets || Object.keys(siteYaml.targets).length === 0) {
+    console.error(`\n  Error: No targets configured in site.yaml\n`)
+    process.exit(1)
+  }
+
+  // Determine which targets to publish to
+  const targetNames = targetName ? [targetName] : Object.keys(siteYaml.targets)
+  for (const name of targetNames) {
+    if (!siteYaml.targets[name]) {
+      console.error(`\n  Error: Unknown target "${name}". Available: ${Object.keys(siteYaml.targets).join(', ')}\n`)
+      process.exit(1)
+    }
+  }
+
+  // Initialize targets
+  const { createTargetRegistry } = await import('../targets.js')
+  const targets = await createTargetRegistry(
+    Object.fromEntries(targetNames.map(n => [n, siteYaml.targets![n]])),
+    siteDir
+  )
+
+  const { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createWorkerPurge } = await import('../publish-rendered.js')
+
+  console.log(`\n  Site: ${site.manifest.name}`)
+  console.log(`  Pages: ${[...site.pages.keys()].join(', ')}`)
+  console.log(`  Fragments: ${[...site.fragments.keys()].join(', ')}`)
+  console.log(`  Targets: ${targetNames.join(', ')}\n`)
+
+  for (const name of targetNames) {
+    const targetStorage = targets.get(name)
+    if (!targetStorage) {
+      console.error(`  ${name}: SKIPPED (failed to initialize)`)
+      continue
+    }
+
+    console.log(`  Publishing to ${name}...`)
+    let totalFiles = 0
+
+    // Publish all fragments
+    for (const fragName of site.fragments.keys()) {
+      const { files } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage)
+      totalFiles += files
+      console.log(`    fragment: ${fragName} (${files} files)`)
+    }
+
+    // Publish all pages
+    for (const pageName of site.pages.keys()) {
+      const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage)
+      totalFiles += files
+      console.log(`    page: ${pageName} (${files} files)`)
+    }
+
+    // Site manifest + fragment index
+    await publishSiteManifest(storage, siteDir, targetStorage)
+    await publishFragmentIndex(storage, siteDir, targetStorage)
+    totalFiles += 2
+
+    // Purge cache if worker URL configured
+    const config = siteYaml.targets[name]
+    if (config.workerUrl) {
+      const purge = createWorkerPurge(config.workerUrl)
+      await purge.purgeAll()
+      console.log(`    cache purged`)
+    }
+
+    console.log(`  ${name}: ${totalFiles} files published\n`)
+  }
+
+  console.log(`  Done!\n`)
 }
 
 async function runDev(siteDir: string, port: number) {
@@ -451,6 +542,9 @@ async function main() {
   switch (command) {
     case 'init':
       await runInit(args[1] ?? '.')
+      break
+    case 'build':
+      await runBuild(parsed.siteDir, parsed.target)
       break
     case 'dev':
       await runDev(parsed.siteDir, parsed.port ?? 3000)
