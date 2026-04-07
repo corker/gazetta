@@ -1,330 +1,277 @@
-# Getting Started
-
-This guide walks you through creating a Gazetta site from scratch.
+# Getting Started with Gazetta
 
 ## Prerequisites
 
 - Node.js 22+
-- Clone the repo and install dependencies:
+
+## Create a site
 
 ```bash
-git clone https://github.com/gazetta-studio/gazetta-studio.git
-cd gazetta
+npx gazetta init my-site
+cd my-site
 npm install
-npm run build
 ```
 
-## 1. Create a Site
+This scaffolds:
+- A home page with a hero and text block
+- A shared header fragment (nav bar)
+- Templates: page-layout, hero, nav, text-block
 
-A Gazetta site is a folder with a `site.yaml` and three directories:
-
-```
-my-site/
-  site.yaml
-  templates/
-  fragments/
-  pages/
-```
-
-Create it:
+## Start the dev server
 
 ```bash
-mkdir -p my-site/{templates,fragments,pages}
+npx gazetta dev
 ```
 
-Add `site.yaml`:
+- **http://localhost:3000** — your site
+- **http://localhost:3000/admin** — CMS editor
 
-```yaml
-# my-site/site.yaml
-name: "My Site"
-```
+The server watches for changes and reloads automatically.
 
-## 2. Create a Template
+## Templates
 
-A template is a pure function that returns `{ html, css, js }`. Every template
-must also export a Zod schema describing its content.
-
-Create a simple hero template:
-
-```bash
-mkdir my-site/templates/hero
-```
+A template is a TypeScript function that returns `{ html, css, js }`. Every template exports a Zod schema for its content.
 
 ```ts
-// my-site/templates/hero/index.ts
+// templates/hero/index.ts
 import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/core'
+import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
-  title: z.string().describe('Heading'),
-  subtitle: z.string().optional().describe('Subheading'),
+  title: z.string(),
+  subtitle: z.string().optional(),
 })
 
-const template: TemplateFunction = ({ content = {} }) => ({
+type Content = z.infer<typeof schema>
+
+const template: TemplateFunction<Content> = ({ content }) => ({
   html: `<section class="hero">
-  <h1>${content.title ?? ''}</h1>
-  <p>${content.subtitle ?? ''}</p>
+  <h1>${content?.title ?? ''}</h1>
+  <p>${content?.subtitle ?? ''}</p>
 </section>`,
-  css: `.hero {
-  padding: 4rem 2rem;
-  text-align: center;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-}
-.hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
-.hero p { font-size: 1.25rem; opacity: 0.9; }`,
+  css: `.hero { padding: 4rem 2rem; text-align: center; }
+.hero h1 { font-size: 2.5rem; }`,
   js: '',
 })
 
 export default template
 ```
 
-**Key points:**
-- `export default` — the render function (required)
-- `export const schema` — Zod schema for content validation and CMS form generation (required)
-- The function receives `{ content, children, params }`
-- Returns `{ html, css, js }` — nothing else
+### Template fields
 
-## 3. Create a Page Layout Template
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `html` | string | Yes | HTML markup |
+| `css` | string | Yes | CSS (scoped per component automatically) |
+| `js` | string | Yes | Client-side JavaScript (`''` for static components) |
+| `head` | string | No | Content for `<head>` — favicons, fonts, meta tags |
 
-Pages need a layout template that wraps children:
+### Frameworks
 
-```bash
-mkdir my-site/templates/page-layout
+Templates can use any framework that SSR's to HTML:
+
+**React:**
+```tsx
+import { renderToStaticMarkup } from 'react-dom/server'
+
+const template: TemplateFunction<Content> = ({ content }) => ({
+  html: renderToStaticMarkup(<Card {...content!} />),
+  css: `.card { padding: 1.5rem; }`,
+  js: '',
+})
 ```
 
+**Vue 3:**
 ```ts
-// my-site/templates/page-layout/index.ts
-import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/core'
+import { createSSRApp, h } from 'vue'
+import { renderToString } from 'vue/server-renderer'
 
-export const schema = z.object({})
+const template: TemplateFunction<Content> = async ({ content }) => {
+  const app = createSSRApp(Quote, content ?? {})
+  return { html: await renderToString(app), css: '...', js: '' }
+}
+```
 
+**Interactive components** return JS that runs in the browser:
+```ts
+const template: TemplateFunction<Content> = ({ content }) => ({
+  html: `<button id="btn">Click me</button>`,
+  css: `button { padding: 0.5rem 1rem; }`,
+  js: `document.getElementById('btn').addEventListener('click', () => alert('Hi'))`,
+})
+```
+
+### Composite templates
+
+Layout templates receive `children` — the rendered output of child components:
+
+```ts
 const template: TemplateFunction = ({ children = [] }) => ({
   html: `<main>${children.map(c => c.html).join('\n')}</main>`,
-  css: `*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, sans-serif; color: #1a1a1a; line-height: 1.6; }
+  css: `main { max-width: 800px; margin: 0 auto; }
 ${children.map(c => c.css).join('\n')}`,
   js: children.map(c => c.js).filter(Boolean).join('\n'),
+  head: children.map(c => c.head).filter(Boolean).join('\n'),
 })
-
-export default template
 ```
 
-**Composite templates** receive `children` — the rendered output of child components.
-They decide how to arrange them (flex, grid, stack, etc.).
+## Pages
 
-## 4. Create a Page
-
-A page is a folder under `pages/` with a `page.yaml` manifest:
-
-```bash
-mkdir -p my-site/pages/home/hero
-```
+A page is a folder with a `page.yaml` manifest:
 
 ```yaml
-# my-site/pages/home/page.yaml
-route: /
+# pages/about/page.yaml
+route: /about
 template: page-layout
 metadata:
-  title: "Home"
+  title: About
+  description: About our company
 components:
-  - hero
+  - "@header"       # shared fragment
+  - about-text      # local component
+  - "@footer"       # shared fragment
 ```
 
-Each component listed in `components` needs a `component.yaml`:
+Local components live in subfolders:
 
 ```yaml
-# my-site/pages/home/hero/component.yaml
-template: hero
+# pages/about/about-text/component.yaml
+template: text-block
 content:
-  title: "Hello World"
-  subtitle: "My first Gazetta site"
+  body: "<p>We build composable websites.</p>"
 ```
 
-## 5. Run the Dev Server
+Or create pages in the CMS — click **New page** in the admin UI.
 
-```bash
-npx tsx packages/cli/src/index.ts dev my-site
-```
-
-Open http://localhost:3000 — you should see your page.
-
-Edit `hero/component.yaml`, change the title — the browser reloads automatically.
-
-## 6. Add a Shared Fragment
-
-Fragments are reusable components shared across pages. Create a footer:
-
-```bash
-mkdir -p my-site/templates/footer-layout
-mkdir -p my-site/fragments/footer/copyright
-```
-
-```ts
-// my-site/templates/footer-layout/index.ts
-import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/core'
-
-export const schema = z.object({})
-
-const template: TemplateFunction = ({ children = [] }) => ({
-  html: `<footer style="padding:2rem;text-align:center;background:#f5f5f5">
-  ${children.map(c => c.html).join('\n')}
-</footer>`,
-  css: children.map(c => c.css).join('\n'),
-  js: children.map(c => c.js).filter(Boolean).join('\n'),
-})
-
-export default template
-```
-
-```bash
-mkdir my-site/templates/text
-```
-
-```ts
-// my-site/templates/text/index.ts
-import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/core'
-
-export const schema = z.object({
-  text: z.string().describe('Text content'),
-})
-
-const template: TemplateFunction = ({ content = {} }) => ({
-  html: `<p>${content.text ?? ''}</p>`,
-  css: '',
-  js: '',
-})
-
-export default template
-```
+### Dynamic routes
 
 ```yaml
-# my-site/fragments/footer/fragment.yaml
-template: footer-layout
-components:
-  - copyright
-```
-
-```yaml
-# my-site/fragments/footer/copyright/component.yaml
-template: text
-content:
-  text: "© 2026 My Site"
-```
-
-Now add it to your page with the `@` prefix:
-
-```yaml
-# my-site/pages/home/page.yaml
-route: /
-template: page-layout
-metadata:
-  title: "Home"
-components:
-  - hero
-  - "@footer"
-```
-
-Note: `@` references must be quoted in YAML (`"@footer"`) since `@` is a reserved character.
-
-Restart the dev server — the footer now appears on every page that references `@footer`.
-
-## 7. Use React (or Any Framework)
-
-Templates can use any framework that SSR's to HTML. Here's a React template:
-
-```bash
-mkdir my-site/templates/card
-```
-
-```tsx
-// my-site/templates/card/index.tsx
-import React from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
-import { z } from 'zod'
-import type { TemplateFunction } from '@gazetta/core'
-
-export const schema = z.object({
-  title: z.string().describe('Card title'),
-  body: z.string().describe('Card body'),
-})
-
-function Card({ title, body }: { title: string; body: string }) {
-  return (
-    <div style={{ padding: '1.5rem', border: '1px solid #eee', borderRadius: '8px' }}>
-      <h3>{title}</h3>
-      <p>{body}</p>
-    </div>
-  )
-}
-
-const template: TemplateFunction = ({ content = {} }) => ({
-  html: renderToStaticMarkup(
-    <Card title={content.title as string ?? ''} body={content.body as string ?? ''} />
-  ),
-  css: '',
-  js: '',
-})
-
-export default template
-```
-
-Make sure `react` and `react-dom` are installed as dev dependencies in your site.
-
-## 8. Dynamic Routes
-
-For blog posts, products, or any parameterized content:
-
-```bash
-mkdir -p my-site/pages/blog/\[slug\]/article
-```
-
-```yaml
-# my-site/pages/blog/[slug]/page.yaml
+# pages/blog/[slug]/page.yaml
 route: /blog/:slug
-template: page-layout
-metadata:
-  title: "Blog Post"
+template: blog-post
 components:
   - article
 ```
 
-```yaml
-# my-site/pages/blog/[slug]/article/component.yaml
-template: hero
-content:
-  title: "A Blog Post"
-  subtitle: "Written with Gazetta"
-```
-
-The `[slug]` folder maps to `:slug` in the route. Templates receive route params:
+Templates receive route params:
 
 ```ts
-const template: TemplateFunction = ({ content = {}, params = {} }) => ({
-  html: `<h1>${content.title ?? params.slug}</h1>`,
-  // ...
+const template: TemplateFunction<Content> = ({ content, params }) => ({
+  html: `<h1>${content?.title ?? params?.slug}</h1>`,
+  ...
 })
 ```
 
-## Template Contract Summary
+## Fragments
 
-Every template file must export:
+Fragments are shared components reusable across pages. They live in `fragments/` and are referenced with `@`:
 
-| Export | Required | Type |
-|--------|----------|------|
-| `default` | Yes | `(params: { content?, children?, params? }) => { html, css, js, head? }` |
-| `schema` | Yes | Zod schema (e.g., `z.object({ title: z.string() })`) |
-| `editor` | No | `{ mount(el, { content, onChange }), unmount(el) }` |
+```yaml
+# fragments/header/fragment.yaml
+template: nav
+content:
+  brand: My Site
+  links:
+    - label: Home
+      href: /
+    - label: About
+      href: /about
+```
 
-- `content` — data from the component's YAML manifest
-- `children` — rendered output of child components (for composite templates)
-- `params` — URL route parameters (e.g., `{ slug: "hello-world" }`)
+Reference in any page with `"@header"`. Update the fragment once — every page reflects it.
 
-## What's Next
+> Note: `@` in YAML must be quoted: `"@header"`.
 
-- See `examples/starter/` for a complete working site
-- See `docs/design.md` for the full architecture
-- Run the CMS editor: see the README for instructions
+## CMS editor
+
+1. Open **http://localhost:3000/admin**
+2. Click a page → see its components
+3. Expand fragments (click `@header`) → edit child components
+4. Edit content → live preview updates
+5. Click **Save** → writes to disk
+6. Click **Publish** → pre-renders and uploads to target
+
+## Publishing
+
+### Configure a target
+
+```yaml
+# site.yaml
+name: My Site
+targets:
+  staging:
+    type: filesystem
+    path: ./dist/staging
+  production:
+    type: s3
+    endpoint: "https://<account_id>.r2.cloudflarestorage.com"
+    bucket: "my-site"
+    accessKeyId: "${R2_ACCESS_KEY_ID}"
+    secretAccessKey: "${R2_SECRET_ACCESS_KEY}"
+    siteUrl: "https://mysite.com"
+    cache:
+      browser: 60
+      edge: 86400
+```
+
+### Build from CLI
+
+```bash
+npx gazetta build                   # publish to all targets
+npx gazetta build -t production     # specific target
+```
+
+The build command:
+1. Pre-renders all pages with ESI placeholders for fragments
+2. Writes hashed CSS/JS files (immutable browser cache)
+3. Pre-renders all fragments as HTML with `<head>` section
+4. Uploads to the target storage
+5. Purges the edge cache (if configured)
+
+### Cache configuration
+
+Per target:
+```yaml
+cache:
+  browser: 60     # max-age — seconds before browser revalidates
+  edge: 86400     # s-maxage — seconds before edge refetches from storage
+```
+
+Per page (overrides target):
+```yaml
+# pages/dashboard/page.yaml
+cache:
+  browser: 0      # always fresh
+```
+
+Defaults: `browser: 0`, `edge: 86400`.
+
+ETags are automatic — browsers get `304 Not Modified` for unchanged pages.
+
+## Site structure
+
+```
+my-site/
+  site.yaml                  # site manifest + targets
+  templates/                 # developer-created templates
+    hero/index.ts
+    nav/index.ts
+    page-layout/index.ts
+  fragments/                 # shared components
+    header/fragment.yaml
+  pages/                     # routable pages
+    home/
+      page.yaml
+      hero/component.yaml
+    about/
+      page.yaml
+    blog/
+      [slug]/page.yaml       # dynamic route
+  package.json
+```
+
+## Next steps
+
+- Browse the [starter example](../examples/starter/) for more templates
+- Read the [design document](design.md) for architecture details
+- Check out the [contributing guide](../CONTRIBUTING.md) to get involved
