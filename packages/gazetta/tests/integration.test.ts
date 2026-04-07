@@ -132,4 +132,17 @@ describe('starter site', () => {
     expect(html).toContain('[data-gz=')
     expect(html).toContain('data-gz=')
   })
+
+  it('validates all pages resolve without errors', async () => {
+    const site = await loadSite(starterDir, storage)
+    const errors: string[] = []
+    for (const pageName of site.pages.keys()) {
+      try {
+        await resolvePage(pageName, site)
+      } catch (err) {
+        errors.push(`${pageName}: ${(err as Error).message}`)
+      }
+    }
+    expect(errors).toEqual([])
+  })
 })

@@ -41,6 +41,7 @@ function printHelp() {
     gazetta dev --port 8080         # custom port
     gazetta build                   # publish to all targets
     gazetta build -t production     # publish to specific target
+    gazetta validate                # check site for broken references
 `)
 }
 
@@ -296,6 +297,72 @@ async function runBuild(siteDir: string, targetName?: string) {
   }
 
   console.log(`  Done!\n`)
+}
+
+async function runValidate(siteDir: string) {
+  const storage = createFilesystemProvider()
+
+  console.log(`\n  Validating ${siteDir}...\n`)
+
+  // 1. Check site.yaml
+  let site: Awaited<ReturnType<typeof loadSite>>
+  try {
+    site = await loadSite(siteDir, storage)
+    console.log(`  ✓ site.yaml — ${site.manifest.name}`)
+  } catch (err) {
+    console.error(`  ✗ site.yaml — ${(err as Error).message}`)
+    process.exit(1)
+  }
+
+  let errors = 0
+
+  // 2. Validate all fragments
+  for (const [fragName, frag] of site.fragments) {
+    try {
+      const { resolveComponent } = await import('../resolver.js')
+      const templatesDir = join(siteDir, 'templates')
+      const ctx = { site, templatesDir, visited: new Set<string>(), path: [`@${fragName}`] }
+      await resolveComponent(`@${fragName}`, '', ctx)
+
+      const childCount = frag.components?.length ?? 0
+      console.log(`  ✓ fragment: ${fragName} (${childCount} components)`)
+    } catch (err) {
+      console.error(`  ✗ fragment: ${fragName} — ${(err as Error).message}`)
+      errors++
+    }
+  }
+
+  // 3. Validate all pages
+  for (const [pageName, page] of site.pages) {
+    try {
+      await resolvePage(pageName, site)
+
+      const componentCount = page.components?.length ?? 0
+      const fragmentCount = page.components?.filter(c => c.startsWith('@')).length ?? 0
+      console.log(`  ✓ page: ${pageName} (${componentCount} components, ${fragmentCount} fragments)`)
+    } catch (err) {
+      console.error(`  ✗ page: ${pageName} — ${(err as Error).message}`)
+      errors++
+    }
+  }
+
+  // 4. List templates
+  const templatesDir = join(siteDir, 'templates')
+  try {
+    const entries = await storage.readDir(templatesDir)
+    const templateCount = entries.filter(e => e.isDirectory).length
+    console.log(`  ✓ ${templateCount} templates found`)
+  } catch {
+    console.log(`  ⚠ templates/ directory not found`)
+  }
+
+  console.log()
+  if (errors > 0) {
+    console.error(`  ${errors} error${errors > 1 ? 's' : ''} found.\n`)
+    process.exit(1)
+  } else {
+    console.log(`  All good.\n`)
+  }
 }
 
 function renderErrorOverlay(err: Error): string {
@@ -597,6 +664,9 @@ async function main() {
       break
     case 'build':
       await runBuild(parsed.siteDir, parsed.target)
+      break
+    case 'validate':
+      await runValidate(parsed.siteDir)
       break
     case 'dev':
       await runDev(parsed.siteDir, parsed.port ?? 3000)
