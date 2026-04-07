@@ -83,9 +83,8 @@ export async function publishPageRendered(
   if (pageOutput.css) localCssParts.unshift(pageOutput.css)
   if (pageOutput.head) localHeadParts.unshift(pageOutput.head)
 
-  // Determine page path from route
-  const routePath = page.route === '/' ? 'home' : page.route.replace(/^\//, '')
-  const pageDir = `pages/${routePath}`
+  // Use page name as path (matches source folder structure)
+  const pageDir = `pages/${pageName}`
 
   // Remember old hashed files for cleanup
   const oldFiles = await listHashedFiles(targetStorage, pageDir)

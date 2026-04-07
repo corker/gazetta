@@ -71,7 +71,7 @@ app.get('*', async (c) => {
   // Check page cache
   const cached = pageCache.get(requestPath)
   if (cached && Date.now() - cached.at < TTL) {
-    return c.html(cached.html, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'HIT' })
+    return c.html(cached.html, 200, { 'Cache-Control': 'public, max-age=0, s-maxage=86400', 'X-Cache': 'HIT' })
   }
 
   // Find page HTML by URL convention
@@ -82,7 +82,7 @@ app.get('*', async (c) => {
   const assembled = await assembleEsi(c.env.SITE_BUCKET, pageHtml)
 
   pageCache.set(requestPath, { html: assembled, at: Date.now() })
-  return c.html(assembled, 200, { 'Cache-Control': 'public, s-maxage=86400', 'X-Cache': 'MISS' })
+  return c.html(assembled, 200, { 'Cache-Control': 'public, max-age=0, s-maxage=86400', 'X-Cache': 'MISS' })
 })
 
 /**
@@ -100,16 +100,21 @@ async function findPage(bucket: R2Bucket, requestPath: string): Promise<string |
   const obj = await bucket.get(pagePath)
   if (obj) return await obj.text()
 
-  // Try dynamic segments — replace last segment with [param] patterns
+  // Try dynamic segments — list parent directory, find [param] entries
   const parts = requestPath.split('/').filter(Boolean)
   for (let i = parts.length - 1; i >= 0; i--) {
-    const dynamicParts = [...parts]
-    // Try common param patterns
-    for (const param of ['[slug]', '[id]', '[...path]']) {
-      dynamicParts[i] = param
-      const dynamicPath = `pages/${dynamicParts.join('/')}/index.html`
-      const dynObj = await bucket.get(dynamicPath)
-      if (dynObj) return await dynObj.text()
+    const parentDir = parts.slice(0, i).join('/')
+    const prefix = parentDir ? `pages/${parentDir}/` : 'pages/'
+    const listed = await bucket.list({ prefix, delimiter: '/' })
+    for (const item of listed.delimitedPrefixes) {
+      const segment = item.replace(prefix, '').replace(/\/$/, '')
+      if (segment.startsWith('[') && segment.endsWith(']')) {
+        const dynamicParts = [...parts]
+        dynamicParts[i] = segment
+        const dynamicPath = `pages/${dynamicParts.join('/')}/index.html`
+        const dynObj = await bucket.get(dynamicPath)
+        if (dynObj) return await dynObj.text()
+      }
     }
   }
 
