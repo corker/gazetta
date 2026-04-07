@@ -2,13 +2,7 @@ import { Hono } from 'hono'
 
 interface Env {
   SITE_BUCKET: R2Bucket
-  PURGE_TOKEN?: string
 }
-
-// In-memory cache — per-isolate, cleared on deploy
-const pageCache = new Map<string, { html: string; at: number }>()
-const fragmentCache = new Map<string, { html: string; at: number }>()
-const TTL = 86400_000 // 24h
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -22,37 +16,13 @@ app.use('*', async (c, next) => {
   return next()
 })
 
-// ---- Purge endpoints ----
-
-app.post('/purge/all', async (c) => {
-  if (c.env.PURGE_TOKEN && c.req.header('Authorization')?.replace('Bearer ', '') !== c.env.PURGE_TOKEN) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-  pageCache.clear()
-  fragmentCache.clear()
-  return c.json({ purged: 'all' })
-})
-
-app.post('/purge/urls', async (c) => {
-  if (c.env.PURGE_TOKEN && c.req.header('Authorization')?.replace('Bearer ', '') !== c.env.PURGE_TOKEN) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-  const { urls } = await c.req.json() as { urls: string[] }
-  if (!urls?.length) return c.json({ error: 'No URLs' }, 400)
-  let purged = 0
-  for (const url of urls) { if (pageCache.delete(url)) purged++ }
-  // Always clear fragment cache — fragments are shared, stale fragments affect all pages
-  fragmentCache.clear()
-  return c.json({ purged })
-})
-
 // ---- Static assets (CSS, JS) — immutable cache ----
 
 app.get('/pages/*', async (c) => serveStatic(c, c.env.SITE_BUCKET))
 app.get('/fragments/*', async (c) => serveStatic(c, c.env.SITE_BUCKET))
 
 async function serveStatic(c: { req: { url: string }; header: (k: string, v: string) => void; body: (b: ReadableStream | string) => Response; notFound: () => Response }, bucket: R2Bucket) {
-  const path = new URL(c.req.url).pathname.slice(1) // remove leading /
+  const path = new URL(c.req.url).pathname.slice(1)
   const obj = await bucket.get(path)
   if (!obj) return c.notFound()
 
@@ -68,21 +38,11 @@ async function serveStatic(c: { req: { url: string }; header: (k: string, v: str
 app.get('*', async (c) => {
   const requestPath = new URL(c.req.url).pathname
 
-  // Check page cache
-  const cached = pageCache.get(requestPath)
-  if (cached && Date.now() - cached.at < TTL) {
-    return c.html(cached.html, 200, { 'Cache-Control': 'public, max-age=0, s-maxage=86400', 'X-Cache': 'HIT' })
-  }
-
-  // Find page HTML by URL convention
   const pageHtml = await findPage(c.env.SITE_BUCKET, requestPath)
   if (!pageHtml) return c.html('<h1>404 — Page not found</h1>', 404)
 
-  // ESI assembly
   const assembled = await assembleEsi(c.env.SITE_BUCKET, pageHtml)
-
-  pageCache.set(requestPath, { html: assembled, at: Date.now() })
-  return c.html(assembled, 200, { 'Cache-Control': 'public, max-age=0, s-maxage=86400', 'X-Cache': 'MISS' })
+  return c.html(assembled, 200, { 'Cache-Control': 'public, max-age=0, s-maxage=86400' })
 })
 
 /**
@@ -96,7 +56,6 @@ async function findPage(bucket: R2Bucket, requestPath: string): Promise<string |
   const pagePath = requestPath === '/' ? 'pages/home/index.html'
     : `pages${requestPath}/index.html`
 
-  // Try literal path first
   const obj = await bucket.get(pagePath)
   if (obj) return await obj.text()
 
@@ -121,14 +80,8 @@ async function findPage(bucket: R2Bucket, requestPath: string): Promise<string |
   return null
 }
 
-/**
- * ESI assembly:
- * 1. Find all <!--esi-head:path--> tags, collect fragment head sections, deduplicate
- * 2. Insert collected heads before </head>
- * 3. Replace <!--esi:path--> with fragment body
- */
+/** ESI assembly: collect fragment heads (CSS then JS, deduped), replace body placeholders */
 async function assembleEsi(bucket: R2Bucket, html: string): Promise<string> {
-  // Find all ESI tags (both head and body)
   const esiHeadRegex = /<!--esi-head:(\/[^>]+)-->/g
   const esiBodyRegex = /<!--esi:(\/[^>]+)-->/g
 
@@ -138,7 +91,7 @@ async function assembleEsi(bucket: R2Bucket, html: string): Promise<string> {
   while ((match = esiHeadRegex.exec(html)) !== null) fragmentPaths.add(match[1])
   while ((match = esiBodyRegex.exec(html)) !== null) fragmentPaths.add(match[1])
 
-  // Read all unique fragments in parallel (with per-fragment caching)
+  // Read all fragments in parallel
   const fragmentEntries = await Promise.all(
     [...fragmentPaths].map(async (path) => [path, await readFragment(bucket, path)] as const)
   )
@@ -198,29 +151,12 @@ async function assembleEsi(bucket: R2Bucket, html: string): Promise<string> {
   return html
 }
 
-/**
- * Read and parse a fragment file, splitting on <head>...</head>.
- * Returns { head, body } where head is the content inside <head> tags
- * and body is everything else.
- */
 async function readFragment(bucket: R2Bucket, path: string): Promise<{ head: string; body: string }> {
-  const key = path.slice(1) // remove leading /
-
-  // Check fragment cache
-  const cached = fragmentCache.get(key)
-  if (cached && Date.now() - cached.at < TTL) {
-    return splitFragment(cached.html)
-  }
-
+  const key = path.slice(1)
   const obj = await bucket.get(key)
   if (!obj) return { head: '', body: `<!-- fragment not found: ${path} -->` }
 
   const html = await obj.text()
-  fragmentCache.set(key, { html, at: Date.now() })
-  return splitFragment(html)
-}
-
-function splitFragment(html: string): { head: string; body: string } {
   const headStart = html.indexOf('<head>')
   const headEnd = html.indexOf('</head>')
 
@@ -228,9 +164,10 @@ function splitFragment(html: string): { head: string; body: string } {
     return { head: '', body: html }
   }
 
-  const head = html.slice(headStart + 6, headEnd).trim()
-  const body = (html.slice(0, headStart) + html.slice(headEnd + 7)).trim()
-  return { head, body }
+  return {
+    head: html.slice(headStart + 6, headEnd).trim(),
+    body: (html.slice(0, headStart) + html.slice(headEnd + 7)).trim(),
+  }
 }
 
 export default app
