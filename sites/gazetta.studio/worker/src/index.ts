@@ -41,6 +41,8 @@ app.post('/purge/urls', async (c) => {
   if (!urls?.length) return c.json({ error: 'No URLs' }, 400)
   let purged = 0
   for (const url of urls) { if (pageCache.delete(url)) purged++ }
+  // Always clear fragment cache — fragments are shared, stale fragments affect all pages
+  fragmentCache.clear()
   return c.json({ purged })
 })
 
