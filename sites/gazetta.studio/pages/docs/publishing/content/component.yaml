@@ -1,0 +1,17 @@
+template: text
+content:
+  body: |
+    <p><strong>Targets</strong> are where your site gets published. Three storage types:</p>
+    <p><code>filesystem</code> — local folder (staging, backups)<br>
+    <code>s3</code> — AWS S3, Cloudflare R2, MinIO<br>
+    <code>azure-blob</code> — Azure Blob Storage</p>
+    <p><strong>Build from CLI:</strong></p>
+    <p><code>npx gazetta build</code> — publishes to all targets<br>
+    <code>npx gazetta build -t production</code> — specific target</p>
+    <p>The build pre-renders pages with ESI placeholders for fragments, writes content-hashed CSS/JS files (immutable browser cache), and uploads everything to the target.</p>
+    <p><strong>Cache configuration</strong> per target in <code>site.yaml</code>:</p>
+    <p><code>browser: 60</code> — seconds before the browser revalidates (max-age)<br>
+    <code>edge: 86400</code> — seconds before the CDN refetches from storage (s-maxage)</p>
+    <p>Pages can override with their own <code>cache:</code> in <code>page.yaml</code>. Defaults: browser 0, edge 86400.</p>
+    <p><strong>ETags</strong> are automatic. Browsers get <code>304 Not Modified</code> for unchanged pages — zero bandwidth even with <code>browser: 0</code>.</p>
+    <p><strong>Purge:</strong> Publish a page → purge that URL. Publish a fragment → purge all. CLI build → purge all once at the end.</p>
