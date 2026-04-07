@@ -84,6 +84,8 @@ const template: TemplateFunction = ({ children = [] }) => ({
   css: \`main { max-width: 800px; margin: 0 auto; padding: 2rem; font-family: system-ui, sans-serif; }
 \${children.map(c => c.css).join('\\n')}\`,
   js: children.map(c => c.js).filter(Boolean).join('\\n'),
+  head: \`<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+\${children.map(c => c.head).filter(Boolean).join('\\n')}\`,
 })
 
 export default template

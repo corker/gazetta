@@ -154,6 +154,39 @@ describe('renderComponent', () => {
     const result = await renderComponent(component)
     expect(result.html).toContain('<h1>Async Template</h1>')
   })
+
+  it('collects head from template output', async () => {
+    const component: ResolvedComponent = {
+      template: () => ({
+        html: '<div>content</div>',
+        css: '',
+        js: '',
+        head: '<link rel="icon" href="/favicon.svg">',
+      }),
+      children: [],
+    }
+    const result = await renderComponent(component)
+    expect(result.head).toContain('<link rel="icon" href="/favicon.svg">')
+  })
+
+  it('collects head from children and parent', async () => {
+    const child: ResolvedComponent = {
+      template: () => ({ html: '<p>child</p>', css: '', js: '', head: '<link rel="preconnect" href="https://fonts.example.com">' }),
+      children: [],
+    }
+    const parent = composite(
+      (children) => ({
+        html: children.map(c => c.html).join(''),
+        css: '',
+        js: '',
+        head: `<link rel="icon" href="/favicon.svg">\n${children.map(c => c.head).filter(Boolean).join('\n')}`,
+      }),
+      [child]
+    )
+    const result = await renderComponent(parent)
+    expect(result.head).toContain('favicon.svg')
+    expect(result.head).toContain('fonts.example.com')
+  })
 })
 
 describe('renderPage', () => {
@@ -194,6 +227,21 @@ describe('renderPage', () => {
     const page = leaf('<p></p>', '', '')
     const html = await renderPage(page)
     expect(html).not.toContain('<script')
+  })
+
+  it('includes head tags from page template', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({
+        html: '<p>content</p>',
+        css: '',
+        js: '',
+        head: '<link rel="icon" href="/favicon.svg">\n<link rel="preconnect" href="https://fonts.example.com">',
+      }),
+      children: [],
+    }
+    const html = await renderPage(page)
+    expect(html).toContain('<link rel="icon" href="/favicon.svg">')
+    expect(html).toContain('fonts.example.com')
   })
 
   it('resets scope counter between pages', async () => {
