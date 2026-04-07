@@ -62,7 +62,9 @@ async function handleDelete(node: TreeNode) {
     editor.clearComponentSelection()
     await site.load()
   } catch (err) {
-    alert(`Failed to delete: ${(err as Error).message}`)
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    editor.toast = { message: `Failed to delete "${name}": ${msg}`, type: 'error' }
+    setTimeout(() => { editor.toast = null }, 5000)
   }
 }
 </script>

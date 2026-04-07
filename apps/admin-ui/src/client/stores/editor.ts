@@ -23,6 +23,23 @@ export const useEditorStore = defineStore('editor', () => {
   const previewVersion = ref(0)
   const draftVersion = ref(0)
 
+  // Toast notification system
+  const toast = ref<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    toast.value = { message, type }
+    setTimeout(() => { toast.value = null }, 3000)
+  }
+
+  function showError(err: unknown, fallback: string) {
+    const message = err instanceof Error ? err.message : fallback
+    // Make API errors more readable
+    const friendly = message
+      .replace(/^Request failed: (\d+)$/, 'Server error ($1)')
+      .replace(/^Failed to fetch$/, 'Cannot connect to server')
+    showToast(friendly, 'error')
+  }
+
   const previewRoute = computed(() => {
     if (selectionType.value === 'page' && pageDetail.value) return pageDetail.value.route
     return null
@@ -37,20 +54,28 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   async function selectPage(name: string) {
-    selectionType.value = 'page'
-    selectionName.value = name
-    fragmentDetail.value = null
-    clearComponentSelection()
-    pageDetail.value = await api.getPage(name)
-    previewVersion.value++
+    try {
+      selectionType.value = 'page'
+      selectionName.value = name
+      fragmentDetail.value = null
+      clearComponentSelection()
+      pageDetail.value = await api.getPage(name)
+      previewVersion.value++
+    } catch (err) {
+      showError(err, `Failed to load page "${name}"`)
+    }
   }
 
   async function selectFragment(name: string) {
-    selectionType.value = 'fragment'
-    selectionName.value = name
-    pageDetail.value = null
-    clearComponentSelection()
-    fragmentDetail.value = await api.getFragment(name)
+    try {
+      selectionType.value = 'fragment'
+      selectionName.value = name
+      pageDetail.value = null
+      clearComponentSelection()
+      fragmentDetail.value = await api.getFragment(name)
+    } catch (err) {
+      showError(err, `Failed to load fragment "${name}"`)
+    }
   }
 
   function clearComponentSelection() {
@@ -65,16 +90,20 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   async function selectComponent(path: string, template: string) {
-    selectedComponentPath.value = path
-    componentTemplate.value = template
-    dirty.value = false
-    lastSaveError.value = null
-    lastSaveSuccess.value = false
-    const comp = await api.getComponent(path)
-    const content = (comp.content as Record<string, unknown>) ?? {}
-    componentContent.value = content
-    savedContent.value = deepClone(content)
-    templateSchema.value = await api.getTemplateSchema(template)
+    try {
+      selectedComponentPath.value = path
+      componentTemplate.value = template
+      dirty.value = false
+      lastSaveError.value = null
+      lastSaveSuccess.value = false
+      const comp = await api.getComponent(path)
+      const content = (comp.content as Record<string, unknown>) ?? {}
+      componentContent.value = content
+      savedContent.value = deepClone(content)
+      templateSchema.value = await api.getTemplateSchema(template)
+    } catch (err) {
+      showError(err, `Failed to load component`)
+    }
   }
 
   async function saveComponent() {
@@ -88,9 +117,11 @@ export const useEditorStore = defineStore('editor', () => {
       dirty.value = false
       lastSaveSuccess.value = true
       previewVersion.value++
+      showToast('Saved')
       setTimeout(() => { lastSaveSuccess.value = false }, 3000)
     } catch (err) {
       lastSaveError.value = (err as Error).message
+      showError(err, 'Failed to save')
     } finally {
       saving.value = false
     }
@@ -114,14 +145,18 @@ export const useEditorStore = defineStore('editor', () => {
     const [moved] = components.splice(index, 1)
     components.splice(newIndex, 0, moved)
 
-    if (selectionType.value === 'page' && selectionName.value) {
-      await api.updatePage(selectionName.value, { components })
-      pageDetail.value = await api.getPage(selectionName.value)
-    } else if (selectionType.value === 'fragment' && selectionName.value) {
-      await api.updateFragment(selectionName.value, { components })
-      fragmentDetail.value = await api.getFragment(selectionName.value)
+    try {
+      if (selectionType.value === 'page' && selectionName.value) {
+        await api.updatePage(selectionName.value, { components })
+        pageDetail.value = await api.getPage(selectionName.value)
+      } else if (selectionType.value === 'fragment' && selectionName.value) {
+        await api.updateFragment(selectionName.value, { components })
+        fragmentDetail.value = await api.getFragment(selectionName.value)
+      }
+      previewVersion.value++
+    } catch (err) {
+      showError(err, 'Failed to move component')
     }
-    previewVersion.value++
   }
 
   async function removeComponent(index: number) {
@@ -129,43 +164,52 @@ export const useEditorStore = defineStore('editor', () => {
     if (!detail?.components) return
 
     const components = [...detail.components]
-    components.splice(index, 1)
+    const removed = components.splice(index, 1)[0]
 
-    if (selectionType.value === 'page' && selectionName.value) {
-      await api.updatePage(selectionName.value, { components })
-      pageDetail.value = await api.getPage(selectionName.value)
-    } else if (selectionType.value === 'fragment' && selectionName.value) {
-      await api.updateFragment(selectionName.value, { components })
-      fragmentDetail.value = await api.getFragment(selectionName.value)
+    try {
+      if (selectionType.value === 'page' && selectionName.value) {
+        await api.updatePage(selectionName.value, { components })
+        pageDetail.value = await api.getPage(selectionName.value)
+      } else if (selectionType.value === 'fragment' && selectionName.value) {
+        await api.updateFragment(selectionName.value, { components })
+        fragmentDetail.value = await api.getFragment(selectionName.value)
+      }
+      clearComponentSelection()
+      previewVersion.value++
+      showToast(`Removed "${removed}"`)
+    } catch (err) {
+      showError(err, 'Failed to remove component')
     }
-    clearComponentSelection()
-    previewVersion.value++
   }
 
   async function addComponent(name: string, template: string) {
     const detail = pageDetail.value ?? fragmentDetail.value
     if (!detail) return
 
-    // Create the component on disk
-    await api.createComponent(detail.dir, name, template)
+    try {
+      await api.createComponent(detail.dir, name, template)
 
-    // Add to manifest
-    const components = [...(detail.components ?? []), name]
+      const components = [...(detail.components ?? []), name]
 
-    if (selectionType.value === 'page' && selectionName.value) {
-      await api.updatePage(selectionName.value, { components })
-      pageDetail.value = await api.getPage(selectionName.value)
-    } else if (selectionType.value === 'fragment' && selectionName.value) {
-      await api.updateFragment(selectionName.value, { components })
-      fragmentDetail.value = await api.getFragment(selectionName.value)
+      if (selectionType.value === 'page' && selectionName.value) {
+        await api.updatePage(selectionName.value, { components })
+        pageDetail.value = await api.getPage(selectionName.value)
+      } else if (selectionType.value === 'fragment' && selectionName.value) {
+        await api.updateFragment(selectionName.value, { components })
+        fragmentDetail.value = await api.getFragment(selectionName.value)
+      }
+      previewVersion.value++
+      showToast(`Added "${name}"`)
+    } catch (err) {
+      showError(err, `Failed to add component "${name}"`)
     }
-    previewVersion.value++
   }
 
   return {
     selectionType, selectionName, pageDetail, fragmentDetail,
     selectedComponentPath, componentContent, componentTemplate, templateSchema,
     previewRoute, previewVersion, draftVersion, saving, dirty, lastSaveError, lastSaveSuccess,
+    toast,
     selectPage, selectFragment, selectComponent, saveComponent,
     markDirty, discardChanges, clearComponentSelection,
     moveComponent, removeComponent, addComponent,

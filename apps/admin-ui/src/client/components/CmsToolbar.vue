@@ -30,8 +30,9 @@ const canPublish = computed(() => editor.selectionName && !editor.dirty)
     </template>
     <template #center>
       <Transition name="fade">
-        <span v-if="editor.lastSaveSuccess" class="cms-toast cms-toast-success">
-          <i class="pi pi-check-circle" /> Saved
+        <span v-if="editor.toast" class="cms-toast" :class="editor.toast.type === 'error' ? 'cms-toast-error' : 'cms-toast-success'">
+          <i :class="editor.toast.type === 'error' ? 'pi pi-exclamation-circle' : 'pi pi-check-circle'" />
+          {{ editor.toast.message }}
         </span>
         <span v-else-if="editor.lastSaveError" class="cms-toast cms-toast-error">
           <i class="pi pi-exclamation-circle" /> {{ editor.lastSaveError }}
