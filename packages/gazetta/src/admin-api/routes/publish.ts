@@ -75,7 +75,8 @@ export function publishRoutes(
         for (const item of allItems) {
           if (item.startsWith('pages/')) {
             const pageName = item.replace('pages/', '')
-            const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage)
+            const config = getTargetConfig(targetName)
+            const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache)
             totalFiles += files
           } else if (item.startsWith('fragments/')) {
             const fragName = item.replace('fragments/', '')

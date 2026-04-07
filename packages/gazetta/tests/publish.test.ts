@@ -245,4 +245,28 @@ describe('publishRendered', () => {
     expect(oldCss.length).toBe(0)
     expect(oldJs.length).toBe(0)
   })
+
+  it('bakes cache config comment into page HTML with defaults', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+    await publishPageRendered('home', storage, starterDir, target)
+    const html = await target.readFile('pages/home/index.html')
+    expect(html).toMatch(/^<!--cache:browser=0,edge=86400-->/)
+    expect(html).toContain('<!DOCTYPE html>')
+  })
+
+  it('bakes target cache config into page HTML', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+    await publishPageRendered('home', storage, starterDir, target, { browser: 120, edge: 3600 })
+    const html = await target.readFile('pages/home/index.html')
+    expect(html).toMatch(/^<!--cache:browser=120,edge=3600-->/)
+  })
+
+  it('cache comment is on first line before DOCTYPE', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+    await publishPageRendered('home', storage, starterDir, target)
+    const html = await target.readFile('pages/home/index.html')
+    const lines = html.split('\n')
+    expect(lines[0]).toMatch(/^<!--cache:/)
+    expect(lines[1]).toBe('<!DOCTYPE html>')
+  })
 })

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import type { StorageProvider, PurgeStrategy } from './types.js'
+import type { StorageProvider, PurgeStrategy, CacheConfig } from './types.js'
 import { loadSite } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent } from './renderer.js'
@@ -44,6 +44,7 @@ export async function publishPageRendered(
   sourceStorage: StorageProvider,
   sourceDir: string,
   targetStorage: StorageProvider,
+  targetCache?: CacheConfig,
 ): Promise<{ files: number }> {
   const site = await loadSite(sourceDir, sourceStorage)
   const page = site.pages.get(pageName)
@@ -141,7 +142,12 @@ export async function publishPageRendered(
 
   const bodyContent = bodyParts.join('\n')
 
-  const html = `<!DOCTYPE html>
+  // Resolve cache config: page → target → defaults
+  const browser = page.cache?.browser ?? targetCache?.browser ?? 0
+  const edge = page.cache?.edge ?? targetCache?.edge ?? 86400
+  const cacheComment = `<!--cache:browser=${browser},edge=${edge}-->\n`
+
+  const html = `${cacheComment}<!DOCTYPE html>
 <html lang="en">
 <head>
   ${headContent}

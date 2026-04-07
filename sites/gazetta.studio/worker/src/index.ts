@@ -48,8 +48,29 @@ app.get('*', async (c) => {
   const pageHtml = await findPage(c.env.SITE_BUCKET, requestPath)
   if (!pageHtml) return c.html('<h1>404 — Page not found</h1>', 404)
 
-  const assembled = await assembleEsi(c.env.SITE_BUCKET, pageHtml)
-  const response = c.html(assembled, 200, { 'Cache-Control': 'public, max-age=0, s-maxage=86400' })
+  // Read and strip cache config comment
+  const { html: rawHtml, browser, edge } = parseCacheComment(pageHtml)
+
+  const assembled = await assembleEsi(c.env.SITE_BUCKET, rawHtml)
+
+  // Compute ETag from assembled content
+  const encoder = new TextEncoder()
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(assembled))
+  const etag = `"${[...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)}"`
+
+  // Check If-None-Match
+  if (c.req.header('If-None-Match') === etag) {
+    return new Response(null, { status: 304, headers: { 'ETag': etag } })
+  }
+
+  const response = new Response(assembled, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': `public, max-age=${browser}, s-maxage=${edge}`,
+      'ETag': etag,
+    },
+  })
 
   // Store in edge cache (non-blocking)
   c.executionCtx.waitUntil(cache.put(request, response.clone()))
@@ -178,6 +199,16 @@ async function readFragment(bucket: R2Bucket, path: string): Promise<{ head: str
   return {
     head: html.slice(headStart + 6, headEnd).trim(),
     body: (html.slice(0, headStart) + html.slice(headEnd + 7)).trim(),
+  }
+}
+
+function parseCacheComment(html: string): { html: string; browser: number; edge: number } {
+  const match = html.match(/^<!--cache:browser=(\d+),edge=(\d+)-->\n/)
+  if (!match) return { html, browser: 0, edge: 86400 }
+  return {
+    html: html.slice(match[0].length),
+    browser: parseInt(match[1], 10),
+    edge: parseInt(match[2], 10),
   }
 }
 

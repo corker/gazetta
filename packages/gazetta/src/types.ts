@@ -36,10 +36,19 @@ export interface ComponentManifest {
 /** Fragment manifest (shared component) */
 export interface FragmentManifest extends ComponentManifest {}
 
+/** Cache configuration */
+export interface CacheConfig {
+  /** Browser cache TTL in seconds (max-age). Default: 0 */
+  browser?: number
+  /** Edge/CDN cache TTL in seconds (s-maxage). Default: 86400 */
+  edge?: number
+}
+
 /** Page manifest (routable component) */
 export interface PageManifest extends ComponentManifest {
   route: string
   metadata?: Record<string, unknown>
+  cache?: CacheConfig
 }
 
 /** Target configuration in site.yaml */
@@ -47,6 +56,7 @@ export interface TargetConfig {
   type: 'filesystem' | 'azure-blob' | 's3'
   /** Base URL of the site for cache purging (e.g. https://gazetta.studio) */
   siteUrl?: string
+  cache?: CacheConfig
   path?: string
   connectionString?: string
   container?: string

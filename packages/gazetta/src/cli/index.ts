@@ -272,7 +272,7 @@ async function runBuild(siteDir: string, targetName?: string) {
 
     // Publish all pages
     for (const pageName of site.pages.keys()) {
-      const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage)
+      const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage, siteYaml.targets![name].cache)
       totalFiles += files
       console.log(`    page: ${pageName} (${files} files)`)
     }
