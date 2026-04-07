@@ -27,7 +27,7 @@ function printHelp() {
   Usage:
     gazetta init [dir]        Create a new site
     gazetta dev [site-dir]    Start dev server + CMS at /admin
-    gazetta build [site-dir]  Pre-render and publish to targets
+    gazetta publish [site-dir] Pre-render and publish to targets
     gazetta help              Show this help message
 
   Options:
@@ -39,8 +39,8 @@ function printHelp() {
     gazetta dev                     # dev server + CMS
     gazetta dev ./my-site           # specific site directory
     gazetta dev --port 8080         # custom port
-    gazetta build                   # publish to all targets
-    gazetta build -t production     # publish to specific target
+    gazetta publish                  # publish to all targets
+    gazetta publish -t production   # publish to specific target
     gazetta validate                # check site for broken references
 `)
 }
@@ -213,7 +213,7 @@ content:
   console.log()
 }
 
-async function runBuild(siteDir: string, targetName?: string) {
+async function runPublish(siteDir: string, targetName?: string) {
   const storage = createFilesystemProvider()
 
   console.log(`\n  Loading site from ${siteDir}...`)
@@ -662,8 +662,8 @@ async function main() {
     case 'init':
       await runInit(args[1] ?? '.')
       break
-    case 'build':
-      await runBuild(parsed.siteDir, parsed.target)
+    case 'publish':
+      await runPublish(parsed.siteDir, parsed.target)
       break
     case 'validate':
       await runValidate(parsed.siteDir)

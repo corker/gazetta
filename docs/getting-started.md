@@ -231,8 +231,8 @@ Environment variables (like `${R2_ACCESS_KEY_ID}`) are resolved at runtime — d
 ### Build from CLI
 
 ```bash
-npx gazetta build                   # publish to all targets
-npx gazetta build -t production     # specific target
+npx gazetta publish                   # publish to all targets
+npx gazetta publish -t production     # specific target
 ```
 
 The build command:
