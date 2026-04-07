@@ -1,5 +1,25 @@
-template: article
+template: markdown
 content:
-  title: "Hello from Gazetta"
-  author: "The Gazetta Team"
-  body: "This is a blog post rendered with dynamic routes. The slug from the URL is available to templates via route params."
+  body: |
+    # Hello from Gazetta
+
+    *By The Gazetta Team*
+
+    This is a blog post written in **markdown**. The slug from the URL is available to templates via route params.
+
+    ## Features
+
+    - **Bold** and *italic* text
+    - [Links](https://gazetta.studio)
+    - Code blocks with `inline code`
+    - Lists, tables, blockquotes
+
+    > Gazetta converts markdown to HTML automatically when you use `format.markdown()` in your Zod schema.
+
+    ```ts
+    export const schema = z.object({
+      body: z.string().meta(format.markdown()),
+    })
+    ```
+
+    That's it. The CMS editor shows a markdown textarea, and the renderer converts it to HTML before your template receives it.

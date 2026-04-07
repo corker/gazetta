@@ -40,5 +40,8 @@ export { createTargetProvider, createTargetRegistry } from './targets.js'
 export { publishItems, resolveDependencies } from './publish.js'
 export { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, publishFragmentWithPurge, publishPageWithPurge, createWorkerPurge } from './publish-rendered.js'
 
+// Format helpers
+export { format } from './formats.js'
+
 // Editor
 export { createEditorMount } from './editor/mount.js'

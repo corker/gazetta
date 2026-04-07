@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import type { ResolvedComponent, ComponentManifest } from './types.js'
 import { parseComponentManifest } from './manifest.js'
 import { loadTemplate } from './template-loader.js'
+import { processContent } from './content.js'
 import type { Site } from './site-loader.js'
 
 interface ResolveContext {
@@ -70,7 +71,7 @@ export async function resolveComponent(
   ctx.path.pop()
   ctx.visited.delete(key)
 
-  return { template: loaded.render, content: manifest.content, children, path: componentDir }
+  return { template: loaded.render, content: processContent(manifest.content, loaded.schema), children, path: componentDir }
 }
 
 export async function resolvePage(pageName: string, site: Site): Promise<ResolvedComponent> {
@@ -95,5 +96,5 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
     }
   }
 
-  return { template: loaded.render, content: page.content, children, path: page.dir }
+  return { template: loaded.render, content: processContent(page.content, loaded.schema), children, path: page.dir }
 }

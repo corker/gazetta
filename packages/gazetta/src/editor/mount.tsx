@@ -4,7 +4,7 @@ import Form from '@rjsf/core'
 import validator from '@rjsf/validator-ajv8'
 import type { EditorMount } from '../types.js'
 import type { IChangeEvent } from '@rjsf/core'
-import type { UiSchema } from '@rjsf/utils'
+import type { WidgetProps } from '@rjsf/utils'
 
 const roots = new WeakMap<HTMLElement, Root>()
 
@@ -14,6 +14,7 @@ const STYLES = `
 .gz-editor label { display: block; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; color: #a0a0a0; margin-bottom: 0.25rem; }
 .gz-editor .field-description { font-size: 0.75rem; color: #888; margin-bottom: 0.375rem; }
 .gz-editor input[type="text"], .gz-editor input[type="number"], .gz-editor input[type="url"],
+.gz-editor input[type="email"], .gz-editor input[type="password"], .gz-editor input[type="color"],
 .gz-editor textarea, .gz-editor select {
   width: 100%; padding: 0.5rem 0.625rem; font-size: 0.875rem; font-family: inherit;
   background: #1e1e2e; color: #e0e0e0; border: 1px solid #3a3a4a; border-radius: 6px;
@@ -29,28 +30,30 @@ const STYLES = `
 .gz-editor .array-item-toolbox { display: flex; gap: 0.25rem; margin-top: 0.375rem; }
 .gz-editor .array-item-toolbox .btn { display: inline-flex; padding: 0.25rem 0.5rem; font-size: 0.75rem; background: #2a2a3a; color: #ccc; border: none; border-radius: 4px; cursor: pointer; }
 .gz-editor .array-item-toolbox .btn:hover { background: #3a3a4a; }
+.gz-editor .markdown-widget textarea { min-height: 12rem; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.8125rem; line-height: 1.6; }
+.gz-editor .markdown-widget .markdown-hint { font-size: 0.6875rem; color: #52525b; margin-top: 0.25rem; }
 `
 
-function buildUiSchema(schema: Record<string, unknown>): UiSchema {
-  const uiSchema: UiSchema = { 'ui:submitButtonOptions': { norender: true } }
-  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined
-  if (!properties) return uiSchema
+/** Markdown widget — textarea with monospace font and hint */
+function MarkdownWidget(props: WidgetProps) {
+  return (
+    <div className="markdown-widget">
+      <textarea
+        value={props.value ?? ''}
+        onChange={(e) => props.onChange(e.target.value)}
+        placeholder={props.placeholder}
+        rows={(props.schema as Record<string, unknown>).rows as number ?? 12}
+      />
+      <div className="markdown-hint">Markdown supported</div>
+    </div>
+  )
+}
 
-  for (const [key, prop] of Object.entries(properties)) {
-    if (prop.type === 'string') {
-      const desc = (prop.description as string) ?? ''
-      const isLong = desc.toLowerCase().includes('body') || desc.toLowerCase().includes('text') ||
-        desc.toLowerCase().includes('description') || desc.toLowerCase().includes('content') ||
-        key === 'body' || key === 'description' || key === 'text' || key === 'content'
-      if (isLong) uiSchema[key] = { 'ui:widget': 'textarea' }
-    }
-  }
-  return uiSchema
+const customWidgets = {
+  markdown: MarkdownWidget,
 }
 
 export function createEditorMount(jsonSchema: object): EditorMount {
-  const uiSchema = buildUiSchema(jsonSchema as Record<string, unknown>)
-
   return {
     mount(el, { content, onChange }) {
       const existing = roots.get(el)
@@ -73,10 +76,11 @@ export function createEditorMount(jsonSchema: object): EditorMount {
             <div className="gz-editor">
               <Form
                 schema={jsonSchema as Record<string, unknown>}
-                uiSchema={uiSchema}
+                uiSchema={{ 'ui:submitButtonOptions': { norender: true } }}
                 formData={formData}
                 onChange={handleChange}
                 validator={validator}
+                widgets={customWidgets}
                 liveValidate
                 omitExtraData
               />
