@@ -10,6 +10,30 @@ function contentHash(content: string): string {
   return createHash('md5').update(content).digest('hex').slice(0, 8)
 }
 
+/** List existing hashed files (styles.*.css, script.*.js) in a directory */
+async function listHashedFiles(storage: StorageProvider, dir: string): Promise<string[]> {
+  try {
+    const entries = await storage.readDir(dir)
+    return entries
+      .filter(e => !e.isDirectory && /\.(css|js)$/.test(e.name) && /\.[a-f0-9]{8}\./.test(e.name))
+      .map(e => `${dir}/${e.name}`)
+  } catch {
+    return []
+  }
+}
+
+/** Delete files that existed before but weren't written this time */
+async function cleanupOldFiles(storage: StorageProvider, oldFiles: string[], newFiles: string[]): Promise<number> {
+  const newSet = new Set(newFiles)
+  let removed = 0
+  for (const file of oldFiles) {
+    if (!newSet.has(file)) {
+      try { await storage.rm(file); removed++ } catch { /* already gone */ }
+    }
+  }
+  return removed
+}
+
 /**
  * Publish a page as HTML with ESI placeholders for fragments.
  * Local components are baked in. Fragment markup is replaced at request time by the worker.
@@ -63,6 +87,9 @@ export async function publishPageRendered(
   const routePath = page.route === '/' ? 'home' : page.route.replace(/^\//, '')
   const pageDir = `pages/${routePath}`
 
+  // Remember old hashed files for cleanup
+  const oldFiles = await listHashedFiles(targetStorage, pageDir)
+  const newFiles: string[] = []
   let fileCount = 0
 
   // Write page CSS as hashed file
@@ -73,6 +100,7 @@ export async function publishPageRendered(
     const cssPath = `${pageDir}/styles.${hash}.css`
     await targetStorage.mkdir(pageDir)
     await targetStorage.writeFile(cssPath, pageCss)
+    newFiles.push(cssPath)
     pageCssLink = `<link rel="stylesheet" href="/${cssPath}">`
     fileCount++
   }
@@ -95,6 +123,7 @@ export async function publishPageRendered(
     const jsPath = `${pageDir}/script.${hash}.js`
     await targetStorage.mkdir(pageDir)
     await targetStorage.writeFile(jsPath, pageJs)
+    newFiles.push(jsPath)
     pageJsLink = `<script type="module" src="/${jsPath}"></script>`
     fileCount++
   }
@@ -127,6 +156,10 @@ ${bodyContent}
   await targetStorage.writeFile(`${pageDir}/index.html`, html)
   fileCount++
 
+  // Clean up old hashed files
+  const removed = await cleanupOldFiles(targetStorage, oldFiles, newFiles)
+  if (removed > 0) fileCount -= removed
+
   return { files: fileCount }
 }
 
@@ -152,6 +185,8 @@ export async function publishFragmentRendered(
   const rendered = await renderComponent(resolved)
 
   const fragDir = `fragments/${fragmentName}`
+  const oldFiles = await listHashedFiles(targetStorage, fragDir)
+  const newFiles: string[] = []
   let fileCount = 0
 
   // Write fragment CSS as hashed file
@@ -161,6 +196,7 @@ export async function publishFragmentRendered(
     const cssPath = `${fragDir}/styles.${hash}.css`
     await targetStorage.mkdir(fragDir)
     await targetStorage.writeFile(cssPath, rendered.css)
+    newFiles.push(cssPath)
     headParts.push(`<link rel="stylesheet" href="/${cssPath}">`)
     fileCount++
   }
@@ -171,6 +207,7 @@ export async function publishFragmentRendered(
     const jsPath = `${fragDir}/script.${hash}.js`
     await targetStorage.mkdir(fragDir)
     await targetStorage.writeFile(jsPath, rendered.js)
+    newFiles.push(jsPath)
     headParts.push(`<script type="module" src="/${jsPath}"></script>`)
     fileCount++
   }
@@ -186,6 +223,10 @@ export async function publishFragmentRendered(
   await targetStorage.mkdir(fragDir)
   await targetStorage.writeFile(`${fragDir}/index.html`, fragmentHtml)
   fileCount++
+
+  // Clean up old hashed files
+  const removed = await cleanupOldFiles(targetStorage, oldFiles, newFiles)
+  if (removed > 0) fileCount -= removed
 
   return { files: fileCount }
 }
