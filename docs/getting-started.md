@@ -193,7 +193,19 @@ Reference in any page with `"@header"`. Update the fragment once — every page 
 
 ## Publishing
 
-### Configure a target
+### Target types
+
+Targets are where your site gets published. Three storage providers are supported:
+
+| Type | Use case | Config |
+|------|----------|--------|
+| `filesystem` | Local dev, staging, backups | `path: ./dist/staging` |
+| `s3` | AWS S3, Cloudflare R2, MinIO | `endpoint`, `bucket`, `accessKeyId`, `secretAccessKey` |
+| `azure-blob` | Azure Blob Storage | `connectionString`, `container` |
+
+The default for local development is filesystem — just a folder on disk.
+
+### Configure targets
 
 ```yaml
 # site.yaml
@@ -213,6 +225,8 @@ targets:
       browser: 60
       edge: 86400
 ```
+
+Environment variables (like `${R2_ACCESS_KEY_ID}`) are resolved at runtime — don't commit secrets to site.yaml.
 
 ### Build from CLI
 
