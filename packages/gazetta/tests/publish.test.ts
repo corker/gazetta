@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
-import { writeFile, mkdir, rm } from 'node:fs/promises'
+import { writeFile, mkdir, rm, readdir } from 'node:fs/promises'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { publishItems, resolveDependencies } from '../src/publish.js'
+import { publishPageRendered, publishFragmentRendered } from '../src/publish-rendered.js'
 
 const testDir = join(tmpdir(), 'gazetta-publish-test-' + Date.now())
 const sourceDir = join(testDir, 'source')
@@ -158,5 +159,90 @@ describe('resolveDependencies', () => {
     const deps = await resolveDependencies(storage, '', ['pages/empty'])
     expect(deps).toContain('pages/empty')
     expect(deps).toHaveLength(1)
+  })
+})
+
+describe('publishRendered', () => {
+  const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+  const storage = createFilesystemProvider()
+  const renderTargetDir = join(tmpdir(), 'gazetta-render-test-' + Date.now())
+
+  afterEach(async () => {
+    await rm(renderTargetDir, { recursive: true, force: true })
+  })
+
+  it('publishes a page as HTML with ESI placeholders and hashed CSS', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+    const { files } = await publishPageRendered('home', storage, starterDir, target)
+    expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
+
+    // Check page HTML exists with ESI tags
+    const html = await target.readFile('pages/home/index.html')
+    expect(html).toContain('<!DOCTYPE html>')
+    expect(html).toContain('<!--esi:/fragments/header/index.html-->')
+    expect(html).toContain('Welcome to Gazetta')
+
+    // Check hashed CSS exists
+    const entries = await target.readDir('pages/home')
+    const cssFiles = entries.filter(e => e.name.endsWith('.css'))
+    expect(cssFiles.length).toBe(1)
+    expect(cssFiles[0].name).toMatch(/^styles\.[a-f0-9]{8}\.css$/)
+  })
+
+  it('publishes a fragment as HTML with hashed CSS', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+    const { files } = await publishFragmentRendered('header', storage, starterDir, target)
+    expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
+
+    const html = await target.readFile('fragments/header/index.html')
+    expect(html).toContain('<head>')
+    expect(html).toContain('stylesheet')
+    expect(html).toContain('Gazetta')
+
+    const entries = await target.readDir('fragments/header')
+    const cssFiles = entries.filter(e => e.name.endsWith('.css'))
+    expect(cssFiles.length).toBe(1)
+  })
+
+  it('cleans up old hashed files when content changes', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+
+    // First publish
+    await publishFragmentRendered('header', storage, starterDir, target)
+    const entries1 = await target.readDir('fragments/header')
+    const css1 = entries1.find(e => e.name.endsWith('.css'))!.name
+
+    // Write a fake old hashed CSS file
+    await target.writeFile(`fragments/header/styles.00000000.css`, '.old {}')
+    const entriesBefore = await target.readDir('fragments/header')
+    expect(entriesBefore.filter(e => e.name.endsWith('.css')).length).toBe(2)
+
+    // Publish again — same content, same hash
+    await publishFragmentRendered('header', storage, starterDir, target)
+    const entriesAfter = await target.readDir('fragments/header')
+    const cssAfter = entriesAfter.filter(e => e.name.endsWith('.css'))
+
+    // Old fake file should be cleaned up, real file kept
+    expect(cssAfter.length).toBe(1)
+    expect(cssAfter[0].name).toBe(css1)
+  })
+
+  it('page publish cleans up old hashed JS files', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+
+    // First publish
+    await publishPageRendered('home', storage, starterDir, target)
+
+    // Write fake old files
+    await target.writeFile('pages/home/styles.00000000.css', '.old {}')
+    await target.writeFile('pages/home/script.00000000.js', '// old')
+
+    // Publish again
+    await publishPageRendered('home', storage, starterDir, target)
+    const entries = await target.readDir('pages/home')
+    const oldCss = entries.filter(e => e.name === 'styles.00000000.css')
+    const oldJs = entries.filter(e => e.name === 'script.00000000.js')
+    expect(oldCss.length).toBe(0)
+    expect(oldJs.length).toBe(0)
   })
 })
