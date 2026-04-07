@@ -2,10 +2,19 @@
 
 Validated approaches and things to avoid. Each entry: rule, then why.
 
-<!-- Example format:
-1. **Use integration tests against real databases, not mocks.**
-   Why: Mocked tests passed but prod migration failed — mock/prod divergence masked the bug.
+1. **No auto-save in CMS.** Edits stay in memory until explicit save. Preview uses POST with draft content overrides.
+   Why: Auto-save doesn't fit the CMS UX — content authors need control over when changes are persisted.
 
-2. **Prefer one bundled PR for related refactors over many small ones.**
-   Why: Splitting tightly coupled changes creates review churn with no benefit.
--->
+2. **Use testcontainers for Docker-based integration tests, not docker-compose.**
+   Why: Testcontainers manage lifecycle programmatically — cleaner setup/teardown, no manual docker-compose up.
+
+3. **Use data-testid attributes for Playwright selectors, not CSS classes or aria-labels.**
+   Why: CSS/aria selectors are brittle — break when PrimeVue updates or labels change. Test IDs are stable.
+
+4. **Write tests alongside new functionality, in the same commit.**
+   Why: Tests added as follow-up commits get forgotten or deprioritized. Ship tested code, not code then tests.
+
+5. **Types infer from Zod schema — single source of truth.**
+   Use `type Content = z.infer<typeof schema>` and `TemplateFunction<Content>`. Don't duplicate types manually.
+
+6. **Content, not props.** The CMS vocabulary is "content" — matches what content authors see. Don't use React terminology (props) in CMS/template code.
