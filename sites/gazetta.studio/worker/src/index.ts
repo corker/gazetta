@@ -16,6 +16,18 @@ app.use('*', async (c, next) => {
   return next()
 })
 
+// ---- Health check ----
+
+app.get('/health', async (c) => {
+  const pages = await c.env.SITE_BUCKET.list({ prefix: 'pages/', delimiter: '/' })
+  const fragments = await c.env.SITE_BUCKET.list({ prefix: 'fragments/', delimiter: '/' })
+  return c.json({
+    ok: true,
+    pages: pages.delimitedPrefixes.length,
+    fragments: fragments.delimitedPrefixes.length,
+  })
+})
+
 // ---- Static assets (CSS, JS) — immutable cache ----
 
 app.get('/pages/*', async (c) => serveStatic(c, c.env.SITE_BUCKET))
