@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies } from '../../publish.js'
 import type { PublishResult } from '../../publish.js'
-import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createWorkerPurge } from '../../publish-rendered.js'
+import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge } from '../../publish-rendered.js'
+import { loadSite } from '../../site-loader.js'
 
 export function publishRoutes(
   siteDir: string,
@@ -88,12 +89,32 @@ export function publishRoutes(
         await publishFragmentIndex(sourceStorage, siteDir, targetStorage)
         totalFiles += 2
 
-        // 4. Purge edge cache if worker URL configured
+        // 4. Purge edge cache via Cloudflare API
         const config = getTargetConfig(targetName)
-        if (config?.workerUrl) {
-          const purge = createWorkerPurge(config.workerUrl)
-          await purge.purgeAll()
-          console.log(`    ${targetName}: cache purged`)
+        const zoneId = process.env.CF_ZONE_ID
+        const apiToken = process.env.CF_API_TOKEN
+        if (config?.siteUrl && zoneId && apiToken) {
+          const purge = createCloudflarePurge(zoneId, apiToken)
+          const hasFragments = allItems.some(i => i.startsWith('fragments/'))
+          if (hasFragments) {
+            // Fragment changed — purge everything (all pages use fragments)
+            await purge.purgeAll()
+            console.log(`    ${targetName}: cache purged (all)`)
+          } else {
+            // Only pages changed — purge specific URLs
+            const site = await loadSite(siteDir, sourceStorage)
+            const urls = allItems
+              .filter(i => i.startsWith('pages/'))
+              .map(i => {
+                const page = site.pages.get(i.replace('pages/', ''))
+                return page ? `${config.siteUrl}${page.route}` : null
+              })
+              .filter(Boolean) as string[]
+            if (urls.length > 0) {
+              await purge.purgeUrls(urls)
+              console.log(`    ${targetName}: cache purged (${urls.join(', ')})`)
+            }
+          }
         }
 
         results.push({ target: targetName, success: true, copiedFiles: totalFiles })

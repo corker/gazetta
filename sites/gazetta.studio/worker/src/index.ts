@@ -36,13 +36,24 @@ async function serveStatic(c: { req: { url: string }; header: (k: string, v: str
 // ---- Page serving with ESI assembly ----
 
 app.get('*', async (c) => {
-  const requestPath = new URL(c.req.url).pathname
+  const request = c.req.raw
+  const cache = (caches as unknown as { default: Cache }).default
 
+  // Check edge cache
+  const cached = await cache.match(request)
+  if (cached) return cached
+
+  // Cache miss — assemble from R2
+  const requestPath = new URL(c.req.url).pathname
   const pageHtml = await findPage(c.env.SITE_BUCKET, requestPath)
   if (!pageHtml) return c.html('<h1>404 — Page not found</h1>', 404)
 
   const assembled = await assembleEsi(c.env.SITE_BUCKET, pageHtml)
-  return c.html(assembled, 200, { 'Cache-Control': 'public, max-age=0, s-maxage=86400' })
+  const response = c.html(assembled, 200, { 'Cache-Control': 'public, max-age=0, s-maxage=86400' })
+
+  // Store in edge cache (non-blocking)
+  c.executionCtx.waitUntil(cache.put(request, response.clone()))
+  return response
 })
 
 /**

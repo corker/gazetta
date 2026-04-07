@@ -246,7 +246,7 @@ async function runBuild(siteDir: string, targetName?: string) {
     siteDir
   )
 
-  const { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createWorkerPurge } = await import('../publish-rendered.js')
+  const { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } = await import('../publish-rendered.js')
 
   console.log(`\n  Site: ${site.manifest.name}`)
   console.log(`  Pages: ${[...site.pages.keys()].join(', ')}`)
@@ -282,15 +282,17 @@ async function runBuild(siteDir: string, targetName?: string) {
     await publishFragmentIndex(storage, siteDir, targetStorage)
     totalFiles += 2
 
-    // Purge cache if worker URL configured
-    const config = siteYaml.targets[name]
-    if (config.workerUrl) {
-      const purge = createWorkerPurge(config.workerUrl)
-      await purge.purgeAll()
-      console.log(`    cache purged`)
-    }
-
     console.log(`  ${name}: ${totalFiles} files published\n`)
+  }
+
+  // Purge cache once at the end (all targets)
+  const zoneId = process.env.CF_ZONE_ID
+  const apiToken = process.env.CF_API_TOKEN
+  if (zoneId && apiToken) {
+    const { createCloudflarePurge } = await import('../publish-rendered.js')
+    const purge = createCloudflarePurge(zoneId, apiToken)
+    await purge.purgeAll()
+    console.log(`  Cache purged\n`)
   }
 
   console.log(`  Done!\n`)

@@ -45,8 +45,8 @@ export interface PageManifest extends ComponentManifest {
 /** Target configuration in site.yaml */
 export interface TargetConfig {
   type: 'filesystem' | 'azure-blob' | 's3'
-  /** Worker URL for cache purging after publish */
-  workerUrl?: string
+  /** Base URL of the site for cache purging (e.g. https://gazetta.studio) */
+  siteUrl?: string
   path?: string
   connectionString?: string
   container?: string

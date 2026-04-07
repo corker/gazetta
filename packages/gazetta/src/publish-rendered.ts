@@ -270,20 +270,25 @@ export async function publishFragmentIndex(
   return index
 }
 
-/** Purge via Worker's /purge endpoints */
-export function createWorkerPurge(workerUrl: string, token?: string): PurgeStrategy {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+/** Purge via Cloudflare zone cache API */
+export function createCloudflarePurge(zoneId: string, apiToken: string): PurgeStrategy {
+  const apiBase = `https://api.cloudflare.com/client/v4/zones/${zoneId}/purge_cache`
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` }
 
   return {
     async purgeAll() {
-      await fetch(`${workerUrl}/purge/all`, { method: 'POST', headers })
+      const res = await fetch(apiBase, { method: 'POST', headers, body: JSON.stringify({ purge_everything: true }) })
+      if (!res.ok) throw new Error(`Cloudflare purge failed: ${res.status} ${await res.text()}`)
     },
     async purgeUrls(urls: string[]) {
-      await fetch(`${workerUrl}/purge/urls`, { method: 'POST', headers, body: JSON.stringify({ urls }) })
+      const res = await fetch(apiBase, { method: 'POST', headers, body: JSON.stringify({ files: urls }) })
+      if (!res.ok) throw new Error(`Cloudflare purge failed: ${res.status} ${await res.text()}`)
     },
   }
 }
+
+/** @deprecated Use createCloudflarePurge instead */
+export const createWorkerPurge = createCloudflarePurge
 
 /**
  * Publish a fragment and purge affected pages.

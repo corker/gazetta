@@ -6,4 +6,4 @@ targets:
     bucket: "gazetta-studio-site"
     accessKeyId: "${R2_ACCESS_KEY_ID}"
     secretAccessKey: "${R2_SECRET_ACCESS_KEY}"
-    workerUrl: "https://gazetta.studio"
+    siteUrl: "https://gazetta.studio"
