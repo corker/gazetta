@@ -4,7 +4,6 @@ import type { StorageProvider, PurgeStrategy, CacheConfig } from './types.js'
 import { loadSite } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent, renderPage } from './renderer.js'
-import { resetScopeCounter } from './scope.js'
 
 function contentHash(content: string): string {
   return createHash('md5').update(content).digest('hex').slice(0, 8)
@@ -50,7 +49,7 @@ export async function publishPageRendered(
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
-  resetScopeCounter()
+  // Scope IDs are now deterministic (hash-based), no reset needed
   const resolved = await resolvePage(pageName, site)
 
   // Render each child — fragments become ESI placeholders, local components baked in
@@ -170,7 +169,7 @@ export async function publishPageStatic(
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
-  resetScopeCounter()
+  // Scope IDs are now deterministic (hash-based), no reset needed
   const resolved = await resolvePage(pageName, site)
   const html = await renderPage(resolved)
 
@@ -203,7 +202,7 @@ export async function publishFragmentRendered(
   const ctx = { site, templatesDir, visited: new Set<string>(), path: [`@${fragmentName}`] }
   const resolved = await resolveComponent(`@${fragmentName}`, '', ctx)
 
-  resetScopeCounter()
+  // Scope IDs are now deterministic (hash-based), no reset needed
   const rendered = await renderComponent(resolved)
 
   const fragDir = `fragments/${fragmentName}`

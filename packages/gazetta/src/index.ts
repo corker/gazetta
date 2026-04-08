@@ -24,7 +24,7 @@ export { resolvePage, resolveComponent } from './resolver.js'
 export { loadSite } from './site-loader.js'
 export type { Site } from './site-loader.js'
 export { loadTemplate, invalidateTemplate, invalidateAllTemplates } from './template-loader.js'
-export { scopeHtml, scopeCss, generateScopeId, resetScopeCounter } from './scope.js'
+export { scopeHtml, scopeCss, hashPath, generateScopeId, resetScopeCounter } from './scope.js'
 export { createApp } from './app.js'
 
 // Storage providers

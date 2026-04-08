@@ -68,10 +68,13 @@ export async function resolveComponent(
     }
   }
 
+  // Tree path is the component's position relative to the page (excluding the page name)
+  const treePath = ctx.path.slice(1).join('/')
+
   ctx.path.pop()
   ctx.visited.delete(key)
 
-  return { template: loaded.render, content: processContent(manifest.content, loaded.schema), children, path: componentDir }
+  return { template: loaded.render, content: processContent(manifest.content, loaded.schema), children, path: componentDir, treePath }
 }
 
 export async function resolvePage(pageName: string, site: Site): Promise<ResolvedComponent> {
@@ -96,5 +99,5 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
     }
   }
 
-  return { template: loaded.render, content: processContent(page.content, loaded.schema), children, path: page.dir }
+  return { template: loaded.render, content: processContent(page.content, loaded.schema), children, path: page.dir, treePath: '' }
 }

@@ -1,39 +1,39 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import type { ResolvedComponent, RenderOutput } from '../src/types.js'
 import { renderComponent, renderPage } from '../src/renderer.js'
-import { resetScopeCounter } from '../src/scope.js'
+import { hashPath } from '../src/scope.js'
 
-beforeEach(() => {
-  resetScopeCounter()
-})
-
-function leaf(html: string, css = '', js = ''): ResolvedComponent {
+function leaf(html: string, css = '', js = '', treePath = ''): ResolvedComponent {
   return {
     template: () => ({ html, css, js }),
     children: [],
+    treePath,
   }
 }
 
 function composite(
   render: (children: RenderOutput[]) => RenderOutput,
-  children: ResolvedComponent[]
+  children: ResolvedComponent[],
+  treePath = ''
 ): ResolvedComponent {
   return {
     template: ({ children: c }) => render(c ?? []),
     children,
+    treePath,
   }
 }
 
 describe('renderComponent', () => {
   it('renders a leaf component with scoping', async () => {
-    const result = await renderComponent(leaf('<p>hello</p>', 'p { color: red; }'))
-    expect(result.html).toContain('data-gz="gz0"')
+    const result = await renderComponent(leaf('<p>hello</p>', 'p { color: red; }', '', 'hero'))
+    const id = hashPath('hero')
+    expect(result.html).toContain(`data-gz="${id}"`)
     expect(result.html).toContain('<p>hello</p>')
-    expect(result.css).toContain('[data-gz="gz0"] p')
+    expect(result.css).toContain(`[data-gz="${id}"] p`)
   })
 
   it('renders a leaf with js (js is not scoped)', async () => {
-    const result = await renderComponent(leaf('<div></div>', '', 'console.log("hi")'))
+    const result = await renderComponent(leaf('<div></div>', '', 'console.log("hi")', 'demo'))
     expect(result.js).toBe('console.log("hi")')
   })
 
@@ -46,6 +46,7 @@ describe('renderComponent', () => {
       }),
       content: { title: 'Hello World' },
       children: [],
+      treePath: 'hero',
     }
     const result = await renderComponent(component)
     expect(result.html).toContain('<h1>Hello World</h1>')
@@ -59,9 +60,10 @@ describe('renderComponent', () => {
         js: '',
       }),
       [
-        leaf('<span>A</span>', '.a {}'),
-        leaf('<span>B</span>', '.b {}'),
-      ]
+        leaf('<span>A</span>', '.a {}', '', 'features/a'),
+        leaf('<span>B</span>', '.b {}', '', 'features/b'),
+      ],
+      'features'
     )
     const result = await renderComponent(parent)
     expect(result.html).toContain('<span>A</span>')
@@ -69,7 +71,7 @@ describe('renderComponent', () => {
     expect(result.css).toContain('[data-gz=')
   })
 
-  it('each component gets a unique scope id', async () => {
+  it('each component gets a unique scope id based on tree path', async () => {
     const parent = composite(
       (children) => ({
         html: children.map(c => c.html).join(''),
@@ -77,14 +79,20 @@ describe('renderComponent', () => {
         js: '',
       }),
       [
-        leaf('<span>A</span>', '.a {}'),
-        leaf('<span>B</span>', '.b {}'),
-      ]
+        leaf('<span>A</span>', '.a {}', '', 'section/a'),
+        leaf('<span>B</span>', '.b {}', '', 'section/b'),
+      ],
+      'section'
     )
     const result = await renderComponent(parent)
-    expect(result.html).toContain('data-gz="gz0"')
-    expect(result.html).toContain('data-gz="gz1"')
-    expect(result.html).toContain('data-gz="gz2"')
+    const idA = hashPath('section/a')
+    const idB = hashPath('section/b')
+    const idParent = hashPath('section')
+    expect(result.html).toContain(`data-gz="${idA}"`)
+    expect(result.html).toContain(`data-gz="${idB}"`)
+    expect(result.html).toContain(`data-gz="${idParent}"`)
+    // All different
+    expect(new Set([idA, idB, idParent]).size).toBe(3)
   })
 
   it('passes route params to templates', async () => {
@@ -95,6 +103,7 @@ describe('renderComponent', () => {
         js: '',
       }),
       children: [],
+      treePath: 'article',
     }
     const result = await renderComponent(component, { slug: 'hello-world' })
     expect(result.html).toContain('hello-world')
@@ -108,24 +117,27 @@ describe('renderComponent', () => {
         js: '',
       }),
       children: [],
+      treePath: 'parent/child',
     }
     const parent = composite(
       (children) => ({ html: children.map(c => c.html).join(''), css: '', js: '' }),
-      [child]
+      [child],
+      'parent'
     )
     const result = await renderComponent(parent, { id: '42' })
     expect(result.html).toContain('42')
   })
 
   it('renders nested composites (3 levels deep)', async () => {
-    const grandchild = leaf('<em>deep</em>')
+    const grandchild = leaf('<em>deep</em>', '', '', 'root/mid/deep')
     const child = composite(
       (children) => ({
         html: `<section>${children.map(c => c.html).join('')}</section>`,
         css: '',
         js: '',
       }),
-      [grandchild]
+      [grandchild],
+      'root/mid'
     )
     const root = composite(
       (children) => ({
@@ -133,7 +145,8 @@ describe('renderComponent', () => {
         css: '',
         js: '',
       }),
-      [child]
+      [child],
+      'root'
     )
     const result = await renderComponent(root)
     expect(result.html).toContain('<em>deep</em>')
@@ -150,6 +163,7 @@ describe('renderComponent', () => {
       }),
       content: { title: 'Async Template' },
       children: [],
+      treePath: 'async',
     }
     const result = await renderComponent(component)
     expect(result.html).toContain('<h1>Async Template</h1>')
@@ -164,6 +178,7 @@ describe('renderComponent', () => {
         head: '<link rel="icon" href="/favicon.svg">',
       }),
       children: [],
+      treePath: 'with-head',
     }
     const result = await renderComponent(component)
     expect(result.head).toContain('<link rel="icon" href="/favicon.svg">')
@@ -173,6 +188,7 @@ describe('renderComponent', () => {
     const child: ResolvedComponent = {
       template: () => ({ html: '<p>child</p>', css: '', js: '', head: '<link rel="preconnect" href="https://fonts.example.com">' }),
       children: [],
+      treePath: 'layout/child',
     }
     const parent = composite(
       (children) => ({
@@ -181,7 +197,8 @@ describe('renderComponent', () => {
         js: '',
         head: `<link rel="icon" href="/favicon.svg">\n${children.map(c => c.head).filter(Boolean).join('\n')}`,
       }),
-      [child]
+      [child],
+      'layout'
     )
     const result = await renderComponent(parent)
     expect(result.head).toContain('favicon.svg')
@@ -191,7 +208,7 @@ describe('renderComponent', () => {
 
 describe('renderPage', () => {
   it('wraps output in HTML document', async () => {
-    const page = leaf('<p>content</p>', 'p {}')
+    const page = leaf('<p>content</p>', 'p {}', '', 'page')
     const html = await renderPage(page)
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<style>')
@@ -202,25 +219,26 @@ describe('renderPage', () => {
     const page: ResolvedComponent = {
       template: () => ({ html: '<p></p>', css: '', js: '', head: '<title>My Page</title>' }),
       children: [],
+      treePath: '',
     }
     const html = await renderPage(page)
     expect(html).toContain('<title>My Page</title>')
   })
 
   it('does not inject title when template has no head', async () => {
-    const page = leaf('<p>no head</p>')
+    const page = leaf('<p>no head</p>', '', '', 'page')
     const html = await renderPage(page)
     expect(html).not.toContain('<title>')
   })
 
   it('includes script tag when js is present', async () => {
-    const page = leaf('<p></p>', '', 'alert(1)')
+    const page = leaf('<p></p>', '', 'alert(1)', 'page')
     const html = await renderPage(page)
     expect(html).toContain('<script type="module">alert(1)</script>')
   })
 
   it('omits script tag when js is empty', async () => {
-    const page = leaf('<p></p>', '', '')
+    const page = leaf('<p></p>', '', '', 'page')
     const html = await renderPage(page)
     expect(html).not.toContain('<script')
   })
@@ -234,19 +252,24 @@ describe('renderPage', () => {
         head: '<link rel="icon" href="/favicon.svg">\n<link rel="preconnect" href="https://fonts.example.com">',
       }),
       children: [],
+      treePath: '',
     }
     const html = await renderPage(page)
     expect(html).toContain('<link rel="icon" href="/favicon.svg">')
     expect(html).toContain('fonts.example.com')
   })
 
-  it('resets scope counter between pages', async () => {
+  it('scope IDs are deterministic across renders', async () => {
     const page = composite(
       (children) => ({ html: children.map(c => c.html).join(''), css: children.map(c => c.css).join(''), js: '' }),
-      [leaf('<p>child</p>', '.p {}')]
+      [leaf('<p>child</p>', '.p {}', '', 'child')],
+      'page'
     )
-    await renderPage(page)
-    const html = await renderPage(page)
-    expect(html).toContain('data-gz="gz0"')
+    const html1 = await renderPage(page)
+    const html2 = await renderPage(page)
+    // Same tree path → same scope ID → same HTML
+    const id = hashPath('child')
+    expect(html1).toContain(`data-gz="${id}"`)
+    expect(html2).toContain(`data-gz="${id}"`)
   })
 })

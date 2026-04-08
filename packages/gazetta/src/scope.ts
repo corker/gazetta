@@ -2,14 +2,18 @@ import postcss from 'postcss'
 // @ts-expect-error no type declarations available
 import prefixer from 'postcss-prefix-selector'
 
-let counter = 0
-
-export function generateScopeId(): string {
-  return 'gz' + (counter++).toString(36)
-}
-
-export function resetScopeCounter(): void {
-  counter = 0
+/**
+ * Hash a tree path to an 8-char hex string (FNV-1a).
+ * Deterministic — same path always produces the same hash.
+ * Works identically in Node and browser.
+ */
+export function hashPath(path: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < path.length; i++) {
+    hash ^= path.charCodeAt(i)
+    hash = (hash * 0x01000193) >>> 0
+  }
+  return hash.toString(16).padStart(8, '0')
 }
 
 /**
@@ -22,8 +26,6 @@ export function scopeHtml(html: string, scopeId: string): string {
 
 /**
  * Prefixes CSS selectors with a scope attribute selector using PostCSS.
- * Handles all CSS edge cases: @-rules, combinators, pseudo-elements,
- * content strings, CSS nesting, attribute selectors.
  */
 export function scopeCss(css: string, scopeId: string): string {
   if (!css.trim()) return ''
@@ -35,3 +37,9 @@ export function scopeCss(css: string, scopeId: string): string {
 
   return result
 }
+
+// Legacy exports for backwards compatibility
+/** @deprecated Use hashPath instead */
+export function generateScopeId(): string { return hashPath(String(Date.now())) }
+/** @deprecated No longer needed — scope IDs are deterministic */
+export function resetScopeCounter(): void {}

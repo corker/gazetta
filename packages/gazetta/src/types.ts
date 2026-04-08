@@ -107,6 +107,8 @@ export interface ResolvedComponent {
   content?: Record<string, unknown>
   children: ResolvedComponent[]
   path?: string
+  /** Component's position in the page tree (e.g., "hero", "@header/logo", "features/fast") */
+  treePath?: string
 }
 
 /** Purge strategy for cache invalidation */

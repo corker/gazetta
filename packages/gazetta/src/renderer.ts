@@ -1,11 +1,12 @@
 import type { RenderOutput, ResolvedComponent } from './types.js'
-import { generateScopeId, scopeHtml, scopeCss, resetScopeCounter } from './scope.js'
+import { hashPath, scopeHtml, scopeCss } from './scope.js'
 
 export async function renderComponent(component: ResolvedComponent, routeParams?: Record<string, string>): Promise<RenderOutput> {
   const children = await Promise.all(component.children.map(c => renderComponent(c, routeParams)))
   const output = await component.template({ content: component.content, children, params: routeParams })
 
-  const scopeId = generateScopeId()
+  const scopeId = hashPath(component.treePath ?? '')
+
   const headParts = [
     ...children.map(c => c.head).filter(Boolean),
     output.head,
@@ -23,7 +24,6 @@ export async function renderPage(
   component: ResolvedComponent,
   routeParams?: Record<string, string>
 ): Promise<string> {
-  resetScopeCounter()
   const children = await Promise.all(component.children.map(c => renderComponent(c, routeParams)))
   const output = await component.template({ content: component.content, children, params: routeParams })
 
