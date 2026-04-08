@@ -12,8 +12,6 @@ import {
   publishFragmentRendered,
   publishSiteManifest,
   publishFragmentIndex,
-  type PublishedPageManifest,
-  type PublishedComponent,
 } from 'gazetta'
 
 const starterDir = resolve(import.meta.dirname, '../../../examples/starter')

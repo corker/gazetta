@@ -15,8 +15,6 @@ export type {
   CacheConfig,
   DirEntry,
   StorageProvider,
-  PublishedPageManifest,
-  PublishedComponent,
   PurgeStrategy,
 } from './types.js'
 

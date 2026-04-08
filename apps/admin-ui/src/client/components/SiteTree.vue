@@ -26,7 +26,7 @@ const nodes = computed<TreeNode[]>(() => [
       key: `page:${p.name}`,
       label: p.name,
       icon: 'pi pi-file',
-      data: { type: 'page' as const, name: p.name },
+      data: { type: 'page' as const, name: p.name, route: p.route },
     })),
   },
   {
@@ -77,6 +77,7 @@ async function handleDelete(node: TreeNode) {
       <template #default="{ node }">
         <div class="node-row" :data-testid="node.data ? `site-${node.data.type}-${node.data.name}` : `site-group-${node.key}`">
           <span class="node-label">{{ node.label }}</span>
+          <span v-if="node.data?.route" class="node-route">{{ node.data.route }}</span>
           <Button v-if="node.data" icon="pi pi-trash" text rounded size="small" severity="danger"
             class="node-delete" :data-testid="`delete-${node.data.type}-${node.data.name}`"
             @click.stop="handleDelete(node)" />
@@ -102,6 +103,7 @@ async function handleDelete(node: TreeNode) {
 .new-btns { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 .node-row { display: flex; align-items: center; gap: 0.25rem; width: 100%; }
 .node-label { flex: 1; }
+.node-route { font-size: 0.6875rem; color: #52525b; }
 .node-delete { opacity: 0; transition: opacity 0.15s; }
 .node-row:hover .node-delete { opacity: 1; }
 </style>
