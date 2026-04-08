@@ -28,7 +28,7 @@ function printHelp() {
     gazetta init [dir]        Create a new site
     gazetta dev [site-dir]    Start dev server + CMS at /admin
     gazetta publish [site-dir] Pre-render and publish to targets
-    gazetta deploy -t <name>  Publish + deploy worker to hosting
+    gazetta deploy -t <name>  Deploy worker to hosting (one-time setup)
     gazetta validate [site-dir] Check site for broken references
     gazetta help              Show this help message
 
@@ -41,7 +41,7 @@ function printHelp() {
     gazetta dev                     # dev server + CMS
     gazetta publish                  # publish to all targets
     gazetta publish -t production   # publish to specific target
-    gazetta deploy -t production    # publish + deploy worker
+    gazetta deploy -t production    # deploy worker (one-time)
     gazetta validate                # check site for broken references
 `)
 }
@@ -332,11 +332,7 @@ async function runDeploy(siteDir: string, targetName?: string) {
     process.exit(1)
   }
 
-  // 1. Publish content
-  console.log(`\n  Publishing to ${targetName}...`)
-  await runPublish(siteDir, targetName)
-
-  // 2. Generate worker in temp dir
+  // Generate worker in temp dir
   const workerName = target.worker.name ?? targetName
   const bucketName = target.storage.bucket ?? workerName
   const tmpDir = join(siteDir, '.gazetta-deploy')
@@ -382,7 +378,7 @@ async function runDeploy(siteDir: string, targetName?: string) {
     await rm(tmpDir, { recursive: true, force: true })
   }
 
-  console.log(`\n  Deploy complete!\n`)
+  console.log(`\n  Worker deployed. Now publish content:\n    gazetta publish -t ${targetName}\n`)
 }
 
 async function runValidate(siteDir: string) {
