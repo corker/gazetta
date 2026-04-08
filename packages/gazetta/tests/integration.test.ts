@@ -133,15 +133,39 @@ describe('starter site', () => {
     expect(html).toContain('data-gz=')
   })
 
-  it('renders unique data-gz IDs per component', async () => {
+  it('renders unique data-gz IDs per component on all pages', async () => {
+    const site = await loadSite(starterDir, storage)
+    for (const pageName of site.pages.keys()) {
+      const resolved = await resolvePage(pageName, site)
+      const html = await renderPage(resolved)
+      const divIds = [...html.matchAll(/<div data-gz="([^"]+)">/g)].map(m => m[1])
+      expect(divIds.length).toBeGreaterThan(0)
+      expect(new Set(divIds).size).toBe(divIds.length) // all unique within the page
+    }
+  })
+
+  it('fragment children have unique IDs (nested components)', async () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
     const html = await renderPage(resolved)
-    const ids = [...html.matchAll(/data-gz="([^"]+)"/g)].map(m => m[1])
-    // Filter to unique div wrappers (not CSS selector references)
     const divIds = [...html.matchAll(/<div data-gz="([^"]+)">/g)].map(m => m[1])
-    expect(divIds.length).toBeGreaterThan(0)
-    expect(new Set(divIds).size).toBe(divIds.length) // all unique
+
+    // Home page has @header (with logo, nav), hero, features (with children), demo, @footer (with copyright)
+    // All must be unique including fragment children
+    expect(divIds.length).toBeGreaterThanOrEqual(8)
+    expect(new Set(divIds).size).toBe(divIds.length)
+  })
+
+  it('same fragment on different pages gets same IDs', async () => {
+    const site = await loadSite(starterDir, storage)
+    const homeHtml = await renderPage(await resolvePage('home', site))
+    const aboutHtml = await renderPage(await resolvePage('about', site))
+
+    // @header should have the same data-gz ID on both pages
+    const homeHeaderId = homeHtml.match(/<div data-gz="([^"]+)">.*?site-header/s)?.[1]
+    const aboutHeaderId = aboutHtml.match(/<div data-gz="([^"]+)">.*?site-header/s)?.[1]
+    expect(homeHeaderId).toBeDefined()
+    expect(homeHeaderId).toBe(aboutHeaderId)
   })
 
   it('data-gz IDs are deterministic across renders', async () => {
