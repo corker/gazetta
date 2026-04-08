@@ -105,16 +105,6 @@ export async function publishPageRendered(
     fileCount++
   }
 
-  // Build page HTML
-  const title = (page.metadata?.title as string) ?? 'Gazetta'
-  const description = page.metadata?.description as string | undefined
-
-  const metaTags = [
-    description ? `<meta name="description" content="${description}">` : '',
-    title ? `<meta property="og:title" content="${title}">` : '',
-    description ? `<meta property="og:description" content="${description}">` : '',
-  ].filter(Boolean).join('\n  ')
-
   // Write page JS as hashed file (if any)
   const pageJs = localJsParts.join('\n')
   let pageJsLink = ''
@@ -131,10 +121,7 @@ export async function publishPageRendered(
   const headContent = [
     `<meta charset="UTF-8">`,
     `<meta name="viewport" content="width=device-width, initial-scale=1.0">`,
-    `<title>${title}</title>`,
-    metaTags,
     ...localHeadParts,
-    // CSS first, then ESI heads (fragment CSS + JS), then page JS
     pageCssLink,
     ...esiHeadTags,
     pageJsLink,
@@ -185,7 +172,7 @@ export async function publishPageStatic(
 
   resetScopeCounter()
   const resolved = await resolvePage(pageName, site)
-  const html = await renderPage(resolved, page.metadata)
+  const html = await renderPage(resolved)
 
   // URL path: / → index.html, /about → about/index.html
   const urlPath = page.route === '/' ? '' : page.route.replace(/^\//, '')

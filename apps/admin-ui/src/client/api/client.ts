@@ -14,7 +14,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export interface PageSummary { name: string; route: string; template: string; metadata?: Record<string, unknown> }
+export interface PageSummary { name: string; route: string; template: string }
 export interface FragmentSummary { name: string; template: string }
 export interface TemplateSummary { name: string }
 export interface SiteManifest { name: string; version?: string }

@@ -24,7 +24,7 @@ describe('starter site', () => {
   it('resolves and renders the home page', async () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
-    const html = await renderPage(resolved, site.pages.get('home')!.metadata)
+    const html = await renderPage(resolved, )
 
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<title>Home</title>')
@@ -39,7 +39,7 @@ describe('starter site', () => {
   it('resolves and renders the about page', async () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('about', site)
-    const html = await renderPage(resolved, site.pages.get('about')!.metadata)
+    const html = await renderPage(resolved, )
 
     expect(html).toContain('<title>About</title>')
     expect(html).toContain('About Gazetta')
@@ -91,7 +91,7 @@ describe('starter site', () => {
   it('renders React SSR templates (feature cards)', async () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
-    const html = await renderPage(resolved, site.pages.get('home')!.metadata)
+    const html = await renderPage(resolved, )
 
     expect(html).toContain('Why Gazetta')
     expect(html).toContain('<div class="feature-card">')
@@ -111,7 +111,7 @@ describe('starter site', () => {
   it('resolves and renders blog page with route params', async () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('blog/[slug]', site)
-    const html = await renderPage(resolved, site.pages.get('blog/[slug]')!.metadata, { slug: 'hello-world' })
+    const html = await renderPage(resolved, { slug: 'hello-world' })
 
     expect(html).toContain('<title>Blog Post</title>')
     expect(html).toContain('Hello from Gazetta')
@@ -122,7 +122,7 @@ describe('starter site', () => {
   it('renders valid HTML document with scoped CSS', async () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
-    const html = await renderPage(resolved, site.pages.get('home')!.metadata)
+    const html = await renderPage(resolved, )
 
     expect(html).toMatch(/^<!DOCTYPE html>/)
     expect(html).toContain('<html lang="en">')

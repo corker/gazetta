@@ -13,13 +13,12 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
       name,
       route: page.route,
       template: page.template,
-      metadata: page.metadata,
     }))
     return c.json(pages)
   })
 
   app.post('/api/pages', async (c) => {
-    const body = await c.req.json() as { name: string; route: string; template: string; metadata?: Record<string, unknown> }
+    const body = await c.req.json() as { name: string; route: string; template: string; content?: Record<string, unknown> }
     if (!body.name || !body.route || !body.template) {
       return c.json({ error: 'Missing required fields: name, route, template' }, 400)
     }
@@ -35,7 +34,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
     const manifest = {
       route: body.route,
       template: body.template,
-      metadata: body.metadata ?? { title: body.name },
+      content: body.content ?? { title: body.name },
       components: [],
     }
     const yamlContent = yaml.dump(manifest, { quotingType: '"', forceQuotes: false })
@@ -52,7 +51,6 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
       name,
       route: page.route,
       template: page.template,
-      metadata: page.metadata,
       content: page.content,
       components: page.components,
       dir: page.dir,
@@ -69,7 +67,6 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
     const manifest = {
       route: body.route ?? page.route,
       template: body.template ?? page.template,
-      metadata: body.metadata ?? page.metadata,
       content: body.content ?? page.content,
       components: body.components ?? page.components,
     }

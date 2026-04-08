@@ -238,7 +238,7 @@ describe('PUT /api/pages/:name', () => {
     await rm(resolve(starterDir, 'pages/update-test'), { recursive: true, force: true })
   })
 
-  it('updates page metadata', async () => {
+  it('updates page content', async () => {
     // Create
     await app.request('/api/pages', {
       method: 'POST',
@@ -250,20 +250,20 @@ describe('PUT /api/pages/:name', () => {
     const res = await app.request('/api/pages/update-test', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ metadata: { title: 'Updated Title' } }),
+      body: JSON.stringify({ content: { title: 'Updated Title' } }),
     })
     expect(res.status).toBe(200)
 
     // Verify
     const { body } = await get('/api/pages/update-test')
-    expect(body.metadata.title).toBe('Updated Title')
+    expect(body.content.title).toBe('Updated Title')
   })
 
   it('returns 404 for missing page', async () => {
     const res = await app.request('/api/pages/nonexistent', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ metadata: {} }),
+      body: JSON.stringify({ content: {} }),
     })
     expect(res.status).toBe(404)
   })

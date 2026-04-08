@@ -1,6 +1,6 @@
 route: /
 template: page-default
-metadata:
+content:
   title: Home
   description: Welcome to Gazetta
 components:

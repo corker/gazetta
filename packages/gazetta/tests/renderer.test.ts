@@ -192,29 +192,19 @@ describe('renderComponent', () => {
 describe('renderPage', () => {
   it('wraps output in HTML document', async () => {
     const page = leaf('<p>content</p>', 'p {}')
-    const html = await renderPage(page, { title: 'Test Page' })
+    const html = await renderPage(page)
     expect(html).toContain('<!DOCTYPE html>')
-    expect(html).toContain('<title>Test Page</title>')
     expect(html).toContain('<style>')
     expect(html).toContain('<p>content</p>')
   })
 
-  it('includes description meta tag when provided', async () => {
-    const page = leaf('<p></p>')
-    const html = await renderPage(page, { title: 'T', description: 'My description' })
-    expect(html).toContain('<meta name="description" content="My description">')
-  })
-
-  it('omits description meta tag when not provided', async () => {
-    const page = leaf('<p></p>')
-    const html = await renderPage(page, { title: 'T' })
-    expect(html).not.toContain('meta name="description"')
-  })
-
-  it('defaults title to Gazetta', async () => {
-    const page = leaf('<p></p>')
+  it('renders title from template head output', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({ html: '<p></p>', css: '', js: '', head: '<title>My Page</title>' }),
+      children: [],
+    }
     const html = await renderPage(page)
-    expect(html).toContain('<title>Gazetta</title>')
+    expect(html).toContain('<title>My Page</title>')
   })
 
   it('includes script tag when js is present', async () => {

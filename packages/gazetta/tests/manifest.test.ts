@@ -54,7 +54,7 @@ describe('parsePageManifest', () => {
     const path = await writeYaml('page.yaml', `
 route: /home
 template: page-default
-metadata:
+content:
   title: "Home"
 components:
   - "@header"
@@ -64,7 +64,7 @@ components:
     const result = await parsePageManifest(storage, path)
     expect(result.route).toBe('/home')
     expect(result.template).toBe('page-default')
-    expect(result.metadata?.title).toBe('Home')
+    expect(result.content?.title).toBe('Home')
     expect(result.components).toEqual(['@header', 'hero', '@footer'])
   })
 

@@ -1,6 +1,6 @@
 route: /about
 template: page-default
-metadata:
+content:
   title: About
   description: About Gazetta
 components:

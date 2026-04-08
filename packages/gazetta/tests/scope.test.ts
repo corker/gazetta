@@ -25,8 +25,8 @@ describe('scopeHtml', () => {
     expect(scopeHtml('<p>hello</p>', 'gz0')).toBe('<div data-gz="gz0"><p>hello</p></div>')
   })
 
-  it('handles empty html', () => {
-    expect(scopeHtml('', 'gz0')).toBe('<div data-gz="gz0"></div>')
+  it('returns empty string for empty html', () => {
+    expect(scopeHtml('', 'gz0')).toBe('')
   })
 })
 

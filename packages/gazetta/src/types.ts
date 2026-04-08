@@ -47,7 +47,6 @@ export interface CacheConfig {
 /** Page manifest (routable component) */
 export interface PageManifest extends ComponentManifest {
   route: string
-  metadata?: Record<string, unknown>
   cache?: CacheConfig
 }
 

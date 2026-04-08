@@ -79,14 +79,21 @@ async function runInit(dir: string) {
     'templates/page-layout/index.ts': `import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
 
-export const schema = z.object({})
+export const schema = z.object({
+  title: z.string().describe('Page title'),
+  description: z.string().optional().describe('Page description'),
+})
 
-const template: TemplateFunction = ({ children = [] }) => ({
+type Content = z.infer<typeof schema>
+
+const template: TemplateFunction<Content> = ({ content, children = [] }) => ({
   html: \`<main>\${children.map(c => c.html).join('\\n')}</main>\`,
   css: \`main { max-width: 800px; margin: 0 auto; padding: 2rem; font-family: system-ui, sans-serif; }
 \${children.map(c => c.css).join('\\n')}\`,
   js: children.map(c => c.js).filter(Boolean).join('\\n'),
-  head: \`<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  head: \`<title>\${content?.title ?? ''}</title>
+\${content?.description ? \`<meta name="description" content="\${content.description}">\` : ''}
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
 \${children.map(c => c.head).filter(Boolean).join('\\n')}\`,
 })
 
@@ -171,8 +178,9 @@ content:
 
     'pages/home/page.yaml': `route: /
 template: page-layout
-metadata:
+content:
   title: ${name}
+  description: A site built with Gazetta
 components:
   - "@header"
   - hero
@@ -537,7 +545,7 @@ async function runDev(siteDir: string, port: number) {
       try {
         const freshSite = await loadSite(siteDir, storage)
         const resolved = await resolvePage(pageName, freshSite)
-        const html = await renderPage(resolved, page.metadata, c.req.param())
+        const html = await renderPage(resolved, c.req.param())
         return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
       } catch (err) {
         return c.html(renderErrorOverlay(err as Error), 500)

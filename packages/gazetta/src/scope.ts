@@ -16,6 +16,7 @@ export function resetScopeCounter(): void {
  * Wraps HTML in a scoped container with a data-gz attribute.
  */
 export function scopeHtml(html: string, scopeId: string): string {
+  if (!html.trim()) return ''
   return `<div data-gz="${scopeId}">${html}</div>`
 }
 

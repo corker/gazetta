@@ -79,6 +79,7 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   function clearComponentSelection() {
+    editingPageContent.value = false
     selectedComponentPath.value = null
     componentContent.value = null
     componentTemplate.value = null
@@ -91,6 +92,7 @@ export const useEditorStore = defineStore('editor', () => {
 
   async function selectComponent(path: string, template: string) {
     try {
+      editingPageContent.value = false
       selectedComponentPath.value = path
       componentTemplate.value = template
       dirty.value = false
@@ -106,13 +108,39 @@ export const useEditorStore = defineStore('editor', () => {
     }
   }
 
+  // Track whether we're editing a page or a component (different save endpoints)
+  const editingPageContent = ref(false)
+
+  async function selectPageContent() {
+    const detail = pageDetail.value ?? fragmentDetail.value
+    if (!detail) return
+    try {
+      editingPageContent.value = true
+      selectedComponentPath.value = detail.dir
+      componentTemplate.value = detail.template
+      dirty.value = false
+      lastSaveError.value = null
+      lastSaveSuccess.value = false
+      const content = (detail.content as Record<string, unknown>) ?? {}
+      componentContent.value = content
+      savedContent.value = deepClone(content)
+      templateSchema.value = await api.getTemplateSchema(detail.template)
+    } catch (err) {
+      showError(err, 'Failed to load page content')
+    }
+  }
+
   async function saveComponent() {
     if (!selectedComponentPath.value || !componentContent.value) return
     saving.value = true
     lastSaveError.value = null
     lastSaveSuccess.value = false
     try {
-      await api.updateComponent(selectedComponentPath.value, { content: componentContent.value })
+      if (editingPageContent.value && selectionName.value) {
+        await api.updatePage(selectionName.value, { content: componentContent.value })
+      } else {
+        await api.updateComponent(selectedComponentPath.value, { content: componentContent.value })
+      }
       savedContent.value = deepClone(componentContent.value)
       dirty.value = false
       lastSaveSuccess.value = true
@@ -210,7 +238,7 @@ export const useEditorStore = defineStore('editor', () => {
     selectedComponentPath, componentContent, componentTemplate, templateSchema,
     previewRoute, previewVersion, draftVersion, saving, dirty, lastSaveError, lastSaveSuccess,
     toast,
-    selectPage, selectFragment, selectComponent, saveComponent,
+    selectPage, selectFragment, selectComponent, selectPageContent, saveComponent,
     markDirty, discardChanges, clearComponentSelection,
     moveComponent, removeComponent, addComponent,
   }

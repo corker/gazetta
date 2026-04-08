@@ -1,6 +1,6 @@
 route: /blog
 template: site-layout
-metadata:
+content:
   title: "Blog — Gazetta"
   description: "News, tutorials, and updates from the Gazetta team."
 components:

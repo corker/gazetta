@@ -67,9 +67,20 @@ async function buildComponentNode(name: string, parentDir: string, index: number
 
 watch(detail, async (d) => {
   if (!d || !d.components) { componentNodes.value = []; return }
-  componentNodes.value = await Promise.all(
+  const children = await Promise.all(
     d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i))
   )
+
+  // Page/fragment itself as the root clickable node
+  const rootNode: TreeNode = {
+    key: `root:${editor.selectionName}`,
+    label: editor.selectionName ?? '',
+    icon: editor.selectionType === 'page' ? 'pi pi-file' : 'pi pi-share-alt',
+    data: { isPage: true, path: d.dir, template: d.template },
+    children,
+  }
+  componentNodes.value = [rootNode]
+  expandedKeys.value = { [`root:${editor.selectionName}`]: true }
 }, { immediate: true })
 
 const expandedKeys = ref<Record<string, boolean>>({})
@@ -80,6 +91,11 @@ function onSelect(node: TreeNode) {
   if (node.data.isFragment) {
     const key = node.key as string
     expandedKeys.value = { ...expandedKeys.value, [key]: !expandedKeys.value[key] }
+    return
+  }
+  // Page/fragment root node — edit page content
+  if (node.data.isPage) {
+    editor.selectPageContent()
     return
   }
   if (!node.data.path || !node.data.template) return
