@@ -148,7 +148,7 @@ function handleMessage(e: MessageEvent) {
     }
   }
   if (e.data?.type === 'gazetta:external' && e.data.url) {
-    editor.toast = { message: `External link: ${e.data.url}`, type: 'success' }
+    editor.toast = { message: e.data.url, type: 'success', link: e.data.url }
     setTimeout(() => { editor.toast = null }, 5000)
   }
 }

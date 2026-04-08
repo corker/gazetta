@@ -24,7 +24,7 @@ export const useEditorStore = defineStore('editor', () => {
   const draftVersion = ref(0)
 
   // Toast notification system
-  const toast = ref<{ message: string; type: 'success' | 'error' } | null>(null)
+  const toast = ref<{ message: string; type: 'success' | 'error'; link?: string } | null>(null)
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {
     toast.value = { message, type }

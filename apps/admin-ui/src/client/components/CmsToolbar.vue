@@ -32,7 +32,8 @@ const canPublish = computed(() => editor.selectionName && !editor.dirty)
       <Transition name="fade">
         <span v-if="editor.toast" class="cms-toast" :class="editor.toast.type === 'error' ? 'cms-toast-error' : 'cms-toast-success'">
           <i :class="editor.toast.type === 'error' ? 'pi pi-exclamation-circle' : 'pi pi-check-circle'" />
-          {{ editor.toast.message }}
+          <a v-if="editor.toast.link" :href="editor.toast.link" target="_blank" rel="noopener" class="cms-toast-link">{{ editor.toast.message }}</a>
+          <template v-else>{{ editor.toast.message }}</template>
         </span>
         <span v-else-if="editor.lastSaveError" class="cms-toast cms-toast-error">
           <i class="pi pi-exclamation-circle" /> {{ editor.lastSaveError }}
@@ -69,6 +70,7 @@ const canPublish = computed(() => editor.selectionName && !editor.dirty)
 .cms-toast { font-size: 0.8125rem; display: flex; align-items: center; gap: 0.375rem; }
 .cms-toast-success { color: #16a34a; }
 .cms-toast-error { color: #dc2626; }
+.cms-toast-link { color: inherit; text-decoration: underline; }
 .cms-toast-dirty { color: #d97706; }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
