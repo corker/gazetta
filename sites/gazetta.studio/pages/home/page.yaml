@@ -1,4 +1,3 @@
-route: /
 template: site-layout
 content:
   title: "Gazetta — Stateless CMS for Composable Websites"

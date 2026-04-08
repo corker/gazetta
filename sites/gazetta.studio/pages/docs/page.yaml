@@ -1,4 +1,3 @@
-route: /docs
 template: site-layout
 content:
   title: "Documentation — Gazetta"

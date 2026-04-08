@@ -1,4 +1,3 @@
-route: /
 template: page-default
 content:
   title: Home

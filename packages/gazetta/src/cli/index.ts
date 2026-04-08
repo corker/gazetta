@@ -176,8 +176,7 @@ content:
       href: /
 `,
 
-    'pages/home/page.yaml': `route: /
-template: page-layout
+    'pages/home/page.yaml': `template: page-layout
 content:
   title: ${name}
   description: A site built with Gazetta

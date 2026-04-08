@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { writeFile, mkdir, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { deriveRoute } from '../src/site-loader.js'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { loadSite } from '../src/site-loader.js'
 
@@ -121,5 +122,27 @@ describe('loadSite', () => {
     expect(site.manifest.name).toBe('Gazetta Starter')
     expect(site.pages.size).toBeGreaterThanOrEqual(3)
     expect(site.fragments.size).toBe(2)
+  })
+})
+
+describe('deriveRoute', () => {
+  it('home → /', () => {
+    expect(deriveRoute('home')).toBe('/')
+  })
+
+  it('about → /about', () => {
+    expect(deriveRoute('about')).toBe('/about')
+  })
+
+  it('blog/[slug] → /blog/:slug', () => {
+    expect(deriveRoute('blog/[slug]')).toBe('/blog/:slug')
+  })
+
+  it('docs/getting-started → /docs/getting-started', () => {
+    expect(deriveRoute('docs/getting-started')).toBe('/docs/getting-started')
+  })
+
+  it('products/[category]/[id] → /products/:category/:id', () => {
+    expect(deriveRoute('products/[category]/[id]')).toBe('/products/:category/:id')
   })
 })

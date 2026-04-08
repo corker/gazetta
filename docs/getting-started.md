@@ -117,13 +117,12 @@ ${children.map(c => c.css).join('\n')}`,
 
 ## Pages
 
-A page is a folder with a `page.yaml` manifest:
+A page is a folder with a `page.yaml` manifest. The route is derived from the folder path — `pages/about/` becomes `/about`:
 
 ```yaml
 # pages/about/page.yaml
-route: /about
 template: page-layout
-metadata:
+content:
   title: About
   description: About our company
 components:
@@ -145,9 +144,10 @@ Or create pages in the CMS — click **New page** in the admin UI.
 
 ### Dynamic routes
 
+Use `[param]` in the folder name — it becomes `:param` in the route:
+
 ```yaml
-# pages/blog/[slug]/page.yaml
-route: /blog/:slug
+# pages/blog/[slug]/page.yaml → /blog/:slug
 template: blog-post
 components:
   - article

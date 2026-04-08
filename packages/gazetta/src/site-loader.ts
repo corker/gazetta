@@ -2,6 +2,12 @@ import { join } from 'node:path'
 import type { PageManifest, FragmentManifest, SiteManifest, StorageProvider } from './types.js'
 import { parseSiteManifest, parsePageManifest, parseFragmentManifest } from './manifest.js'
 
+/** Derive route from page folder name: home → /, about → /about, blog/[slug] → /blog/:slug */
+export function deriveRoute(pageName: string): string {
+  if (pageName === 'home') return '/'
+  return '/' + pageName.replace(/\[([^\]]+)\]/g, ':$1')
+}
+
 export interface Site {
   manifest: SiteManifest
   pages: Map<string, PageManifest & { dir: string }>
@@ -31,7 +37,8 @@ async function discoverPages(
     if (await storage.exists(manifestPath)) {
       try {
         const manifest = await parsePageManifest(storage, manifestPath)
-        pages.set(name, { ...manifest, dir })
+        const route = deriveRoute(name)
+        pages.set(name, { ...manifest, route, dir })
       } catch (err) {
         console.warn(`  Warning: skipping page "${name}": ${(err as Error).message}`)
       }

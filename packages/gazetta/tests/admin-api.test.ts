@@ -204,7 +204,7 @@ describe('POST /api/pages (create)', () => {
     const res = await app.request('/api/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'test-page', route: '/test-page', template: 'page-default' }),
+      body: JSON.stringify({ name: 'test-page', template: 'page-default' }),
     })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -218,7 +218,7 @@ describe('POST /api/pages (create)', () => {
     const res = await app.request('/api/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'test-page', route: '/test-page', template: 'page-default' }),
+      body: JSON.stringify({ name: 'test-page', template: 'page-default' }),
     })
     expect(res.status).toBe(409)
   })
@@ -243,7 +243,7 @@ describe('PUT /api/pages/:name', () => {
     await app.request('/api/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'update-test', route: '/update-test', template: 'page-default' }),
+      body: JSON.stringify({ name: 'update-test', template: 'page-default' }),
     })
 
     // Update
@@ -306,7 +306,7 @@ describe('DELETE /api/pages/:name', () => {
     await app.request('/api/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'to-delete', route: '/to-delete', template: 'page-default' }),
+      body: JSON.stringify({ name: 'to-delete', template: 'page-default' }),
     })
 
     const res = await app.request('/api/pages/to-delete', { method: 'DELETE' })

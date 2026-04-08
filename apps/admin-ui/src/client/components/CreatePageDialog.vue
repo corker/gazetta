@@ -14,13 +14,13 @@ const site = useSiteStore()
 const templates = ref<Array<{ name: string }>>([])
 const selectedTemplate = ref<string | null>(null)
 const pageName = ref('')
-const pageRoute = ref('')
 const creating = ref(false)
 const error = ref<string | null>(null)
 
-const autoRoute = computed(() => {
+const derivedRoute = computed(() => {
   const name = pageName.value.trim().toLowerCase().replace(/\s+/g, '-')
-  return name ? `/${name}` : '/'
+  if (!name || name === 'home') return '/'
+  return `/${name}`
 })
 
 onMounted(async () => {
@@ -33,8 +33,7 @@ async function handleCreate() {
   error.value = null
   try {
     const name = pageName.value.trim().toLowerCase().replace(/\s+/g, '-').replace(/\/+/g, '/')
-    const route = pageRoute.value.trim() || autoRoute.value
-    await api.createPage({ name, route, template: selectedTemplate.value, metadata: { title: pageName.value.trim() } })
+    await api.createPage({ name, template: selectedTemplate.value })
     await site.load()
     emit('close')
   } catch (err) {
@@ -51,12 +50,7 @@ async function handleCreate() {
       <div class="create-field">
         <label>Page name</label>
         <InputText v-model="pageName" placeholder="e.g. contact or blog/my-post" class="create-input" />
-      </div>
-
-      <div class="create-field">
-        <label>Route</label>
-        <InputText v-model="pageRoute" :placeholder="autoRoute || '/'" class="create-input" />
-        <span class="create-hint">{{ pageRoute.trim() ? '' : `Will use: ${autoRoute}` }}</span>
+        <span v-if="pageName.trim()" class="create-hint">Route: {{ derivedRoute }}</span>
       </div>
 
       <div class="create-field">

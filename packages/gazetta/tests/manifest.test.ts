@@ -52,7 +52,6 @@ describe('parseSiteManifest', () => {
 describe('parsePageManifest', () => {
   it('parses a valid page.yaml', async () => {
     const path = await writeYaml('page.yaml', `
-route: /home
 template: page-default
 content:
   title: "Home"
@@ -62,29 +61,18 @@ components:
   - "@footer"
 `)
     const result = await parsePageManifest(storage, path)
-    expect(result.route).toBe('/home')
     expect(result.template).toBe('page-default')
     expect(result.content?.title).toBe('Home')
     expect(result.components).toEqual(['@header', 'hero', '@footer'])
   })
 
-  it('throws on missing route', async () => {
-    const path = await writeYaml('page.yaml', 'template: default')
-    await expect(parsePageManifest(storage, path)).rejects.toThrow('missing required field(s): route')
-  })
-
   it('throws on missing template', async () => {
-    const path = await writeYaml('page.yaml', 'route: /')
-    await expect(parsePageManifest(storage, path)).rejects.toThrow('missing required field(s): template')
-  })
-
-  it('throws on missing both route and template', async () => {
     const path = await writeYaml('page.yaml', 'components: []')
-    await expect(parsePageManifest(storage, path)).rejects.toThrow('route, template')
+    await expect(parsePageManifest(storage, path)).rejects.toThrow('missing required "template" field')
   })
 
   it('handles page without components', async () => {
-    const path = await writeYaml('page.yaml', 'route: /\ntemplate: default')
+    const path = await writeYaml('page.yaml', 'template: default')
     const result = await parsePageManifest(storage, path)
     expect(result.components).toBeUndefined()
   })

@@ -1,4 +1,3 @@
-route: /blog
 template: site-layout
 content:
   title: "Blog — Gazetta"

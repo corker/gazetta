@@ -1,4 +1,3 @@
-route: /blog/:slug
 template: page-default
 content:
   title: Blog Post

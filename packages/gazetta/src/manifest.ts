@@ -26,14 +26,11 @@ export async function parseSiteManifest(storage: StorageProvider, filePath: stri
 
 export async function parsePageManifest(storage: StorageProvider, filePath: string): Promise<PageManifest> {
   const raw = parseYaml(await storage.readFile(filePath), filePath)
-  const missing: string[] = []
-  if (typeof raw.route !== 'string') missing.push('route')
-  if (typeof raw.template !== 'string') missing.push('template')
-  if (missing.length > 0) {
-    throw new Error(`Invalid page.yaml at ${filePath}: missing required field(s): ${missing.join(', ')}`)
+  if (typeof raw.template !== 'string') {
+    throw new Error(`Invalid page.yaml at ${filePath}: missing required "template" field`)
   }
   return {
-    route: raw.route as string,
+    route: '', // derived from folder path by site-loader
     template: raw.template as string,
     content: raw.content as Record<string, unknown> | undefined,
     components: raw.components as string[] | undefined,

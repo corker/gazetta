@@ -18,9 +18,9 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
   })
 
   app.post('/api/pages', async (c) => {
-    const body = await c.req.json() as { name: string; route: string; template: string; content?: Record<string, unknown> }
-    if (!body.name || !body.route || !body.template) {
-      return c.json({ error: 'Missing required fields: name, route, template' }, 400)
+    const body = await c.req.json() as { name: string; template: string; content?: Record<string, unknown> }
+    if (!body.name || !body.template) {
+      return c.json({ error: 'Missing required fields: name, template' }, 400)
     }
 
     const pageDir = join(join(siteDir, 'pages'), body.name)
@@ -32,7 +32,6 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
 
     await storage.mkdir(pageDir)
     const manifest = {
-      route: body.route,
       template: body.template,
       content: body.content ?? { title: body.name },
       components: [],
@@ -65,7 +64,6 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
 
     const body = await c.req.json()
     const manifest = {
-      route: body.route ?? page.route,
       template: body.template ?? page.template,
       content: body.content ?? page.content,
       components: body.components ?? page.components,
