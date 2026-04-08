@@ -28,19 +28,20 @@ function printHelp() {
     gazetta init [dir]        Create a new site
     gazetta dev [site-dir]    Start dev server + CMS at /admin
     gazetta publish [site-dir] Pre-render and publish to targets
+    gazetta deploy -t <name>  Publish + deploy worker to hosting
+    gazetta validate [site-dir] Check site for broken references
     gazetta help              Show this help message
 
   Options:
     --port, -p <port>         Server port (default: 3000)
-    --target, -t <name>       Target to publish to (default: all)
+    --target, -t <name>       Target to publish/deploy to (default: all)
 
   Examples:
     gazetta init my-site            # scaffold a new site
     gazetta dev                     # dev server + CMS
-    gazetta dev ./my-site           # specific site directory
-    gazetta dev --port 8080         # custom port
     gazetta publish                  # publish to all targets
     gazetta publish -t production   # publish to specific target
+    gazetta deploy -t production    # publish + deploy worker
     gazetta validate                # check site for broken references
 `)
 }
@@ -273,7 +274,7 @@ async function runPublish(siteDir: string, targetName?: string) {
 
     // Publish all pages
     for (const pageName of site.pages.keys()) {
-      const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage, siteYaml.targets![name].cache)
+      const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage, siteYaml.targets![name]?.cache)
       totalFiles += files
       console.log(`    page: ${pageName} (${files} files)`)
     }
@@ -297,6 +298,91 @@ async function runPublish(siteDir: string, targetName?: string) {
   }
 
   console.log(`  Done!\n`)
+}
+
+async function runDeploy(siteDir: string, targetName?: string) {
+  const { execSync } = await import('node:child_process')
+  const { writeFile, mkdir, rm } = await import('node:fs/promises')
+
+  const siteYamlPath = join(siteDir, 'site.yaml')
+  if (!existsSync(siteYamlPath)) {
+    console.error(`\n  Error: No site.yaml found at ${siteDir}\n`)
+    process.exit(1)
+  }
+  const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as import('../types.js').SiteManifest
+  if (!siteYaml.targets) {
+    console.error(`\n  Error: No targets configured in site.yaml\n`)
+    process.exit(1)
+  }
+  if (!targetName) {
+    console.error(`\n  Error: --target is required for deploy\n  Usage: gazetta deploy -t <target-name>\n`)
+    process.exit(1)
+  }
+  const target = siteYaml.targets[targetName]
+  if (!target) {
+    console.error(`\n  Error: Unknown target "${targetName}". Available: ${Object.keys(siteYaml.targets).join(', ')}\n`)
+    process.exit(1)
+  }
+  if (!target.worker) {
+    console.error(`\n  Error: Target "${targetName}" has no worker config. Add to site.yaml:\n\n  worker:\n    type: cloudflare\n    name: my-site\n`)
+    process.exit(1)
+  }
+  if (target.worker.type !== 'cloudflare') {
+    console.error(`\n  Error: Unsupported worker type "${target.worker.type}". Currently only "cloudflare" is supported.\n`)
+    process.exit(1)
+  }
+
+  // 1. Publish content
+  console.log(`\n  Publishing to ${targetName}...`)
+  await runPublish(siteDir, targetName)
+
+  // 2. Generate worker in temp dir
+  const workerName = target.worker.name ?? targetName
+  const bucketName = target.storage.bucket ?? workerName
+  const tmpDir = join(siteDir, '.gazetta-deploy')
+  await rm(tmpDir, { recursive: true, force: true })
+  await mkdir(tmpDir, { recursive: true })
+
+  // Generate wrangler.toml
+  let wranglerToml = `name = "${workerName}"\nmain = "index.ts"\ncompatibility_date = "2024-12-01"\nworkers_dev = true\n\n[[r2_buckets]]\nbinding = "SITE_BUCKET"\nbucket_name = "${bucketName}"\n`
+
+  // Add custom domain route if siteUrl is configured
+  if (target.siteUrl) {
+    const url = new URL(target.siteUrl)
+    const hostname = url.hostname
+    wranglerToml += `\n[[routes]]\npattern = "${hostname}/*"\nzone_name = "${hostname}"\n`
+  }
+
+  await writeFile(join(tmpDir, 'wrangler.toml'), wranglerToml)
+
+  // Generate worker entry point
+  const workerCode = `import { createWorker } from 'gazetta/workers/cloudflare-r2'\nexport default createWorker()\n`
+  await writeFile(join(tmpDir, 'index.ts'), workerCode)
+
+  // Generate package.json for wrangler
+  const pkgJson = JSON.stringify({
+    type: 'module',
+    dependencies: { gazetta: '*', hono: '*' },
+  })
+  await writeFile(join(tmpDir, 'package.json'), pkgJson)
+
+  // Install deps and deploy
+  console.log(`  Deploying worker "${workerName}" to Cloudflare...`)
+  try {
+    execSync('npm install --install-links ' + resolve(import.meta.dirname, '../..'), { cwd: tmpDir, stdio: 'pipe' })
+    const output = execSync('npx wrangler deploy', { cwd: tmpDir, stdio: 'pipe' }).toString()
+    const urlMatch = output.match(/https:\/\/[^\s]+/)
+    console.log(`  Worker deployed: ${urlMatch?.[0] ?? workerName}`)
+    if (target.siteUrl) console.log(`  Site: ${target.siteUrl}`)
+  } catch (err) {
+    const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? (err as Error).message
+    console.error(`\n  Deploy failed: ${stderr}\n`)
+    process.exit(1)
+  } finally {
+    await rm(tmpDir, { recursive: true, force: true })
+  }
+
+  console.log(`\n  Deploy complete!\n`)
 }
 
 async function runValidate(siteDir: string) {
@@ -664,6 +750,9 @@ async function main() {
       break
     case 'publish':
       await runPublish(parsed.siteDir, parsed.target)
+      break
+    case 'deploy':
+      await runDeploy(parsed.siteDir, parsed.target)
       break
     case 'validate':
       await runValidate(parsed.siteDir)
