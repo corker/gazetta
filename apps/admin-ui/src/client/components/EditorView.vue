@@ -1,10 +1,17 @@
 <script setup lang="ts">
+import { ref, provide } from 'vue'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import SiteTree from './SiteTree.vue'
 import ComponentTree from './ComponentTree.vue'
 import EditorPanel from './EditorPanel.vue'
 import PreviewPanel from './PreviewPanel.vue'
+
+const componentTreeRef = ref<InstanceType<typeof ComponentTree> | null>(null)
+
+provide('selectByGzId', (gzId: string) => {
+  componentTreeRef.value?.selectByGzId(gzId)
+})
 </script>
 
 <template>
@@ -12,7 +19,7 @@ import PreviewPanel from './PreviewPanel.vue'
     <SplitterPanel :size="20" :minSize="15" class="cms-panel">
       <div class="cms-panel-content">
         <SiteTree />
-        <ComponentTree />
+        <ComponentTree ref="componentTreeRef" />
       </div>
     </SplitterPanel>
     <SplitterPanel :size="35" :minSize="20" class="cms-panel">

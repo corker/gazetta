@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed, inject, onMounted, onUnmounted } from 'vue'
 import morphdom from 'morphdom'
 import { useEditorStore } from '../stores/editor.js'
 
@@ -8,6 +8,8 @@ const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let currentHtml = ''
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+const selectByGzId = inject<(gzId: string) => void>('selectByGzId')
 
 const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
 const previewPath = computed(() => {
@@ -27,6 +29,82 @@ const devicePresets = [
 const activePreset = ref(0)
 const previewWidth = computed(() => devicePresets[activePreset.value].width)
 
+// Bridge script — hover highlights, click selects component
+const BRIDGE_SCRIPT = `
+<script>
+(function() {
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:absolute;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:all 0.15s;display:none;';
+  document.body.appendChild(overlay);
+  var highlighted = null;
+
+  function findGz(el) {
+    while (el && el !== document.body) {
+      if (el.dataset && el.dataset.gz) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function showOverlay(el, color) {
+    var rect = el.getBoundingClientRect();
+    overlay.style.display = 'block';
+    overlay.style.borderColor = color || '#a78bfa';
+    overlay.style.top = (rect.top + window.scrollY) + 'px';
+    overlay.style.left = (rect.left + window.scrollX) + 'px';
+    overlay.style.width = rect.width + 'px';
+    overlay.style.height = rect.height + 'px';
+  }
+
+  document.addEventListener('mousemove', function(e) {
+    var target = findGz(e.target);
+    if (target && target !== highlighted) {
+      highlighted = target;
+      showOverlay(target, '#a78bfa');
+    } else if (!target) {
+      highlighted = null;
+      overlay.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    var target = findGz(e.target);
+    if (target) {
+      e.preventDefault();
+      e.stopPropagation();
+      showOverlay(target, '#22c55e');
+      window.parent.postMessage({ type: 'gazetta:select', gzId: target.dataset.gz }, '*');
+    }
+  }, true);
+
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'gazetta:highlight') {
+      var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
+      if (el) { highlighted = el; showOverlay(el, '#22c55e'); }
+    }
+  });
+})();
+<\/script>
+`
+
+function injectBridge(html: string): string {
+  return html.replace('</body>', `${BRIDGE_SCRIPT}\n</body>`)
+}
+
+function handleMessage(e: MessageEvent) {
+  if (e.data?.type === 'gazetta:select' && e.data.gzId && selectByGzId) {
+    selectByGzId(e.data.gzId)
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('message', handleMessage)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('message', handleMessage)
+})
+
 async function fetchPreview(morph = true) {
   if (!previewPath.value) { currentHtml = ''; return }
   loading.value = true
@@ -44,7 +122,7 @@ async function fetchPreview(morph = true) {
     } else {
       res = await fetch(previewPath.value)
     }
-    const html = await res.text()
+    const html = injectBridge(await res.text())
     applyHtml(html, morph)
   } catch {
     applyHtml('<pre style="color:red;padding:2rem">Failed to load preview</pre>', false)
@@ -58,31 +136,25 @@ function applyHtml(html: string, morph: boolean) {
   if (!iframe) return
 
   if (!morph || !currentHtml || !iframe.contentDocument?.body?.innerHTML) {
-    // First load or error — full replace
     iframe.srcdoc = html
     currentHtml = html
     return
   }
 
-  // Morph the body — preserves scroll, focus, no flash
   try {
     const doc = iframe.contentDocument
     if (!doc) { iframe.srcdoc = html; currentHtml = html; return }
 
-    // Parse new HTML to extract body and head
     const parser = new DOMParser()
     const newDoc = parser.parseFromString(html, 'text/html')
 
-    // Morph the body
     morphdom(doc.body, newDoc.body, {
       onBeforeElUpdated(fromEl, toEl) {
-        // Don't update if elements are the same (skip unchanged subtrees)
         if (fromEl.isEqualNode(toEl)) return false
         return true
       },
     })
 
-    // Update style tags in head (CSS might have changed)
     const oldStyles = doc.head.querySelectorAll('style')
     const newStyles = newDoc.head.querySelectorAll('style')
     oldStyles.forEach((s, i) => {
@@ -93,7 +165,6 @@ function applyHtml(html: string, morph: boolean) {
 
     currentHtml = html
   } catch {
-    // Fallback to full replace
     iframe.srcdoc = html
     currentHtml = html
   }
@@ -104,11 +175,14 @@ function debouncedFetchPreview() {
   debounceTimer = setTimeout(() => fetchPreview(true), 300)
 }
 
-// Refresh on page selection or after save (full fetch, morph)
+// Highlight selected component in preview
+watch(() => editor.selectedComponentPath, (path) => {
+  if (!path || !iframeRef.value?.contentWindow) return
+  // TODO: compute gzId from the component's treePath and send to iframe
+})
+
 watch(() => editor.previewVersion, () => fetchPreview(true))
 watch(previewPath, () => fetchPreview(false), { immediate: true })
-
-// Live refresh on draft edits (debounced, morph)
 watch(() => editor.draftVersion, debouncedFetchPreview)
 
 function toggleFullscreen() {

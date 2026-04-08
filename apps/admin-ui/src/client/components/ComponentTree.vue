@@ -7,6 +7,16 @@ import { useEditorStore } from '../stores/editor.js'
 import { api } from '../api/client.js'
 import AddComponentDialog from './AddComponentDialog.vue'
 
+/** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
+function hashPath(path: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < path.length; i++) {
+    hash ^= path.charCodeAt(i)
+    hash = (hash * 0x01000193) >>> 0
+  }
+  return hash.toString(16).padStart(8, '0')
+}
+
 const editor = useEditorStore()
 const selectedKey = ref<Record<string, boolean>>({})
 const componentNodes = ref<TreeNode[]>([])
@@ -21,25 +31,33 @@ const title = computed(() => {
 
 const componentCount = computed(() => detail.value?.components?.length ?? 0)
 
-async function buildComponentNode(name: string, parentDir: string, index: number): Promise<TreeNode> {
+// Map from data-gz hash → component info (built during tree construction)
+type GzEntry = { path: string; template: string } | { isFragment: true; fragName: string }
+const gzMap = ref(new Map<string, GzEntry>())
+
+
+async function buildComponentNode(name: string, parentDir: string, index: number, parentTreePath: string, map: Map<string, GzEntry>): Promise<TreeNode> {
+  const treePath = parentTreePath ? `${parentTreePath}/${name}` : name
+  const gzId = hashPath(treePath)
   const isFragment = name.startsWith('@')
 
   if (isFragment) {
     const fragName = name.slice(1)
+    map.set(gzId, { isFragment: true, fragName })
     try {
       const frag = await api.getFragment(fragName)
       const children = frag.components
-        ? await Promise.all(frag.components.map((c: string, i: number) => buildComponentNode(c, frag.dir, i)))
+        ? await Promise.all(frag.components.map((c: string, i: number) => buildComponentNode(c, frag.dir, i, treePath, map)))
         : []
       return {
         key: `frag:${fragName}:${index}`,
         label: name,
         icon: 'pi pi-share-alt',
-        data: { isFragment: true, fragName, index, isTopLevel: true },
+        data: { isFragment: true, fragName, treePath, index, isTopLevel: true },
         children,
       }
     } catch {
-      return { key: `frag:${fragName}:${index}`, label: name, icon: 'pi pi-share-alt', data: { isFragment: true, index, isTopLevel: true } }
+      return { key: `frag:${fragName}:${index}`, label: name, icon: 'pi pi-share-alt', data: { isFragment: true, treePath, index, isTopLevel: true } }
     }
   }
 
@@ -51,24 +69,28 @@ async function buildComponentNode(name: string, parentDir: string, index: number
     template = (comp.template as string) ?? ''
     if (comp.components) {
       children = await Promise.all(
-        (comp.components as string[]).map((c: string, i: number) => buildComponentNode(c, path, i))
+        (comp.components as string[]).map((c: string, i: number) => buildComponentNode(c, path, i, treePath, map))
       )
     }
   } catch { /* component may not have manifest */ }
+
+  map.set(gzId, { path, template })
 
   return {
     key: `comp:${path}:${index}`,
     label: name,
     icon: 'pi pi-box',
-    data: { path, template, isFragment: false, index, isTopLevel: true },
+    data: { path, template, treePath, isFragment: false, index, isTopLevel: true },
     children: children.map(c => ({ ...c, data: { ...c.data, isTopLevel: false } })),
   }
 }
 
 watch(detail, async (d) => {
-  if (!d || !d.components) { componentNodes.value = []; return }
+  if (!d || !d.components) { componentNodes.value = []; gzMap.value = new Map(); return }
+
+  const map = new Map<string, GzEntry>()
   const children = await Promise.all(
-    d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i))
+    d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i, '', map))
   )
 
   // Page/fragment itself as the root clickable node
@@ -76,11 +98,12 @@ watch(detail, async (d) => {
     key: `root:${editor.selectionName}`,
     label: editor.selectionName ?? '',
     icon: editor.selectionType === 'page' ? 'pi pi-file' : 'pi pi-share-alt',
-    data: { isPage: true, path: d.dir, template: d.template },
+    data: { isPage: true, path: d.dir, template: d.template, treePath: '' },
     children,
   }
   componentNodes.value = [rootNode]
   expandedKeys.value = { [`root:${editor.selectionName}`]: true }
+  gzMap.value = map
 }, { immediate: true })
 
 const expandedKeys = ref<Record<string, boolean>>({})
@@ -101,6 +124,26 @@ function onSelect(node: TreeNode) {
   if (!node.data.path || !node.data.template) return
   editor.selectComponent(node.data.path, node.data.template)
 }
+
+// Select a component by its data-gz hash (called from PreviewPanel)
+function selectByGzId(gzId: string) {
+  const entry = gzMap.value.get(gzId)
+  if (!entry) return
+  if ('isFragment' in entry) {
+    // Expand the fragment in the tree
+    const key = [...expandedKeys.value]
+    const fragKey = componentNodes.value[0]?.children?.find(
+      c => c.data?.fragName === entry.fragName
+    )?.key as string
+    if (fragKey) {
+      expandedKeys.value = { ...expandedKeys.value, [fragKey]: true }
+    }
+    return
+  }
+  editor.selectComponent(entry.path, entry.template)
+}
+
+defineExpose({ selectByGzId })
 </script>
 
 <template>
