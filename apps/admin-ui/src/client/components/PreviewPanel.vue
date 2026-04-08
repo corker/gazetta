@@ -29,7 +29,7 @@ const devicePresets = [
 const activePreset = ref(0)
 const previewWidth = computed(() => devicePresets[activePreset.value].width)
 
-// Bridge script — hover highlights, click selects component
+// Bridge script — Shift+hover highlights, Shift+click selects component
 const BRIDGE_SCRIPT = `
 <script>
 (function() {
@@ -37,6 +37,10 @@ const BRIDGE_SCRIPT = `
   overlay.style.cssText = 'position:absolute;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:all 0.15s;display:none;';
   document.body.appendChild(overlay);
   var highlighted = null;
+  var shiftDown = false;
+
+  document.addEventListener('keydown', function(e) { if (e.key === 'Shift') { shiftDown = true; document.body.style.cursor = 'crosshair'; } });
+  document.addEventListener('keyup', function(e) { if (e.key === 'Shift') { shiftDown = false; highlighted = null; overlay.style.display = 'none'; document.body.style.cursor = ''; } });
 
   function findGz(el) {
     while (el && el !== document.body) {
@@ -57,6 +61,7 @@ const BRIDGE_SCRIPT = `
   }
 
   document.addEventListener('mousemove', function(e) {
+    if (!shiftDown) { if (highlighted) { highlighted = null; overlay.style.display = 'none'; } return; }
     var target = findGz(e.target);
     if (target && target !== highlighted) {
       highlighted = target;
@@ -68,6 +73,7 @@ const BRIDGE_SCRIPT = `
   });
 
   document.addEventListener('click', function(e) {
+    if (!e.shiftKey) return;
     var target = findGz(e.target);
     if (target) {
       e.preventDefault();
