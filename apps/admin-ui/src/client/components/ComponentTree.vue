@@ -125,20 +125,43 @@ function onSelect(node: TreeNode) {
   editor.selectComponent(node.data.path, node.data.template)
 }
 
+// Find a tree node by walking the tree, return the node and its ancestor keys
+function findNodeByData(nodes: TreeNode[], predicate: (data: Record<string, unknown>) => boolean, ancestors: string[] = []): { node: TreeNode; ancestors: string[] } | null {
+  for (const node of nodes) {
+    if (node.data && predicate(node.data as Record<string, unknown>)) {
+      return { node, ancestors }
+    }
+    if (node.children) {
+      const found = findNodeByData(node.children, predicate, [...ancestors, node.key as string])
+      if (found) return found
+    }
+  }
+  return null
+}
+
 // Select a component by its data-gz hash (called from PreviewPanel)
 function selectByGzId(gzId: string) {
   const entry = gzMap.value.get(gzId)
   if (!entry) return
   if ('isFragment' in entry) {
-    // Expand the fragment in the tree
-    const key = [...expandedKeys.value]
-    const fragKey = componentNodes.value[0]?.children?.find(
-      c => c.data?.fragName === entry.fragName
-    )?.key as string
-    if (fragKey) {
-      expandedKeys.value = { ...expandedKeys.value, [fragKey]: true }
+    // Expand the fragment in the tree and select it
+    const found = findNodeByData(componentNodes.value, d => d.fragName === entry.fragName)
+    if (found) {
+      const expanded = { ...expandedKeys.value }
+      for (const key of found.ancestors) expanded[key] = true
+      expanded[found.node.key as string] = true
+      expandedKeys.value = expanded
+      selectedKey.value = { [found.node.key as string]: true }
     }
     return
+  }
+  // Expand ancestors and select the node in the tree
+  const found = findNodeByData(componentNodes.value, d => d.path === entry.path)
+  if (found) {
+    const expanded = { ...expandedKeys.value }
+    for (const key of found.ancestors) expanded[key] = true
+    expandedKeys.value = expanded
+    selectedKey.value = { [found.node.key as string]: true }
   }
   editor.selectComponent(entry.path, entry.template)
 }
