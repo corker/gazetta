@@ -207,6 +207,12 @@ describe('renderPage', () => {
     expect(html).toContain('<title>My Page</title>')
   })
 
+  it('does not inject title when template has no head', async () => {
+    const page = leaf('<p>no head</p>')
+    const html = await renderPage(page)
+    expect(html).not.toContain('<title>')
+  })
+
   it('includes script tag when js is present', async () => {
     const page = leaf('<p></p>', '', 'alert(1)')
     const html = await renderPage(page)

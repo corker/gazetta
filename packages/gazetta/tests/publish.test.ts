@@ -176,11 +176,12 @@ describe('publishRendered', () => {
     const { files } = await publishPageRendered('home', storage, starterDir, target)
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
-    // Check page HTML exists with ESI tags
+    // Check page HTML exists with ESI tags and title from content
     const html = await target.readFile('pages/home/index.html')
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<!--esi:/fragments/header/index.html-->')
     expect(html).toContain('Welcome to Gazetta')
+    expect(html).toContain('<title>Home</title>')
 
     // Check hashed CSS exists
     const entries = await target.readDir('pages/home')
@@ -286,6 +287,7 @@ describe('publishPageStatic', () => {
     const html = await target.readFile('index.html')
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('Welcome to Gazetta')
+    expect(html).toContain('<title>Home</title>') // from page content
     // Fragments baked in
     expect(html).toContain('Gazetta') // from header
     expect(html).toContain('© 2026') // from footer
