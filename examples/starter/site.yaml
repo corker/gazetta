@@ -2,9 +2,11 @@ name: "Gazetta Starter"
 version: "1.0.0"
 targets:
   staging:
-    type: filesystem
-    path: ./dist/staging
+    storage:
+      type: filesystem
+      path: ./dist/staging
   production:
-    type: azure-blob
-    connectionString: "UseDevelopmentStorage=true"
-    container: "gazetta-production"
+    storage:
+      type: azure-blob
+      connectionString: "UseDevelopmentStorage=true"
+      container: "gazetta-production"

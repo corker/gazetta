@@ -51,12 +51,9 @@ export interface PageManifest extends ComponentManifest {
   cache?: CacheConfig
 }
 
-/** Target configuration in site.yaml */
-export interface TargetConfig {
+/** Storage configuration */
+export interface StorageConfig {
   type: 'filesystem' | 'azure-blob' | 's3'
-  /** Base URL of the site for cache purging (e.g. https://gazetta.studio) */
-  siteUrl?: string
-  cache?: CacheConfig
   path?: string
   connectionString?: string
   container?: string
@@ -65,6 +62,21 @@ export interface TargetConfig {
   accessKeyId?: string
   secretAccessKey?: string
   region?: string
+}
+
+/** Worker/runtime configuration */
+export interface WorkerConfig {
+  type: 'cloudflare'
+  name?: string
+}
+
+/** Target configuration in site.yaml */
+export interface TargetConfig {
+  storage: StorageConfig
+  worker?: WorkerConfig
+  /** Base URL of the site (e.g. https://gazetta.studio) */
+  siteUrl?: string
+  cache?: CacheConfig
 }
 
 /** Site manifest (site.yaml) */

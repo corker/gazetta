@@ -1,9 +1,16 @@
 name: "Gazetta Studio"
 targets:
   production:
-    type: s3
-    endpoint: "https://30ec7440a8cdafa137c993cd4a0f4c67.r2.cloudflarestorage.com"
-    bucket: "gazetta-studio-site"
-    accessKeyId: "${R2_ACCESS_KEY_ID}"
-    secretAccessKey: "${R2_SECRET_ACCESS_KEY}"
+    storage:
+      type: s3
+      endpoint: "https://30ec7440a8cdafa137c993cd4a0f4c67.r2.cloudflarestorage.com"
+      bucket: "gazetta-studio-site"
+      accessKeyId: "${R2_ACCESS_KEY_ID}"
+      secretAccessKey: "${R2_SECRET_ACCESS_KEY}"
+    worker:
+      type: cloudflare
+      name: gazetta-studio
     siteUrl: "https://gazetta.studio"
+    cache:
+      browser: 0
+      edge: 86400

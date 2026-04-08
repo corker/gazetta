@@ -10,6 +10,9 @@ export type {
   SiteManifest,
   ResolvedComponent,
   TargetConfig,
+  StorageConfig,
+  WorkerConfig,
+  CacheConfig,
   DirEntry,
   StorageProvider,
   PublishedPageManifest,
@@ -34,7 +37,7 @@ export { createS3Provider } from './providers/s3.js'
 export type { S3ProviderOptions } from './providers/s3.js'
 
 // Targets
-export { createTargetProvider, createTargetRegistry } from './targets.js'
+export { createStorageProvider, createTargetProvider, createTargetRegistry } from './targets.js'
 
 // Publish
 export { publishItems, resolveDependencies } from './publish.js'
