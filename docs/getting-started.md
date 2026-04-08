@@ -246,12 +246,19 @@ npx gazetta deploy -t production      # deploy worker (one-time setup)
 
 `publish` pre-renders pages and uploads to storage. `deploy` deploys the worker that serves them. Deploy once, publish as often as you want.
 
-The publish command:
-1. Pre-renders all pages with ESI placeholders for fragments
-2. Writes hashed CSS/JS files (immutable browser cache)
-3. Pre-renders all fragments as HTML with `<head>` section
-4. Uploads to the target storage
-5. Purges the edge cache (if configured)
+The publish mode is automatic based on the target config:
+
+**With worker** (Cloudflare, edge hosting):
+- Pages have ESI placeholders for fragments
+- Fragments stored separately — update one, all pages reflect it
+- Hashed CSS/JS files with immutable caching
+- Worker assembles pages at request time
+
+**Without worker** (GitHub Pages, Netlify, Vercel):
+- Pages are fully assembled — fragments baked in
+- One self-contained HTML file per page
+- CSS/JS inline — no external files
+- Fragment changes require republishing all pages
 
 ### Cache configuration
 
