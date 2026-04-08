@@ -29,7 +29,16 @@ const devicePresets = [
 const activePreset = ref(0)
 const previewWidth = computed(() => devicePresets[activePreset.value].width)
 
-// Bridge script — Shift+hover highlights, Shift+click selects component
+// Edit mode — controlled by toolbar toggle, disabled in fullscreen
+const editMode = ref(true)
+
+// Send edit mode state to iframe bridge
+function sendEditMode() {
+  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:editMode', enabled: editMode.value }, '*')
+}
+watch(editMode, sendEditMode)
+
+// Bridge script — parent controls edit mode via postMessage
 const BRIDGE_SCRIPT = `
 <script>
 (function() {
@@ -37,10 +46,7 @@ const BRIDGE_SCRIPT = `
   overlay.style.cssText = 'position:absolute;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:all 0.15s;display:none;';
   document.body.appendChild(overlay);
   var highlighted = null;
-  var shiftDown = false;
-
-  document.addEventListener('keydown', function(e) { if (e.key === 'Shift') { shiftDown = true; document.body.style.cursor = 'crosshair'; } });
-  document.addEventListener('keyup', function(e) { if (e.key === 'Shift') { shiftDown = false; highlighted = null; overlay.style.display = 'none'; document.body.style.cursor = ''; } });
+  var enabled = true;
 
   function findGz(el) {
     while (el && el !== document.body) {
@@ -61,7 +67,7 @@ const BRIDGE_SCRIPT = `
   }
 
   document.addEventListener('mousemove', function(e) {
-    if (!shiftDown) { if (highlighted) { highlighted = null; overlay.style.display = 'none'; } return; }
+    if (!enabled) { if (highlighted) { highlighted = null; overlay.style.display = 'none'; } return; }
     var target = findGz(e.target);
     if (target && target !== highlighted) {
       highlighted = target;
@@ -73,7 +79,7 @@ const BRIDGE_SCRIPT = `
   });
 
   document.addEventListener('click', function(e) {
-    if (!e.shiftKey) return;
+    if (!enabled) return;
     var target = findGz(e.target);
     if (target) {
       e.preventDefault();
@@ -84,6 +90,11 @@ const BRIDGE_SCRIPT = `
   }, true);
 
   window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'gazetta:editMode') {
+      enabled = !!e.data.enabled;
+      if (!enabled) { highlighted = null; overlay.style.display = 'none'; document.body.style.cursor = ''; }
+      else { document.body.style.cursor = 'crosshair'; }
+    }
     if (e.data && e.data.type === 'gazetta:highlight') {
       var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
       if (el) { highlighted = el; showOverlay(el, '#22c55e'); }
@@ -130,6 +141,8 @@ async function fetchPreview(morph = true) {
     }
     const html = injectBridge(await res.text())
     applyHtml(html, morph)
+    // Send initial edit mode state after iframe loads
+    setTimeout(sendEditMode, 100)
   } catch {
     applyHtml('<pre style="color:red;padding:2rem">Failed to load preview</pre>', false)
   } finally {
@@ -212,10 +225,18 @@ function toggleFullscreen() {
             <i :class="preset.icon" />
           </button>
         </div>
-        <button class="device-btn" :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
-          @click="toggleFullscreen">
-          <i :class="fullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" />
-        </button>
+        <div class="preview-actions">
+          <button
+            :class="['device-btn', { active: editMode }]"
+            :title="editMode ? 'Edit mode (click to preview)' : 'Preview mode (click to edit)'"
+            @click="editMode = !editMode">
+            <i :class="editMode ? 'pi pi-pencil' : 'pi pi-eye'" />
+          </button>
+          <button class="device-btn" :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+            @click="toggleFullscreen">
+            <i :class="fullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" />
+          </button>
+        </div>
       </div>
       <div class="preview-frame-wrapper">
         <iframe ref="iframeRef" class="preview-iframe" data-testid="preview-iframe"
@@ -234,6 +255,7 @@ function toggleFullscreen() {
 .preview-empty { padding: 1rem; color: #aaa; font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; }
 .preview-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0.375rem 0.5rem; border-bottom: 1px solid #27272a; }
 .preview-devices { display: flex; gap: 0.25rem; }
+.preview-actions { display: flex; gap: 0.25rem; }
 .device-btn { background: none; border: 1px solid transparent; border-radius: 4px; padding: 0.25rem 0.5rem; color: #71717a; cursor: pointer; font-size: 0.875rem; }
 .device-btn:hover { color: #e4e4e7; border-color: #3f3f46; }
 .device-btn.active { color: #a78bfa; border-color: #a78bfa; }
