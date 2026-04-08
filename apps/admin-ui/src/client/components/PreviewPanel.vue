@@ -137,7 +137,10 @@ const BRIDGE_SCRIPT = `
 `
 
 function injectBridge(html: string): string {
-  return html.replace('</body>', `${BRIDGE_SCRIPT}\n</body>`)
+  // Strip dev server reload script (parent handles SSE) and inject bridge
+  return html
+    .replace(/<script>new EventSource\([^)]+\)[^<]*<\/script>/g, '')
+    .replace('</body>', `${BRIDGE_SCRIPT}\n</body>`)
 }
 
 function handleMessage(e: MessageEvent) {
@@ -158,12 +161,22 @@ function handleMessage(e: MessageEvent) {
   }
 }
 
+// SSE hot reload — listen for template/manifest changes from dev server
+let sse: EventSource | null = null
+
 onMounted(() => {
   window.addEventListener('message', handleMessage)
+  // Connect to dev server reload stream (ignored in production — endpoint won't exist)
+  try {
+    sse = new EventSource('/__reload')
+    sse.onmessage = () => fetchPreview(true)
+    sse.onerror = () => { sse?.close(); sse = null }
+  } catch { /* SSE not available */ }
 })
 
 onUnmounted(() => {
   window.removeEventListener('message', handleMessage)
+  sse?.close()
 })
 
 async function fetchPreview(morph = true) {

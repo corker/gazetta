@@ -7,6 +7,12 @@ import { renderPage } from '../../renderer.js'
 export function previewRoutes(siteDir: string, storage: StorageProvider) {
   const app = new Hono()
 
+  // No caching — preview always serves fresh content for editing
+  app.use('/preview/*', async (c, next) => {
+    await next()
+    c.header('Cache-Control', 'no-store')
+  })
+
   app.get('/preview/*', async (c) => {
     return renderPreview(c, siteDir, storage)
   })
@@ -26,7 +32,7 @@ async function renderPreview(
   overrides?: Record<string, Record<string, unknown>>
 ) {
   const site = await loadSite(siteDir, storage)
-  const requestPath = new URL(c.req.url).pathname.replace(/^\/preview/, '') || '/'
+  const requestPath = c.req.path.replace(/^.*\/preview/, '') || '/'
 
   for (const [pageName, page] of site.pages) {
     const params = matchRoute(page.route, requestPath)

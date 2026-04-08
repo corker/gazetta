@@ -1,4 +1,6 @@
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { createJiti } from 'jiti'
 import type { TemplateFunction, TemplateModule, StorageProvider } from './types.js'
 
 interface LoadedTemplate {
@@ -8,6 +10,8 @@ interface LoadedTemplate {
 }
 
 const cache = new Map<string, LoadedTemplate>()
+/** Tracks which templates have been imported — reloads use jiti to bypass Node's module cache */
+const importedPaths = new Set<string>()
 
 const TEMPLATE_FILES = ['index.ts', 'index.tsx']
 
@@ -17,6 +21,17 @@ async function findTemplateFile(storage: StorageProvider, templatesDir: string, 
     if (await storage.exists(path)) return path
   }
   return null
+}
+
+async function importTemplate(templatePath: string): Promise<Record<string, unknown>> {
+  if (!importedPaths.has(templatePath)) {
+    // First load — use native import() (fast, resolves deps from project node_modules)
+    importedPaths.add(templatePath)
+    return await import(pathToFileURL(templatePath).href)
+  }
+  // Reload — use jiti with moduleCache disabled (bypasses Node/tsx module cache)
+  const freshJiti = createJiti(pathToFileURL(templatePath).href, { jsx: true, moduleCache: false })
+  return await freshJiti.import(templatePath) as Record<string, unknown>
 }
 
 export async function loadTemplate(storage: StorageProvider, templatesDir: string, templateName: string): Promise<LoadedTemplate> {
@@ -33,7 +48,7 @@ export async function loadTemplate(storage: StorageProvider, templatesDir: strin
 
   let mod: Record<string, unknown>
   try {
-    mod = await import(`${templatePath}?t=${Date.now()}`)
+    mod = await importTemplate(templatePath)
   } catch (err) {
     throw new Error(
       `Failed to import template "${templateName}" from ${templatePath}: ${(err as Error).message}`

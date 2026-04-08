@@ -2,7 +2,6 @@
 
 import { resolve, join } from 'node:path'
 import { watch, existsSync, readFileSync } from 'node:fs'
-import { spawn, type ChildProcess } from 'node:child_process'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
@@ -558,8 +557,8 @@ async function runDev(siteDir: string, port: number) {
   const isDevMode = cmsWebDir !== null
 
   if (isDevMode) {
-    // Dev mode: proxy API to subprocess, Vite middleware for HMR
-    await setupDevMode(app, siteDir, port, cmsWebDir!)
+    // Dev mode: mount CMS API inline (same process = shared template cache)
+    await setupCmsApi(app, siteDir, storage)
   } else if (cmsStaticDir) {
     // Production mode: inline CMS API + static files
     await setupProductionMode(app, siteDir, storage, cmsStaticDir)
@@ -572,20 +571,6 @@ async function runDev(siteDir: string, port: number) {
   })
 
   // ---- Start server ----
-  let apiProc: ChildProcess | null = null
-
-  if (isDevMode) {
-    const apiPort = port + 100
-    apiProc = spawn('npx', ['tsx', join(cmsWebDir!, 'src/server/dev.ts'), siteDir], {
-      env: { ...process.env, API_PORT: String(apiPort) },
-      stdio: 'pipe',
-    })
-    apiProc.stderr?.on('data', (d: Buffer) => {
-      const msg = d.toString().trim()
-      if (msg) console.error(`  [admin-api] ${msg}`)
-    })
-  }
-
   const nodeServer = serve({ fetch: app.fetch, port }, async () => {
     console.log(`\n  Gazetta running at http://localhost:${port}\n`)
     console.log(`  Site: ${site.manifest.name}`)
@@ -637,12 +622,6 @@ async function runDev(siteDir: string, port: number) {
     console.log()
   })
 
-  // ---- Cleanup ----
-  process.on('SIGINT', () => {
-    apiProc?.kill()
-    process.exit(0)
-  })
-
   // ---- File watching ----
   watch(siteDir, { recursive: true }, (_event, filename) => {
     if (!filename) return
@@ -661,29 +640,16 @@ async function runDev(siteDir: string, port: number) {
   })
 }
 
-// ---- Dev mode: proxy /admin/api/* and /admin/preview/* to CMS API subprocess ----
-async function setupDevMode(app: Hono, _siteDir: string, port: number, _cmsWebDir: string) {
-  const apiPort = port + 100
-
-  for (const prefix of ['/admin/api', '/admin/preview']) {
-    app.all(`${prefix}/*`, async (c) => {
-      try {
-        const url = new URL(c.req.url)
-        const path = url.pathname.replace('/admin', '')
-        const targetUrl = `http://localhost:${apiPort}${path}${url.search}`
-        const res = await fetch(targetUrl, {
-          method: c.req.method,
-          headers: c.req.raw.headers,
-          body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
-          // @ts-expect-error duplex needed for streaming body
-          duplex: 'half',
-        })
-        return new Response(res.body, { status: res.status, headers: res.headers })
-      } catch {
-        return c.json({ error: 'CMS API not ready' }, 502)
-      }
-    })
+// ---- Mount CMS API on the main Hono app (shared process = shared template cache) ----
+async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>) {
+  const siteYamlPath = join(siteDir, 'site.yaml')
+  let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
+  if (existsSync(siteYamlPath)) {
+    const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as SiteManifest
+    targetConfigs = siteYaml.targets
   }
+  const cmsApp = createAdminApp({ siteDir, storage, targetConfigs })
+  app.route('/admin', cmsApp)
 }
 
 // ---- Production mode: inline CMS API + static files from admin-dist/ ----
