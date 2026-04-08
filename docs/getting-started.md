@@ -195,15 +195,18 @@ Reference in any page with `"@header"`. Update the fragment once — every page 
 
 ### Target types
 
-Targets are where your site gets published. Three storage providers are supported:
+Each target has a **storage** config (where files go) and an optional **worker** config (what serves them):
 
-| Type | Use case | Config |
+| Storage type | Use case | Config |
 |------|----------|--------|
 | `filesystem` | Local dev, staging, backups | `path: ./dist/staging` |
 | `s3` | AWS S3, Cloudflare R2, MinIO | `endpoint`, `bucket`, `accessKeyId`, `secretAccessKey` |
 | `azure-blob` | Azure Blob Storage | `connectionString`, `container` |
 
-The default for local development is filesystem — just a folder on disk.
+| Worker type | Use case |
+|-------------|----------|
+| `cloudflare` | Cloudflare Workers — ESI assembly at the edge |
+| (none) | No worker — just publish files to storage |
 
 ### Configure targets
 
@@ -212,14 +215,19 @@ The default for local development is filesystem — just a folder on disk.
 name: My Site
 targets:
   staging:
-    type: filesystem
-    path: ./dist/staging
+    storage:
+      type: filesystem
+      path: ./dist/staging
   production:
-    type: s3
-    endpoint: "https://<account_id>.r2.cloudflarestorage.com"
-    bucket: "my-site"
-    accessKeyId: "${R2_ACCESS_KEY_ID}"
-    secretAccessKey: "${R2_SECRET_ACCESS_KEY}"
+    storage:
+      type: s3
+      endpoint: "https://<account_id>.r2.cloudflarestorage.com"
+      bucket: "my-site"
+      accessKeyId: "${R2_ACCESS_KEY_ID}"
+      secretAccessKey: "${R2_SECRET_ACCESS_KEY}"
+    worker:
+      type: cloudflare
+      name: my-site
     siteUrl: "https://mysite.com"
     cache:
       browser: 60
@@ -228,14 +236,17 @@ targets:
 
 Environment variables (like `${R2_ACCESS_KEY_ID}`) are resolved at runtime — don't commit secrets to site.yaml.
 
-### Build from CLI
+### Publish and deploy
 
 ```bash
-npx gazetta publish                   # publish to all targets
-npx gazetta publish -t production     # specific target
+npx gazetta publish                   # publish content to all targets
+npx gazetta publish -t production     # publish to specific target
+npx gazetta deploy -t production      # deploy worker (one-time setup)
 ```
 
-The build command:
+`publish` pre-renders pages and uploads to storage. `deploy` deploys the worker that serves them. Deploy once, publish as often as you want.
+
+The publish command:
 1. Pre-renders all pages with ESI placeholders for fragments
 2. Writes hashed CSS/JS files (immutable browser cache)
 3. Pre-renders all fragments as HTML with `<head>` section
