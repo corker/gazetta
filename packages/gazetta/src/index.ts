@@ -43,5 +43,8 @@ export { publishPageRendered, publishFragmentRendered, publishSiteManifest, publ
 // Format helpers
 export { format } from './formats.js'
 
+// ESI assembly (for edge workers and servers)
+export { assembleEsi, parseCacheComment, splitFragment, findEsiPaths } from './assemble.js'
+
 // Editor
 export { createEditorMount } from './editor/mount.js'
