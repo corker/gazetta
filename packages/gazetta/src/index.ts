@@ -41,7 +41,7 @@ export { createStorageProvider, createTargetProvider, createTargetRegistry } fro
 
 // Publish
 export { publishItems, resolveDependencies } from './publish.js'
-export { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, publishFragmentWithPurge, publishPageWithPurge, createWorkerPurge } from './publish-rendered.js'
+export { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, publishFragmentWithPurge, publishPageWithPurge, createWorkerPurge } from './publish-rendered.js'
 
 // Format helpers
 export { format } from './formats.js'

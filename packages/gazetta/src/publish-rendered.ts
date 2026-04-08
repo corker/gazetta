@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { StorageProvider, PurgeStrategy, CacheConfig } from './types.js'
 import { loadSite } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
-import { renderComponent } from './renderer.js'
+import { renderComponent, renderPage } from './renderer.js'
 import { resetScopeCounter } from './scope.js'
 
 function contentHash(content: string): string {
@@ -166,6 +166,36 @@ ${bodyContent}
   if (removed > 0) fileCount -= removed
 
   return { files: fileCount }
+}
+
+/**
+ * Publish a page as fully assembled HTML — no ESI, no worker needed.
+ * All components (including fragments) are baked in. CSS/JS inline.
+ * For static hosting: GitHub Pages, Netlify, Vercel, any file server.
+ */
+export async function publishPageStatic(
+  pageName: string,
+  sourceStorage: StorageProvider,
+  sourceDir: string,
+  targetStorage: StorageProvider,
+): Promise<{ files: number }> {
+  const site = await loadSite(sourceDir, sourceStorage)
+  const page = site.pages.get(pageName)
+  if (!page) throw new Error(`Page "${pageName}" not found`)
+
+  resetScopeCounter()
+  const resolved = await resolvePage(pageName, site)
+  const html = await renderPage(resolved, page.metadata)
+
+  // URL path: / → index.html, /about → about/index.html
+  const urlPath = page.route === '/' ? '' : page.route.replace(/^\//, '')
+  const outputPath = urlPath ? `${urlPath}/index.html` : 'index.html'
+  const outputDir = urlPath || '.'
+
+  await targetStorage.mkdir(outputDir)
+  await targetStorage.writeFile(outputPath, html)
+
+  return { files: 1 }
 }
 
 /**

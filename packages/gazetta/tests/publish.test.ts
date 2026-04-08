@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { writeFile, mkdir, rm, readdir } from 'node:fs/promises'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { publishItems, resolveDependencies } from '../src/publish.js'
-import { publishPageRendered, publishFragmentRendered } from '../src/publish-rendered.js'
+import { publishPageRendered, publishPageStatic, publishFragmentRendered } from '../src/publish-rendered.js'
 
 const testDir = join(tmpdir(), 'gazetta-publish-test-' + Date.now())
 const sourceDir = join(testDir, 'source')
@@ -268,5 +268,53 @@ describe('publishRendered', () => {
     const lines = html.split('\n')
     expect(lines[0]).toMatch(/^<!--cache:/)
     expect(lines[1]).toBe('<!DOCTYPE html>')
+  })
+})
+
+describe('publishPageStatic', () => {
+  const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+  const storage = createFilesystemProvider()
+  const staticTargetDir = join(tmpdir(), 'gazetta-static-test-' + Date.now())
+
+  afterEach(async () => {
+    await rm(staticTargetDir, { recursive: true, force: true })
+  })
+
+  it('publishes fully assembled HTML at URL path', async () => {
+    const target = createFilesystemProvider(staticTargetDir)
+    await publishPageStatic('home', storage, starterDir, target)
+    const html = await target.readFile('index.html')
+    expect(html).toContain('<!DOCTYPE html>')
+    expect(html).toContain('Welcome to Gazetta')
+    // Fragments baked in
+    expect(html).toContain('Gazetta') // from header
+    expect(html).toContain('© 2026') // from footer
+    // No ESI tags
+    expect(html).not.toContain('<!--esi')
+  })
+
+  it('publishes about page at /about/index.html', async () => {
+    const target = createFilesystemProvider(staticTargetDir)
+    await publishPageStatic('about', storage, starterDir, target)
+    const html = await target.readFile('about/index.html')
+    expect(html).toContain('About Gazetta')
+    expect(html).not.toContain('<!--esi')
+  })
+
+  it('includes inline CSS and JS', async () => {
+    const target = createFilesystemProvider(staticTargetDir)
+    await publishPageStatic('home', storage, starterDir, target)
+    const html = await target.readFile('index.html')
+    expect(html).toContain('<style>')
+    // Counter JS should be inline
+    expect(html).toContain('script type="module"')
+  })
+
+  it('no separate CSS/JS files', async () => {
+    const target = createFilesystemProvider(staticTargetDir)
+    await publishPageStatic('home', storage, starterDir, target)
+    const entries = await target.readDir('.')
+    const cssOrJs = entries.filter(e => e.name.endsWith('.css') || e.name.endsWith('.js'))
+    expect(cssOrJs.length).toBe(0)
   })
 })

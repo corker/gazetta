@@ -248,7 +248,7 @@ async function runPublish(siteDir: string, targetName?: string) {
     siteDir
   )
 
-  const { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } = await import('../publish-rendered.js')
+  const { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } = await import('../publish-rendered.js')
 
   console.log(`\n  Site: ${site.manifest.name}`)
   console.log(`  Pages: ${[...site.pages.keys()].join(', ')}`)
@@ -262,21 +262,30 @@ async function runPublish(siteDir: string, targetName?: string) {
       continue
     }
 
-    console.log(`  Publishing to ${name}...`)
+    const targetConfig = siteYaml.targets![name]
+    const isStatic = !targetConfig?.worker
+    console.log(`  Publishing to ${name}${isStatic ? ' (static)' : ' (ESI)'}...`)
     let totalFiles = 0
 
-    // Publish all fragments
-    for (const fragName of site.fragments.keys()) {
-      const { files } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage)
-      totalFiles += files
-      console.log(`    fragment: ${fragName} (${files} files)`)
-    }
-
-    // Publish all pages
-    for (const pageName of site.pages.keys()) {
-      const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage, siteYaml.targets![name]?.cache)
-      totalFiles += files
-      console.log(`    page: ${pageName} (${files} files)`)
+    if (isStatic) {
+      // Static mode — fully assembled HTML, no fragments needed separately
+      for (const pageName of site.pages.keys()) {
+        const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage)
+        totalFiles += files
+        console.log(`    page: ${pageName} (${files} files)`)
+      }
+    } else {
+      // ESI mode — fragments separate, pages with placeholders
+      for (const fragName of site.fragments.keys()) {
+        const { files } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage)
+        totalFiles += files
+        console.log(`    fragment: ${fragName} (${files} files)`)
+      }
+      for (const pageName of site.pages.keys()) {
+        const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache)
+        totalFiles += files
+        console.log(`    page: ${pageName} (${files} files)`)
+      }
     }
 
     // Site manifest + fragment index
