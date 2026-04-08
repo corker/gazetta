@@ -129,7 +129,7 @@ describe('Azure Blob publish (Azurite)', () => {
 
   it('reads back published content', async () => {
     const content = await blobProvider.readFile('pages/home/page.yaml')
-    expect(content).toContain('route:')
+    expect(content).toContain('template:')
   })
 
   it('lists published files', async () => {

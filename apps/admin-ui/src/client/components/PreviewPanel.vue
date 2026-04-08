@@ -45,7 +45,8 @@ const BRIDGE_SCRIPT = `
 <script>
 (function() {
   var overlay = document.createElement('div');
-  overlay.style.cssText = 'position:absolute;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:all 0.15s;display:none;';
+  overlay.id = 'gz-overlay';
+  overlay.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:border-color 0.15s;display:none;';
   document.body.appendChild(overlay);
   var highlighted = null;
   var enabled = true;
@@ -62,11 +63,19 @@ const BRIDGE_SCRIPT = `
     var rect = el.getBoundingClientRect();
     overlay.style.display = 'block';
     overlay.style.borderColor = color || '#a78bfa';
-    overlay.style.top = (rect.top + window.scrollY) + 'px';
-    overlay.style.left = (rect.left + window.scrollX) + 'px';
+    overlay.style.top = rect.top + 'px';
+    overlay.style.left = rect.left + 'px';
     overlay.style.width = rect.width + 'px';
     overlay.style.height = rect.height + 'px';
   }
+
+  function refreshOverlay() {
+    if (highlighted && highlighted.isConnected) showOverlay(highlighted, overlay.style.borderColor);
+    else { highlighted = null; overlay.style.display = 'none'; }
+  }
+
+  window.addEventListener('scroll', refreshOverlay, true);
+  window.addEventListener('resize', refreshOverlay);
 
   document.addEventListener('mousemove', function(e) {
     if (!enabled) { if (highlighted) { highlighted = null; overlay.style.display = 'none'; } return; }
@@ -81,7 +90,6 @@ const BRIDGE_SCRIPT = `
   });
 
   document.addEventListener('click', function(e) {
-    // Always intercept links — never navigate away from preview
     var link = e.target.closest ? e.target.closest('a[href]') : null;
     if (link) {
       var href = link.getAttribute('href');
@@ -97,7 +105,6 @@ const BRIDGE_SCRIPT = `
         return;
       }
     }
-    // Edit mode — select component
     if (!enabled) return;
     var target = findGz(e.target);
     if (target) {
@@ -200,7 +207,12 @@ function applyHtml(html: string, morph: boolean) {
     const newDoc = parser.parseFromString(html, 'text/html')
 
     morphdom(doc.body, newDoc.body, {
+      onBeforeNodeDiscarded(node) {
+        if ((node as Element).id === 'gz-overlay') return false
+        return true
+      },
       onBeforeElUpdated(fromEl, toEl) {
+        if (fromEl.id === 'gz-overlay') return false
         if (fromEl.isEqualNode(toEl)) return false
         return true
       },

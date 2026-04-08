@@ -8,8 +8,15 @@ import type { EditorMount } from 'gazetta/types'
 const editor = useEditorStore()
 const containerRef = ref<HTMLElement | null>(null)
 
+const hasProperties = computed(() => {
+  const s = editor.templateSchema as Record<string, unknown> | null
+  if (!s) return false
+  const props = s.properties as Record<string, unknown> | undefined
+  return props && Object.keys(props).length > 0
+})
+
 const editorMountRef = computed<EditorMount | null>(() => {
-  if (!editor.templateSchema) return null
+  if (!editor.templateSchema || !hasProperties.value) return null
   return createEditorMount(editor.templateSchema)
 })
 
@@ -30,7 +37,8 @@ useEditorMount(containerRef, editorMountRef, contentRef, handleChange)
     </div>
     <div v-else>
       <h3>{{ editor.componentTemplate }}</h3>
-      <div ref="containerRef" class="editor-container" data-testid="editor-container" :key="editor.selectedComponentPath" />
+      <div v-if="hasProperties" ref="containerRef" class="editor-container" data-testid="editor-container" :key="editor.selectedComponentPath" />
+      <p v-else class="editor-no-schema">No editable content. Edit its children instead.</p>
     </div>
   </div>
 </template>
@@ -39,4 +47,5 @@ useEditorMount(containerRef, editorMountRef, contentRef, handleChange)
 .editor-panel h3 { font-size: 0.75rem; text-transform: uppercase; color: #888; margin-bottom: 1rem; letter-spacing: 0.05em; }
 .editor-empty { color: #aaa; font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; }
 .editor-container { font-size: 0.875rem; }
+.editor-no-schema { color: #71717a; font-size: 0.875rem; }
 </style>

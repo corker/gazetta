@@ -185,11 +185,12 @@ Reference in any page with `"@header"`. Update the fragment once — every page 
 ## CMS editor
 
 1. Open **http://localhost:3000/admin**
-2. Click a page → see its components
-3. Expand fragments (click `@header`) → edit child components
-4. Edit content → live preview updates
-5. Click **Save** → writes to disk
-6. Click **Publish** → pre-renders and uploads to target
+2. Click a page → see its component tree with live preview
+3. Click any component or fragment → edit its content
+4. Toggle **Edit mode** in the preview toolbar → click components directly in the preview to select them
+5. Edit content → preview updates live as you type
+6. Click **Save** → writes to disk
+7. Click **Publish** → pre-renders and uploads to target
 
 ## Publishing
 

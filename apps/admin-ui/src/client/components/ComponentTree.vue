@@ -43,6 +43,7 @@ async function buildComponentNode(name: string, parentDir: string, index: number
 
   if (isFragment) {
     const fragName = name.slice(1)
+    // Will be updated with path+template after API fetch
     map.set(gzId, { isFragment: true, fragName })
     try {
       const frag = await api.getFragment(fragName)
@@ -53,7 +54,7 @@ async function buildComponentNode(name: string, parentDir: string, index: number
         key: `frag:${fragName}:${index}`,
         label: name,
         icon: 'pi pi-share-alt',
-        data: { isFragment: true, fragName, treePath, index, isTopLevel: true },
+        data: { isFragment: true, fragName, treePath, path: frag.dir, template: frag.template, index, isTopLevel: true },
         children,
       }
     } catch {
@@ -86,12 +87,12 @@ async function buildComponentNode(name: string, parentDir: string, index: number
 }
 
 watch(detail, async (d) => {
-  if (!d || !d.components) { componentNodes.value = []; gzMap.value = new Map(); return }
+  if (!d) { componentNodes.value = []; gzMap.value = new Map(); return }
 
   const map = new Map<string, GzEntry>()
-  const children = await Promise.all(
-    d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i, '', map))
-  )
+  const children = d.components
+    ? await Promise.all(d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i, '', map)))
+    : []
 
   // Page/fragment itself as the root clickable node
   const rootNode: TreeNode = {
@@ -110,10 +111,13 @@ const expandedKeys = ref<Record<string, boolean>>({})
 
 function onSelect(node: TreeNode) {
   if (!node.data) return
-  // Fragments have no editor form — toggle expand instead
-  if (node.data.isFragment) {
-    const key = node.key as string
-    expandedKeys.value = { ...expandedKeys.value, [key]: !expandedKeys.value[key] }
+  // Fragments — always open editor, expand if has children
+  if (node.data.isFragment && node.data.fragName) {
+    if (node.children && node.children.length > 0) {
+      const key = node.key as string
+      expandedKeys.value = { ...expandedKeys.value, [key]: true }
+    }
+    editor.selectFragmentContent(node.data.fragName)
     return
   }
   // Page/fragment root node — edit page content
@@ -153,6 +157,7 @@ function selectByGzId(gzId: string) {
       expandedKeys.value = expanded
       selectedKey.value = { [found.node.key as string]: true }
     }
+    editor.selectFragmentContent(entry.fragName)
     return
   }
   // Expand ancestors and select the node in the tree

@@ -79,7 +79,8 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   function clearComponentSelection() {
-    editingPageContent.value = false
+    editingTarget.value = 'component'
+    editingFragmentName.value = null
     selectedComponentPath.value = null
     componentContent.value = null
     componentTemplate.value = null
@@ -92,7 +93,7 @@ export const useEditorStore = defineStore('editor', () => {
 
   async function selectComponent(path: string, template: string) {
     try {
-      editingPageContent.value = false
+      editingTarget.value = 'component'
       selectedComponentPath.value = path
       componentTemplate.value = template
       dirty.value = false
@@ -108,14 +109,16 @@ export const useEditorStore = defineStore('editor', () => {
     }
   }
 
-  // Track whether we're editing a page or a component (different save endpoints)
-  const editingPageContent = ref(false)
+  // Track what we're editing — different save endpoints for each
+  const editingTarget = ref<'page' | 'fragment' | 'component'>('component')
+  const editingFragmentName = ref<string | null>(null)
 
   async function selectPageContent() {
     const detail = pageDetail.value ?? fragmentDetail.value
     if (!detail) return
     try {
-      editingPageContent.value = true
+      editingTarget.value = selectionType.value === 'fragment' ? 'fragment' : 'page'
+      editingFragmentName.value = selectionType.value === 'fragment' ? selectionName.value : null
       selectedComponentPath.value = detail.dir
       componentTemplate.value = detail.template
       dirty.value = false
@@ -126,7 +129,26 @@ export const useEditorStore = defineStore('editor', () => {
       savedContent.value = deepClone(content)
       templateSchema.value = await api.getTemplateSchema(detail.template)
     } catch (err) {
-      showError(err, 'Failed to load page content')
+      showError(err, 'Failed to load content')
+    }
+  }
+
+  async function selectFragmentContent(fragName: string) {
+    try {
+      const frag = await api.getFragment(fragName)
+      editingTarget.value = 'fragment'
+      editingFragmentName.value = fragName
+      selectedComponentPath.value = frag.dir
+      componentTemplate.value = frag.template
+      dirty.value = false
+      lastSaveError.value = null
+      lastSaveSuccess.value = false
+      const content = (frag.content as Record<string, unknown>) ?? {}
+      componentContent.value = content
+      savedContent.value = deepClone(content)
+      templateSchema.value = await api.getTemplateSchema(frag.template)
+    } catch (err) {
+      showError(err, `Failed to load fragment "${fragName}"`)
     }
   }
 
@@ -136,8 +158,10 @@ export const useEditorStore = defineStore('editor', () => {
     lastSaveError.value = null
     lastSaveSuccess.value = false
     try {
-      if (editingPageContent.value && selectionName.value) {
+      if (editingTarget.value === 'page' && selectionName.value) {
         await api.updatePage(selectionName.value, { content: componentContent.value })
+      } else if (editingTarget.value === 'fragment' && editingFragmentName.value) {
+        await api.updateFragment(editingFragmentName.value, { content: componentContent.value })
       } else {
         await api.updateComponent(selectedComponentPath.value, { content: componentContent.value })
       }
@@ -238,7 +262,7 @@ export const useEditorStore = defineStore('editor', () => {
     selectedComponentPath, componentContent, componentTemplate, templateSchema,
     previewRoute, previewVersion, draftVersion, saving, dirty, lastSaveError, lastSaveSuccess,
     toast,
-    selectPage, selectFragment, selectComponent, selectPageContent, saveComponent,
+    selectPage, selectFragment, selectComponent, selectPageContent, selectFragmentContent, saveComponent,
     markDirty, discardChanges, clearComponentSelection,
     moveComponent, removeComponent, addComponent,
   }
