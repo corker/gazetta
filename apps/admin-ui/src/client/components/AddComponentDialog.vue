@@ -5,12 +5,9 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Listbox from 'primevue/listbox'
 import { api } from '../api/client.js'
-import { useEditorStore } from '../stores/editor.js'
 
 const props = defineProps<{ visible: boolean }>()
-const emit = defineEmits<{ (e: 'close'): void }>()
-
-const editor = useEditorStore()
+const emit = defineEmits<{ (e: 'close'): void; (e: 'add', name: string, template: string): void }>()
 const templates = ref<Array<{ name: string }>>([])
 const selectedTemplate = ref<string | null>(null)
 const componentName = ref('')
@@ -27,7 +24,7 @@ async function handleCreate() {
   error.value = null
   try {
     const name = componentName.value.trim().toLowerCase().replace(/\s+/g, '-')
-    await editor.addComponent(name, selectedTemplate.value)
+    emit('add', name, selectedTemplate.value)
     emit('close')
   } catch (err) {
     error.value = (err as Error).message

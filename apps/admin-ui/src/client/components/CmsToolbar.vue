@@ -3,20 +3,24 @@ import { ref, computed } from 'vue'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
-import { useEditorStore } from '../stores/editor.js'
+import { useSelectionStore } from '../stores/selection.js'
+import { useEditingStore } from '../stores/editing.js'
+import { useToastStore } from '../stores/toast.js'
 import { useThemeStore } from '../stores/theme.js'
 import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
 
 const site = useSiteStore()
-const editor = useEditorStore()
+const selection = useSelectionStore()
+const editing = useEditingStore()
+const toast = useToastStore()
 const theme = useThemeStore()
 const showPublish = ref(false)
 const showFetch = ref(false)
 
-const publishItemType = computed(() => editor.selectionType === 'page' ? 'pages' : 'fragments')
-const publishItemName = computed(() => editor.selectionName ?? '')
-const canPublish = computed(() => editor.selectionName && !editor.dirty)
+const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fragments')
+const publishItemName = computed(() => selection.name ?? '')
+const canPublish = computed(() => selection.name && !editing.dirty)
 </script>
 
 <template>
@@ -30,15 +34,15 @@ const canPublish = computed(() => editor.selectionName && !editor.dirty)
     </template>
     <template #center>
       <Transition name="fade">
-        <span v-if="editor.toast" class="cms-toast" :class="editor.toast.type === 'error' ? 'cms-toast-error' : 'cms-toast-success'">
-          <i :class="editor.toast.type === 'error' ? 'pi pi-exclamation-circle' : 'pi pi-check-circle'" />
-          <a v-if="editor.toast.link" :href="editor.toast.link" target="_blank" rel="noopener" class="cms-toast-link">{{ editor.toast.message }}</a>
-          <template v-else>{{ editor.toast.message }}</template>
+        <span v-if="toast.current" class="cms-toast" :class="toast.current.type === 'error' ? 'cms-toast-error' : 'cms-toast-success'">
+          <i :class="toast.current.type === 'error' ? 'pi pi-exclamation-circle' : 'pi pi-check-circle'" />
+          <a v-if="toast.current.link" :href="toast.current.link" target="_blank" rel="noopener" class="cms-toast-link">{{ toast.current.message }}</a>
+          <template v-else>{{ toast.current.message }}</template>
         </span>
-        <span v-else-if="editor.lastSaveError" class="cms-toast cms-toast-error">
-          <i class="pi pi-exclamation-circle" /> {{ editor.lastSaveError }}
+        <span v-else-if="editing.lastSaveError" class="cms-toast cms-toast-error">
+          <i class="pi pi-exclamation-circle" /> {{ editing.lastSaveError }}
         </span>
-        <span v-else-if="editor.dirty" class="cms-toast cms-toast-dirty">
+        <span v-else-if="editing.dirty" class="cms-toast cms-toast-dirty">
           Unsaved changes
         </span>
       </Transition>
@@ -46,10 +50,10 @@ const canPublish = computed(() => editor.selectionName && !editor.dirty)
     <template #end>
       <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
-      <Button v-if="editor.dirty" label="Discard" icon="pi pi-undo" severity="secondary" text
-        data-testid="discard-btn" @click="editor.discardChanges()" size="small" class="cms-btn" />
-      <Button label="Save" icon="pi pi-save" severity="primary" :loading="editor.saving"
-        data-testid="save-btn" :disabled="!editor.dirty" @click="editor.saveComponent()" size="small" class="cms-btn" />
+      <Button v-if="editing.dirty" label="Discard" icon="pi pi-undo" severity="secondary" text
+        data-testid="discard-btn" @click="editing.discard()" size="small" class="cms-btn" />
+      <Button label="Save" icon="pi pi-save" severity="primary" :loading="editing.saving"
+        data-testid="save-btn" :disabled="!editing.dirty" @click="editing.save()" size="small" class="cms-btn" />
       <Button label="Fetch" icon="pi pi-cloud-download" severity="info"
         data-testid="fetch-btn" @click="showFetch = true" size="small" class="cms-btn" />
       <Button label="Publish" icon="pi pi-cloud-upload" severity="success"

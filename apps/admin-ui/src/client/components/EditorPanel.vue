@@ -1,29 +1,29 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useEditorStore } from '../stores/editor.js'
+import { useEditingStore } from '../stores/editing.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from 'gazetta/editor'
 import type { EditorMount } from 'gazetta/types'
 
-const editor = useEditorStore()
+const editing = useEditingStore()
 const containerRef = ref<HTMLElement | null>(null)
 
 const hasProperties = computed(() => {
-  const s = editor.templateSchema as Record<string, unknown> | null
+  const s = editing.schema as Record<string, unknown> | null
   if (!s) return false
   const props = s.properties as Record<string, unknown> | undefined
   return props && Object.keys(props).length > 0
 })
 
 const editorMountRef = computed<EditorMount | null>(() => {
-  if (!editor.templateSchema || !hasProperties.value) return null
-  return createEditorMount(editor.templateSchema)
+  if (!editing.schema || !hasProperties.value) return null
+  return createEditorMount(editing.schema)
 })
 
-const contentRef = computed(() => editor.componentContent)
+const contentRef = computed(() => editing.content)
 
 function handleChange(content: Record<string, unknown>) {
-  editor.markDirty(content)
+  editing.markDirty(content)
 }
 
 useEditorMount(containerRef, editorMountRef, contentRef, handleChange)
@@ -31,13 +31,13 @@ useEditorMount(containerRef, editorMountRef, contentRef, handleChange)
 
 <template>
   <div class="editor-panel" data-testid="editor-panel">
-    <div v-if="!editor.selectedComponentPath" class="editor-empty" data-testid="editor-empty">
+    <div v-if="!editing.path" class="editor-empty" data-testid="editor-empty">
       <i class="pi pi-pencil" style="font-size: 2rem; color: #ddd; margin-bottom: 0.5rem;" />
       <p>Select a component to edit</p>
     </div>
     <div v-else>
-      <h3>{{ editor.componentTemplate }}</h3>
-      <div v-if="hasProperties" ref="containerRef" class="editor-container" data-testid="editor-container" :key="editor.selectedComponentPath" />
+      <h3>{{ editing.template }}</h3>
+      <div v-if="hasProperties" ref="containerRef" class="editor-container" data-testid="editor-container" :key="editing.path" />
       <p v-else class="editor-no-schema">No editable content. Edit its children instead.</p>
     </div>
   </div>

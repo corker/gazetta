@@ -1,18 +1,28 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Tree from 'primevue/tree'
 import Button from 'primevue/button'
 import type { TreeNode } from 'primevue/treenode'
 import { useSiteStore } from '../stores/site.js'
-import { useEditorStore } from '../stores/editor.js'
+import { useSelectionStore } from '../stores/selection.js'
+import { useEditingStore } from '../stores/editing.js'
+import { useToastStore } from '../stores/toast.js'
 import { api } from '../api/client.js'
 import CreatePageDialog from './CreatePageDialog.vue'
 import CreateFragmentDialog from './CreateFragmentDialog.vue'
 
 const site = useSiteStore()
-const editor = useEditorStore()
+const selection = useSelectionStore()
+const editing = useEditingStore()
+const toast = useToastStore()
 const selectedKey = ref<Record<string, boolean>>({})
 const expandedKeys = ref<Record<string, boolean>>({ pages: true, fragments: true })
+
+// Sync tree selection when selection changes externally (e.g. preview link click)
+watch(() => selection.selection, (sel) => {
+  if (sel) selectedKey.value = { [`${sel.type}:${sel.name}`]: true }
+  else selectedKey.value = {}
+})
 const showCreatePage = ref(false)
 const showCreateFragment = ref(false)
 
@@ -45,8 +55,9 @@ const nodes = computed<TreeNode[]>(() => [
 
 function onSelect(node: TreeNode) {
   if (!node.data) return
-  if (node.data.type === 'page') editor.selectPage(node.data.name)
-  else if (node.data.type === 'fragment') editor.selectFragment(node.data.name)
+  editing.clear()
+  if (node.data.type === 'page') selection.selectPage(node.data.name)
+  else if (node.data.type === 'fragment') selection.selectFragment(node.data.name)
 }
 
 async function handleDelete(node: TreeNode) {
@@ -59,12 +70,10 @@ async function handleDelete(node: TreeNode) {
   try {
     if (type === 'page') await api.deletePage(name)
     else if (type === 'fragment') await api.deleteFragment(name)
-    editor.clearComponentSelection()
+    editing.clear()
     await site.load()
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    editor.toast = { message: `Failed to delete "${name}": ${msg}`, type: 'error' }
-    setTimeout(() => { editor.toast = null }, 5000)
+    toast.showError(err, `Failed to delete "${name}"`)
   }
 }
 </script>

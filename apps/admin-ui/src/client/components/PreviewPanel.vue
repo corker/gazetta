@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { ref, watch, computed, inject, onMounted, onUnmounted } from 'vue'
 import morphdom from 'morphdom'
-import { useEditorStore } from '../stores/editor.js'
+import { useSelectionStore } from '../stores/selection.js'
+import { useEditingStore } from '../stores/editing.js'
+import { usePreviewStore } from '../stores/preview.js'
+import { useToastStore } from '../stores/toast.js'
 import { useSiteStore } from '../stores/site.js'
 
-const editor = useEditorStore()
+const selection = useSelectionStore()
+const editing = useEditingStore()
+const preview = usePreviewStore()
+const toast = useToastStore()
 const site = useSiteStore()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
@@ -15,8 +21,8 @@ const selectByGzId = inject<(gzId: string) => void>('selectByGzId')
 
 const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
 const previewPath = computed(() => {
-  if (!editor.previewRoute) return null
-  return `${basePath}/preview${editor.previewRoute}`
+  if (!selection.previewRoute) return null
+  return `${basePath}/preview${selection.previewRoute}`
 })
 
 // Full-screen toggle
@@ -141,15 +147,14 @@ function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:navigate' && e.data.route) {
     const page = site.pages.find(p => p.route === e.data.route)
     if (page) {
-      editor.selectPage(page.name)
+      editing.clear()
+      selection.selectPage(page.name)
     } else {
-      editor.toast = { message: `No page found for route ${e.data.route}`, type: 'error' }
-      setTimeout(() => { editor.toast = null }, 3000)
+      toast.show(`No page found for route ${e.data.route}`, { type: 'error' })
     }
   }
   if (e.data?.type === 'gazetta:external' && e.data.url) {
-    editor.toast = { message: e.data.url, type: 'success', link: e.data.url }
-    setTimeout(() => { editor.toast = null }, 5000)
+    toast.show(e.data.url, { link: e.data.url, duration: 5000 })
   }
 }
 
@@ -165,11 +170,11 @@ async function fetchPreview(morph = true) {
   if (!previewPath.value) { currentHtml = ''; return }
   loading.value = true
   try {
-    const hasDraft = editor.dirty && editor.selectedComponentPath && editor.componentContent
+    const hasDraft = editing.dirty && editing.path && editing.content
     let res: Response
     if (hasDraft) {
       const overrides: Record<string, Record<string, unknown>> = {}
-      overrides[editor.selectedComponentPath!] = editor.componentContent!
+      overrides[editing.path!] = editing.content!
       res = await fetch(previewPath.value, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -239,14 +244,14 @@ function debouncedFetchPreview() {
 }
 
 // Highlight selected component in preview
-watch(() => editor.selectedComponentPath, (path) => {
+watch(() => editing.path, (path) => {
   if (!path || !iframeRef.value?.contentWindow) return
   // TODO: compute gzId from the component's treePath and send to iframe
 })
 
-watch(() => editor.previewVersion, () => fetchPreview(true))
+watch(() => preview.version, () => fetchPreview(true))
 watch(previewPath, () => fetchPreview(false), { immediate: true })
-watch(() => editor.draftVersion, debouncedFetchPreview)
+watch(() => preview.draftVersion, debouncedFetchPreview)
 
 function toggleFullscreen() {
   fullscreen.value = !fullscreen.value
