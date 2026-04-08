@@ -133,6 +133,27 @@ describe('starter site', () => {
     expect(html).toContain('data-gz=')
   })
 
+  it('renders unique data-gz IDs per component', async () => {
+    const site = await loadSite(starterDir, storage)
+    const resolved = await resolvePage('home', site)
+    const html = await renderPage(resolved)
+    const ids = [...html.matchAll(/data-gz="([^"]+)"/g)].map(m => m[1])
+    // Filter to unique div wrappers (not CSS selector references)
+    const divIds = [...html.matchAll(/<div data-gz="([^"]+)">/g)].map(m => m[1])
+    expect(divIds.length).toBeGreaterThan(0)
+    expect(new Set(divIds).size).toBe(divIds.length) // all unique
+  })
+
+  it('data-gz IDs are deterministic across renders', async () => {
+    const site = await loadSite(starterDir, storage)
+    const resolved = await resolvePage('home', site)
+    const html1 = await renderPage(resolved)
+    const html2 = await renderPage(resolved)
+    const ids1 = [...html1.matchAll(/<div data-gz="([^"]+)">/g)].map(m => m[1])
+    const ids2 = [...html2.matchAll(/<div data-gz="([^"]+)">/g)].map(m => m[1])
+    expect(ids1).toEqual(ids2)
+  })
+
   it('validates all pages resolve without errors', async () => {
     const site = await loadSite(starterDir, storage)
     const errors: string[] = []
