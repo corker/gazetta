@@ -7,4 +7,5 @@ components:
   - hero
   - features
   - demo
+  - vue-demo
   - "@footer"

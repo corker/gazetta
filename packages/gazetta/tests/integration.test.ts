@@ -67,8 +67,8 @@ describe('starter site', () => {
     const site = await loadSite(starterDir, storage)
     const resolved = await resolvePage('home', site)
 
-    // @header, hero, features, demo, @footer
-    expect(resolved.children).toHaveLength(5)
+    // @header, hero, features, demo, vue-demo, @footer
+    expect(resolved.children).toHaveLength(6)
 
     const header = resolved.children[0]
     expect(header.children).toHaveLength(2)
@@ -84,7 +84,12 @@ describe('starter site', () => {
     const demo = resolved.children[3]
     expect(demo.children).toHaveLength(0)
 
-    const footer = resolved.children[4]
+    // vue-demo (Vue SSR) is a leaf
+    const vueDemo = resolved.children[4]
+    expect(vueDemo.children).toHaveLength(0)
+    expect(vueDemo.content?.heading).toBe('Vue SSR Works')
+
+    const footer = resolved.children[5]
     expect(footer.children).toHaveLength(1)
   })
 

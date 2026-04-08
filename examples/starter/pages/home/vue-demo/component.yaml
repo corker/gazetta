@@ -1,0 +1,4 @@
+template: vue-test
+content:
+  heading: Vue SSR Works
+  body: This component is rendered with Vue 3 SSR
