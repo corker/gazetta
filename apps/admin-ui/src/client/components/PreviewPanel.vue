@@ -2,8 +2,10 @@
 import { ref, watch, computed, inject, onMounted, onUnmounted } from 'vue'
 import morphdom from 'morphdom'
 import { useEditorStore } from '../stores/editor.js'
+import { useSiteStore } from '../stores/site.js'
 
 const editor = useEditorStore()
+const site = useSiteStore()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let currentHtml = ''
@@ -79,6 +81,23 @@ const BRIDGE_SCRIPT = `
   });
 
   document.addEventListener('click', function(e) {
+    // Always intercept links — never navigate away from preview
+    var link = e.target.closest ? e.target.closest('a[href]') : null;
+    if (link) {
+      var href = link.getAttribute('href');
+      if (href) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (href.startsWith('/') || href.startsWith(location.origin)) {
+          var path = href.startsWith('/') ? href : new URL(href).pathname;
+          window.parent.postMessage({ type: 'gazetta:navigate', route: path }, '*');
+        } else {
+          window.parent.postMessage({ type: 'gazetta:external', url: href }, '*');
+        }
+        return;
+      }
+    }
+    // Edit mode — select component
     if (!enabled) return;
     var target = findGz(e.target);
     if (target) {
@@ -111,6 +130,19 @@ function injectBridge(html: string): string {
 function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:select' && e.data.gzId && selectByGzId) {
     selectByGzId(e.data.gzId)
+  }
+  if (e.data?.type === 'gazetta:navigate' && e.data.route) {
+    const page = site.pages.find(p => p.route === e.data.route)
+    if (page) {
+      editor.selectPage(page.name)
+    } else {
+      editor.toast = { message: `No page found for route ${e.data.route}`, type: 'error' }
+      setTimeout(() => { editor.toast = null }, 3000)
+    }
+  }
+  if (e.data?.type === 'gazetta:external' && e.data.url) {
+    editor.toast = { message: `External link: ${e.data.url}`, type: 'success' }
+    setTimeout(() => { editor.toast = null }, 5000)
   }
 }
 
