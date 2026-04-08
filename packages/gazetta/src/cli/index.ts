@@ -625,7 +625,7 @@ async function runDev(siteDir: string, port: number) {
   // ---- File watching ----
   watch(siteDir, { recursive: true }, (_event, filename) => {
     if (!filename) return
-    if (filename.endsWith('.ts') && filename.includes('templates/')) {
+    if ((filename.endsWith('.ts') || filename.endsWith('.tsx')) && filename.includes('templates/')) {
       const parts = filename.split('/')
       const idx = parts.indexOf('templates')
       if (idx >= 0 && idx + 1 < parts.length) {
