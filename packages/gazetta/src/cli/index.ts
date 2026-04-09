@@ -302,8 +302,8 @@ async function runPublish(siteDir: string, targetName?: string) {
     console.log(`  ${name}: ${totalFiles} files published\n`)
   }
 
-  // Purge cache (requires CF_API_TOKEN with cache purge permission — wrangler OAuth doesn't include it)
-  const cfApiToken = process.env.CF_API_TOKEN
+  // Purge cache (requires CLOUDFLARE_API_TOKEN with cache purge permission — wrangler OAuth doesn't include it)
+  const cfApiToken = process.env.CLOUDFLARE_API_TOKEN
   if (cfApiToken) {
     for (const [name, config] of Object.entries(siteYaml.targets ?? {})) {
       if (!config.siteUrl || config.worker?.type !== 'cloudflare') continue
@@ -319,7 +319,7 @@ async function runPublish(siteDir: string, targetName?: string) {
     }
   } else {
     const hasCloudflare = Object.values(siteYaml.targets ?? {}).some(t => t.worker?.type === 'cloudflare')
-    if (hasCloudflare) console.log(`\n  Tip: set CF_API_TOKEN to purge edge cache after publish`)
+    if (hasCloudflare) console.log(`\n  Tip: set CLOUDFLARE_API_TOKEN to purge edge cache after publish`)
   }
 
   console.log(`  Done!\n`)
