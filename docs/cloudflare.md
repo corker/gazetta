@@ -218,20 +218,30 @@ export default app
 ### wrangler.toml
 
 ```toml
+# Worker name — appears in the Cloudflare dashboard
 name = "my-site"
+
+# Entry point — the file that exports the Hono app
 main = "src/index.ts"
+
+# Workers runtime version — determines which APIs are available
 compatibility_date = "2024-12-01"
+
+# Enable *.workers.dev subdomain for testing without a custom domain
 workers_dev = true
 
+# Route all traffic for your domain to this worker
 [[routes]]
 pattern = "mysite.com/*"
 zone_name = "mysite.com"
 
+# Also handle www subdomain (redirect to bare domain in worker code)
 [[routes]]
 pattern = "www.mysite.com/*"
 zone_name = "mysite.com"
 
+# R2 bucket binding — the worker accesses R2 via this binding name
 [[r2_buckets]]
-binding = "SITE_BUCKET"
-bucket_name = "my-site"
+binding = "SITE_BUCKET"        # must match createWorker({ bucketBinding })
+bucket_name = "my-site"        # the actual R2 bucket name
 ```
