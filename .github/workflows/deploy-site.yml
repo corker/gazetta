@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'sites/gazetta.studio/**'
+      - 'packages/gazetta/**'
 
 jobs:
   deploy:
@@ -21,10 +22,11 @@ jobs:
 
       - run: npm run build
 
-      - name: Seed site to R2
-        run: cd sites/gazetta.studio/worker && npx tsx src/seed.ts
+      - name: Publish site to R2
+        run: npx tsx packages/gazetta/src/cli/index.ts publish sites/gazetta.studio
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Deploy worker
         run: cd sites/gazetta.studio/worker && npx wrangler deploy
