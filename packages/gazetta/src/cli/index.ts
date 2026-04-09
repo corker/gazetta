@@ -199,6 +199,12 @@ content:
   body: "<p>Edit this content in the CMS at <a href='/admin'>/admin</a>.</p>"
 `,
 
+    'pages/404/page.yaml': `template: page-layout
+content:
+  title: "Page Not Found"
+  description: "The page you're looking for doesn't exist."
+`,
+
     '.gitignore': `node_modules/\ndist/\n.env\n.env.local\n`,
 
     'package.json': JSON.stringify({
