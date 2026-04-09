@@ -308,7 +308,7 @@ async function runPublish(siteDir: string, targetName?: string) {
     for (const [name, config] of Object.entries(siteYaml.targets ?? {})) {
       if (!config.siteUrl || config.worker?.type !== 'cloudflare') continue
       try {
-        const zoneId = process.env.CF_ZONE_ID ?? await lookupZoneId(config.siteUrl, cfApiToken)
+        const zoneId = process.env.CLOUDFLARE_ZONE_ID ?? await lookupZoneId(config.siteUrl, cfApiToken)
         if (!zoneId) { console.log(`  ${name}: zone not found for ${config.siteUrl}, skipping purge`); continue }
         const { createCloudflarePurge } = await import('../publish-rendered.js')
         await createCloudflarePurge(zoneId, cfApiToken).purgeAll()

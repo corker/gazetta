@@ -92,7 +92,7 @@ export function publishRoutes(
 
         // 4. Purge edge cache via Cloudflare API
         const config = getTargetConfig(targetName)
-        const zoneId = process.env.CF_ZONE_ID
+        const zoneId = process.env.CLOUDFLARE_ZONE_ID
         const apiToken = process.env.CLOUDFLARE_API_TOKEN
         if (config?.siteUrl && zoneId && apiToken) {
           const purge = createCloudflarePurge(zoneId, apiToken)
