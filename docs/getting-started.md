@@ -200,8 +200,9 @@ Each target has a **storage** config (where files go) and an optional **worker**
 
 | Storage type | Use case | Config |
 |------|----------|--------|
+| `r2` | Cloudflare R2 | `accountId`, `bucket` |
+| `s3` | AWS S3, MinIO | `endpoint`, `bucket`, `accessKeyId`, `secretAccessKey` |
 | `filesystem` | Local dev, staging, backups | `path: ./dist/staging` |
-| `s3` | AWS S3, Cloudflare R2, MinIO | `endpoint`, `bucket`, `accessKeyId`, `secretAccessKey` |
 | `azure-blob` | Azure Blob Storage | `connectionString`, `container` |
 
 | Worker type | Use case |
@@ -221,21 +222,47 @@ targets:
       path: ./dist/staging
   production:
     storage:
-      type: s3
-      endpoint: "https://<account_id>.r2.cloudflarestorage.com"
+      type: r2
+      accountId: "your-cloudflare-account-id"
       bucket: "my-site"
-      accessKeyId: "${R2_ACCESS_KEY_ID}"
-      secretAccessKey: "${R2_SECRET_ACCESS_KEY}"
     worker:
       type: cloudflare
-      name: my-site
     siteUrl: "https://mysite.com"
     cache:
-      browser: 60
+      browser: 0
       edge: 86400
+      purge:
+        type: cloudflare
+        apiToken: "${CLOUDFLARE_API_TOKEN}"
 ```
 
-Environment variables (like `${R2_ACCESS_KEY_ID}`) are resolved at runtime — don't commit secrets to site.yaml.
+### Authentication
+
+**Local dev:** Run `npx wrangler login` once. The CLI uses your wrangler session to access R2 — no API keys needed.
+
+**CI (GitHub Actions):** Create a Cloudflare API token in the dashboard with these permissions:
+
+| Permission | Access |
+|-----------|--------|
+| Account / Workers Scripts | Edit |
+| Account / R2 | Edit |
+| User / User Details | Read |
+| User / Memberships | Read |
+| Zone / Workers Routes | Edit |
+| Zone / Cache Purge | Purge |
+| Zone / Zone | Read |
+
+Add it as a `CLOUDFLARE_API_TOKEN` secret in your repo settings.
+
+**Environment variables:** Create a `.env` file in your site directory (gitignored) for local secrets:
+
+```
+CLOUDFLARE_API_TOKEN=your-token-here
+```
+
+The CLI loads `.env` automatically. In CI, env vars are set directly — `.env` is skipped when `CI=true`.
+
+Values in site.yaml can reference env vars with `${VAR_NAME}` syntax — they're resolved at runtime.
 
 ### Publish and deploy
 
@@ -266,8 +293,11 @@ The publish mode is automatic based on the target config:
 Per target:
 ```yaml
 cache:
-  browser: 60     # max-age — seconds before browser revalidates
-  edge: 86400     # s-maxage — seconds before edge refetches from storage
+  browser: 0       # max-age — seconds before browser revalidates
+  edge: 86400      # s-maxage — seconds before edge refetches from storage
+  purge:           # optional — purge CDN cache after publish
+    type: cloudflare
+    apiToken: "${CLOUDFLARE_API_TOKEN}"
 ```
 
 Per page (overrides target):
@@ -277,9 +307,11 @@ cache:
   browser: 0      # always fresh
 ```
 
-Defaults: `browser: 0`, `edge: 86400`.
+Defaults: `browser: 0`, `edge: 86400`. Set `edge: 0` to skip CDN caching entirely (no purge needed).
 
 ETags are automatic — browsers get `304 Not Modified` for unchanged pages.
+
+When `cache.purge` is configured, `gazetta publish` automatically purges the CDN cache after uploading. The zone ID is auto-detected from `siteUrl`.
 
 ## Site structure
 
