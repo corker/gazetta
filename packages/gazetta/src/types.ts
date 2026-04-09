@@ -52,7 +52,7 @@ export interface PageManifest extends ComponentManifest {
 
 /** Storage configuration */
 export interface StorageConfig {
-  type: 'filesystem' | 'azure-blob' | 's3'
+  type: 'filesystem' | 'azure-blob' | 's3' | 'r2'
   path?: string
   connectionString?: string
   container?: string
@@ -61,6 +61,7 @@ export interface StorageConfig {
   accessKeyId?: string
   secretAccessKey?: string
   region?: string
+  accountId?: string
 }
 
 /** Worker/runtime configuration */
