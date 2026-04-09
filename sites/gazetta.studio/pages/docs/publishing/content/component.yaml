@@ -2,16 +2,24 @@ template: text
 content:
   body: |
     <p>Each target has <strong>storage</strong> (where files go) and an optional <strong>worker</strong> (what serves them).</p>
-    <p><strong>Storage types:</strong> <code>filesystem</code> (local), <code>s3</code> (AWS S3, Cloudflare R2, MinIO), <code>azure-blob</code></p>
-    <p><strong>Worker types:</strong> <code>cloudflare</code> (edge assembly). More coming.</p>
+    <p><strong>Storage types:</strong> <code>r2</code> (Cloudflare R2), <code>s3</code> (AWS S3, MinIO), <code>filesystem</code> (local), <code>azure-blob</code></p>
+    <p><strong>Serving options:</strong></p>
+    <ul>
+      <li><code>gazetta serve</code> — Node production server (VPS, Docker, Fly.io)</li>
+      <li><code>worker: cloudflare</code> — Cloudflare Workers (edge assembly)</li>
+    </ul>
     <p><strong>Publish content:</strong></p>
     <p><code>npx gazetta publish</code> — publishes to all targets<br>
     <code>npx gazetta publish -t production</code> — specific target</p>
-    <p><strong>Deploy worker (one-time):</strong></p>
-    <p><code>npx gazetta deploy -t production</code> — deploys the Cloudflare Worker</p>
-    <p>Publish as often as you want. Deploy once. The CMS Publish button triggers publish, not deploy.</p>
-    <p><strong>Cache configuration</strong> per target in <code>site.yaml</code>:</p>
-    <p><code>browser: 60</code> — seconds before the browser revalidates (max-age)<br>
-    <code>edge: 86400</code> — seconds before the CDN refetches from storage (s-maxage)</p>
-    <p>Pages can override with their own <code>cache:</code> in <code>page.yaml</code>. Defaults: browser 0, edge 86400.</p>
+    <p><strong>Serve locally:</strong></p>
+    <p><code>npx gazetta serve</code> — serves from first target<br>
+    <code>npx gazetta serve -t staging -p 8080</code> — specific target and port</p>
+    <p><strong>Deploy Cloudflare Worker (one-time):</strong></p>
+    <p><code>npx gazetta deploy -t production</code></p>
+    <p>Publish as often as you want. Deploy/serve once.</p>
+    <p><strong>Authentication:</strong> Run <code>npx wrangler login</code> for local R2 access. For CI, set <code>CLOUDFLARE_API_TOKEN</code>. The CLI loads <code>.env</code> from the site directory automatically.</p>
+    <p><strong>Cache:</strong></p>
+    <p><code>browser: 0</code> — seconds before the browser revalidates (max-age)<br>
+    <code>edge: 86400</code> — seconds before the CDN/proxy refetches from storage (s-maxage)</p>
+    <p>Configure <code>cache.purge</code> to automatically purge the CDN after publish. Pages can override cache in <code>page.yaml</code>.</p>
     <p><strong>ETags</strong> are automatic. Browsers get <code>304 Not Modified</code> for unchanged pages — zero bandwidth even with <code>browser: 0</code>.</p>
