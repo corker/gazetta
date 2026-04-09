@@ -22,7 +22,11 @@ provide('selectByGzId', (gzId: string) => {
 function handleKeydown(e: KeyboardEvent) {
   if (e.key !== 'Escape' || uiMode.mode !== 'edit') return
   const active = document.activeElement as HTMLElement | null
-  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) return
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
+    // First Escape: blur the focused input. Second Escape: exit edit mode.
+    ;(active as HTMLElement).blur()
+    return
+  }
   if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
   uiMode.enterBrowse()
 }
