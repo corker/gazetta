@@ -194,6 +194,8 @@ Reference in any page with `"@header"`. Update the fragment once — every page 
 
 ## Publishing
 
+> **Deploying to Cloudflare?** See the [Cloudflare deployment guide](./cloudflare.md) for complete setup instructions.
+
 ### Target types
 
 Each target has a **storage** config (where files go) and an optional **worker** config (what serves them):
