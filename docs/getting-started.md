@@ -291,6 +291,23 @@ The publish mode is automatic based on the target config:
 - CSS/JS inline — no external files
 - Fragment changes require republishing all pages
 
+### Custom 404 page
+
+Create a `pages/404/` page like any other page. It's automatically served with a 404 status when a route doesn't match. The URL stays as-is — no redirect.
+
+```yaml
+# pages/404/page.yaml
+template: page-default
+content:
+  title: "Page Not Found"
+components:
+  - "@header"
+  - error-message
+  - "@footer"
+```
+
+Works with both `gazetta serve` and Cloudflare Workers. Fragments are assembled normally.
+
 ### Cache configuration
 
 Per target:
