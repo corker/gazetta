@@ -27,19 +27,22 @@ function printHelp() {
     gazetta init [dir]        Create a new site
     gazetta dev [site-dir]    Start dev server + CMS at /admin
     gazetta publish [site-dir] Pre-render and publish to targets
+    gazetta serve [site-dir]  Serve published site from target storage
     gazetta deploy -t <name>  Deploy worker to hosting (one-time setup)
     gazetta validate [site-dir] Check site for broken references
     gazetta help              Show this help message
 
   Options:
     --port, -p <port>         Server port (default: 3000)
-    --target, -t <name>       Target to publish/deploy to (default: all)
+    --target, -t <name>       Target to publish/deploy/serve (default: first)
 
   Examples:
     gazetta init my-site            # scaffold a new site
     gazetta dev                     # dev server + CMS
     gazetta publish                  # publish to all targets
     gazetta publish -t production   # publish to specific target
+    gazetta serve                   # serve from first target
+    gazetta serve -t staging -p 8080 # serve staging on port 8080
     gazetta deploy -t production    # deploy worker (one-time)
     gazetta validate                # check site for broken references
 `)
@@ -328,6 +331,38 @@ async function runPublish(siteDir: string, targetName?: string) {
   }
 
   console.log(`  Done!\n`)
+}
+
+async function runServe(siteDir: string, port: number, targetName?: string) {
+  const siteYamlPath = join(siteDir, 'site.yaml')
+  if (!existsSync(siteYamlPath)) {
+    console.error(`\n  Error: ${siteYamlPath} not found\n`)
+    process.exit(1)
+  }
+
+  const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as import('../types.js').SiteManifest
+  if (!siteYaml.targets || Object.keys(siteYaml.targets).length === 0) {
+    console.error('\n  Error: no targets configured in site.yaml\n')
+    process.exit(1)
+  }
+
+  const name = targetName ?? Object.keys(siteYaml.targets)[0]
+  const config = siteYaml.targets[name]
+  if (!config) {
+    console.error(`\n  Error: target "${name}" not found in site.yaml\n`)
+    process.exit(1)
+  }
+
+  const { createStorageProvider } = await import('../targets.js')
+  const storage = await createStorageProvider(config.storage, siteDir)
+
+  const { createServer } = await import('../serve.js')
+  const app = createServer({ storage })
+
+  serve({ fetch: app.fetch, port }, () => {
+    console.log(`\n  Gazetta serving "${siteYaml.name}" from target "${name}"`)
+    console.log(`  http://localhost:${port}\n`)
+  })
 }
 
 async function runDeploy(siteDir: string, targetName?: string) {
@@ -757,6 +792,9 @@ async function main() {
       break
     case 'publish':
       await runPublish(parsed.siteDir, parsed.target)
+      break
+    case 'serve':
+      await runServe(parsed.siteDir, parsed.port ?? 3000, parsed.target)
       break
     case 'deploy':
       await runDeploy(parsed.siteDir, parsed.target)

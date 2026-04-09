@@ -39,6 +39,10 @@ export type { R2RestProviderOptions } from './providers/r2.js'
 // Targets
 export { createStorageProvider, createTargetProvider, createTargetRegistry } from './targets.js'
 
+// Server
+export { createServer } from './serve.js'
+export type { ServeOptions } from './serve.js'
+
 // Publish
 export { publishItems, resolveDependencies } from './publish.js'
 export { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, publishFragmentWithPurge, publishPageWithPurge, createWorkerPurge } from './publish-rendered.js'
