@@ -194,7 +194,8 @@ Reference in any page with `"@header"`. Update the fragment once — every page 
 
 ## Publishing
 
-> **Deploying to Cloudflare?** See the [Cloudflare deployment guide](./cloudflare.md) for complete setup instructions.
+> **Deploying to Cloudflare?** See the [Cloudflare deployment guide](./cloudflare.md).
+> **Self-hosting?** See the [self-hosted deployment guide](./self-hosted.md) for VPS, Docker, and Fly.io.
 
 ### Target types
 

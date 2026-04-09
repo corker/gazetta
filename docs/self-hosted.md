@@ -1,0 +1,189 @@
+# Self-Hosted Deployment
+
+Deploy Gazetta sites on your own infrastructure — VPS, Docker, Fly.io, or any Node.js host. Pages are pre-rendered and stored in your chosen storage, assembled at request time by a Node server.
+
+## How it works
+
+```
+gazetta publish → pre-render pages/fragments → upload to storage
+
+gazetta serve   → fetch page from storage
+                → resolve fragment ESI placeholders
+                → assemble full HTML
+                → serve with ETag + Cache-Control
+```
+
+Same assembly logic as the [Cloudflare deployment](./cloudflare.md), but runs on Node instead of a Worker.
+
+## Setup
+
+### 1. Configure a target
+
+```yaml
+# site.yaml
+name: My Site
+targets:
+  production:
+    storage:
+      type: filesystem
+      path: ./dist/production
+    siteUrl: "https://mysite.com"
+    cache:
+      browser: 0
+      edge: 86400
+```
+
+Any storage type works:
+
+| Storage | Config |
+|---------|--------|
+| Filesystem | `type: filesystem`, `path: ./dist/production` |
+| S3 / MinIO | `type: s3`, `endpoint`, `bucket`, `accessKeyId`, `secretAccessKey` |
+| R2 | `type: r2`, `accountId`, `bucket` |
+| Azure Blob | `type: azure-blob`, `connectionString`, `container` |
+
+### 2. Publish
+
+```bash
+npx gazetta publish
+```
+
+### 3. Serve
+
+```bash
+npx gazetta serve --port 8080
+```
+
+That's it. The server reads from the target's storage and assembles pages on each request.
+
+## Options
+
+```bash
+gazetta serve                      # first target, port 3000
+gazetta serve -t production        # specific target
+gazetta serve -p 8080              # custom port
+gazetta serve -t staging -p 3001   # combine
+```
+
+## Cache headers
+
+The server sets response headers based on your cache config:
+
+```yaml
+cache:
+  browser: 0       # Cache-Control: max-age=0 (browser always revalidates)
+  edge: 86400      # Cache-Control: s-maxage=86400 (CDN caches for 24h)
+```
+
+- **ETag** — computed from assembled HTML. Browsers get `304 Not Modified` for unchanged pages.
+- **max-age** — how long the browser caches before revalidating.
+- **s-maxage** — how long a reverse proxy (Nginx, Varnish, CDN) caches.
+
+Per-page cache overrides work:
+
+```yaml
+# pages/dashboard/page.yaml
+cache:
+  browser: 0
+  edge: 0       # never cache this page
+```
+
+## Docker
+
+```dockerfile
+FROM node:22-slim
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --production
+
+COPY . .
+RUN npx gazetta publish
+
+EXPOSE 8080
+CMD ["npx", "gazetta", "serve", "-p", "8080"]
+```
+
+Or with a remote storage target (S3/R2):
+
+```dockerfile
+FROM node:22-slim
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --production
+
+COPY . .
+
+EXPOSE 8080
+CMD ["npx", "gazetta", "serve", "-p", "8080"]
+```
+
+Pass storage credentials as environment variables:
+
+```bash
+docker run -p 8080:8080 \
+  -e R2_ACCESS_KEY_ID=... \
+  -e R2_SECRET_ACCESS_KEY=... \
+  my-site
+```
+
+## Reverse proxy
+
+### Nginx
+
+```nginx
+server {
+    listen 80;
+    server_name mysite.com;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+}
+```
+
+Nginx respects `s-maxage` from the response headers — it will cache pages at the proxy level.
+
+### Behind a CDN
+
+Place any CDN (CloudFront, Fastly, Bunny) in front of your server. The `s-maxage` header tells the CDN how long to cache. The `ETag` header enables conditional requests.
+
+No special configuration needed — standard HTTP caching.
+
+## Fly.io
+
+```toml
+# fly.toml
+app = "my-site"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+[[services.ports]]
+  port = 443
+  handlers = ["tls", "http"]
+```
+
+```bash
+fly deploy
+```
+
+## Compared to Cloudflare Workers
+
+| | Self-hosted | Cloudflare Workers |
+|---|---|---|
+| Runtime | Node.js / Bun | V8 isolate |
+| Storage | Any (filesystem, S3, R2, Azure) | R2 only |
+| Cache | Reverse proxy / CDN | Cloudflare Cache API |
+| Deploy | Docker / systemd / PM2 | `wrangler deploy` |
+| Cold start | None (long-running process) | ~1ms (isolate) |
+| Cost | Your server | Workers free tier / paid |
+
+Both use the same assembly logic and serve identical HTML.

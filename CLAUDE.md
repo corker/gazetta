@@ -11,6 +11,7 @@ Stateless CMS that structures websites as composable fragments. All state lives 
 - `sites/gazetta.studio/` — The gazetta.studio website (dogfooding)
 - `docs/design.md` — Human-readable design document
 - `docs/cloudflare.md` — Cloudflare deployment guide (R2, Workers, cache, CI)
+- `docs/self-hosted.md` — Self-hosted deployment guide (VPS, Docker, Fly.io)
 
 ## Design docs (auto-loaded by Claude)
 
