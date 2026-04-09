@@ -30,7 +30,7 @@ export function createServer(options: ServeOptions) {
     const pageHtml = await findPage(storage, requestPath)
     if (!pageHtml) return c.html('<h1>404 — Page not found</h1>', 404)
 
-    const { html: rawHtml, browser } = parseCacheComment(pageHtml)
+    const { html: rawHtml, browser, edge } = parseCacheComment(pageHtml)
 
     // Fetch all fragments in parallel
     const fragmentPaths = findEsiPaths(rawHtml)
@@ -53,7 +53,7 @@ export function createServer(options: ServeOptions) {
     }
 
     return c.html(html, 200, {
-      'Cache-Control': `public, max-age=${browser}`,
+      'Cache-Control': `public, max-age=${browser}, s-maxage=${edge}`,
       'ETag': etag,
     })
   })
