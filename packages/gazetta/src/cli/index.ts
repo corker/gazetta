@@ -302,14 +302,24 @@ async function runPublish(siteDir: string, targetName?: string) {
     console.log(`  ${name}: ${totalFiles} files published\n`)
   }
 
-  // Purge cache once at the end (all targets)
-  const zoneId = process.env.CF_ZONE_ID
-  const apiToken = process.env.CF_API_TOKEN
-  if (zoneId && apiToken) {
-    const { createCloudflarePurge } = await import('../publish-rendered.js')
-    const purge = createCloudflarePurge(zoneId, apiToken)
-    await purge.purgeAll()
-    console.log(`  Cache purged\n`)
+  // Purge cache (requires CF_API_TOKEN with cache purge permission — wrangler OAuth doesn't include it)
+  const cfApiToken = process.env.CF_API_TOKEN
+  if (cfApiToken) {
+    for (const [name, config] of Object.entries(siteYaml.targets ?? {})) {
+      if (!config.siteUrl || config.worker?.type !== 'cloudflare') continue
+      try {
+        const zoneId = process.env.CF_ZONE_ID ?? await lookupZoneId(config.siteUrl, cfApiToken)
+        if (!zoneId) { console.log(`  ${name}: zone not found for ${config.siteUrl}, skipping purge`); continue }
+        const { createCloudflarePurge } = await import('../publish-rendered.js')
+        await createCloudflarePurge(zoneId, cfApiToken).purgeAll()
+        console.log(`  ${name}: cache purged`)
+      } catch (err) {
+        console.warn(`  ${name}: cache purge failed: ${(err as Error).message}`)
+      }
+    }
+  } else {
+    const hasCloudflare = Object.values(siteYaml.targets ?? {}).some(t => t.worker?.type === 'cloudflare')
+    if (hasCloudflare) console.log(`\n  Tip: set CF_API_TOKEN to purge edge cache after publish`)
   }
 
   console.log(`  Done!\n`)
@@ -712,6 +722,17 @@ function findCmsStaticDir(): string | null {
     if (existsSync(join(dir, 'index.html'))) return dir
   }
   return null
+}
+
+/** Look up Cloudflare zone ID from a site URL */
+async function lookupZoneId(siteUrl: string, apiToken: string): Promise<string | null> {
+  const domain = new URL(siteUrl).hostname.replace(/^www\./, '')
+  const res = await fetch(`https://api.cloudflare.com/client/v4/zones?name=${domain}`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  })
+  if (!res.ok) return null
+  const data = await res.json() as { result: Array<{ id: string }> }
+  return data.result?.[0]?.id ?? null
 }
 
 async function main() {
