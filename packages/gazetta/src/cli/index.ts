@@ -743,6 +743,19 @@ async function main() {
 
   const parsed = parseArgs(args.slice(1))
 
+  // Load .env from site directory (skipped in CI)
+  if (!process.env.CI) {
+    for (const name of ['.env', '.env.local']) {
+      const envPath = join(resolve(parsed.siteDir), name)
+      if (existsSync(envPath)) {
+        for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+          const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/)
+          if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
+        }
+      }
+    }
+  }
+
   switch (command) {
     case 'init':
       await runInit(args[1] ?? '.')
