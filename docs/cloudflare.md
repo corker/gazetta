@@ -220,13 +220,18 @@ export default app
 ```toml
 name = "my-site"
 main = "src/index.ts"
-compatibility_date = "2025-01-01"
+compatibility_date = "2024-12-01"
+workers_dev = true
+
+[[routes]]
+pattern = "mysite.com/*"
+zone_name = "mysite.com"
+
+[[routes]]
+pattern = "www.mysite.com/*"
+zone_name = "mysite.com"
 
 [[r2_buckets]]
 binding = "SITE_BUCKET"
 bucket_name = "my-site"
-
-[routes]
-pattern = "mysite.com/*"
-zone_name = "mysite.com"
 ```
