@@ -19,6 +19,7 @@ export const useSelectionStore = defineStore('selection', () => {
   const detail = computed(() => selection.value?.detail ?? null)
   const previewRoute = computed(() => {
     if (selection.value?.type === 'page') return selection.value.detail.route
+    if (selection.value?.type === 'fragment') return `/@${selection.value.name}`
     return null
   })
 
@@ -36,6 +37,7 @@ export const useSelectionStore = defineStore('selection', () => {
     try {
       const detail = await api.getFragment(fragName)
       selection.value = { type: 'fragment', name: fragName, detail }
+      usePreviewStore().invalidate()
     } catch (err) {
       toast.showError(err, `Failed to load fragment "${fragName}"`)
     }

@@ -1,8 +1,8 @@
 import { Hono, type Context } from 'hono'
 import type { StorageProvider, ResolvedComponent } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
-import { resolvePage } from '../../resolver.js'
-import { renderPage } from '../../renderer.js'
+import { resolveFragment, resolvePage } from '../../resolver.js'
+import { renderFragment, renderPage } from '../../renderer.js'
 
 export function previewRoutes(siteDir: string, storage: StorageProvider) {
   const app = new Hono()
@@ -33,6 +33,21 @@ async function renderPreview(
 ) {
   const site = await loadSite(siteDir, storage)
   const requestPath = c.req.path.replace(/^.*\/preview/, '') || '/'
+
+  // Fragment preview: /preview/@fragmentName
+  if (requestPath.startsWith('/@')) {
+    const fragmentName = requestPath.slice(2)
+    try {
+      const resolved = await resolveFragment(fragmentName, site)
+      if (overrides) applyOverrides(resolved, overrides)
+      return c.html(await renderFragment(resolved))
+    } catch (err) {
+      const e = err as Error
+      const msg = e.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const stack = (e.stack ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      return c.html(`<div style="font-family:system-ui;padding:2rem;color:#fca5a5;background:#1a1a2e;min-height:100vh"><h2 style="color:#f87171;margin-bottom:1rem">Template Error</h2><pre style="white-space:pre-wrap;font-size:0.875rem;line-height:1.7">${msg}</pre><details style="margin-top:1rem"><summary style="color:#52525b;cursor:pointer">Stack trace</summary><pre style="color:#52525b;font-size:0.75rem;margin-top:0.5rem">${stack}</pre></details></div>`, 500)
+    }
+  }
 
   for (const [pageName, page] of site.pages) {
     const params = matchRoute(page.route, requestPath)

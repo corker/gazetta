@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { TemplateFunction } from '../src/types.js'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
-import { resolvePage } from '../src/resolver.js'
+import { resolveFragment, resolvePage } from '../src/resolver.js'
 import { loadSite } from '../src/site-loader.js'
 
 const testDir = join(tmpdir(), 'gazetta-resolver-test')
@@ -164,6 +164,66 @@ describe('resolvePage', () => {
     } catch (err) {
       const message = (err as Error).message
       expect(message).toContain('@header')
+    }
+  })
+})
+
+describe('resolveFragment', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  it('resolves a simple fragment', async () => {
+    await writeSite({
+      'site.yaml': 'name: "Test"',
+      'fragments/header/fragment.yaml': 'template: echo\ncontent:\n  text: "Header"',
+    })
+    await writeTemplate('echo')
+
+    const site = await loadSite(testDir, storage)
+    const resolved = await resolveFragment('header', site)
+
+    expect(resolved.content?.text).toBe('Header')
+    expect(resolved.treePath).toBe('')
+  })
+
+  it('resolves a fragment with children', async () => {
+    await writeSite({
+      'site.yaml': 'name: "Test"',
+      'fragments/header/fragment.yaml': 'template: echo\ncomponents:\n  - logo',
+      'fragments/header/logo/component.yaml': 'template: echo\ncontent:\n  text: "Logo"',
+    })
+    await writeTemplate('echo')
+
+    const site = await loadSite(testDir, storage)
+    const resolved = await resolveFragment('header', site)
+
+    expect(resolved.children).toHaveLength(1)
+    expect(resolved.children[0].content?.text).toBe('Logo')
+  })
+
+  it('throws on missing fragment', async () => {
+    await writeSite({ 'site.yaml': 'name: "Test"' })
+    const site = await loadSite(testDir, storage)
+    await expect(resolveFragment('nope', site)).rejects.toThrow('Fragment "nope" not found')
+  })
+
+  it('lists available fragments on missing fragment error', async () => {
+    await writeSite({
+      'site.yaml': 'name: "Test"',
+      'fragments/header/fragment.yaml': 'template: echo',
+      'fragments/footer/fragment.yaml': 'template: echo',
+    })
+    await writeTemplate('echo')
+
+    const site = await loadSite(testDir, storage)
+    try {
+      await resolveFragment('missing', site)
+      expect.fail('should have thrown')
+    } catch (err) {
+      const message = (err as Error).message
+      expect(message).toContain('header')
+      expect(message).toContain('footer')
     }
   })
 })

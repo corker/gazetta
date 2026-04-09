@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ResolvedComponent, RenderOutput } from '../src/types.js'
-import { renderComponent, renderPage } from '../src/renderer.js'
+import { renderComponent, renderFragment, renderPage } from '../src/renderer.js'
 import { hashPath } from '../src/scope.js'
 
 function leaf(html: string, css = '', js = '', treePath = ''): ResolvedComponent {
@@ -203,6 +203,44 @@ describe('renderComponent', () => {
     const result = await renderComponent(parent)
     expect(result.head).toContain('favicon.svg')
     expect(result.head).toContain('fonts.example.com')
+  })
+})
+
+describe('renderFragment', () => {
+  it('wraps output in HTML document', async () => {
+    const fragment = leaf('<nav>links</nav>', 'nav {}', '', '')
+    const html = await renderFragment(fragment)
+    expect(html).toContain('<!DOCTYPE html>')
+    expect(html).toContain('<style>')
+    expect(html).toContain('<nav>links</nav>')
+  })
+
+  it('includes children', async () => {
+    const fragment = composite(
+      (children) => ({ html: `<header>${children.map(c => c.html).join('')}</header>`, css: '', js: '' }),
+      [leaf('<span>Logo</span>', '', '', 'logo')],
+      ''
+    )
+    const html = await renderFragment(fragment)
+    expect(html).toContain('<span>Logo</span>')
+    expect(html).toContain('<header>')
+  })
+
+  it('includes head, css, and js', async () => {
+    const fragment: ResolvedComponent = {
+      template: () => ({
+        html: '<nav>nav</nav>',
+        css: 'nav { color: red; }',
+        js: 'console.log("nav")',
+        head: '<link rel="icon" href="/favicon.svg">',
+      }),
+      children: [],
+      treePath: '',
+    }
+    const html = await renderFragment(fragment)
+    expect(html).toContain('nav { color: red; }')
+    expect(html).toContain('<script type="module">console.log("nav")</script>')
+    expect(html).toContain('<link rel="icon" href="/favicon.svg">')
   })
 })
 

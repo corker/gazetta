@@ -167,6 +167,35 @@ describe('GET /preview/*', () => {
   })
 })
 
+describe('GET /preview/@fragment', () => {
+  it('renders fragment standalone', async () => {
+    const { status, body } = await getText('/preview/@header')
+    expect(status).toBe(200)
+    expect(body).toContain('<!DOCTYPE html>')
+  })
+
+  it('returns 500 for missing fragment', async () => {
+    const { status } = await getText('/preview/@nonexistent')
+    expect(status).toBe(500)
+  })
+})
+
+describe('POST /preview/@fragment', () => {
+  it('renders fragment with content overrides', async () => {
+    const footerPath = resolve(starterDir, 'fragments/footer')
+    const res = await app.request('/preview/@footer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        overrides: { [footerPath]: { text: 'Draft Footer' } },
+      }),
+    })
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('<!DOCTYPE html>')
+  })
+})
+
 describe('POST /preview/*', () => {
   it('renders with content overrides', async () => {
     const heroPath = resolve(starterDir, 'pages/home/hero')

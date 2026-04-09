@@ -6,12 +6,14 @@ import { useEditingStore } from '../stores/editing.js'
 import { usePreviewStore } from '../stores/preview.js'
 import { useToastStore } from '../stores/toast.js'
 import { useSiteStore } from '../stores/site.js'
+import { useUiModeStore } from '../stores/uiMode.js'
 
 const selection = useSelectionStore()
 const editing = useEditingStore()
 const preview = usePreviewStore()
 const toast = useToastStore()
 const site = useSiteStore()
+const uiMode = useUiModeStore()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let currentHtml = ''
@@ -25,9 +27,6 @@ const previewPath = computed(() => {
   return `${basePath}/preview${selection.previewRoute}`
 })
 
-// Full-screen toggle
-const fullscreen = ref(false)
-
 // Device presets
 const devicePresets = [
   { label: 'Desktop', width: '100%', icon: 'pi pi-desktop' },
@@ -37,16 +36,21 @@ const devicePresets = [
 const activePreset = ref(0)
 const previewWidth = computed(() => devicePresets[activePreset.value].width)
 
-// Edit mode — controlled by toolbar toggle, disabled in fullscreen
-const editMode = ref(true)
+// Highlight toggle — only meaningful in edit mode
+const highlightEnabled = ref(true)
 
-// Send edit mode state to iframe bridge
-function sendEditMode() {
-  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:editMode', enabled: editMode.value }, '*')
+// Send bridge mode + highlight state to iframe
+function sendBridgeMode() {
+  iframeRef.value?.contentWindow?.postMessage({
+    type: 'gazetta:mode',
+    mode: uiMode.bridgeMode,
+    highlight: highlightEnabled.value,
+  }, '*')
 }
-watch(editMode, sendEditMode)
+watch(() => uiMode.bridgeMode, sendBridgeMode)
+watch(highlightEnabled, sendBridgeMode)
 
-// Bridge script — parent controls edit mode via postMessage
+// Bridge script — three-mode behavior controlled by parent via postMessage
 const BRIDGE_SCRIPT = `
 <script>
 (function() {
@@ -55,7 +59,8 @@ const BRIDGE_SCRIPT = `
   overlay.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:border-color 0.15s;display:none;';
   document.body.appendChild(overlay);
   var highlighted = null;
-  var enabled = true;
+  var mode = 'browse';
+  var highlight = true;
 
   function findGz(el) {
     while (el && el !== document.body) {
@@ -63,6 +68,11 @@ const BRIDGE_SCRIPT = `
       el = el.parentElement;
     }
     return null;
+  }
+
+  function isInteractive(el) {
+    var tag = el.tagName;
+    return tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'LABEL' || el.isContentEditable;
   }
 
   function showOverlay(el, color) {
@@ -84,7 +94,7 @@ const BRIDGE_SCRIPT = `
   window.addEventListener('resize', refreshOverlay);
 
   document.addEventListener('mousemove', function(e) {
-    if (!enabled) { if (highlighted) { highlighted = null; overlay.style.display = 'none'; } return; }
+    if (mode !== 'edit' || !highlight) { if (highlighted) { highlighted = null; overlay.style.display = 'none'; } return; }
     var target = findGz(e.target);
     if (target && target !== highlighted) {
       highlighted = target;
@@ -96,6 +106,7 @@ const BRIDGE_SCRIPT = `
   });
 
   document.addEventListener('click', function(e) {
+    // Links are intercepted in all modes
     var link = e.target.closest ? e.target.closest('a[href]') : null;
     if (link) {
       var href = link.getAttribute('href');
@@ -111,21 +122,30 @@ const BRIDGE_SCRIPT = `
         return;
       }
     }
-    if (!enabled) return;
+
+    // Fullscreen: everything native
+    if (mode === 'fullscreen') return;
+
+    // Interactive elements: native behavior
+    if (isInteractive(e.target)) return;
+
     var target = findGz(e.target);
-    if (target) {
-      e.preventDefault();
-      e.stopPropagation();
-      showOverlay(target, '#22c55e');
-      window.parent.postMessage({ type: 'gazetta:select', gzId: target.dataset.gz }, '*');
-    }
+    if (!target) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (mode === 'edit' && highlight) showOverlay(target, '#22c55e');
+    window.parent.postMessage({ type: 'gazetta:select', gzId: target.dataset.gz }, '*');
   }, true);
 
   window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'gazetta:editMode') {
-      enabled = !!e.data.enabled;
-      if (!enabled) { highlighted = null; overlay.style.display = 'none'; document.body.style.cursor = ''; }
-      else { document.body.style.cursor = 'crosshair'; }
+    if (e.data && e.data.type === 'gazetta:mode') {
+      mode = e.data.mode || 'browse';
+      highlight = e.data.highlight !== false;
+      highlighted = null;
+      overlay.style.display = 'none';
+      document.body.style.cursor = (mode === 'edit' && highlight) ? 'crosshair' : '';
     }
     if (e.data && e.data.type === 'gazetta:highlight') {
       var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
@@ -144,8 +164,10 @@ function injectBridge(html: string): string {
 }
 
 function handleMessage(e: MessageEvent) {
-  if (e.data?.type === 'gazetta:select' && e.data.gzId && selectByGzId) {
-    selectByGzId(e.data.gzId)
+  if (e.data?.type === 'gazetta:select' && e.data.gzId) {
+    // In browse mode, entering edit first — selectByGzId buffers via pendingGzId
+    if (uiMode.mode === 'browse') uiMode.enterEdit()
+    if (selectByGzId) selectByGzId(e.data.gzId)
   }
   if (e.data?.type === 'gazetta:navigate' && e.data.route) {
     const page = site.pages.find(p => p.route === e.data.route)
@@ -199,8 +221,8 @@ async function fetchPreview(morph = true) {
     }
     const html = injectBridge(await res.text())
     applyHtml(html, morph)
-    // Send initial edit mode state after iframe loads
-    setTimeout(sendEditMode, 100)
+    // Send initial bridge mode after iframe loads
+    setTimeout(sendBridgeMode, 100)
   } catch {
     applyHtml('<pre style="color:red;padding:2rem">Failed to load preview</pre>', false)
   } finally {
@@ -266,17 +288,13 @@ watch(() => editing.path, (path) => {
 watch(() => preview.version, () => fetchPreview(true))
 watch(previewPath, () => fetchPreview(false), { immediate: true })
 watch(() => preview.draftVersion, debouncedFetchPreview)
-
-function toggleFullscreen() {
-  fullscreen.value = !fullscreen.value
-}
 </script>
 
 <template>
-  <div class="preview-panel" :class="{ fullscreen }" data-testid="preview-panel">
+  <div class="preview-panel" :class="{ fullscreen: uiMode.fullscreen }" data-testid="preview-panel">
     <div v-if="!previewPath" class="preview-empty" data-testid="preview-empty">
       <i class="pi pi-eye" style="font-size: 2rem; color: #ddd; margin-bottom: 0.5rem;" />
-      <p>Select a page to preview</p>
+      <p>Select a page or fragment to preview</p>
     </div>
     <template v-else>
       <div class="preview-toolbar">
@@ -289,15 +307,18 @@ function toggleFullscreen() {
           </button>
         </div>
         <div class="preview-actions">
-          <button
-            :class="['device-btn', { active: editMode }]"
-            :title="editMode ? 'Edit mode (click to preview)' : 'Preview mode (click to edit)'"
-            @click="editMode = !editMode">
-            <i :class="editMode ? 'pi pi-pencil' : 'pi pi-eye'" />
+          <button v-if="uiMode.mode === 'edit'"
+            :class="['device-btn', { active: highlightEnabled }]"
+            :title="highlightEnabled ? 'Hide highlights' : 'Show highlights'"
+            data-testid="highlight-toggle"
+            @click="highlightEnabled = !highlightEnabled">
+            <i class="pi pi-eye" />
           </button>
-          <button class="device-btn" :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
-            @click="toggleFullscreen">
-            <i :class="fullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" />
+          <button class="device-btn"
+            :title="uiMode.fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+            data-testid="fullscreen-toggle"
+            @click="uiMode.toggleFullscreen()">
+            <i :class="uiMode.fullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" />
           </button>
         </div>
       </div>

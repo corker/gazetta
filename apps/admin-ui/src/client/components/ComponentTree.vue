@@ -4,7 +4,7 @@ import Tree from 'primevue/tree'
 import Button from 'primevue/button'
 import type { TreeNode } from 'primevue/treenode'
 import { useSelectionStore } from '../stores/selection.js'
-import { useEditingStore, type EditingTarget } from '../stores/editing.js'
+import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
 import { usePreviewStore } from '../stores/preview.js'
 import { api } from '../api/client.js'
@@ -19,6 +19,9 @@ function hashPath(path: string): string {
   }
   return hash.toString(16).padStart(8, '0')
 }
+
+const props = defineProps<{ pendingGzId?: string | null }>()
+const emit = defineEmits<{ (e: 'pendingConsumed'): void }>()
 
 const selection = useSelectionStore()
 const editing = useEditingStore()
@@ -109,7 +112,20 @@ watch(detail, async (d) => {
   componentNodes.value = [rootNode]
   expandedKeys.value = { [`root:${selection.name}`]: true }
   gzMap.value = map
+
+  // Process pending selection if tree just built and a gzId is waiting
+  consumePending()
 }, { immediate: true })
+
+function consumePending() {
+  if (props.pendingGzId && gzMap.value.size > 0) {
+    selectByGzId(props.pendingGzId)
+    emit('pendingConsumed')
+  }
+}
+
+// Also react to pendingGzId changes when tree is already built (edit mode click-to-select)
+watch(() => props.pendingGzId, () => consumePending())
 
 const expandedKeys = ref<Record<string, boolean>>({})
 
@@ -252,7 +268,6 @@ async function addComponent(name: string, template: string) {
   }
 }
 
-defineExpose({ selectByGzId, addComponent })
 </script>
 
 <template>

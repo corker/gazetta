@@ -19,8 +19,8 @@ export type {
 } from './types.js'
 
 // Renderer
-export { renderComponent, renderPage } from './renderer.js'
-export { resolvePage, resolveComponent } from './resolver.js'
+export { renderComponent, renderFragment, renderPage } from './renderer.js'
+export { resolveComponent, resolveFragment, resolvePage } from './resolver.js'
 export { loadSite } from './site-loader.js'
 export type { Site } from './site-loader.js'
 export { loadTemplate, invalidateTemplate, invalidateAllTemplates } from './template-loader.js'

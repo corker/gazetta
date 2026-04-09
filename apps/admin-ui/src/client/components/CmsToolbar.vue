@@ -7,6 +7,7 @@ import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
 import { useThemeStore } from '../stores/theme.js'
+import { useUiModeStore } from '../stores/uiMode.js'
 import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
 
@@ -15,17 +16,25 @@ const selection = useSelectionStore()
 const editing = useEditingStore()
 const toast = useToastStore()
 const theme = useThemeStore()
+const uiMode = useUiModeStore()
 const showPublish = ref(false)
 const showFetch = ref(false)
 
 const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fragments')
 const publishItemName = computed(() => selection.name ?? '')
 const canPublish = computed(() => selection.name && !editing.dirty)
+
+function handleBack() {
+  if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
+  uiMode.enterBrowse()
+}
 </script>
 
 <template>
   <Toolbar class="cms-toolbar">
     <template #start>
+      <Button v-if="uiMode.mode === 'edit'" icon="pi pi-arrow-left" text rounded
+        data-testid="back-to-browse" @click="handleBack" size="small" class="cms-btn" />
       <span class="cms-logo">
         <i class="pi pi-objects-column" />
         Gazetta
@@ -50,9 +59,9 @@ const canPublish = computed(() => selection.name && !editing.dirty)
     <template #end>
       <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
-      <Button v-if="editing.dirty" label="Discard" icon="pi pi-undo" severity="secondary" text
+      <Button v-if="uiMode.mode === 'edit' && editing.dirty" label="Discard" icon="pi pi-undo" severity="secondary" text
         data-testid="discard-btn" @click="editing.discard()" size="small" class="cms-btn" />
-      <Button label="Save" icon="pi pi-save" severity="primary" :loading="editing.saving"
+      <Button v-if="uiMode.mode === 'edit'" label="Save" icon="pi pi-save" severity="primary" :loading="editing.saving"
         data-testid="save-btn" :disabled="!editing.dirty" @click="editing.save()" size="small" class="cms-btn" />
       <Button label="Fetch" icon="pi pi-cloud-download" severity="info"
         data-testid="fetch-btn" @click="showFetch = true" size="small" class="cms-btn" />

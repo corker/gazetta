@@ -77,6 +77,31 @@ export async function resolveComponent(
   return { template: loaded.render, content: processContent(manifest.content, loaded.schema), children, path: componentDir, treePath }
 }
 
+export async function resolveFragment(fragmentName: string, site: Site): Promise<ResolvedComponent> {
+  const fragment = site.fragments.get(fragmentName)
+  if (!fragment) {
+    const available = [...site.fragments.keys()]
+    throw new Error(
+      `Fragment "${fragmentName}" not found.\n` +
+      `  Available fragments: ${available.length > 0 ? available.join(', ') : '(none)'}`
+    )
+  }
+
+  const templatesDir = join(site.siteDir, 'templates')
+  const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: [`@${fragmentName}`] }
+
+  const loaded = await loadTemplate(site.storage, templatesDir, fragment.template)
+
+  const children: ResolvedComponent[] = []
+  if (fragment.components) {
+    for (const childName of fragment.components) {
+      children.push(await resolveComponent(childName, fragment.dir, ctx))
+    }
+  }
+
+  return { template: loaded.render, content: processContent(fragment.content, loaded.schema), children, path: fragment.dir, treePath: '' }
+}
+
 export async function resolvePage(pageName: string, site: Site): Promise<ResolvedComponent> {
   const page = site.pages.get(pageName)
   if (!page) {

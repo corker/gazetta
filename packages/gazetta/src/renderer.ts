@@ -20,6 +20,29 @@ export async function renderComponent(component: ResolvedComponent, routeParams?
   }
 }
 
+export async function renderFragment(component: ResolvedComponent): Promise<string> {
+  const children = await Promise.all(component.children.map(c => renderComponent(c)))
+  const output = await component.template({ content: component.content, children })
+
+  const headContent = [
+    ...children.map(c => c.head).filter(Boolean),
+    output.head,
+  ].filter(Boolean).join('\n  ')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${headContent}
+  <style>${output.css}</style>
+</head>
+<body>
+${output.html}${output.js ? `\n<script type="module">${output.js}</script>` : ''}
+</body>
+</html>`
+}
+
 export async function renderPage(
   component: ResolvedComponent,
   routeParams?: Record<string, string>
