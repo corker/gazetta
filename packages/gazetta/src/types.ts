@@ -68,6 +68,8 @@ export interface StorageConfig {
 export interface WorkerConfig {
   type: 'cloudflare'
   name?: string
+  /** API token for deploy/purge — use ${ENV_VAR} syntax. Falls back to CLOUDFLARE_API_TOKEN env var. */
+  apiToken?: string
 }
 
 /** Target configuration in site.yaml */

@@ -4,6 +4,7 @@ import { publishItems, resolveDependencies } from '../../publish.js'
 import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
+import { resolveEnvVars } from '../../targets.js'
 
 export function publishRoutes(
   siteDir: string,
@@ -92,8 +93,8 @@ export function publishRoutes(
 
         // 4. Purge edge cache via Cloudflare API
         const config = getTargetConfig(targetName)
+        const apiToken = (config?.worker?.type === 'cloudflare' ? resolveEnvVars(config.worker.apiToken) : undefined) || process.env.CLOUDFLARE_API_TOKEN
         const zoneId = process.env.CLOUDFLARE_ZONE_ID
-        const apiToken = process.env.CLOUDFLARE_API_TOKEN
         if (config?.siteUrl && zoneId && apiToken) {
           const purge = createCloudflarePurge(zoneId, apiToken)
           const hasFragments = allItems.some(i => i.startsWith('fragments/'))

@@ -302,24 +302,21 @@ async function runPublish(siteDir: string, targetName?: string) {
     console.log(`  ${name}: ${totalFiles} files published\n`)
   }
 
-  // Purge cache (requires CLOUDFLARE_API_TOKEN with cache purge permission — wrangler OAuth doesn't include it)
-  const cfApiToken = process.env.CLOUDFLARE_API_TOKEN
-  if (cfApiToken) {
-    for (const [name, config] of Object.entries(siteYaml.targets ?? {})) {
-      if (!config.siteUrl || config.worker?.type !== 'cloudflare') continue
-      try {
-        const zoneId = process.env.CLOUDFLARE_ZONE_ID ?? await lookupZoneId(config.siteUrl, cfApiToken)
-        if (!zoneId) { console.log(`  ${name}: zone not found for ${config.siteUrl}, skipping purge`); continue }
-        const { createCloudflarePurge } = await import('../publish-rendered.js')
-        await createCloudflarePurge(zoneId, cfApiToken).purgeAll()
-        console.log(`  ${name}: cache purged`)
-      } catch (err) {
-        console.warn(`  ${name}: cache purge failed: ${(err as Error).message}`)
-      }
+  // Purge edge cache per target
+  const { resolveEnvVars } = await import('../targets.js')
+  for (const [name, config] of Object.entries(siteYaml.targets ?? {})) {
+    if (!config.siteUrl || config.worker?.type !== 'cloudflare') continue
+    const apiToken = resolveEnvVars(config.worker.apiToken) || process.env.CLOUDFLARE_API_TOKEN
+    if (!apiToken) { console.log(`  ${name}: no API token, skipping cache purge`); continue }
+    try {
+      const zoneId = process.env.CLOUDFLARE_ZONE_ID ?? await lookupZoneId(config.siteUrl, apiToken)
+      if (!zoneId) { console.log(`  ${name}: zone not found for ${config.siteUrl}, skipping purge`); continue }
+      const { createCloudflarePurge } = await import('../publish-rendered.js')
+      await createCloudflarePurge(zoneId, apiToken).purgeAll()
+      console.log(`  ${name}: cache purged`)
+    } catch (err) {
+      console.warn(`  ${name}: cache purge failed: ${(err as Error).message}`)
     }
-  } else {
-    const hasCloudflare = Object.values(siteYaml.targets ?? {}).some(t => t.worker?.type === 'cloudflare')
-    if (hasCloudflare) console.log(`\n  Tip: set CLOUDFLARE_API_TOKEN to purge edge cache after publish`)
   }
 
   console.log(`  Done!\n`)

@@ -3,7 +3,7 @@ import { execSync } from 'node:child_process'
 import type { StorageProvider, TargetConfig, StorageConfig } from './types.js'
 import { createFilesystemProvider } from './providers/filesystem.js'
 
-function resolveEnvVars(value: string | undefined): string | undefined {
+export function resolveEnvVars(value: string | undefined): string | undefined {
   if (!value) return value
   return value.replace(/\$\{(\w+)\}/g, (_, name) => process.env[name] ?? '')
 }
