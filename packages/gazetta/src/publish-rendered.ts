@@ -309,6 +309,17 @@ export function createCloudflarePurge(zoneId: string, apiToken: string): PurgeSt
   }
 }
 
+/** Look up Cloudflare zone ID from a site URL */
+export async function lookupCloudflareZoneId(siteUrl: string, apiToken: string): Promise<string | null> {
+  const domain = new URL(siteUrl).hostname.replace(/^www\./, '')
+  const res = await fetch(`https://api.cloudflare.com/client/v4/zones?name=${domain}`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  })
+  if (!res.ok) return null
+  const data = await res.json() as { result: Array<{ id: string }> }
+  return data.result?.[0]?.id ?? null
+}
+
 /** @deprecated Use createCloudflarePurge instead */
 export const createWorkerPurge = createCloudflarePurge
 

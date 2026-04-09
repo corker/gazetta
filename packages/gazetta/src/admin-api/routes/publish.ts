@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies } from '../../publish.js'
 import type { PublishResult } from '../../publish.js'
-import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge } from '../../publish-rendered.js'
+import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
 import { resolveEnvVars } from '../../targets.js'
 
@@ -96,7 +96,7 @@ export function publishRoutes(
         const purgeConfig = config?.cache?.purge
         if (purgeConfig?.type === 'cloudflare') {
           const apiToken = resolveEnvVars(purgeConfig.apiToken)
-          const zoneId = resolveEnvVars(purgeConfig.zoneId)
+          const zoneId = resolveEnvVars(purgeConfig.zoneId) ?? (config?.siteUrl && apiToken ? await lookupCloudflareZoneId(config.siteUrl, apiToken) : null)
           if (apiToken && zoneId) {
             const purge = createCloudflarePurge(zoneId, apiToken)
             const hasFragments = allItems.some(i => i.startsWith('fragments/'))

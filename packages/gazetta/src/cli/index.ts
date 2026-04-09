@@ -311,7 +311,8 @@ async function runPublish(siteDir: string, targetName?: string) {
       const apiToken = resolveEnvVars(purge.apiToken)
       if (!apiToken) { console.log(`  ${name}: purge.apiToken not set, skipping cache purge`); continue }
       try {
-        const zoneId = resolveEnvVars(purge.zoneId) ?? (config.siteUrl ? await lookupZoneId(config.siteUrl, apiToken) : null)
+        const { lookupCloudflareZoneId } = await import('../publish-rendered.js')
+        const zoneId = resolveEnvVars(purge.zoneId) ?? (config.siteUrl ? await lookupCloudflareZoneId(config.siteUrl, apiToken) : null)
         if (!zoneId) { console.log(`  ${name}: zone not found, set purge.zoneId or siteUrl`); continue }
         const { createCloudflarePurge } = await import('../publish-rendered.js')
         await createCloudflarePurge(zoneId, apiToken).purgeAll()
@@ -724,16 +725,6 @@ function findCmsStaticDir(): string | null {
   return null
 }
 
-/** Look up Cloudflare zone ID from a site URL */
-async function lookupZoneId(siteUrl: string, apiToken: string): Promise<string | null> {
-  const domain = new URL(siteUrl).hostname.replace(/^www\./, '')
-  const res = await fetch(`https://api.cloudflare.com/client/v4/zones?name=${domain}`, {
-    headers: { Authorization: `Bearer ${apiToken}` },
-  })
-  if (!res.ok) return null
-  const data = await res.json() as { result: Array<{ id: string }> }
-  return data.result?.[0]?.id ?? null
-}
 
 async function main() {
   if (!command || command === 'help' || command === '--help' || command === '-h') {
