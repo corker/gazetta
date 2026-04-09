@@ -20,7 +20,10 @@ provide('selectByGzId', (gzId: string) => {
 
 // Escape key exits edit mode (only when no input is focused)
 function handleKeydown(e: KeyboardEvent) {
-  if (e.key !== 'Escape' || uiMode.mode !== 'edit') return
+  if (e.key !== 'Escape') return
+  // Fullscreen: close it first
+  if (uiMode.fullscreen) { uiMode.toggleFullscreen(); return }
+  if (uiMode.mode !== 'edit') return
   const active = document.activeElement as HTMLElement | null
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
     // First Escape: blur the focused input. Second Escape: exit edit mode.
