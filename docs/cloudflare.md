@@ -221,7 +221,6 @@ export default app
 name = "my-site"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
-workers_dev = true              # enables *.workers.dev subdomain for testing
 
 [[routes]]
 pattern = "mysite.com/*"
