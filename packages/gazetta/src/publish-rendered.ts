@@ -44,7 +44,7 @@ export async function publishPageRendered(
   sourceDir: string,
   targetStorage: StorageProvider,
   targetCache?: CacheConfig,
-): Promise<{ files: number }> {
+): Promise<{ files: number; removed: number }> {
   const site = await loadSite(sourceDir, sourceStorage)
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
@@ -149,9 +149,8 @@ ${bodyContent}
 
   // Clean up old hashed files
   const removed = await cleanupOldFiles(targetStorage, oldFiles, newFiles)
-  if (removed > 0) fileCount -= removed
 
-  return { files: fileCount }
+  return { files: fileCount, removed }
 }
 
 /**
@@ -193,7 +192,7 @@ export async function publishFragmentRendered(
   sourceStorage: StorageProvider,
   sourceDir: string,
   targetStorage: StorageProvider,
-): Promise<{ files: number }> {
+): Promise<{ files: number; removed: number }> {
   const site = await loadSite(sourceDir, sourceStorage)
   const fragment = site.fragments.get(fragmentName)
   if (!fragment) throw new Error(`Fragment "${fragmentName}" not found`)
@@ -247,9 +246,8 @@ export async function publishFragmentRendered(
 
   // Clean up old hashed files
   const removed = await cleanupOldFiles(targetStorage, oldFiles, newFiles)
-  if (removed > 0) fileCount -= removed
 
-  return { files: fileCount }
+  return { files: fileCount, removed }
 }
 
 /**

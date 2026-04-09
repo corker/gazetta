@@ -272,6 +272,7 @@ async function runPublish(siteDir: string, targetName?: string) {
     const isStatic = !targetConfig?.worker
     console.log(`  Publishing to ${name}${isStatic ? ' (static)' : ' (ESI)'}...`)
     let totalFiles = 0
+    let totalRemoved = 0
 
     if (isStatic) {
       // Static mode — fully assembled HTML, no fragments needed separately
@@ -283,13 +284,15 @@ async function runPublish(siteDir: string, targetName?: string) {
     } else {
       // ESI mode — fragments separate, pages with placeholders
       for (const fragName of site.fragments.keys()) {
-        const { files } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage)
+        const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage)
         totalFiles += files
+        totalRemoved += removed
         console.log(`    fragment: ${fragName} (${files} files)`)
       }
       for (const pageName of site.pages.keys()) {
-        const { files } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache)
+        const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache)
         totalFiles += files
+        totalRemoved += removed
         console.log(`    page: ${pageName} (${files} files)`)
       }
     }
@@ -299,7 +302,8 @@ async function runPublish(siteDir: string, targetName?: string) {
     await publishFragmentIndex(storage, siteDir, targetStorage)
     totalFiles += 2
 
-    console.log(`  ${name}: ${totalFiles} files published\n`)
+    const removedMsg = totalRemoved > 0 ? `, ${totalRemoved} old files cleaned up` : ''
+    console.log(`  ${name}: ${totalFiles} files published${removedMsg}\n`)
   }
 
   // Purge CDN cache per target
