@@ -168,6 +168,8 @@ function handleMessage(e: MessageEvent) {
     // In browse mode, entering edit first — selectByGzId buffers via pendingGzId
     if (uiMode.mode === 'browse') uiMode.enterEdit()
     if (selectByGzId) selectByGzId(e.data.gzId)
+    // Move focus from iframe to parent so keyboard shortcuts (Escape) work
+    iframeRef.value?.blur()
   }
   if (e.data?.type === 'gazetta:navigate' && e.data.route) {
     const page = site.pages.find(p => p.route === e.data.route)
