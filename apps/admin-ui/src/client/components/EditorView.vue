@@ -32,38 +32,38 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>
-  <!-- Browse mode: SiteTree + Preview -->
-  <Splitter v-if="uiMode.mode === 'browse'" class="cms-editor" style="height: calc(100% - 60px)">
-    <SplitterPanel :size="25" :minSize="15" class="cms-panel">
-      <div class="cms-panel-content">
+  <div class="cms-editor">
+    <div class="cms-left" :class="{ 'cms-left-wide': uiMode.mode === 'edit' }">
+      <!-- Browse: SiteTree -->
+      <div v-if="uiMode.mode === 'browse'" class="cms-panel-content">
         <SiteTree />
       </div>
-    </SplitterPanel>
-    <SplitterPanel :size="75" :minSize="40" class="cms-panel">
+      <!-- Edit: ComponentTree + Editor with drag-to-resize -->
+      <Splitter v-else class="cms-splitter">
+        <SplitterPanel :size="40" :minSize="30" class="cms-panel">
+          <div class="cms-panel-content">
+            <ComponentTree :pendingGzId="pendingGzId" @pendingConsumed="pendingGzId = null" />
+          </div>
+        </SplitterPanel>
+        <SplitterPanel :size="60" :minSize="30" class="cms-panel">
+          <div class="cms-panel-content">
+            <EditorPanel />
+          </div>
+        </SplitterPanel>
+      </Splitter>
+    </div>
+    <div class="cms-preview">
       <PreviewPanel />
-    </SplitterPanel>
-  </Splitter>
-
-  <!-- Edit mode: ComponentTree + Editor + Preview -->
-  <Splitter v-else class="cms-editor" style="height: calc(100% - 60px)">
-    <SplitterPanel :size="20" :minSize="15" class="cms-panel">
-      <div class="cms-panel-content">
-        <ComponentTree :pendingGzId="pendingGzId" @pendingConsumed="pendingGzId = null" />
-      </div>
-    </SplitterPanel>
-    <SplitterPanel :size="35" :minSize="20" class="cms-panel">
-      <div class="cms-panel-content">
-        <EditorPanel />
-      </div>
-    </SplitterPanel>
-    <SplitterPanel :size="45" :minSize="25" class="cms-panel">
-      <PreviewPanel />
-    </SplitterPanel>
-  </Splitter>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.cms-editor { border: 0; border-radius: 0; }
+.cms-editor { display: flex; height: calc(100% - 60px); }
+.cms-left { width: 250px; flex-shrink: 0; overflow: auto; border-right: 1px solid #27272a; }
+.cms-left-wide { width: 550px; overflow: hidden; }
+.cms-splitter { height: 100%; border: 0; border-radius: 0; }
+.cms-preview { flex: 1; min-width: 0; overflow: hidden; }
 .cms-panel { overflow: auto; }
 .cms-panel-content { padding: 1rem; }
 </style>
