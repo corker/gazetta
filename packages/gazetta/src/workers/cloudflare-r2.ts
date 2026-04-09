@@ -61,7 +61,22 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
     const requestPath = new URL(c.req.url).pathname
 
     const pageHtml = await findPage(bucket, requestPath)
-    if (!pageHtml) return c.html('<h1>404 — Page not found</h1>', 404)
+    if (!pageHtml) {
+      const notFoundHtml = await findPage(bucket, '/404')
+      if (notFoundHtml) {
+        const { html: raw404 } = parseCacheComment(notFoundHtml)
+        const fragPaths = findEsiPaths(raw404)
+        const fragEntries = await Promise.all(
+          fragPaths.map(async (p) => {
+            const obj = await bucket.get(p.slice(1))
+            if (!obj) return [p, { head: '', body: '' }] as const
+            return [p, splitFragment(await obj.text())] as const
+          })
+        )
+        return c.html(assembleEsi(raw404, new Map(fragEntries)), 404)
+      }
+      return c.html('<h1>404 — Page not found</h1>', 404)
+    }
 
     const { html: rawHtml, browser, edge } = parseCacheComment(pageHtml)
 

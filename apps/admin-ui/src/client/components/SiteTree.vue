@@ -55,6 +55,7 @@ const nodes = computed<TreeNode[]>(() => [
 
 function onSelect(node: TreeNode) {
   if (!node.data) return
+  if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
   editing.clear()
   if (node.data.type === 'page') selection.selectPage(node.data.name)
   else if (node.data.type === 'fragment') selection.selectFragment(node.data.name)

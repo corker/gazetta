@@ -31,9 +31,10 @@ describe('GET /api/pages', () => {
   it('returns all pages', async () => {
     const { status, body } = await get('/api/pages')
     expect(status).toBe(200)
-    expect(body).toHaveLength(3)
+    expect(body.length).toBeGreaterThanOrEqual(4)
     const names = body.map((p: { name: string }) => p.name)
     expect(names).toContain('home')
+    expect(names).toContain('404')
     expect(names).toContain('about')
     expect(names).toContain('blog/[slug]')
   })

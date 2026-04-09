@@ -157,6 +157,7 @@ async function openFragmentEditor(fragName: string) {
 
 function onSelect(node: TreeNode) {
   if (!node.data) return
+  if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
   // Fragments — always open editor, expand if has children
   if (node.data.isFragment && node.data.fragName) {
     if (node.children && node.children.length > 0) {

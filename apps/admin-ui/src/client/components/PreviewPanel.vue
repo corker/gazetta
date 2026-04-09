@@ -150,6 +150,7 @@ function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:navigate' && e.data.route) {
     const page = site.pages.find(p => p.route === e.data.route)
     if (page) {
+      if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
       editing.clear()
       selection.selectPage(page.name)
     } else {

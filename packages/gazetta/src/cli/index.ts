@@ -199,6 +199,8 @@ content:
   body: "<p>Edit this content in the CMS at <a href='/admin'>/admin</a>.</p>"
 `,
 
+    '.gitignore': `node_modules/\ndist/\n.env\n.env.local\n`,
+
     'package.json': JSON.stringify({
       name,
       private: true,

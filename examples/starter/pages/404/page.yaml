@@ -1,0 +1,7 @@
+template: page-default
+content:
+  title: "Page Not Found"
+components:
+  - "@header"
+  - message
+  - "@footer"

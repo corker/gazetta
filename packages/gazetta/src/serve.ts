@@ -28,7 +28,22 @@ export function createServer(options: ServeOptions) {
     const requestPath = new URL(c.req.url).pathname
 
     const pageHtml = await findPage(storage, requestPath)
-    if (!pageHtml) return c.html('<h1>404 — Page not found</h1>', 404)
+    if (!pageHtml) {
+      // Try custom 404 page
+      const notFoundHtml = await findPage(storage, '/404')
+      if (notFoundHtml) {
+        const { html: raw404 } = parseCacheComment(notFoundHtml)
+        const fragPaths = findEsiPaths(raw404)
+        const fragEntries = await Promise.all(
+          fragPaths.map(async (p) => {
+            try { return [p, splitFragment(await storage.readFile(p.slice(1)))] as const }
+            catch { return [p, { head: '', body: '' }] as const }
+          })
+        )
+        return c.html(assembleEsi(raw404, new Map(fragEntries)), 404)
+      }
+      return c.html('<h1>404 — Page not found</h1>', 404)
+    }
 
     const { html: rawHtml, browser, edge } = parseCacheComment(pageHtml)
 
