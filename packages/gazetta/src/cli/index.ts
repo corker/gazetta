@@ -367,10 +367,17 @@ async function runServe(siteDir: string, port: number, targetName?: string) {
   const { createServer } = await import('../serve.js')
   const app = createServer({ storage })
 
-  serve({ fetch: app.fetch, port }, () => {
+  const server = serve({ fetch: app.fetch, port }, () => {
     console.log(`\n  Gazetta serving "${siteYaml.name}" from target "${name}"`)
     console.log(`  http://localhost:${port}\n`)
   })
+
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => {
+      console.log(`\n  Shutting down...`)
+      server.close(() => process.exit(0))
+    })
+  }
 }
 
 async function runDeploy(siteDir: string, targetName?: string) {

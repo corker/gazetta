@@ -5,6 +5,7 @@
  */
 
 import { Hono } from 'hono'
+import { logger } from 'hono/logger'
 import { createHash } from 'node:crypto'
 import type { StorageProvider } from './types.js'
 import { assembleEsi, parseCacheComment, splitFragment, findEsiPaths } from './assemble.js'
@@ -17,6 +18,7 @@ export function createServer(options: ServeOptions) {
   const { storage } = options
   const app = new Hono()
 
+  app.use(logger())
   app.get('/health', (c) => c.json({ ok: true }))
 
   // Hashed CSS/JS — immutable cache
