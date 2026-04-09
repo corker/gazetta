@@ -36,12 +36,23 @@ export interface ComponentManifest {
 /** Fragment manifest (shared component) */
 export interface FragmentManifest extends ComponentManifest {}
 
+/** CDN cache purge configuration */
+export interface PurgeConfig {
+  type: 'cloudflare'
+  /** API token with cache purge permission — use ${ENV_VAR} syntax */
+  apiToken?: string
+  /** Zone ID — auto-detected from siteUrl when not set */
+  zoneId?: string
+}
+
 /** Cache configuration */
 export interface CacheConfig {
   /** Browser cache TTL in seconds (max-age). Default: 0 */
   browser?: number
   /** Edge/CDN cache TTL in seconds (s-maxage). Default: 86400 */
   edge?: number
+  /** CDN cache purge configuration */
+  purge?: PurgeConfig
 }
 
 /** Page manifest (routable component) */
@@ -68,8 +79,6 @@ export interface StorageConfig {
 export interface WorkerConfig {
   type: 'cloudflare'
   name?: string
-  /** API token for deploy/purge — use ${ENV_VAR} syntax. Falls back to CLOUDFLARE_API_TOKEN env var. */
-  apiToken?: string
 }
 
 /** Target configuration in site.yaml */

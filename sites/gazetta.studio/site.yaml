@@ -14,3 +14,6 @@ targets:
     cache:
       browser: 0
       edge: 86400
+      purge:
+        type: cloudflare
+        apiToken: "${CLOUDFLARE_API_TOKEN}"

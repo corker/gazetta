@@ -302,20 +302,23 @@ async function runPublish(siteDir: string, targetName?: string) {
     console.log(`  ${name}: ${totalFiles} files published\n`)
   }
 
-  // Purge edge cache per target
+  // Purge CDN cache per target
   const { resolveEnvVars } = await import('../targets.js')
   for (const [name, config] of Object.entries(siteYaml.targets ?? {})) {
-    if (!config.siteUrl || config.worker?.type !== 'cloudflare') continue
-    const apiToken = resolveEnvVars(config.worker.apiToken) || process.env.CLOUDFLARE_API_TOKEN
-    if (!apiToken) { console.log(`  ${name}: no API token, skipping cache purge`); continue }
-    try {
-      const zoneId = process.env.CLOUDFLARE_ZONE_ID ?? await lookupZoneId(config.siteUrl, apiToken)
-      if (!zoneId) { console.log(`  ${name}: zone not found for ${config.siteUrl}, skipping purge`); continue }
-      const { createCloudflarePurge } = await import('../publish-rendered.js')
-      await createCloudflarePurge(zoneId, apiToken).purgeAll()
-      console.log(`  ${name}: cache purged`)
-    } catch (err) {
-      console.warn(`  ${name}: cache purge failed: ${(err as Error).message}`)
+    const purge = config.cache?.purge
+    if (!purge) continue
+    if (purge.type === 'cloudflare') {
+      const apiToken = resolveEnvVars(purge.apiToken)
+      if (!apiToken) { console.log(`  ${name}: purge.apiToken not set, skipping cache purge`); continue }
+      try {
+        const zoneId = resolveEnvVars(purge.zoneId) ?? (config.siteUrl ? await lookupZoneId(config.siteUrl, apiToken) : null)
+        if (!zoneId) { console.log(`  ${name}: zone not found, set purge.zoneId or siteUrl`); continue }
+        const { createCloudflarePurge } = await import('../publish-rendered.js')
+        await createCloudflarePurge(zoneId, apiToken).purgeAll()
+        console.log(`  ${name}: cache purged`)
+      } catch (err) {
+        console.warn(`  ${name}: cache purge failed: ${(err as Error).message}`)
+      }
     }
   }
 

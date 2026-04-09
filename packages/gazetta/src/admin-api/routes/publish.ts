@@ -91,30 +91,31 @@ export function publishRoutes(
         await publishFragmentIndex(sourceStorage, siteDir, targetStorage)
         totalFiles += 2
 
-        // 4. Purge edge cache via Cloudflare API
+        // 4. Purge CDN cache
         const config = getTargetConfig(targetName)
-        const apiToken = (config?.worker?.type === 'cloudflare' ? resolveEnvVars(config.worker.apiToken) : undefined) || process.env.CLOUDFLARE_API_TOKEN
-        const zoneId = process.env.CLOUDFLARE_ZONE_ID
-        if (config?.siteUrl && zoneId && apiToken) {
-          const purge = createCloudflarePurge(zoneId, apiToken)
-          const hasFragments = allItems.some(i => i.startsWith('fragments/'))
-          if (hasFragments) {
-            // Fragment changed — purge everything (all pages use fragments)
-            await purge.purgeAll()
-            console.log(`    ${targetName}: cache purged (all)`)
-          } else {
-            // Only pages changed — purge specific URLs
-            const site = await loadSite(siteDir, sourceStorage)
-            const urls = allItems
-              .filter(i => i.startsWith('pages/'))
-              .map(i => {
-                const page = site.pages.get(i.replace('pages/', ''))
-                return page ? `${config.siteUrl}${page.route}` : null
-              })
-              .filter(Boolean) as string[]
-            if (urls.length > 0) {
-              await purge.purgeUrls(urls)
-              console.log(`    ${targetName}: cache purged (${urls.join(', ')})`)
+        const purgeConfig = config?.cache?.purge
+        if (purgeConfig?.type === 'cloudflare') {
+          const apiToken = resolveEnvVars(purgeConfig.apiToken)
+          const zoneId = resolveEnvVars(purgeConfig.zoneId)
+          if (apiToken && zoneId) {
+            const purge = createCloudflarePurge(zoneId, apiToken)
+            const hasFragments = allItems.some(i => i.startsWith('fragments/'))
+            if (hasFragments) {
+              await purge.purgeAll()
+              console.log(`    ${targetName}: cache purged (all)`)
+            } else if (config?.siteUrl) {
+              const site = await loadSite(siteDir, sourceStorage)
+              const urls = allItems
+                .filter(i => i.startsWith('pages/'))
+                .map(i => {
+                  const page = site.pages.get(i.replace('pages/', ''))
+                  return page ? `${config.siteUrl}${page.route}` : null
+                })
+                .filter(Boolean) as string[]
+              if (urls.length > 0) {
+                await purge.purgeUrls(urls)
+                console.log(`    ${targetName}: cache purged (${urls.join(', ')})`)
+              }
             }
           }
         }
