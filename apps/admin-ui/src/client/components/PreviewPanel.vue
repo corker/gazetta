@@ -271,6 +271,10 @@ const BRIDGE_SCRIPT = `
     window.parent.postMessage({ type: 'gazetta:select', gzId: target.dataset.gz }, '*');
   }, true);
 
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') window.parent.postMessage({ type: 'gazetta:escape' }, '*');
+  });
+
   window.addEventListener('message', function(e) {
     if (e.data && e.data.type === 'gazetta:mode') {
       mode = e.data.mode || 'browse';
@@ -332,6 +336,9 @@ function injectBridge(html: string): string {
 }
 
 function handleMessage(e: MessageEvent) {
+  if (e.data?.type === 'gazetta:escape') {
+    if (uiMode.mode === 'fullscreen') uiMode.toggleFullscreen()
+  }
   if (e.data?.type === 'gazetta:select' && e.data.gzId) {
     // Instant visual feedback — show selection overlay before async processing
     iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:showSelect', gzId: e.data.gzId }, '*')
