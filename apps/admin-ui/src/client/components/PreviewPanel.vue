@@ -87,17 +87,26 @@ watch(fragmentScopeGzId, sendScope)
 const BRIDGE_SCRIPT = `
 <script>
 (function() {
-  var overlay = document.createElement('div');
-  overlay.id = 'gz-overlay';
-  overlay.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:border-color 0.15s, opacity 0.2s;display:none;opacity:1;';
-  document.body.appendChild(overlay);
+  // Hover overlay — transient, subtle, fades
+  var hoverOvl = document.createElement('div');
+  hoverOvl.id = 'gz-hover';
+  hoverOvl.style.cssText = 'position:fixed;pointer-events:none;border:1px solid rgba(167,139,250,0.5);border-radius:4px;z-index:100000;transition:opacity 0.2s;display:none;opacity:0;';
+  document.body.appendChild(hoverOvl);
 
+  // Selection overlay — persistent, solid green
+  var selectOvl = document.createElement('div');
+  selectOvl.id = 'gz-select';
+  selectOvl.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #22c55e;border-radius:4px;z-index:99999;display:none;';
+  document.body.appendChild(selectOvl);
+
+  // Dim overlay — fragment scope backdrop
   var dimOverlay = document.createElement('div');
   dimOverlay.id = 'gz-dim';
   dimOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.3);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:99998;pointer-events:none;display:none;transition:opacity 0.2s;opacity:0;';
   document.body.appendChild(dimOverlay);
 
-  var highlighted = null;
+  var hoveredEl = null;
+  var selectedEl = null;
   var mode = 'browse';
   var highlight = true;
   var scopedEl = null;
@@ -116,23 +125,52 @@ const BRIDGE_SCRIPT = `
     return tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'LABEL' || el.isContentEditable;
   }
 
-  function showOverlay(el, color) {
+  function positionOverlay(ovl, el) {
     var rect = el.getBoundingClientRect();
-    overlay.style.display = 'block';
-    overlay.style.borderColor = color || '#a78bfa';
-    overlay.style.top = rect.top + 'px';
-    overlay.style.left = rect.left + 'px';
-    overlay.style.width = rect.width + 'px';
-    overlay.style.height = rect.height + 'px';
+    ovl.style.display = 'block';
+    ovl.style.top = rect.top + 'px';
+    ovl.style.left = rect.left + 'px';
+    ovl.style.width = rect.width + 'px';
+    ovl.style.height = rect.height + 'px';
   }
 
-  function refreshOverlay() {
-    if (highlighted && highlighted.isConnected) showOverlay(highlighted, overlay.style.borderColor);
-    else { highlighted = null; overlay.style.display = 'none'; }
+  function refreshOverlays() {
+    if (hoveredEl && hoveredEl.isConnected) positionOverlay(hoverOvl, hoveredEl);
+    else { hoveredEl = null; hoverOvl.style.display = 'none'; }
+    if (selectedEl && selectedEl.isConnected) positionOverlay(selectOvl, selectedEl);
+    else { selectedEl = null; selectOvl.style.display = 'none'; }
+  }
+
+  function showSelect(el) {
+    selectedEl = el;
+    positionOverlay(selectOvl, el);
+  }
+
+  function clearSelect() {
+    selectedEl = null;
+    selectOvl.style.display = 'none';
+  }
+
+  function showHover(el) {
+    hoveredEl = el;
+    positionOverlay(hoverOvl, el);
+    hoverOvl.style.opacity = '1';
+  }
+
+  function clearHover() {
+    hoverOvl.style.opacity = '0';
+    setTimeout(function() { if (!hoveredEl) hoverOvl.style.display = 'none'; }, 200);
+    hoveredEl = null;
+  }
+
+  function scrollIfOffscreen(el) {
+    var rect = el.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
 
   function applyScope(gzId) {
-    // Remove previous scope
     if (scopedEl) {
       scopedEl.style.position = scopedOrigPos;
       scopedEl.style.zIndex = '';
@@ -153,39 +191,35 @@ const BRIDGE_SCRIPT = `
     if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
     el.style.zIndex = '99999';
     scopedEl = el;
-    // Move crosshair cursor to scoped element if in edit mode
     if (mode === 'edit' && highlight) {
       document.body.style.cursor = '';
       el.style.cursor = 'crosshair';
     }
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     dimOverlay.style.display = 'block';
-    // Force reflow then fade in
     dimOverlay.offsetHeight;
     dimOverlay.style.opacity = '1';
   }
 
-  window.addEventListener('scroll', refreshOverlay, true);
-  window.addEventListener('resize', refreshOverlay);
+  window.addEventListener('scroll', refreshOverlays, true);
+  window.addEventListener('resize', refreshOverlays);
 
   function isInScope(el) {
     return !scopedEl || scopedEl.contains(el);
   }
 
+  // Edit mode: mousemove hover highlight in preview
   document.addEventListener('mousemove', function(e) {
-    if (mode !== 'edit' || !highlight) { if (highlighted) { highlighted = null; overlay.style.display = 'none'; } return; }
+    if (mode !== 'edit' || !highlight) { if (hoveredEl) clearHover(); return; }
     var target = findGz(e.target);
-    if (target && target !== highlighted && isInScope(target)) {
-      highlighted = target;
-      showOverlay(target, '#a78bfa');
+    if (target && target !== hoveredEl && isInScope(target)) {
+      showHover(target);
     } else if (!target || !isInScope(target)) {
-      highlighted = null;
-      overlay.style.display = 'none';
+      if (hoveredEl) clearHover();
     }
   });
 
   document.addEventListener('click', function(e) {
-    // Links are intercepted in all modes
     var link = e.target.closest ? e.target.closest('a[href]') : null;
     if (link) {
       var href = link.getAttribute('href');
@@ -202,10 +236,7 @@ const BRIDGE_SCRIPT = `
       }
     }
 
-    // Fullscreen: everything native
     if (mode === 'fullscreen') return;
-
-    // Interactive elements: native behavior
     if (isInteractive(e.target)) return;
 
     var target = findGz(e.target);
@@ -214,7 +245,7 @@ const BRIDGE_SCRIPT = `
     e.preventDefault();
     e.stopPropagation();
 
-    if (mode === 'edit' && highlight) showOverlay(target, '#22c55e');
+    showSelect(target);
     window.parent.postMessage({ type: 'gazetta:select', gzId: target.dataset.gz }, '*');
   }, true);
 
@@ -222,8 +253,7 @@ const BRIDGE_SCRIPT = `
     if (e.data && e.data.type === 'gazetta:mode') {
       mode = e.data.mode || 'browse';
       highlight = e.data.highlight !== false;
-      highlighted = null;
-      overlay.style.display = 'none';
+      if (hoveredEl) clearHover();
       var cursorTarget = scopedEl || document.body;
       document.body.style.cursor = '';
       if (scopedEl) scopedEl.style.cursor = '';
@@ -231,40 +261,22 @@ const BRIDGE_SCRIPT = `
     }
     if (e.data && e.data.type === 'gazetta:highlight') {
       if (e.data.gzId) {
+        // Tree hover — show hover overlay, scroll if offscreen
         var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
         if (el) {
-          highlighted = el;
-          overlay.style.opacity = '1';
-          overlay.style.borderWidth = '1px';
-          showOverlay(el, 'rgba(167, 139, 250, 0.5)');
-          var rect = el.getBoundingClientRect();
-          if (rect.bottom < 0 || rect.top > window.innerHeight) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
+          showHover(el);
+          scrollIfOffscreen(el);
         }
       } else {
-        // Fade out, then scroll back to selected component
-        overlay.style.opacity = '0';
-        setTimeout(function() {
-          overlay.style.display = 'none';
-          overlay.style.borderWidth = '2px';
-          overlay.style.opacity = '1';
-          if (e.data.selectedGzId) {
-            var sel = document.querySelector('[data-gz="' + e.data.selectedGzId + '"]');
-            if (sel) {
-              highlighted = sel;
-              showOverlay(sel, '#22c55e');
-              var selRect = sel.getBoundingClientRect();
-              if (selRect.bottom < 0 || selRect.top > window.innerHeight) {
-                sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
-            } else {
-              highlighted = null;
-            }
-          } else {
-            highlighted = null;
+        // Tree hover end — fade out hover, scroll back to selected
+        clearHover();
+        if (e.data.selectedGzId) {
+          var sel = document.querySelector('[data-gz="' + e.data.selectedGzId + '"]');
+          if (sel) {
+            showSelect(sel);
+            scrollIfOffscreen(sel);
           }
-        }, 200);
+        }
       }
     }
     if (e.data && e.data.type === 'gazetta:scope') {
@@ -370,11 +382,11 @@ function applyHtml(html: string, morph: boolean) {
 
     morphdom(doc.body, newDoc.body, {
       onBeforeNodeDiscarded(node) {
-        if ((node as Element).id === 'gz-overlay' || (node as Element).id === 'gz-dim') return false
+        const id = (node as Element).id; if (id === 'gz-hover' || id === 'gz-select' || id === 'gz-dim') return false
         return true
       },
       onBeforeElUpdated(fromEl, toEl) {
-        if (fromEl.id === 'gz-overlay' || fromEl.id === 'gz-dim') return false
+        if (fromEl.id === 'gz-hover' || fromEl.id === 'gz-select' || fromEl.id === 'gz-dim') return false
         if (fromEl.isEqualNode(toEl)) return false
         return true
       },
