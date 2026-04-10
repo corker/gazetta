@@ -32,12 +32,6 @@ const componentNodes = ref<TreeNode[]>([])
 const showAddDialog = ref(false)
 
 const detail = computed(() => selection.detail)
-const title = computed(() => {
-  if (selection.type === 'page') return `Page: ${selection.name}`
-  if (selection.type === 'fragment') return `Fragment: ${selection.name}`
-  return ''
-})
-
 const componentCount = computed(() => detail.value?.components?.length ?? 0)
 
 // Map from data-gz hash → component info (built during tree construction)
@@ -277,16 +271,12 @@ async function addComponent(name: string, template: string) {
 
 <template>
   <div v-if="detail" class="component-tree">
-    <h3>{{ title }}</h3>
-    <p class="component-template">Template: {{ detail.template }}</p>
-
     <Tree v-if="componentNodes.length" :value="componentNodes" v-model:selectionKeys="selectedKey"
       v-model:expandedKeys="expandedKeys"
       selectionMode="single" @node-select="onSelect" class="tree">
       <template #default="{ node }">
         <div class="node-row" :data-testid="`component-${node.data?.isFragment ? node.data.fragName : node.label}`">
           <span class="node-label">{{ node.label }}</span>
-          <span v-if="node.data?.template" class="node-template">{{ node.data.template }}</span>
           <span v-if="node.data?.isTopLevel" class="node-actions">
             <Button icon="pi pi-arrow-up" text rounded size="small"
               :data-testid="`move-up-${node.label}`"
@@ -314,14 +304,11 @@ async function addComponent(name: string, template: string) {
 </template>
 
 <style scoped>
-.component-tree { margin-top: 1.5rem; }
-.component-tree h3 { font-size: 0.75rem; text-transform: uppercase; color: #888; margin-bottom: 0.5rem; letter-spacing: 0.05em; }
-.component-template { font-size: 0.75rem; color: #aaa; margin-bottom: 0.5rem; }
+.component-tree { }
 .tree { font-size: 0.875rem; }
 .empty { font-size: 0.875rem; color: #aaa; }
 .node-row { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
 .node-label { flex: 1; }
-.node-template { font-size: 0.6875rem; color: #666; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; }
 .node-row:hover .node-actions { opacity: 1; }
 .add-btn { margin-top: 0.5rem; }
