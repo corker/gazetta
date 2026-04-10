@@ -141,6 +141,7 @@ const BRIDGE_SCRIPT = `
     if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
     el.style.zIndex = '99999';
     scopedEl = el;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     dimOverlay.style.display = 'block';
     // Force reflow then fade in
     dimOverlay.offsetHeight;
