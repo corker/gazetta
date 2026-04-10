@@ -30,6 +30,13 @@ let currentHtml = ''
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const selectByGzId = inject<(gzId: string) => void>('selectByGzId')
+const highlightGzId = inject<import('vue').Ref<string | null>>('highlightGzId')
+
+// Send highlight to bridge
+function sendHighlight(gzId: string | null) {
+  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:highlight', gzId }, '*')
+}
+watch(() => highlightGzId?.value, (gzId) => sendHighlight(gzId ?? null))
 
 const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
 const previewPath = computed(() => {
@@ -222,8 +229,20 @@ const BRIDGE_SCRIPT = `
       cursorTarget.style.cursor = (mode === 'edit' && highlight) ? 'crosshair' : '';
     }
     if (e.data && e.data.type === 'gazetta:highlight') {
-      var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
-      if (el) { highlighted = el; showOverlay(el, '#22c55e'); }
+      if (e.data.gzId) {
+        var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
+        if (el) {
+          highlighted = el;
+          showOverlay(el, '#a78bfa');
+          var rect = el.getBoundingClientRect();
+          if (rect.bottom < 0 || rect.top > window.innerHeight) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      } else {
+        highlighted = null;
+        overlay.style.display = 'none';
+      }
     }
     if (e.data && e.data.type === 'gazetta:scope') {
       applyScope(e.data.gzId);
@@ -358,11 +377,6 @@ function debouncedFetchPreview() {
   debounceTimer = setTimeout(() => fetchPreview(true), 300)
 }
 
-// Highlight selected component in preview
-watch(() => editing.path, (path) => {
-  if (!path || !iframeRef.value?.contentWindow) return
-  // TODO: compute gzId from the component's treePath and send to iframe
-})
 
 watch(() => preview.version, () => fetchPreview(true))
 watch(previewPath, () => fetchPreview(false), { immediate: true })

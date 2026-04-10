@@ -13,10 +13,12 @@ const uiMode = useUiModeStore()
 const editing = useEditingStore()
 
 const pendingGzId = ref<string | null>(null)
+const highlightGzId = ref<string | null>(null)
 
 provide('selectByGzId', (gzId: string) => {
   pendingGzId.value = gzId
 })
+provide('highlightGzId', highlightGzId)
 
 // Escape key exits edit mode (only when no input is focused)
 function handleKeydown(e: KeyboardEvent) {

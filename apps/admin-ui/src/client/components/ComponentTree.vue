@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch, type Ref } from 'vue'
 import Button from 'primevue/button'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
@@ -27,6 +27,8 @@ interface ComponentNode {
 
 const props = defineProps<{ pendingGzId?: string | null }>()
 const emit = defineEmits<{ (e: 'pendingConsumed'): void }>()
+
+const highlightGzId = inject<Ref<string | null>>('highlightGzId')
 
 const selection = useSelectionStore()
 const editing = useEditingStore()
@@ -193,6 +195,17 @@ async function openFragmentEditor(fragName: string) {
   }
 }
 
+// --- Hover highlight ---
+
+function onHover(node: ComponentNode) {
+  if (!highlightGzId || !node.data.treePath) return
+  highlightGzId.value = hashPath(node.data.treePath as string)
+}
+
+function onHoverEnd() {
+  if (highlightGzId) highlightGzId.value = null
+}
+
 // --- Node selection ---
 
 function onSelect(node: ComponentNode) {
@@ -282,7 +295,9 @@ async function addComponent(name: string, template: string) {
         :class="['node-item', { 'node-root': depth === -1, selected: selectedNodeKey === node.key }]"
         :style="nodeStyle(depth)"
         :data-testid="`component-${node.data?.isFragment ? node.data.fragName : node.label}`"
-        @click="onSelect(node)">
+        @click="onSelect(node)"
+        @mouseenter="onHover(node)"
+        @mouseleave="onHoverEnd()">
         <i :class="nodeIcon(node, depth)" class="node-icon" />
         <span class="node-label">{{ node.label }}</span>
         <span v-if="node.data?.isTopLevel && depth !== -1" class="node-actions">
