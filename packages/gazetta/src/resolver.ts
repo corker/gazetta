@@ -88,7 +88,7 @@ export async function resolveFragment(fragmentName: string, site: Site): Promise
   }
 
   const templatesDir = join(site.siteDir, 'templates')
-  const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: [`@${fragmentName}`] }
+  const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: ['', `@${fragmentName}`] }
 
   const loaded = await loadTemplate(site.storage, templatesDir, fragment.template)
 

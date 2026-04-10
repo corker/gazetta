@@ -200,6 +200,7 @@ describe('resolveFragment', () => {
 
     expect(resolved.children).toHaveLength(1)
     expect(resolved.children[0].content?.text).toBe('Logo')
+    expect(resolved.children[0].treePath).toBe('@header/logo')
   })
 
   it('throws on missing fragment', async () => {

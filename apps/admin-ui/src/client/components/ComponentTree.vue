@@ -98,16 +98,21 @@ watch(detail, async (d) => {
   if (!d) { componentNodes.value = []; gzMap.value = new Map(); return }
 
   const map = new Map<string, GzEntry>()
+  const rootPath = selection.type === 'fragment' ? `@${selection.name}` : ''
   const children = d.components
-    ? await Promise.all(d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i, '', map)))
+    ? await Promise.all(d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i, rootPath, map)))
     : []
 
   const rootNode: TreeNode = {
     key: `root:${selection.name}`,
     label: selection.name ?? '',
     icon: selection.type === 'page' ? 'pi pi-file' : 'pi pi-share-alt',
-    data: { isPage: true, path: d.dir, template: d.template, treePath: '' },
+    data: { isPage: true, path: d.dir, template: d.template, treePath: rootPath },
     children,
+  }
+  // Fragment root has data-gz in host-page preview — add to gzMap for click-to-select
+  if (rootPath) {
+    map.set(hashPath(rootPath), { path: d.dir, template: d.template })
   }
   componentNodes.value = [rootNode]
   expandedKeys.value = { [`root:${selection.name}`]: true }

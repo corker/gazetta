@@ -8,6 +8,16 @@ import { useToastStore } from '../stores/toast.js'
 import { useSiteStore } from '../stores/site.js'
 import { useUiModeStore } from '../stores/uiMode.js'
 
+/** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
+function hashPath(path: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < path.length; i++) {
+    hash ^= path.charCodeAt(i)
+    hash = (hash * 0x01000193) >>> 0
+  }
+  return hash.toString(16).padStart(8, '0')
+}
+
 const selection = useSelectionStore()
 const editing = useEditingStore()
 const preview = usePreviewStore()
@@ -25,6 +35,12 @@ const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
 const previewPath = computed(() => {
   if (!selection.previewRoute) return null
   return `${basePath}/preview${selection.previewRoute}`
+})
+
+// Fragment scope — gzId of the fragment root for dimming
+const fragmentScopeGzId = computed(() => {
+  if (selection.type !== 'fragment' || !selection.name || !selection.fragmentHostPage) return null
+  return hashPath(`@${selection.name}`)
 })
 
 // Device presets
@@ -50,6 +66,15 @@ function sendBridgeMode() {
 watch(() => uiMode.bridgeMode, sendBridgeMode)
 watch(highlightEnabled, sendBridgeMode)
 
+// Send fragment scope to bridge for dimming
+function sendScope() {
+  iframeRef.value?.contentWindow?.postMessage({
+    type: 'gazetta:scope',
+    gzId: fragmentScopeGzId.value,
+  }, '*')
+}
+watch(fragmentScopeGzId, sendScope)
+
 // Bridge script — three-mode behavior controlled by parent via postMessage
 const BRIDGE_SCRIPT = `
 <script>
@@ -58,9 +83,17 @@ const BRIDGE_SCRIPT = `
   overlay.id = 'gz-overlay';
   overlay.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:border-color 0.15s;display:none;';
   document.body.appendChild(overlay);
+
+  var dimOverlay = document.createElement('div');
+  dimOverlay.id = 'gz-dim';
+  dimOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;pointer-events:none;display:none;';
+  document.body.appendChild(dimOverlay);
+
   var highlighted = null;
   var mode = 'browse';
   var highlight = true;
+  var scopedEl = null;
+  var scopedOrigPos = '';
 
   function findGz(el) {
     while (el && el !== document.body) {
@@ -88,6 +121,26 @@ const BRIDGE_SCRIPT = `
   function refreshOverlay() {
     if (highlighted && highlighted.isConnected) showOverlay(highlighted, overlay.style.borderColor);
     else { highlighted = null; overlay.style.display = 'none'; }
+  }
+
+  function applyScope(gzId) {
+    // Remove previous scope
+    if (scopedEl) {
+      scopedEl.style.position = scopedOrigPos;
+      scopedEl.style.zIndex = '';
+      scopedEl = null;
+    }
+    dimOverlay.style.display = 'none';
+
+    if (!gzId) return;
+    var el = document.querySelector('[data-gz="' + gzId + '"]');
+    if (!el) return;
+
+    scopedOrigPos = el.style.position;
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    el.style.zIndex = '99999';
+    scopedEl = el;
+    dimOverlay.style.display = 'block';
   }
 
   window.addEventListener('scroll', refreshOverlay, true);
@@ -150,6 +203,9 @@ const BRIDGE_SCRIPT = `
     if (e.data && e.data.type === 'gazetta:highlight') {
       var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
       if (el) { highlighted = el; showOverlay(el, '#22c55e'); }
+    }
+    if (e.data && e.data.type === 'gazetta:scope') {
+      applyScope(e.data.gzId);
     }
   });
 })();
@@ -223,8 +279,8 @@ async function fetchPreview(morph = true) {
     }
     const html = injectBridge(await res.text())
     applyHtml(html, morph)
-    // Send initial bridge mode after iframe loads
-    setTimeout(sendBridgeMode, 100)
+    // Send initial bridge mode + scope after iframe loads
+    setTimeout(() => { sendBridgeMode(); sendScope() }, 100)
   } catch {
     applyHtml('<pre style="color:red;padding:2rem">Failed to load preview</pre>', false)
   } finally {
@@ -251,11 +307,11 @@ function applyHtml(html: string, morph: boolean) {
 
     morphdom(doc.body, newDoc.body, {
       onBeforeNodeDiscarded(node) {
-        if ((node as Element).id === 'gz-overlay') return false
+        if ((node as Element).id === 'gz-overlay' || (node as Element).id === 'gz-dim') return false
         return true
       },
       onBeforeElUpdated(fromEl, toEl) {
-        if (fromEl.id === 'gz-overlay') return false
+        if (fromEl.id === 'gz-overlay' || fromEl.id === 'gz-dim') return false
         if (fromEl.isEqualNode(toEl)) return false
         return true
       },
@@ -309,6 +365,16 @@ watch(() => preview.draftVersion, debouncedFetchPreview)
           </button>
         </div>
         <div class="preview-actions">
+          <!-- Host page selector for fragment preview -->
+          <select v-if="selection.type === 'fragment' && selection.staticPages.length > 1"
+            class="host-page-select"
+            data-testid="host-page-select"
+            :value="selection.fragmentHostPage?.name ?? ''"
+            @change="selection.setFragmentHostPage(($event.target as HTMLSelectElement).value)">
+            <option v-for="page in selection.staticPages" :key="page.name" :value="page.name">
+              {{ page.name }}
+            </option>
+          </select>
           <button v-if="uiMode.mode === 'edit'"
             :class="['device-btn', { active: highlightEnabled }]"
             :title="highlightEnabled ? 'Hide highlights' : 'Show highlights'"
@@ -341,10 +407,11 @@ watch(() => preview.draftVersion, debouncedFetchPreview)
 .preview-empty { padding: 1rem; color: #aaa; font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; }
 .preview-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0.375rem 0.5rem; border-bottom: 1px solid #27272a; }
 .preview-devices { display: flex; gap: 0.25rem; }
-.preview-actions { display: flex; gap: 0.25rem; }
+.preview-actions { display: flex; gap: 0.25rem; align-items: center; }
 .device-btn { background: none; border: 1px solid transparent; border-radius: 4px; padding: 0.25rem 0.5rem; color: #71717a; cursor: pointer; font-size: 0.875rem; }
 .device-btn:hover { color: #e4e4e7; border-color: #3f3f46; }
 .device-btn.active { color: #a78bfa; border-color: #a78bfa; }
+.host-page-select { background: #1e1e2e; color: #e0e0e0; border: 1px solid #3f3f46; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.75rem; cursor: pointer; }
 .preview-frame-wrapper { flex: 1; display: flex; justify-content: center; overflow: auto; background: #1a1a2e; }
 .preview-iframe { flex: none; height: 100%; border: 0; background: #fff; transition: width 0.2s; }
 </style>
