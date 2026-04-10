@@ -33,14 +33,16 @@ let previewHoverTimer: ReturnType<typeof setTimeout> | null = null
 
 const focus = useComponentFocusStore()
 
-// Send hover highlight to bridge
+// Send hover highlight to bridge (skip in fullscreen)
 function sendHighlight() {
+  if (uiMode.mode === 'fullscreen') return
   iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:highlight', gzId: focus.highlightGzId ?? null }, '*')
 }
 watch(() => focus.highlightGzId, sendHighlight)
 
-// Send selection to bridge — green overlay
+// Send selection to bridge — green overlay (skip in fullscreen)
 function sendSelection() {
+  if (uiMode.mode === 'fullscreen') return
   iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:showSelect', gzId: focus.selectedGzId ?? null }, '*')
 }
 watch(() => focus.selectedGzId, sendSelection)
@@ -73,11 +75,11 @@ const highlightEnabled = ref(true)
 function sendBridgeMode() {
   iframeRef.value?.contentWindow?.postMessage({
     type: 'gazetta:mode',
-    mode: uiMode.bridgeMode,
+    mode: uiMode.mode,
     highlight: highlightEnabled.value,
   }, '*')
 }
-watch(() => uiMode.bridgeMode, sendBridgeMode)
+watch(() => uiMode.mode, sendBridgeMode)
 watch(highlightEnabled, sendBridgeMode)
 
 // Send fragment scope to bridge for dimming
@@ -104,6 +106,11 @@ const BRIDGE_SCRIPT = `
   selectOvl.id = 'gz-select';
   selectOvl.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #22c55e;border-radius:4px;z-index:99999;display:none;';
   document.body.appendChild(selectOvl);
+
+  // Fullscreen hides all overlays via CSS (preserves state for restore)
+  var gzStyle = document.createElement('style');
+  gzStyle.textContent = '[data-gz-mode="fullscreen"] #gz-hover, [data-gz-mode="fullscreen"] #gz-select, [data-gz-mode="fullscreen"] #gz-dim { display: none !important }';
+  document.head.appendChild(gzStyle);
 
   // Dim overlay — fragment scope backdrop
   var dimOverlay = document.createElement('div');
@@ -268,7 +275,9 @@ const BRIDGE_SCRIPT = `
     if (e.data && e.data.type === 'gazetta:mode') {
       mode = e.data.mode || 'browse';
       highlight = e.data.highlight !== false;
+      document.body.setAttribute('data-gz-mode', mode);
       if (hoveredEl) clearHover();
+      refreshOverlays();
       var cursorTarget = scopedEl || document.body;
       document.body.style.cursor = '';
       if (scopedEl) scopedEl.style.cursor = '';
@@ -450,7 +459,7 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
 </script>
 
 <template>
-  <div class="preview-panel" :class="{ fullscreen: uiMode.fullscreen }" data-testid="preview-panel">
+  <div class="preview-panel" :class="{ fullscreen: uiMode.mode === 'fullscreen' }" data-testid="preview-panel">
     <div v-if="!previewPath" class="preview-empty" data-testid="preview-empty">
       <i class="pi pi-eye" style="font-size: 2rem; color: #ddd; margin-bottom: 0.5rem;" />
       <p>Select a page or fragment to preview</p>
@@ -467,7 +476,7 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
         </div>
         <div class="preview-actions">
           <!-- Host page selector for fragment preview -->
-          <select v-if="selection.type === 'fragment' && selection.staticPages.length > 1"
+          <select v-if="selection.type === 'fragment' && selection.staticPages.length > 1 && uiMode.mode !== 'fullscreen'"
             class="host-page-select"
             data-testid="host-page-select"
             :value="selection.fragmentHostPage?.name ?? ''"
@@ -484,10 +493,10 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
             <i class="pi pi-eye" />
           </button>
           <button class="device-btn"
-            :title="uiMode.fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+            :title="uiMode.mode === 'fullscreen' ? 'Exit fullscreen' : 'Fullscreen'"
             data-testid="fullscreen-toggle"
             @click="uiMode.toggleFullscreen()">
-            <i :class="uiMode.fullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" />
+            <i :class="uiMode.mode === 'fullscreen' ? 'pi pi-window-minimize' : 'pi pi-window-maximize'" />
           </button>
         </div>
       </div>

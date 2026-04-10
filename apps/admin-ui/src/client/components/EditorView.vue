@@ -13,7 +13,7 @@ const uiMode = useUiModeStore()
 const editing = useEditingStore()
 
 onKeyStroke('Escape', () => {
-  if (uiMode.fullscreen) { uiMode.toggleFullscreen(); return }
+  if (uiMode.mode === 'fullscreen') { uiMode.toggleFullscreen(); return }
   if (uiMode.mode !== 'edit') return
   const active = document.activeElement as HTMLElement | null
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {

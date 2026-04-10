@@ -1,19 +1,13 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useEditingStore } from './editing.js'
 import { useComponentFocusStore } from './componentFocus.js'
 
-export type UiMode = 'browse' | 'edit'
-export type BridgeMode = 'browse' | 'edit' | 'fullscreen'
+export type UiMode = 'browse' | 'edit' | 'fullscreen'
 
 export const useUiModeStore = defineStore('uiMode', () => {
   const mode = ref<UiMode>('browse')
-  const fullscreen = ref(false)
-
-  const bridgeMode = computed<BridgeMode>(() => {
-    if (fullscreen.value) return 'fullscreen'
-    return mode.value
-  })
+  let previousMode: UiMode = 'browse'
 
   function enterEdit() {
     mode.value = 'edit'
@@ -29,8 +23,13 @@ export const useUiModeStore = defineStore('uiMode', () => {
   }
 
   function toggleFullscreen() {
-    fullscreen.value = !fullscreen.value
+    if (mode.value === 'fullscreen') {
+      mode.value = previousMode
+    } else {
+      previousMode = mode.value as 'browse' | 'edit'
+      mode.value = 'fullscreen'
+    }
   }
 
-  return { mode, fullscreen, bridgeMode, enterEdit, enterBrowse, toggleFullscreen }
+  return { mode, enterEdit, enterBrowse, toggleFullscreen }
 })
