@@ -33,10 +33,11 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 const focus = useComponentFocusStore()
 
 // Send highlight to bridge (includes selectedGzId for scroll-back)
-function sendHighlight(gzId: string | null) {
-  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:highlight', gzId, selectedGzId: focus.selectedGzId }, '*')
+function sendHighlight() {
+  const gzId = focus.highlightGzId
+  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:highlight', gzId: gzId ?? null, selectedGzId: focus.selectedGzId ?? null }, '*')
 }
-watch(() => focus.highlightGzId, (gzId) => sendHighlight(gzId))
+watch(() => focus.highlightGzId, sendHighlight)
 
 const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
 const previewPath = computed(() => {
@@ -240,17 +241,23 @@ const BRIDGE_SCRIPT = `
           }
         }
       } else {
-        highlighted = null;
-        overlay.style.display = 'none';
-        // Scroll back to selected component
+        // Scroll back to selected component and show its highlight
         if (e.data.selectedGzId) {
           var sel = document.querySelector('[data-gz="' + e.data.selectedGzId + '"]');
           if (sel) {
+            highlighted = sel;
+            showOverlay(sel, '#22c55e');
             var selRect = sel.getBoundingClientRect();
             if (selRect.bottom < 0 || selRect.top > window.innerHeight) {
               sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+          } else {
+            highlighted = null;
+            overlay.style.display = 'none';
           }
+        } else {
+          highlighted = null;
+          overlay.style.display = 'none';
         }
       }
     }
