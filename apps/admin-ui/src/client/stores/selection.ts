@@ -118,7 +118,10 @@ export const useSelectionStore = defineStore('selection', () => {
     try {
       const saved = JSON.parse(raw) as { type: string; name: string; hostPage?: string }
       if (saved.type === 'page') {
-        await selectPage(saved.name)
+        const detail = await api.getPage(saved.name)
+        selection.value = { type: 'page', name: saved.name, detail }
+        fragmentHostPage.value = null
+        usePreviewStore().invalidate()
       } else if (saved.type === 'fragment') {
         const detail = await api.getFragment(saved.name)
         selection.value = { type: 'fragment', name: saved.name, detail }
