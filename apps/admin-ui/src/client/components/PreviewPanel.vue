@@ -524,7 +524,7 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
 }
 .preview-empty { padding: 1rem; color: #aaa; font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; }
 .preview-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0.375rem 0.5rem; border-bottom: 1px solid #27272a; }
-.preview-devices { display: flex; gap: 0.25rem; }
+.preview-devices { display: flex; gap: 0.25rem; align-items: center; }
 .preview-actions { display: flex; gap: 0.25rem; align-items: center; }
 .device-btn { background: none; border: 1px solid transparent; border-radius: 4px; padding: 0.25rem 0.5rem; color: #71717a; cursor: pointer; font-size: 0.875rem; }
 .device-btn:hover { color: #e4e4e7; border-color: #3f3f46; }
