@@ -253,6 +253,7 @@ const BRIDGE_SCRIPT = `
             var sel = document.querySelector('[data-gz="' + e.data.selectedGzId + '"]');
             if (sel) {
               highlighted = sel;
+              showOverlay(sel, '#22c55e');
               var selRect = sel.getBoundingClientRect();
               if (selRect.bottom < 0 || selRect.top > window.innerHeight) {
                 sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
