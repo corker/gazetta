@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, inject, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import morphdom from 'morphdom'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
@@ -7,6 +7,7 @@ import { usePreviewStore } from '../stores/preview.js'
 import { useToastStore } from '../stores/toast.js'
 import { useSiteStore } from '../stores/site.js'
 import { useUiModeStore } from '../stores/uiMode.js'
+import { useComponentFocusStore } from '../stores/componentFocus.js'
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
 function hashPath(path: string): string {
@@ -29,14 +30,13 @@ const loading = ref(false)
 let currentHtml = ''
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-const selectByGzId = inject<(gzId: string) => void>('selectByGzId')
-const highlightGzId = inject<import('vue').Ref<string | null>>('highlightGzId')
+const focus = useComponentFocusStore()
 
-// Send highlight to bridge
+// Send highlight to bridge (includes selectedGzId for scroll-back)
 function sendHighlight(gzId: string | null) {
-  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:highlight', gzId }, '*')
+  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:highlight', gzId, selectedGzId: focus.selectedGzId }, '*')
 }
-watch(() => highlightGzId?.value, (gzId) => sendHighlight(gzId ?? null))
+watch(() => focus.highlightGzId, (gzId) => sendHighlight(gzId))
 
 const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
 const previewPath = computed(() => {
@@ -242,6 +242,16 @@ const BRIDGE_SCRIPT = `
       } else {
         highlighted = null;
         overlay.style.display = 'none';
+        // Scroll back to selected component
+        if (e.data.selectedGzId) {
+          var sel = document.querySelector('[data-gz="' + e.data.selectedGzId + '"]');
+          if (sel) {
+            var selRect = sel.getBoundingClientRect();
+            if (selRect.bottom < 0 || selRect.top > window.innerHeight) {
+              sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        }
       }
     }
     if (e.data && e.data.type === 'gazetta:scope') {
@@ -261,9 +271,9 @@ function injectBridge(html: string): string {
 
 function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:select' && e.data.gzId) {
-    // In browse mode, entering edit first — selectByGzId buffers via pendingGzId
+    // In browse mode, entering edit first — setPending buffers for ComponentTree
     if (uiMode.mode === 'browse') uiMode.enterEdit()
-    if (selectByGzId) selectByGzId(e.data.gzId)
+    focus.setPending(e.data.gzId)
     // Move focus from iframe to parent so keyboard shortcuts (Escape) work
     iframeRef.value?.blur()
   }

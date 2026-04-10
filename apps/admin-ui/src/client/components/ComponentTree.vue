@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch, type Ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
 import { usePreviewStore } from '../stores/preview.js'
+import { useComponentFocusStore } from '../stores/componentFocus.js'
 import { api } from '../api/client.js'
 import AddComponentDialog from './AddComponentDialog.vue'
 
@@ -25,15 +26,11 @@ interface ComponentNode {
   children: ComponentNode[]
 }
 
-const props = defineProps<{ pendingGzId?: string | null }>()
-const emit = defineEmits<{ (e: 'pendingConsumed'): void }>()
-
-const highlightGzId = inject<Ref<string | null>>('highlightGzId')
-
 const selection = useSelectionStore()
 const editing = useEditingStore()
 const toast = useToastStore()
 const preview = usePreviewStore()
+const focus = useComponentFocusStore()
 const selectedNodeKey = ref<string | null>(null)
 const componentNodes = ref<ComponentNode[]>([])
 const showAddDialog = ref(false)
@@ -119,14 +116,14 @@ watch(detail, async (d) => {
 }, { immediate: true })
 
 function consumePending() {
-  if (props.pendingGzId && gzMap.value.size > 0) {
-    selectByGzId(props.pendingGzId)
-    emit('pendingConsumed')
+  if (focus.pendingGzId && gzMap.value.size > 0) {
+    selectByGzId(focus.pendingGzId)
+    focus.clearPending()
   }
 }
 
 // Also react to pendingGzId changes when tree is already built (edit mode click-to-select)
-watch(() => props.pendingGzId, () => consumePending())
+watch(() => focus.pendingGzId, () => consumePending())
 
 // Flat list for rendering — walk tree and produce { node, depth } pairs
 const flatNodes = computed(() => {
@@ -198,12 +195,12 @@ async function openFragmentEditor(fragName: string) {
 // --- Hover highlight ---
 
 function onHover(node: ComponentNode) {
-  if (!highlightGzId || !node.data.treePath) return
-  highlightGzId.value = hashPath(node.data.treePath as string)
+  if (!node.data.treePath) return
+  focus.highlight(hashPath(node.data.treePath as string))
 }
 
 function onHoverEnd() {
-  if (highlightGzId) highlightGzId.value = null
+  focus.highlight(null)
 }
 
 // --- Node selection ---
@@ -212,6 +209,8 @@ function onSelect(node: ComponentNode) {
   if (!node.data) return
   if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
   selectedNodeKey.value = node.key
+  const treePath = node.data.treePath as string
+  focus.select(treePath ? hashPath(treePath) : null)
   if (node.data.isFragment && node.data.fragName) {
     openFragmentEditor(node.data.fragName as string)
     return

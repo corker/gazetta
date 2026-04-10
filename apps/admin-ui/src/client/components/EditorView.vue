@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, provide, onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import SiteTree from './SiteTree.vue'
@@ -12,14 +12,6 @@ import { useEditingStore } from '../stores/editing.js'
 const uiMode = useUiModeStore()
 const editing = useEditingStore()
 
-const pendingGzId = ref<string | null>(null)
-const highlightGzId = ref<string | null>(null)
-
-provide('selectByGzId', (gzId: string) => {
-  pendingGzId.value = gzId
-})
-provide('highlightGzId', highlightGzId)
-
 // Escape key exits edit mode (only when no input is focused)
 function handleKeydown(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
@@ -28,7 +20,6 @@ function handleKeydown(e: KeyboardEvent) {
   if (uiMode.mode !== 'edit') return
   const active = document.activeElement as HTMLElement | null
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
-    // First Escape: blur the focused input. Second Escape: exit edit mode.
     ;(active as HTMLElement).blur()
     return
   }
@@ -51,7 +42,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
       <Splitter v-else class="cms-splitter">
         <SplitterPanel :size="35" :minSize="25" class="cms-panel">
           <div class="cms-panel-content">
-            <ComponentTree :pendingGzId="pendingGzId" @pendingConsumed="pendingGzId = null" />
+            <ComponentTree />
           </div>
         </SplitterPanel>
         <SplitterPanel :size="65" :minSize="35" class="cms-panel">
