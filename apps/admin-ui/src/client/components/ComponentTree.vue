@@ -239,6 +239,7 @@ function findNodeByKey(nodes: ComponentNode[], predicate: (data: Record<string, 
 function selectByGzId(gzId: string) {
   const entry = gzMap.value.get(gzId)
   if (!entry) return
+  focus.select(gzId)
   if ('isFragment' in entry) {
     const found = findNodeByKey(componentNodes.value, d => d.fragName === entry.fragName)
     if (found) selectedNodeKey.value = found.key
