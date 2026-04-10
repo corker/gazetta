@@ -26,6 +26,8 @@ export const useEditingStore = defineStore('editing', () => {
   const saved = ref<Record<string, unknown> | null>(null)
   const saving = ref(false)
   const lastSaveError = ref<string | null>(null)
+  /** Bumped on open/discard to trigger editor re-mount */
+  const mountVersion = ref(0)
 
   // Convenience accessors
   const template = computed(() => target.value?.template ?? null)
@@ -49,6 +51,7 @@ export const useEditingStore = defineStore('editing', () => {
     saved.value = deepClone(t.content)
     saving.value = false
     lastSaveError.value = null
+    mountVersion.value++
     usePreviewStore().invalidateDraft()
   }
 
@@ -77,6 +80,7 @@ export const useEditingStore = defineStore('editing', () => {
   function discard() {
     if (saved.value) {
       content.value = deepClone(saved.value)
+      mountVersion.value++
       usePreviewStore().invalidateDraft()
     }
   }
@@ -98,5 +102,5 @@ export const useEditingStore = defineStore('editing', () => {
     }
   }
 
-  return { target, content, saved, saving, lastSaveError, template, path, schema, dirty, open, clear, markDirty, discard, save }
+  return { target, content, saved, saving, lastSaveError, template, path, schema, dirty, mountVersion, open, clear, markDirty, discard, save }
 })

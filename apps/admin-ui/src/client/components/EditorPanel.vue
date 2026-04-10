@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { onKeyStroke } from '@vueuse/core'
 import { useEditingStore } from '../stores/editing.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from 'gazetta/editor'
@@ -22,11 +23,21 @@ const editorMountRef = computed<EditorMount | null>(() => {
 
 const contentRef = computed(() => editing.content)
 
+const mountVersionRef = computed(() => editing.mountVersion)
+
 function handleChange(content: Record<string, unknown>) {
   editing.markDirty(content)
 }
 
-useEditorMount(containerRef, editorMountRef, contentRef, handleChange)
+useEditorMount(containerRef, editorMountRef, contentRef, handleChange, mountVersionRef)
+
+// Ctrl+S / Cmd+S to save
+onKeyStroke('s', (e) => {
+  if (e.metaKey || e.ctrlKey) {
+    e.preventDefault()
+    if (editing.dirty) editing.save()
+  }
+})
 </script>
 
 <template>

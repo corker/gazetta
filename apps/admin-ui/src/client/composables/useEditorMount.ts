@@ -5,7 +5,8 @@ export function useEditorMount(
   containerRef: Ref<HTMLElement | null>,
   editorMount: Ref<EditorMount | null>,
   content: Ref<Record<string, unknown> | null>,
-  onChange: (content: Record<string, unknown>) => void
+  onChange: (content: Record<string, unknown>) => void,
+  mountVersion?: Ref<number>
 ) {
   let mounted = false
 
@@ -22,9 +23,14 @@ export function useEditorMount(
     mounted = false
   }
 
-  // Only re-mount when the container or editor instance changes (new component selected).
-  // Content updates flow through React's internal state via onChange — no re-mount needed.
-  watch([containerRef, editorMount], () => {
+  // Re-mount when container, editor instance, or mountVersion changes.
+  // mountVersion bumps on open/discard — not on every keystroke.
+  // Content updates from editing flow through React's internal state via onChange.
+  const deps = mountVersion
+    ? [containerRef, editorMount, mountVersion] as const
+    : [containerRef, editorMount] as const
+
+  watch(deps, () => {
     if (containerRef.value && editorMount.value && content.value) mount()
     else unmount()
   }, { immediate: true })
