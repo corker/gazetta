@@ -39,6 +39,12 @@ function sendHighlight() {
 }
 watch(() => focus.highlightGzId, sendHighlight)
 
+// Send selection to bridge — keeps green overlay in sync
+function sendSelection() {
+  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:showSelect', gzId: focus.selectedGzId ?? null }, '*')
+}
+watch(() => focus.selectedGzId, sendSelection)
+
 const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
 const previewPath = computed(() => {
   if (!selection.previewRoute) return null
@@ -277,6 +283,15 @@ const BRIDGE_SCRIPT = `
             scrollIfOffscreen(sel);
           }
         }
+      }
+    }
+    if (e.data && e.data.type === 'gazetta:showSelect') {
+      if (e.data.gzId) {
+        var sel = document.querySelector('[data-gz="' + e.data.gzId + '"]');
+        if (sel) showSelect(sel);
+        else clearSelect();
+      } else {
+        clearSelect();
       }
     }
     if (e.data && e.data.type === 'gazetta:scope') {
