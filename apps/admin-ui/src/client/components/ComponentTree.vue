@@ -32,6 +32,7 @@ const toast = useToastStore()
 const preview = usePreviewStore()
 const focus = useComponentFocusStore()
 const selectedNodeKey = ref<string | null>(null)
+const hoveredNodeKey = ref<string | null>(null)
 const componentNodes = ref<ComponentNode[]>([])
 const showAddDialog = ref(false)
 
@@ -124,6 +125,13 @@ function consumePending() {
 
 // Also react to pendingGzId changes when tree is already built (edit mode click-to-select)
 watch(() => focus.pendingGzId, () => consumePending())
+
+// Highlight tree node when component is hovered in preview
+watch(() => focus.previewHoverGzId, (gzId) => {
+  if (!gzId) { hoveredNodeKey.value = null; return }
+  const found = findNodeByKey(componentNodes.value, d => d.treePath && hashPath(d.treePath as string) === gzId)
+  hoveredNodeKey.value = found?.key ?? null
+})
 
 // Flat list for rendering — walk tree and produce { node, depth } pairs
 const flatNodes = computed(() => {
@@ -295,7 +303,7 @@ async function addComponent(name: string, template: string) {
   <div v-if="detail" class="component-tree">
     <template v-if="flatNodes.length">
       <div v-for="{ node, depth } in flatNodes" :key="node.key"
-        :class="['node-item', { 'node-root': depth === -1, selected: selectedNodeKey === node.key }]"
+        :class="['node-item', { 'node-root': depth === -1, selected: selectedNodeKey === node.key, hovered: hoveredNodeKey === node.key }]"
         :style="nodeStyle(depth)"
         :data-testid="`component-${node.data?.isFragment ? node.data.fragName : node.label}`"
         @click="onSelect(node)"
@@ -332,14 +340,14 @@ async function addComponent(name: string, template: string) {
 .component-tree { font-size: 13px; line-height: 22px; }
 .empty { color: #aaa; }
 .node-item { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; margin: 0 2px; cursor: pointer; border-radius: 3px; }
-.node-item:hover { background: rgba(255, 255, 255, 0.05); }
+.node-item:hover, .node-item.hovered { background: rgba(255, 255, 255, 0.05); }
 .node-item.selected { background: rgba(167, 139, 250, 0.15); box-shadow: inset 2px 0 0 #a78bfa; }
 .node-root { font-weight: 600; padding: 0 6px; height: 26px; line-height: 26px; border-radius: 0; margin: 0 0 2px 0; border-bottom: 1px solid #27272a; }
 .node-root.selected { background: rgba(167, 139, 250, 0.1); box-shadow: none; border-bottom-color: #a78bfa; }
 .node-icon { width: 16px; text-align: center; font-size: 10px; color: #666; flex-shrink: 0; }
 .node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #bbb; }
 .node-item.selected .node-label { color: #e4e4e7; }
-.node-item:hover .node-label { color: #e4e4e7; }
+.node-item:hover .node-label, .node-item.hovered .node-label { color: #e4e4e7; }
 .node-root .node-label { color: #e4e4e7; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-actions { opacity: 1; }

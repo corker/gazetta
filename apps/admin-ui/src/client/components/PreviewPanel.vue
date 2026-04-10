@@ -215,12 +215,16 @@ const BRIDGE_SCRIPT = `
 
   // Edit mode: mousemove hover highlight in preview
   document.addEventListener('mousemove', function(e) {
-    if (mode !== 'edit' || !highlight) { if (hoveredEl) clearHover(); return; }
+    if (mode !== 'edit' || !highlight) {
+      if (hoveredEl) { clearHover(); window.parent.postMessage({ type: 'gazetta:hover', gzId: null }, '*'); }
+      return;
+    }
     var target = findGz(e.target);
     if (target && target !== hoveredEl && isInScope(target)) {
       showHover(target);
+      window.parent.postMessage({ type: 'gazetta:hover', gzId: target.dataset.gz }, '*');
     } else if (!target || !isInScope(target)) {
-      if (hoveredEl) clearHover();
+      if (hoveredEl) { clearHover(); window.parent.postMessage({ type: 'gazetta:hover', gzId: null }, '*'); }
     }
   });
 
@@ -315,6 +319,9 @@ function handleMessage(e: MessageEvent) {
     } else {
       toast.show(`No page found for route ${e.data.route}`, { type: 'error' })
     }
+  }
+  if (e.data?.type === 'gazetta:hover') {
+    focus.previewHover(e.data.gzId ?? null)
   }
   if (e.data?.type === 'gazetta:external' && e.data.url) {
     toast.show(e.data.url, { link: e.data.url, duration: 5000 })
