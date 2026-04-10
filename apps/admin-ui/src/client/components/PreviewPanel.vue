@@ -128,6 +128,7 @@ const BRIDGE_SCRIPT = `
     if (scopedEl) {
       scopedEl.style.position = scopedOrigPos;
       scopedEl.style.zIndex = '';
+      scopedEl.style.cursor = '';
       scopedEl = null;
     }
     dimOverlay.style.opacity = '0';
@@ -207,7 +208,10 @@ const BRIDGE_SCRIPT = `
       highlight = e.data.highlight !== false;
       highlighted = null;
       overlay.style.display = 'none';
-      document.body.style.cursor = (mode === 'edit' && highlight) ? 'crosshair' : '';
+      var cursorTarget = scopedEl || document.body;
+      document.body.style.cursor = '';
+      if (scopedEl) scopedEl.style.cursor = '';
+      cursorTarget.style.cursor = (mode === 'edit' && highlight) ? 'crosshair' : '';
     }
     if (e.data && e.data.type === 'gazetta:highlight') {
       var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
