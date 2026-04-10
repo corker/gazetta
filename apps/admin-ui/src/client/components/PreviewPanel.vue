@@ -474,6 +474,7 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
     <template v-else>
       <div class="preview-toolbar">
         <div class="preview-devices">
+          <span v-if="uiMode.mode === 'fullscreen' && selection.previewRoute" class="preview-route">{{ selection.previewRoute }}</span>
           <button v-for="(preset, i) in devicePresets" :key="preset.label"
             :class="['device-btn', { active: activePreset === i }]"
             :title="preset.label"
@@ -481,7 +482,6 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
             <i :class="preset.icon" />
           </button>
         </div>
-        <span v-if="uiMode.mode === 'fullscreen' && selection.previewRoute" class="preview-route">{{ selection.previewRoute }}</span>
         <div class="preview-actions">
           <!-- Host page selector for fragment preview -->
           <select v-if="selection.type === 'fragment' && selection.staticPages.length > 1 && uiMode.mode !== 'fullscreen'"
