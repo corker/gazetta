@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
+import { onKeyStroke } from '@vueuse/core'
 import SiteTree from './SiteTree.vue'
 import ComponentTree from './ComponentTree.vue'
 import EditorPanel from './EditorPanel.vue'
@@ -12,23 +12,17 @@ import { useEditingStore } from '../stores/editing.js'
 const uiMode = useUiModeStore()
 const editing = useEditingStore()
 
-// Escape key exits edit mode (only when no input is focused)
-function handleKeydown(e: KeyboardEvent) {
-  if (e.key !== 'Escape') return
-  // Fullscreen: close it first
+onKeyStroke('Escape', () => {
   if (uiMode.fullscreen) { uiMode.toggleFullscreen(); return }
   if (uiMode.mode !== 'edit') return
   const active = document.activeElement as HTMLElement | null
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
-    ;(active as HTMLElement).blur()
+    active.blur()
     return
   }
   if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
   uiMode.enterBrowse()
-}
-
-onMounted(() => window.addEventListener('keydown', handleKeydown))
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
+})
 </script>
 
 <template>

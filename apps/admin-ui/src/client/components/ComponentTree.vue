@@ -202,16 +202,13 @@ async function openFragmentEditor(fragName: string) {
 
 // --- Hover highlight ---
 
-let hoverEndTimer: ReturnType<typeof setTimeout> | null = null
-
 function onHover(node: ComponentNode) {
-  if (hoverEndTimer) { clearTimeout(hoverEndTimer); hoverEndTimer = null }
   if (!node.data.treePath) return
   focus.highlight(hashPath(node.data.treePath as string))
 }
 
 function onHoverEnd() {
-  hoverEndTimer = setTimeout(() => { focus.highlight(null); hoverEndTimer = null }, 300)
+  focus.highlight(null)
 }
 
 // --- Node selection ---

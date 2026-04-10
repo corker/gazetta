@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import morphdom from 'morphdom'
+import { useEventListener, watchDebounced } from '@vueuse/core'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { usePreviewStore } from '../stores/preview.js'
@@ -28,7 +29,6 @@ const uiMode = useUiModeStore()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let currentHtml = ''
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let previewHoverTimer: ReturnType<typeof setTimeout> | null = null
 
 const focus = useComponentFocusStore()
@@ -358,23 +358,19 @@ function handleMessage(e: MessageEvent) {
   }
 }
 
+// Message listener (auto-cleanup via VueUse)
+useEventListener(window, 'message', handleMessage)
+
 // SSE hot reload — listen for template/manifest changes from dev server
 let sse: EventSource | null = null
-
 onMounted(() => {
-  window.addEventListener('message', handleMessage)
-  // Connect to dev server reload stream (ignored in production — endpoint won't exist)
   try {
     sse = new EventSource('/__reload')
     sse.onmessage = () => fetchPreview(true)
     sse.onerror = () => { sse?.close(); sse = null }
   } catch { /* SSE not available */ }
 })
-
-onUnmounted(() => {
-  window.removeEventListener('message', handleMessage)
-  sse?.close()
-})
+onUnmounted(() => { sse?.close() })
 
 async function fetchPreview(morph = true) {
   if (!previewPath.value) { currentHtml = ''; return }
@@ -448,15 +444,9 @@ function applyHtml(html: string, morph: boolean) {
   }
 }
 
-function debouncedFetchPreview() {
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => fetchPreview(true), 300)
-}
-
-
 watch(() => preview.version, () => fetchPreview(true))
 watch(previewPath, () => fetchPreview(false), { immediate: true })
-watch(() => preview.draftVersion, debouncedFetchPreview)
+watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce: 300 })
 </script>
 
 <template>
