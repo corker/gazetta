@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Tree from 'primevue/tree'
 import Button from 'primevue/button'
-import type { TreeNode } from 'primevue/treenode'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
@@ -20,6 +18,13 @@ function hashPath(path: string): string {
   return hash.toString(16).padStart(8, '0')
 }
 
+interface ComponentNode {
+  key: string
+  label: string
+  data: Record<string, unknown>
+  children: ComponentNode[]
+}
+
 const props = defineProps<{ pendingGzId?: string | null }>()
 const emit = defineEmits<{ (e: 'pendingConsumed'): void }>()
 
@@ -27,8 +32,8 @@ const selection = useSelectionStore()
 const editing = useEditingStore()
 const toast = useToastStore()
 const preview = usePreviewStore()
-const selectedKey = ref<Record<string, boolean>>({})
-const componentNodes = ref<TreeNode[]>([])
+const selectedNodeKey = ref<string | null>(null)
+const componentNodes = ref<ComponentNode[]>([])
 const showAddDialog = ref(false)
 
 const detail = computed(() => selection.detail)
@@ -38,8 +43,7 @@ const componentCount = computed(() => detail.value?.components?.length ?? 0)
 type GzEntry = { path: string; template: string } | { isFragment: true; fragName: string }
 const gzMap = ref(new Map<string, GzEntry>())
 
-
-async function buildComponentNode(name: string, parentDir: string, index: number, parentTreePath: string, map: Map<string, GzEntry>): Promise<TreeNode> {
+async function buildComponentNode(name: string, parentDir: string, index: number, parentTreePath: string, map: Map<string, GzEntry>): Promise<ComponentNode> {
   const treePath = parentTreePath ? `${parentTreePath}/${name}` : name
   const gzId = hashPath(treePath)
   const isFragment = name.startsWith('@')
@@ -55,18 +59,17 @@ async function buildComponentNode(name: string, parentDir: string, index: number
       return {
         key: `frag:${fragName}:${index}`,
         label: name,
-        icon: 'pi pi-share-alt',
         data: { isFragment: true, fragName, treePath, path: frag.dir, template: frag.template, index, isTopLevel: true },
         children,
       }
     } catch {
-      return { key: `frag:${fragName}:${index}`, label: name, icon: 'pi pi-share-alt', data: { isFragment: true, treePath, index, isTopLevel: true } }
+      return { key: `frag:${fragName}:${index}`, label: name, data: { isFragment: true, treePath, index, isTopLevel: true }, children: [] }
     }
   }
 
   const path = `${parentDir}/${name}`
   let template = ''
-  let children: TreeNode[] = []
+  let children: ComponentNode[] = []
   try {
     const comp = await api.getComponent(path)
     template = (comp.template as string) ?? ''
@@ -82,7 +85,6 @@ async function buildComponentNode(name: string, parentDir: string, index: number
   return {
     key: `comp:${path}:${index}`,
     label: name,
-    icon: 'pi pi-box',
     data: { path, template, treePath, isFragment: false, index, isTopLevel: true },
     children: children.map(c => ({ ...c, data: { ...c.data, isTopLevel: false } })),
   }
@@ -97,10 +99,9 @@ watch(detail, async (d) => {
     ? await Promise.all(d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i, rootPath, map)))
     : []
 
-  const rootNode: TreeNode = {
+  const rootNode: ComponentNode = {
     key: `root:${selection.name}`,
     label: selection.name ?? '',
-    icon: selection.type === 'page' ? 'pi pi-file' : 'pi pi-share-alt',
     data: { isPage: true, path: d.dir, template: d.template, treePath: rootPath },
     children,
   }
@@ -109,7 +110,6 @@ watch(detail, async (d) => {
     map.set(hashPath(rootPath), { isFragment: true, fragName: selection.name })
   }
   componentNodes.value = [rootNode]
-  expandedKeys.value = { [`root:${selection.name}`]: true }
   gzMap.value = map
 
   // Process pending selection if tree just built and a gzId is waiting
@@ -126,7 +126,21 @@ function consumePending() {
 // Also react to pendingGzId changes when tree is already built (edit mode click-to-select)
 watch(() => props.pendingGzId, () => consumePending())
 
-const expandedKeys = ref<Record<string, boolean>>({})
+// Flat list for rendering — walk tree and produce { node, depth } pairs
+const flatNodes = computed(() => {
+  const result: { node: ComponentNode; depth: number }[] = []
+  function walk(nodes: ComponentNode[], depth: number) {
+    for (const node of nodes) {
+      result.push({ node, depth })
+      if (node.children.length) walk(node.children, depth + 1)
+    }
+  }
+  if (componentNodes.value[0]) {
+    result.push({ node: componentNodes.value[0], depth: -1 })
+    walk(componentNodes.value[0].children, 0)
+  }
+  return result
+})
 
 // --- Editing helpers: build an EditingTarget with the correct save callback ---
 
@@ -170,19 +184,14 @@ async function openFragmentEditor(fragName: string) {
 
 // --- Node selection ---
 
-function onSelect(node: TreeNode) {
+function onSelect(node: ComponentNode) {
   if (!node.data) return
   if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
-  // Fragments — always open editor, expand if has children
+  selectedNodeKey.value = node.key
   if (node.data.isFragment && node.data.fragName) {
-    if (node.children && node.children.length > 0) {
-      const key = node.key as string
-      expandedKeys.value = { ...expandedKeys.value, [key]: true }
-    }
     openFragmentEditor(node.data.fragName as string)
     return
   }
-  // Page/fragment root node — edit page content
   if (node.data.isPage) {
     openPageContentEditor()
     return
@@ -191,14 +200,12 @@ function onSelect(node: TreeNode) {
   openComponentEditor(node.data.path as string, node.data.template as string)
 }
 
-// Find a tree node by walking the tree, return the node and its ancestor keys
-function findNodeByData(nodes: TreeNode[], predicate: (data: Record<string, unknown>) => boolean, ancestors: string[] = []): { node: TreeNode; ancestors: string[] } | null {
+// Find a node by walking the tree
+function findNodeByKey(nodes: ComponentNode[], predicate: (data: Record<string, unknown>) => boolean): ComponentNode | null {
   for (const node of nodes) {
-    if (node.data && predicate(node.data as Record<string, unknown>)) {
-      return { node, ancestors }
-    }
-    if (node.children) {
-      const found = findNodeByData(node.children, predicate, [...ancestors, node.key as string])
+    if (node.data && predicate(node.data)) return node
+    if (node.children.length) {
+      const found = findNodeByKey(node.children, predicate)
       if (found) return found
     }
   }
@@ -210,24 +217,13 @@ function selectByGzId(gzId: string) {
   const entry = gzMap.value.get(gzId)
   if (!entry) return
   if ('isFragment' in entry) {
-    const found = findNodeByData(componentNodes.value, d => d.fragName === entry.fragName)
-    if (found) {
-      const expanded = { ...expandedKeys.value }
-      for (const key of found.ancestors) expanded[key] = true
-      expanded[found.node.key as string] = true
-      expandedKeys.value = expanded
-      selectedKey.value = { [found.node.key as string]: true }
-    }
+    const found = findNodeByKey(componentNodes.value, d => d.fragName === entry.fragName)
+    if (found) selectedNodeKey.value = found.key
     openFragmentEditor(entry.fragName)
     return
   }
-  const found = findNodeByData(componentNodes.value, d => d.path === entry.path)
-  if (found) {
-    const expanded = { ...expandedKeys.value }
-    for (const key of found.ancestors) expanded[key] = true
-    expandedKeys.value = expanded
-    selectedKey.value = { [found.node.key as string]: true }
-  }
+  const found = findNodeByKey(componentNodes.value, d => d.path === entry.path)
+  if (found) selectedNodeKey.value = found.key
   openComponentEditor(entry.path, entry.template)
 }
 
@@ -266,33 +262,32 @@ async function addComponent(name: string, template: string) {
     toast.showError(err, `Failed to add component "${name}"`)
   }
 }
-
 </script>
 
 <template>
   <div v-if="detail" class="component-tree">
-    <Tree v-if="componentNodes.length" :value="componentNodes" v-model:selectionKeys="selectedKey"
-      v-model:expandedKeys="expandedKeys"
-      selectionMode="single" @node-select="onSelect" class="tree">
-      <template #default="{ node }">
-        <div class="node-row" :data-testid="`component-${node.data?.isFragment ? node.data.fragName : node.label}`">
-          <span class="node-label">{{ node.label }}</span>
-          <span v-if="node.data?.isTopLevel" class="node-actions">
-            <Button icon="pi pi-arrow-up" text rounded size="small"
-              :data-testid="`move-up-${node.label}`"
-              :disabled="node.data.index === 0"
-              @click.stop="moveComponent(node.data.index, -1)" />
-            <Button icon="pi pi-arrow-down" text rounded size="small"
-              :data-testid="`move-down-${node.label}`"
-              :disabled="node.data.index === componentCount - 1"
-              @click.stop="moveComponent(node.data.index, 1)" />
-            <Button icon="pi pi-trash" text rounded size="small" severity="danger"
-              :data-testid="`remove-${node.label}`"
-              @click.stop="removeComponent(node.data.index)" />
-          </span>
-        </div>
-      </template>
-    </Tree>
+    <template v-if="flatNodes.length">
+      <div v-for="{ node, depth } in flatNodes" :key="node.key"
+        :class="['node-item', { 'node-root': depth === -1, selected: selectedNodeKey === node.key }]"
+        :style="depth > 0 ? { paddingLeft: depth * 16 + 'px' } : undefined"
+        :data-testid="`component-${node.data?.isFragment ? node.data.fragName : node.label}`"
+        @click="onSelect(node)">
+        <span class="node-label">{{ node.label }}</span>
+        <span v-if="node.data?.isTopLevel && depth !== -1" class="node-actions">
+          <Button icon="pi pi-arrow-up" text rounded size="small"
+            :data-testid="`move-up-${node.label}`"
+            :disabled="(node.data.index as number) === 0"
+            @click.stop="moveComponent(node.data.index as number, -1)" />
+          <Button icon="pi pi-arrow-down" text rounded size="small"
+            :data-testid="`move-down-${node.label}`"
+            :disabled="(node.data.index as number) === componentCount - 1"
+            @click.stop="moveComponent(node.data.index as number, 1)" />
+          <Button icon="pi pi-trash" text rounded size="small" severity="danger"
+            :data-testid="`remove-${node.label}`"
+            @click.stop="removeComponent(node.data.index as number)" />
+        </span>
+      </div>
+    </template>
     <p v-else class="empty">No components</p>
 
     <Button icon="pi pi-plus" label="Add component" text size="small" class="add-btn"
@@ -304,12 +299,15 @@ async function addComponent(name: string, template: string) {
 </template>
 
 <style scoped>
-.component-tree { }
-.tree { font-size: 0.875rem; }
-.empty { font-size: 0.875rem; color: #aaa; }
-.node-row { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
+.component-tree { font-size: 0.875rem; }
+.empty { color: #aaa; }
+.node-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; cursor: pointer; border-left: 3px solid transparent; border-radius: 2px; }
+.node-item:hover { background: #1e1e2e; }
+.node-item.selected { border-left-color: #a78bfa; background: #1e1e2e; }
+.node-root { font-weight: 600; border-bottom: 1px solid #27272a; margin-bottom: 0.25rem; border-left: none; padding-left: 0.5rem; }
+.node-root.selected { border-bottom-color: #a78bfa; }
 .node-label { flex: 1; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; }
-.node-row:hover .node-actions { opacity: 1; }
+.node-item:hover .node-actions { opacity: 1; }
 .add-btn { margin-top: 0.5rem; }
 </style>
