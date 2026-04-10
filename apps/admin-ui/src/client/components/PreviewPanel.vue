@@ -113,6 +113,7 @@ const BRIDGE_SCRIPT = `
 
   var hoveredEl = null;
   var selectedEl = null;
+  var highlightScrollTimer = null;
   var mode = 'browse';
   var highlight = true;
   var scopedEl = null;
@@ -274,13 +275,19 @@ const BRIDGE_SCRIPT = `
       cursorTarget.style.cursor = (mode === 'edit' && highlight) ? 'crosshair' : '';
     }
     if (e.data && e.data.type === 'gazetta:highlight') {
+      if (highlightScrollTimer) { clearTimeout(highlightScrollTimer); highlightScrollTimer = null; }
       if (e.data.gzId) {
         var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
-        if (el) { showHover(el); scrollIfOffscreen(el); }
+        if (el) {
+          showHover(el);
+          highlightScrollTimer = setTimeout(function() { scrollIfOffscreen(el); }, 150);
+        }
       } else {
         clearHover();
-        if (selectedEl) scrollIfOffscreen(selectedEl);
-        else window.scrollTo({ top: 0, behavior: 'smooth' });
+        highlightScrollTimer = setTimeout(function() {
+          if (selectedEl) scrollIfOffscreen(selectedEl);
+          else window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 150);
       }
     }
     if (e.data && e.data.type === 'gazetta:showSelect') {
