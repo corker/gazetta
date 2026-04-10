@@ -42,10 +42,12 @@ body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; backgr
 .dark body { color: #e4e4e7; background: #09090b; }
 .cms-error { padding: 2rem; color: #c00; }
 .cms-loading { padding: 2rem; color: #666; }
-.global-toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 1001; background: #000; border: 1px solid hsl(0, 0%, 20%); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: hsl(0, 0%, 99%); display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 356px; }
+.global-toast { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 1001; background: #000; border: 1px solid hsl(0, 0%, 20%); border-top: none; border-radius: 0 0 8px 8px; padding: 10px 16px; font-size: 13px; color: hsl(0, 0%, 99%); display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 356px; }
 .toast-success { color: hsl(150, 86%, 65%); }
 .toast-error { color: hsl(358, 100%, 81%); }
 .toast-link { color: inherit; text-decoration: underline; }
-.toast-enter-active, .toast-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+.toast-enter-active { transition: opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease; }
+.toast-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.toast-enter-from { opacity: 0; transform: translateX(-50%) translateY(-100%); }
+.toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-50%); }
 </style>
