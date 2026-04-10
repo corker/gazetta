@@ -311,19 +311,19 @@ async function addComponent(name: string, template: string) {
 </template>
 
 <style scoped>
-.component-tree { font-size: 0.8125rem; line-height: 1; }
+.component-tree { font-size: 0.8125rem; line-height: 1.3; }
 .empty { color: #aaa; }
-.node-item { display: flex; align-items: center; gap: 0.375rem; padding: 0.125rem 0.5rem; cursor: pointer; border-left: 3px solid transparent; height: 1.625rem; }
-.node-item:hover { background: #1e1e2e; }
-.node-item.selected { border-left-color: #a78bfa; background: #1e1e2e; }
-.node-root { font-weight: 600; border-bottom: 1px solid #27272a; border-left: none; padding: 0.125rem 0.5rem; margin-bottom: 2px; }
-.node-root.selected { border-bottom-color: #a78bfa; }
+.node-item { display: flex; align-items: center; gap: 0.25rem; padding: 1px 0.5rem; cursor: pointer; border-left: 2px solid transparent; }
+.node-item:hover { background: rgba(255, 255, 255, 0.04); }
+.node-item.selected { border-left-color: #a78bfa; background: rgba(167, 139, 250, 0.1); }
+.node-root { font-weight: 600; border-bottom: 1px solid #27272a; border-left: none; padding: 3px 0.5rem; margin-bottom: 1px; }
+.node-root.selected { border-bottom-color: #a78bfa; background: rgba(167, 139, 250, 0.1); }
 .node-nested {
-  background-image: repeating-linear-gradient(to right, transparent 0, transparent 7px, #333 7px, #333 8px, transparent 8px, transparent 16px);
+  background-image: repeating-linear-gradient(to right, transparent 0, transparent 7px, #2a2a2a 7px, #2a2a2a 8px, transparent 8px, transparent 16px);
   background-repeat: no-repeat;
   background-position: 0.5rem 0;
 }
-.node-icon { width: 1rem; text-align: center; font-size: 0.625rem; color: #52525b; flex-shrink: 0; }
+.node-icon { width: 0.875rem; text-align: center; font-size: 0.5625rem; color: #555; flex-shrink: 0; }
 .node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 .node-item:hover .node-actions { opacity: 1; }
