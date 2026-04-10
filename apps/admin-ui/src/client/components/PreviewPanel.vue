@@ -480,8 +480,10 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
             @click="activePreset = i">
             <i :class="preset.icon" />
           </button>
-          <span v-if="uiMode.mode === 'fullscreen' && selection.previewRoute" class="preview-separator" />
-          <span v-if="uiMode.mode === 'fullscreen' && selection.previewRoute" class="preview-route">{{ selection.previewRoute }}</span>
+          <template v-if="uiMode.mode === 'fullscreen' && selection.previewRoute">
+            <span class="preview-separator" />
+            <span class="preview-route"><i class="pi pi-globe" />{{ selection.previewRoute }}</span>
+          </template>
         </div>
         <div class="preview-actions">
           <!-- Host page selector for fragment preview -->
@@ -532,7 +534,8 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
 .device-btn.active { color: #a78bfa; border-color: #a78bfa; }
 .host-page-select { background: #1e1e2e; color: #e0e0e0; border: 1px solid #3f3f46; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.75rem; cursor: pointer; }
 .preview-separator { width: 1px; height: 14px; background: #3f3f46; }
-.preview-route { font-size: 0.75rem; color: #71717a; font-family: monospace; }
+.preview-route { display: inline-flex; align-items: center; gap: 6px; background: #18181b; border: 1px solid #27272a; border-radius: 9999px; padding: 2px 10px; height: 24px; font-size: 12px; color: #a1a1aa; font-family: ui-monospace, monospace; }
+.preview-route .pi { font-size: 10px; color: #52525b; }
 .preview-frame-wrapper { flex: 1; display: flex; justify-content: center; overflow: auto; background: #1a1a2e; }
 .preview-iframe { flex: none; height: 100%; border: 0; background: #fff; transition: width 0.2s; }
 </style>
