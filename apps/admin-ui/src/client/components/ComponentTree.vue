@@ -150,7 +150,7 @@ function nodeIcon(node: ComponentNode, depth: number): string {
 
 function nodeStyle(depth: number): Record<string, string> | undefined {
   if (depth <= 0) return undefined
-  return { paddingLeft: depth * 16 + 'px', backgroundSize: depth * 16 + 'px 100%' }
+  return { paddingLeft: depth * 10 + 'px' }
 }
 
 // --- Editing helpers: build an EditingTarget with the correct save callback ---
@@ -279,7 +279,7 @@ async function addComponent(name: string, template: string) {
   <div v-if="detail" class="component-tree">
     <template v-if="flatNodes.length">
       <div v-for="{ node, depth } in flatNodes" :key="node.key"
-        :class="['node-item', { 'node-root': depth === -1, 'node-nested': depth > 0, selected: selectedNodeKey === node.key }]"
+        :class="['node-item', { 'node-root': depth === -1, selected: selectedNodeKey === node.key }]"
         :style="nodeStyle(depth)"
         :data-testid="`component-${node.data?.isFragment ? node.data.fragName : node.label}`"
         @click="onSelect(node)">
@@ -311,21 +311,19 @@ async function addComponent(name: string, template: string) {
 </template>
 
 <style scoped>
-.component-tree { font-size: 0.8125rem; line-height: 1.3; }
+.component-tree { font-size: 13px; line-height: 22px; }
 .empty { color: #aaa; }
-.node-item { display: flex; align-items: center; gap: 0.25rem; padding: 1px 0.5rem; cursor: pointer; border-left: 2px solid transparent; }
-.node-item:hover { background: rgba(255, 255, 255, 0.04); }
-.node-item.selected { border-left-color: #a78bfa; background: rgba(167, 139, 250, 0.1); }
-.node-root { font-weight: 600; border-bottom: 1px solid #27272a; border-left: none; padding: 3px 0.5rem; margin-bottom: 1px; }
-.node-root.selected { border-bottom-color: #a78bfa; background: rgba(167, 139, 250, 0.1); }
-.node-nested {
-  background-image: repeating-linear-gradient(to right, transparent 0, transparent 7px, #2a2a2a 7px, #2a2a2a 8px, transparent 8px, transparent 16px);
-  background-repeat: no-repeat;
-  background-position: 0.5rem 0;
-}
-.node-icon { width: 0.875rem; text-align: center; font-size: 0.5625rem; color: #555; flex-shrink: 0; }
-.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+.node-item { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; margin: 0 2px; cursor: pointer; border-radius: 3px; }
+.node-item:hover { background: rgba(255, 255, 255, 0.05); }
+.node-item.selected { background: rgba(167, 139, 250, 0.15); box-shadow: inset 2px 0 0 #a78bfa; }
+.node-root { font-weight: 600; padding: 0 6px; height: 26px; line-height: 26px; border-radius: 0; margin: 0 0 2px 0; border-bottom: 1px solid #27272a; }
+.node-root.selected { background: rgba(167, 139, 250, 0.1); box-shadow: none; border-bottom-color: #a78bfa; }
+.node-icon { width: 16px; text-align: center; font-size: 10px; color: #666; flex-shrink: 0; }
+.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #bbb; }
+.node-item.selected .node-label { color: #e4e4e7; }
+.node-item:hover .node-label { color: #e4e4e7; }
+.node-root .node-label { color: #e4e4e7; }
+.node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-actions { opacity: 1; }
-.add-btn { margin-top: 0.5rem; }
+.add-btn { margin-top: 6px; }
 </style>
