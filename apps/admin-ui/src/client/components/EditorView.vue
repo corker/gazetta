@@ -47,12 +47,12 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
       </div>
       <!-- Edit: ComponentTree + Editor with drag-to-resize -->
       <Splitter v-else class="cms-splitter">
-        <SplitterPanel :size="40" :minSize="30" class="cms-panel">
+        <SplitterPanel :size="35" :minSize="25" class="cms-panel">
           <div class="cms-panel-content">
             <ComponentTree :pendingGzId="pendingGzId" @pendingConsumed="pendingGzId = null" />
           </div>
         </SplitterPanel>
-        <SplitterPanel :size="60" :minSize="30" class="cms-panel">
+        <SplitterPanel :size="65" :minSize="35" class="cms-panel">
           <div class="cms-panel-content">
             <EditorPanel />
           </div>
@@ -68,7 +68,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 <style scoped>
 .cms-editor { display: flex; height: calc(100% - 60px); }
 .cms-left { width: 250px; flex-shrink: 0; overflow: auto; border-right: 1px solid #27272a; }
-.cms-left-wide { width: 550px; overflow: hidden; }
+.cms-left-wide { width: 45%; max-width: 700px; overflow: hidden; }
 .cms-splitter { height: 100%; border: 0; border-radius: 0; }
 .cms-preview { flex: 1; min-width: 0; overflow: hidden; }
 .cms-panel { overflow: auto; }
