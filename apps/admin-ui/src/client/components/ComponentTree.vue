@@ -142,6 +142,17 @@ const flatNodes = computed(() => {
   return result
 })
 
+function nodeIcon(node: ComponentNode, depth: number): string {
+  if (depth === -1) return selection.type === 'page' ? 'pi pi-file' : 'pi pi-share-alt'
+  if (node.data.isFragment) return 'pi pi-share-alt'
+  return 'pi pi-box'
+}
+
+function nodeStyle(depth: number): Record<string, string> | undefined {
+  if (depth <= 0) return undefined
+  return { paddingLeft: depth * 16 + 'px', backgroundSize: depth * 16 + 'px 100%' }
+}
+
 // --- Editing helpers: build an EditingTarget with the correct save callback ---
 
 async function openComponentEditor(path: string, template: string) {
@@ -268,10 +279,11 @@ async function addComponent(name: string, template: string) {
   <div v-if="detail" class="component-tree">
     <template v-if="flatNodes.length">
       <div v-for="{ node, depth } in flatNodes" :key="node.key"
-        :class="['node-item', { 'node-root': depth === -1, selected: selectedNodeKey === node.key }]"
-        :style="depth > 0 ? { paddingLeft: depth * 16 + 'px' } : undefined"
+        :class="['node-item', { 'node-root': depth === -1, 'node-nested': depth > 0, selected: selectedNodeKey === node.key }]"
+        :style="nodeStyle(depth)"
         :data-testid="`component-${node.data?.isFragment ? node.data.fragName : node.label}`"
         @click="onSelect(node)">
+        <i :class="nodeIcon(node, depth)" class="node-icon" />
         <span class="node-label">{{ node.label }}</span>
         <span v-if="node.data?.isTopLevel && depth !== -1" class="node-actions">
           <Button icon="pi pi-arrow-up" text rounded size="small"
@@ -299,15 +311,21 @@ async function addComponent(name: string, template: string) {
 </template>
 
 <style scoped>
-.component-tree { font-size: 0.875rem; }
+.component-tree { font-size: 0.8125rem; }
 .empty { color: #aaa; }
-.node-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; cursor: pointer; border-left: 3px solid transparent; border-radius: 2px; }
+.node-item { display: flex; align-items: center; gap: 0.375rem; padding: 0.2rem 0.5rem; cursor: pointer; border-left: 3px solid transparent; }
 .node-item:hover { background: #1e1e2e; }
 .node-item.selected { border-left-color: #a78bfa; background: #1e1e2e; }
-.node-root { font-weight: 600; border-bottom: 1px solid #27272a; margin-bottom: 0.25rem; border-left: none; padding-left: 0.5rem; }
+.node-root { font-weight: 600; border-bottom: 1px solid #27272a; margin-bottom: 0.125rem; border-left: none; padding: 0.25rem 0.5rem; }
 .node-root.selected { border-bottom-color: #a78bfa; }
-.node-label { flex: 1; }
-.node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; }
+.node-nested {
+  background-image: repeating-linear-gradient(to right, transparent 0, transparent 7px, #27272a 7px, #27272a 8px, transparent 8px, transparent 16px);
+  background-repeat: no-repeat;
+  background-position: 0.5rem 0;
+}
+.node-icon { font-size: 0.75rem; color: #52525b; flex-shrink: 0; }
+.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 .node-item:hover .node-actions { opacity: 1; }
 .add-btn { margin-top: 0.5rem; }
 </style>
