@@ -480,6 +480,7 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
             @click="activePreset = i">
             <i :class="preset.icon" />
           </button>
+          <span v-if="uiMode.mode === 'fullscreen' && selection.previewRoute" class="preview-separator" />
           <span v-if="uiMode.mode === 'fullscreen' && selection.previewRoute" class="preview-route">{{ selection.previewRoute }}</span>
         </div>
         <div class="preview-actions">
@@ -530,6 +531,7 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
 .device-btn:hover { color: #e4e4e7; border-color: #3f3f46; }
 .device-btn.active { color: #a78bfa; border-color: #a78bfa; }
 .host-page-select { background: #1e1e2e; color: #e0e0e0; border: 1px solid #3f3f46; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.75rem; cursor: pointer; }
+.preview-separator { width: 1px; height: 14px; background: #3f3f46; }
 .preview-route { font-size: 0.75rem; color: #71717a; font-family: monospace; }
 .preview-frame-wrapper { flex: 1; display: flex; justify-content: center; overflow: auto; background: #1a1a2e; }
 .preview-iframe { flex: none; height: 100%; border: 0; background: #fff; transition: width 0.2s; }
