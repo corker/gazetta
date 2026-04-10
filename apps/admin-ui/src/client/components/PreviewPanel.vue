@@ -89,7 +89,7 @@ const BRIDGE_SCRIPT = `
 (function() {
   var overlay = document.createElement('div');
   overlay.id = 'gz-overlay';
-  overlay.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:border-color 0.15s;display:none;';
+  overlay.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #a78bfa;border-radius:4px;z-index:99999;transition:border-color 0.15s, opacity 0.2s;display:none;opacity:1;';
   document.body.appendChild(overlay);
 
   var dimOverlay = document.createElement('div');
@@ -234,31 +234,36 @@ const BRIDGE_SCRIPT = `
         var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
         if (el) {
           highlighted = el;
-          showOverlay(el, '#a78bfa');
+          overlay.style.opacity = '1';
+          overlay.style.borderWidth = '1px';
+          showOverlay(el, 'rgba(167, 139, 250, 0.5)');
           var rect = el.getBoundingClientRect();
           if (rect.bottom < 0 || rect.top > window.innerHeight) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         }
       } else {
-        // Scroll back to selected component and show its highlight
-        if (e.data.selectedGzId) {
-          var sel = document.querySelector('[data-gz="' + e.data.selectedGzId + '"]');
-          if (sel) {
-            highlighted = sel;
-            showOverlay(sel, '#22c55e');
-            var selRect = sel.getBoundingClientRect();
-            if (selRect.bottom < 0 || selRect.top > window.innerHeight) {
-              sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Fade out, then scroll back to selected component
+        overlay.style.opacity = '0';
+        setTimeout(function() {
+          overlay.style.display = 'none';
+          overlay.style.borderWidth = '2px';
+          overlay.style.opacity = '1';
+          if (e.data.selectedGzId) {
+            var sel = document.querySelector('[data-gz="' + e.data.selectedGzId + '"]');
+            if (sel) {
+              highlighted = sel;
+              var selRect = sel.getBoundingClientRect();
+              if (selRect.bottom < 0 || selRect.top > window.innerHeight) {
+                sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            } else {
+              highlighted = null;
             }
           } else {
             highlighted = null;
-            overlay.style.display = 'none';
           }
-        } else {
-          highlighted = null;
-          overlay.style.display = 'none';
-        }
+        }, 200);
       }
     }
     if (e.data && e.data.type === 'gazetta:scope') {
