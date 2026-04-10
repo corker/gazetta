@@ -71,7 +71,7 @@ export const useSelectionStore = defineStore('selection', () => {
     try {
       const detail = await api.getFragment(fragName)
       selection.value = { type: 'fragment', name: fragName, detail }
-      resolveDefaultHostPage()
+      if (!fragmentHostPage.value) resolveDefaultHostPage()
       saveSession({ type: 'fragment', name: fragName, hostPage: fragmentHostPage.value?.name })
       usePreviewStore().invalidate()
     } catch (err) {
