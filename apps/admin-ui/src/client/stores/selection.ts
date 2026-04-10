@@ -120,8 +120,17 @@ export const useSelectionStore = defineStore('selection', () => {
       if (saved.type === 'page') {
         await selectPage(saved.name)
       } else if (saved.type === 'fragment') {
-        await selectFragment(saved.name)
-        if (saved.hostPage) setFragmentHostPage(saved.hostPage)
+        const detail = await api.getFragment(saved.name)
+        selection.value = { type: 'fragment', name: saved.name, detail }
+        // Restore host page if saved, otherwise default
+        if (saved.hostPage) {
+          const page = staticPages.value.find(p => p.name === saved.hostPage)
+          if (page) fragmentHostPage.value = page
+          else resolveDefaultHostPage()
+        } else {
+          resolveDefaultHostPage()
+        }
+        usePreviewStore().invalidate()
       }
     } catch {
       sessionStorage.removeItem(STORAGE_KEY)
