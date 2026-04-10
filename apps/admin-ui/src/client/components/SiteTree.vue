@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Tree from 'primevue/tree'
 import Button from 'primevue/button'
-import type { TreeNode } from 'primevue/treenode'
 import { useSiteStore } from '../stores/site.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
@@ -11,90 +9,115 @@ import { api } from '../api/client.js'
 import CreatePageDialog from './CreatePageDialog.vue'
 import CreateFragmentDialog from './CreateFragmentDialog.vue'
 
+interface SiteNode {
+  key: string
+  label: string
+  type: 'page' | 'fragment'
+  name: string
+  icon: string
+}
+
 const site = useSiteStore()
 const selection = useSelectionStore()
 const editing = useEditingStore()
 const toast = useToastStore()
-const selectedKey = ref<Record<string, boolean>>({})
-const expandedKeys = ref<Record<string, boolean>>({ pages: true, fragments: true })
-
-// Sync tree selection when selection changes externally (e.g. preview link click)
-watch(() => selection.selection, (sel) => {
-  if (sel) selectedKey.value = { [`${sel.type}:${sel.name}`]: true }
-  else selectedKey.value = {}
-})
+const selectedKey = ref<string | null>(null)
 const showCreatePage = ref(false)
 const showCreateFragment = ref(false)
 
-const nodes = computed<TreeNode[]>(() => [
-  {
-    key: 'pages',
-    label: 'Pages',
-    icon: 'pi pi-file',
-    selectable: false,
-    children: [...site.pages]
-      .sort((a, b) => a.route.localeCompare(b.route))
-      .map(p => ({
-        key: `page:${p.name}`,
-        label: p.name,
-        icon: 'pi pi-file',
-        data: { type: 'page' as const, name: p.name, route: p.route },
-      })),
-  },
-  {
-    key: 'fragments',
-    label: 'Fragments',
-    icon: 'pi pi-share-alt',
-    selectable: false,
-    children: site.fragments.map(f => ({
-      key: `fragment:${f.name}`,
-      label: f.name,
-      icon: 'pi pi-share-alt',
-      data: { type: 'fragment' as const, name: f.name },
-    })),
-  },
-])
+// Sync selection when changed externally (e.g. preview link click)
+watch(() => selection.selection, (sel) => {
+  if (sel) selectedKey.value = `${sel.type}:${sel.name}`
+  else selectedKey.value = null
+})
 
-function onSelect(node: TreeNode) {
-  if (!node.data) return
+const systemPageNames = computed(() => new Set(site.manifest?.systemPages ?? []))
+
+const contentPages = computed<SiteNode[]>(() =>
+  [...site.pages]
+    .filter(p => !systemPageNames.value.has(p.name))
+    .sort((a, b) => a.route.localeCompare(b.route))
+    .map(p => ({ key: `page:${p.name}`, label: p.name, type: 'page' as const, name: p.name, icon: 'pi pi-file' }))
+)
+
+const systemPages = computed<SiteNode[]>(() =>
+  [...site.pages]
+    .filter(p => systemPageNames.value.has(p.name))
+    .sort((a, b) => a.route.localeCompare(b.route))
+    .map(p => ({ key: `page:${p.name}`, label: p.name, type: 'page' as const, name: p.name, icon: 'pi pi-file' }))
+)
+
+const fragments = computed<SiteNode[]>(() =>
+  site.fragments
+    .map(f => ({ key: `fragment:${f.name}`, label: f.name, type: 'fragment' as const, name: f.name, icon: 'pi pi-share-alt' }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+)
+
+function onSelect(node: SiteNode) {
   if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
   editing.clear()
-  if (node.data.type === 'page') selection.selectPage(node.data.name)
-  else if (node.data.type === 'fragment') selection.selectFragment(node.data.name)
+  selectedKey.value = node.key
+  if (node.type === 'page') selection.selectPage(node.name)
+  else selection.selectFragment(node.name)
 }
 
-async function handleDelete(node: TreeNode) {
-  if (!node.data) return
-  const name = node.data.name
-  const type = node.data.type
-
-  if (!confirm(`Delete ${type} "${name}"? This cannot be undone.`)) return
-
+async function handleDelete(node: SiteNode, e: Event) {
+  e.stopPropagation()
+  if (!confirm(`Delete ${node.type} "${node.name}"? This cannot be undone.`)) return
   try {
-    if (type === 'page') await api.deletePage(name)
-    else if (type === 'fragment') await api.deleteFragment(name)
+    if (node.type === 'page') await api.deletePage(node.name)
+    else await api.deleteFragment(node.name)
     editing.clear()
     await site.load()
   } catch (err) {
-    toast.showError(err, `Failed to delete "${name}"`)
+    toast.showError(err, `Failed to delete "${node.name}"`)
   }
 }
 </script>
 
 <template>
   <div class="site-tree">
-    <h3>Site</h3>
-    <Tree :value="nodes" v-model:selectionKeys="selectedKey" v-model:expandedKeys="expandedKeys"
-      selectionMode="single" @node-select="onSelect" class="tree">
-      <template #default="{ node }">
-        <div class="node-row" :data-testid="node.data ? `site-${node.data.type}-${node.data.name}` : `site-group-${node.key}`">
-          <span class="node-label">{{ node.label }}</span>
-          <Button v-if="node.data" icon="pi pi-trash" text rounded size="small" severity="danger"
-            class="node-delete" :data-testid="`delete-${node.data.type}-${node.data.name}`"
-            @click.stop="handleDelete(node)" />
-        </div>
-      </template>
-    </Tree>
+    <!-- Pages -->
+    <div class="section-label">Pages</div>
+    <div v-for="node in contentPages" :key="node.key"
+      :class="['node-item', { selected: selectedKey === node.key }]"
+      :data-testid="`site-${node.type}-${node.name}`"
+      @click="onSelect(node)">
+      <i :class="node.icon" class="node-icon" />
+      <span class="node-label">{{ node.label }}</span>
+      <Button icon="pi pi-trash" text rounded size="small" severity="danger"
+        class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
+        @click="handleDelete(node, $event)" />
+    </div>
+
+    <!-- System pages -->
+    <template v-if="systemPages.length">
+      <div class="section-divider" />
+      <div v-for="node in systemPages" :key="node.key"
+        :class="['node-item', { selected: selectedKey === node.key }]"
+        :data-testid="`site-${node.type}-${node.name}`"
+        @click="onSelect(node)">
+        <i :class="node.icon" class="node-icon" />
+        <span class="node-label">{{ node.label }}</span>
+        <Button icon="pi pi-trash" text rounded size="small" severity="danger"
+          class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
+          @click="handleDelete(node, $event)" />
+      </div>
+    </template>
+
+    <!-- Fragments -->
+    <div class="section-label" style="margin-top: 12px;">Fragments</div>
+    <div v-for="node in fragments" :key="node.key"
+      :class="['node-item', { selected: selectedKey === node.key }]"
+      :data-testid="`site-${node.type}-${node.name}`"
+      @click="onSelect(node)">
+      <i :class="node.icon" class="node-icon" />
+      <span class="node-label">{{ node.label }}</span>
+      <Button icon="pi pi-trash" text rounded size="small" severity="danger"
+        class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
+        @click="handleDelete(node, $event)" />
+    </div>
+
     <div class="new-btns">
       <Button icon="pi pi-plus" label="New page" text size="small"
         data-testid="new-page" @click="showCreatePage = true" />
@@ -109,11 +132,17 @@ async function handleDelete(node: TreeNode) {
 </template>
 
 <style scoped>
-.site-tree h3 { font-size: 0.75rem; text-transform: uppercase; color: #888; margin-bottom: 0.5rem; letter-spacing: 0.05em; }
-.tree { font-size: 0.875rem; }
-.new-btns { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-.node-row { display: flex; align-items: center; gap: 0.25rem; width: 100%; }
-.node-label { flex: 1; }
-.node-delete { opacity: 0; transition: opacity 0.15s; }
-.node-row:hover .node-delete { opacity: 1; }
+.site-tree { font-size: 13px; line-height: 22px; }
+.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #666; padding: 4px 8px; font-weight: 600; }
+.section-divider { border-top: 1px solid #27272a; margin: 4px 8px; }
+.node-item { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; margin: 0 2px; cursor: pointer; border-radius: 3px; }
+.node-item:hover { background: rgba(255, 255, 255, 0.05); }
+.node-item.selected { background: rgba(167, 139, 250, 0.15); box-shadow: inset 2px 0 0 #a78bfa; }
+.node-icon { width: 16px; text-align: center; font-size: 10px; color: #666; flex-shrink: 0; }
+.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #bbb; }
+.node-item.selected .node-label { color: #e4e4e7; }
+.node-item:hover .node-label { color: #e4e4e7; }
+.node-delete { opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
+.node-item:hover .node-delete { opacity: 1; }
+.new-btns { display: flex; gap: 0.5rem; margin-top: 8px; padding: 0 6px; }
 </style>

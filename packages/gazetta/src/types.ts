@@ -94,6 +94,7 @@ export interface TargetConfig {
 export interface SiteManifest {
   name: string
   version?: string
+  systemPages?: string[]
   targets?: Record<string, TargetConfig>
 }
 
