@@ -59,6 +59,7 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.6",
+    "@hello-pangea/dnd": "^18.0.1",
     "@hono/node-server": "^1.19.0",
     "@rjsf/core": "^6.4.0",
     "@rjsf/utils": "^6.4.0",

@@ -22,7 +22,9 @@ export function useEditorMount(
     mounted = false
   }
 
-  watch([containerRef, editorMount, content], () => {
+  // Only re-mount when the container or editor instance changes (new component selected).
+  // Content updates flow through React's internal state via onChange — no re-mount needed.
+  watch([containerRef, editorMount], () => {
     if (containerRef.value && editorMount.value && content.value) mount()
     else unmount()
   }, { immediate: true })

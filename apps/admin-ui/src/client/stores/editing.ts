@@ -1,7 +1,7 @@
 function deepClone<T>(obj: T): T { return JSON.parse(JSON.stringify(obj)) }
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import { useToastStore } from './toast.js'
 import { usePreviewStore } from './preview.js'
 
@@ -36,7 +36,14 @@ export const useEditingStore = defineStore('editing', () => {
     return JSON.stringify(content.value) !== JSON.stringify(saved.value)
   })
 
+  /** Returns true if safe to proceed (not dirty, or user confirmed) */
+  function confirmIfDirty(): boolean {
+    if (!dirty.value) return true
+    return window.confirm('You have unsaved changes. Discard them?')
+  }
+
   function open(t: EditingTarget) {
+    if (!confirmIfDirty()) return
     target.value = t
     content.value = deepClone(t.content)
     saved.value = deepClone(t.content)
@@ -46,11 +53,20 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   function clear() {
+    if (!confirmIfDirty()) return
     target.value = null
     content.value = null
     saved.value = null
     saving.value = false
     lastSaveError.value = null
+  }
+
+  // Warn on browser close/refresh with unsaved changes
+  const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+    if (dirty.value) { e.preventDefault(); e.returnValue = '' }
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', beforeUnloadHandler)
   }
 
   function markDirty(newContent: Record<string, unknown>) {

@@ -2,6 +2,7 @@ import React from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import Form from '@rjsf/core'
 import validator from '@rjsf/validator-ajv8'
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
@@ -10,6 +11,11 @@ import Placeholder from '@tiptap/extension-placeholder'
 import type { EditorMount } from '../types.js'
 import type { IChangeEvent } from '@rjsf/core'
 import type { WidgetProps, ArrayFieldTemplateProps, ArrayFieldItemTemplateProps, ArrayFieldItemButtonsTemplateProps, ObjectFieldTemplateProps, IconButtonProps } from '@rjsf/utils'
+
+/** Form context passed to all templates and widgets */
+interface GzFormContext {
+  reorderArray: (fieldPath: string, fromIndex: number, toIndex: number) => void
+}
 
 const roots = new WeakMap<HTMLElement, Root>()
 
@@ -227,10 +233,17 @@ const STYLES = `
   transition: border-color 0.15s;
 }
 .gz-editor .gz-array-item:hover { border-color: #2a2a3a; }
+.gz-editor .gz-array-item.dragging { opacity: 0.9; box-shadow: 0 4px 20px #0006; border-color: #667eea40; }
 .gz-editor .gz-array-item-header {
   display: flex; align-items: center; gap: 0.375rem; padding: 0.5rem 0.625rem;
   cursor: pointer; user-select: none; min-height: 36px;
 }
+.gz-editor .gz-array-item-handle {
+  color: #333; font-size: 0.625rem; cursor: grab; flex-shrink: 0; padding: 0.25rem 0.125rem;
+  opacity: 0; transition: opacity 0.1s; display: flex; align-items: center; letter-spacing: 1px;
+}
+.gz-editor .gz-array-item:hover .gz-array-item-handle { opacity: 1; }
+.gz-editor .gz-array-item-handle:active { cursor: grabbing; color: #667eea; }
 .gz-editor .gz-array-item-chevron {
   color: #444; font-size: 0.5rem; transition: transform 0.15s ease; flex-shrink: 0; width: 12px; text-align: center;
 }
@@ -586,6 +599,14 @@ function RichTextWidget(props: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function GzArrayFieldTemplate(props: ArrayFieldTemplateProps) {
+  const ctx = props.registry.formContext as GzFormContext | undefined
+  const fieldPath = props.fieldPathId?.$id ?? ''
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination || result.source.index === result.destination.index) return
+    ctx?.reorderArray(fieldPath, result.source.index, result.destination.index)
+  }
+
   if (props.items.length === 0) {
     return (
       <div className="gz-array">
@@ -612,7 +633,16 @@ function GzArrayFieldTemplate(props: ArrayFieldTemplateProps) {
         <span className="gz-array-count">{props.items.length}</span>
         {props.canAdd && <button type="button" className="gz-array-add" onClick={props.onAddClick}>+ Add</button>}
       </div>
-      <div className="gz-array-items">{props.items}</div>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId={fieldPath || 'array'}>
+          {(provided) => (
+            <div className="gz-array-items" ref={provided.innerRef} {...provided.droppableProps}>
+              {props.items}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
     </div>
   )
 }
@@ -620,21 +650,35 @@ function GzArrayFieldTemplate(props: ArrayFieldTemplateProps) {
 function GzArrayFieldItemTemplate(props: ArrayFieldItemTemplateProps) {
   const [open, setOpen] = React.useState(true)
   const summary = summarizeItem((props as unknown as { formData: unknown }).formData)
+  const draggableId = `${props.buttonsProps.fieldPathId?.$id ?? 'item'}-${props.index}`
 
   return (
-    <div className="gz-array-item">
-      <div className="gz-array-item-header" onClick={() => setOpen(!open)}>
-        <span className={`gz-array-item-chevron${open ? ' open' : ''}`}>&#x25B6;</span>
-        <span className="gz-array-item-idx">{props.index + 1}</span>
-        {!open && <span className={`gz-array-item-summary${summary ? '' : ' empty'}`}>{summary || 'Empty item'}</span>}
-        <div className="gz-array-item-actions" onClick={(e) => e.stopPropagation()}>
-          <GzArrayFieldItemButtonsTemplate {...props.buttonsProps} />
+    <Draggable draggableId={draggableId} index={props.index}>
+      {(provided, snapshot) => (
+        <div
+          className={`gz-array-item${snapshot.isDragging ? ' dragging' : ''}`}
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+        >
+          <div className="gz-array-item-header" onClick={() => setOpen(!open)}>
+            <span
+              className="gz-array-item-handle"
+              {...provided.dragHandleProps}
+              onClick={(e) => e.stopPropagation()}
+            >&#x2801;&#x2801;</span>
+            <span className={`gz-array-item-chevron${open ? ' open' : ''}`}>&#x25B6;</span>
+            <span className="gz-array-item-idx">{props.index + 1}</span>
+            {!open && <span className={`gz-array-item-summary${summary ? '' : ' empty'}`}>{summary || 'Empty item'}</span>}
+            <div className="gz-array-item-actions" onClick={(e) => e.stopPropagation()}>
+              <GzArrayFieldItemButtonsTemplate {...props.buttonsProps} />
+            </div>
+          </div>
+          <div className={`gz-array-item-body ${open ? 'expanded' : 'collapsed'}`}>
+            {props.children}
+          </div>
         </div>
-      </div>
-      <div className={`gz-array-item-body ${open ? 'expanded' : 'collapsed'}`}>
-        {props.children}
-      </div>
-    </div>
+      )}
+    </Draggable>
   )
 }
 
@@ -700,11 +744,75 @@ export function createEditorMount(jsonSchema: object): EditorMount {
 
       function EditorForm() {
         const [formData, setFormData] = React.useState(content)
+        const formDataRef = React.useRef(formData)
+        formDataRef.current = formData
+
+        const undoStack = React.useRef<Record<string, unknown>[]>([])
+        const redoStack = React.useRef<Record<string, unknown>[]>([])
+        const isUndoRedo = React.useRef(false)
+
+        const pushHistory = (prev: Record<string, unknown>) => {
+          if (isUndoRedo.current) return
+          undoStack.current.push(prev)
+          if (undoStack.current.length > 50) undoStack.current.shift()
+          redoStack.current = []
+        }
+
+        const applyFormData = (data: Record<string, unknown>) => {
+          setFormData(data)
+          onChange(data)
+        }
 
         const handleChange = (e: IChangeEvent) => {
+          pushHistory(formDataRef.current)
           setFormData(e.formData)
           onChange(e.formData as Record<string, unknown>)
         }
+
+        React.useEffect(() => {
+          const handler = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+              e.preventDefault()
+              if (e.shiftKey) {
+                // Redo
+                if (redoStack.current.length === 0) return
+                const next = redoStack.current.pop()!
+                undoStack.current.push(formDataRef.current)
+                isUndoRedo.current = true
+                applyFormData(next)
+                isUndoRedo.current = false
+              } else {
+                // Undo
+                if (undoStack.current.length === 0) return
+                const prev = undoStack.current.pop()!
+                redoStack.current.push(formDataRef.current)
+                isUndoRedo.current = true
+                applyFormData(prev)
+                isUndoRedo.current = false
+              }
+            }
+          }
+          document.addEventListener('keydown', handler)
+          return () => document.removeEventListener('keydown', handler)
+        }, [])
+
+        const reorderArray = React.useCallback((fieldPath: string, fromIndex: number, toIndex: number) => {
+          setFormData((prev: Record<string, unknown>) => {
+            pushHistory(prev)
+            const parts = fieldPath.replace(/^root_/, '').split('_')
+            const key = parts[0]
+            const arr = prev[key]
+            if (!Array.isArray(arr)) return prev
+            const next = [...arr]
+            const [moved] = next.splice(fromIndex, 1)
+            next.splice(toIndex, 0, moved)
+            const updated = { ...prev, [key]: next }
+            onChange(updated)
+            return updated
+          })
+        }, [onChange])
+
+        const formContext: GzFormContext = React.useMemo(() => ({ reorderArray }), [reorderArray])
 
         return (
           <>
@@ -718,6 +826,7 @@ export function createEditorMount(jsonSchema: object): EditorMount {
                 validator={validator}
                 widgets={customWidgets}
                 templates={customTemplates}
+                formContext={formContext}
                 liveValidate={false}
                 omitExtraData
                 noHtml5Validate
