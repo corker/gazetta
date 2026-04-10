@@ -111,8 +111,8 @@ watch(detail, async (d) => {
     children,
   }
   // Fragment root has data-gz in host-page preview — add to gzMap for click-to-select
-  if (rootPath) {
-    map.set(hashPath(rootPath), { path: d.dir, template: d.template })
+  if (rootPath && selection.type === 'fragment' && selection.name) {
+    map.set(hashPath(rootPath), { isFragment: true, fragName: selection.name })
   }
   componentNodes.value = [rootNode]
   expandedKeys.value = { [`root:${selection.name}`]: true }
