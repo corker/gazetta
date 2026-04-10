@@ -68,7 +68,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 <style scoped>
 .cms-editor { display: flex; height: calc(100% - 60px); }
 .cms-left { width: 250px; flex-shrink: 0; overflow: auto; border-right: 1px solid #27272a; }
-.cms-left-wide { width: 45%; max-width: 700px; overflow: hidden; }
+.cms-left-wide { width: 55%; max-width: 900px; overflow: hidden; }
 .cms-splitter { height: 100%; border: 0; border-radius: 0; }
 .cms-preview { flex: 1; min-width: 0; overflow: hidden; }
 .cms-panel { overflow: auto; }
