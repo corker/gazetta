@@ -86,7 +86,7 @@ const BRIDGE_SCRIPT = `
 
   var dimOverlay = document.createElement('div');
   dimOverlay.id = 'gz-dim';
-  dimOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;pointer-events:none;display:none;';
+  dimOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.3);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:99998;pointer-events:none;display:none;transition:opacity 0.2s;opacity:0;';
   document.body.appendChild(dimOverlay);
 
   var highlighted = null;
@@ -130,7 +130,8 @@ const BRIDGE_SCRIPT = `
       scopedEl.style.zIndex = '';
       scopedEl = null;
     }
-    dimOverlay.style.display = 'none';
+    dimOverlay.style.opacity = '0';
+    setTimeout(function() { if (!scopedEl) dimOverlay.style.display = 'none'; }, 200);
 
     if (!gzId) return;
     var el = document.querySelector('[data-gz="' + gzId + '"]');
@@ -141,6 +142,9 @@ const BRIDGE_SCRIPT = `
     el.style.zIndex = '99999';
     scopedEl = el;
     dimOverlay.style.display = 'block';
+    // Force reflow then fade in
+    dimOverlay.offsetHeight;
+    dimOverlay.style.opacity = '1';
   }
 
   window.addEventListener('scroll', refreshOverlay, true);
