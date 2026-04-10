@@ -151,13 +151,17 @@ const BRIDGE_SCRIPT = `
   window.addEventListener('scroll', refreshOverlay, true);
   window.addEventListener('resize', refreshOverlay);
 
+  function isInScope(el) {
+    return !scopedEl || scopedEl.contains(el);
+  }
+
   document.addEventListener('mousemove', function(e) {
     if (mode !== 'edit' || !highlight) { if (highlighted) { highlighted = null; overlay.style.display = 'none'; } return; }
     var target = findGz(e.target);
-    if (target && target !== highlighted) {
+    if (target && target !== highlighted && isInScope(target)) {
       highlighted = target;
       showOverlay(target, '#a78bfa');
-    } else if (!target) {
+    } else if (!target || !isInScope(target)) {
       highlighted = null;
       overlay.style.display = 'none';
     }
@@ -188,7 +192,7 @@ const BRIDGE_SCRIPT = `
     if (isInteractive(e.target)) return;
 
     var target = findGz(e.target);
-    if (!target) return;
+    if (!target || !isInScope(target)) return;
 
     e.preventDefault();
     e.stopPropagation();
