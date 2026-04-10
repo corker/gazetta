@@ -29,6 +29,7 @@ const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let currentHtml = ''
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let previewHoverTimer: ReturnType<typeof setTimeout> | null = null
 
 const focus = useComponentFocusStore()
 
@@ -213,6 +214,11 @@ const BRIDGE_SCRIPT = `
     return !scopedEl || scopedEl.contains(el);
   }
 
+  // Clear hover when mouse leaves the iframe
+  document.addEventListener('mouseleave', function() {
+    if (hoveredEl) { clearHover(); window.parent.postMessage({ type: 'gazetta:hover', gzId: null }, '*'); }
+  });
+
   // Edit mode: mousemove hover highlight in preview
   document.addEventListener('mousemove', function(e) {
     if (mode !== 'edit' || !highlight) {
@@ -285,6 +291,12 @@ const BRIDGE_SCRIPT = `
         clearSelect();
       }
     }
+    if (e.data && e.data.type === 'gazetta:scrollTo') {
+      if (e.data.gzId) {
+        var scrollEl = document.querySelector('[data-gz="' + e.data.gzId + '"]');
+        if (scrollEl) scrollIfOffscreen(scrollEl);
+      }
+    }
     if (e.data && e.data.type === 'gazetta:scope') {
       applyScope(e.data.gzId);
     }
@@ -322,6 +334,14 @@ function handleMessage(e: MessageEvent) {
   }
   if (e.data?.type === 'gazetta:hover') {
     focus.previewHover(e.data.gzId ?? null)
+    // When preview hover ends, scroll back to selected component after delay
+    if (previewHoverTimer) { clearTimeout(previewHoverTimer); previewHoverTimer = null }
+    if (!e.data.gzId && focus.selectedGzId) {
+      previewHoverTimer = setTimeout(() => {
+        iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:scrollTo', gzId: focus.selectedGzId }, '*')
+        previewHoverTimer = null
+      }, 300)
+    }
   }
   if (e.data?.type === 'gazetta:external' && e.data.url) {
     toast.show(e.data.url, { link: e.data.url, duration: 5000 })
