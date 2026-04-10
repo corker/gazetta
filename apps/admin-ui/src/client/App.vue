@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useSiteStore } from './stores/site.js'
+import { useSelectionStore } from './stores/selection.js'
 import { useThemeStore } from './stores/theme.js'
 import Toolbar from './components/CmsToolbar.vue'
 
 const site = useSiteStore()
+const selection = useSelectionStore()
 const theme = useThemeStore()
-onMounted(() => {
-  site.load()
+onMounted(async () => {
+  await site.load()
   theme.init()
+  selection.restore()
 })
 </script>
 

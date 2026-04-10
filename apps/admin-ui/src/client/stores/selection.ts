@@ -9,6 +9,13 @@ export type Selection =
   | { type: 'page'; name: string; detail: PageDetail }
   | { type: 'fragment'; name: string; detail: FragmentDetail }
 
+const STORAGE_KEY = 'gazetta_selection'
+
+function saveSession(data: { type: string; name: string; hostPage?: string } | null) {
+  if (data) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  else sessionStorage.removeItem(STORAGE_KEY)
+}
+
 export const useSelectionStore = defineStore('selection', () => {
   const toast = useToastStore()
 
@@ -41,6 +48,9 @@ export const useSelectionStore = defineStore('selection', () => {
     const page = staticPages.value.find(p => p.name === pageName)
     if (page) {
       fragmentHostPage.value = page
+      if (selection.value?.type === 'fragment') {
+        saveSession({ type: 'fragment', name: selection.value.name, hostPage: pageName })
+      }
       usePreviewStore().invalidate()
     }
   }
@@ -50,6 +60,7 @@ export const useSelectionStore = defineStore('selection', () => {
       const detail = await api.getPage(pageName)
       selection.value = { type: 'page', name: pageName, detail }
       fragmentHostPage.value = null
+      saveSession({ type: 'page', name: pageName })
       usePreviewStore().invalidate()
     } catch (err) {
       toast.showError(err, `Failed to load page "${pageName}"`)
@@ -61,6 +72,7 @@ export const useSelectionStore = defineStore('selection', () => {
       const detail = await api.getFragment(fragName)
       selection.value = { type: 'fragment', name: fragName, detail }
       resolveDefaultHostPage()
+      saveSession({ type: 'fragment', name: fragName, hostPage: fragmentHostPage.value?.name })
       usePreviewStore().invalidate()
     } catch (err) {
       toast.showError(err, `Failed to load fragment "${fragName}"`)
@@ -99,5 +111,22 @@ export const useSelectionStore = defineStore('selection', () => {
     }
   }
 
-  return { selection, type, name, detail, previewRoute, fragmentHostPage, staticPages, selectPage, selectFragment, setFragmentHostPage, reload, updateComponents }
+  /** Restore selection from sessionStorage (call after site data is loaded) */
+  async function restore() {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return
+    try {
+      const saved = JSON.parse(raw) as { type: string; name: string; hostPage?: string }
+      if (saved.type === 'page') {
+        await selectPage(saved.name)
+      } else if (saved.type === 'fragment') {
+        await selectFragment(saved.name)
+        if (saved.hostPage) setFragmentHostPage(saved.hostPage)
+      }
+    } catch {
+      sessionStorage.removeItem(STORAGE_KEY)
+    }
+  }
+
+  return { selection, type, name, detail, previewRoute, fragmentHostPage, staticPages, selectPage, selectFragment, setFragmentHostPage, reload, updateComponents, restore }
 })
