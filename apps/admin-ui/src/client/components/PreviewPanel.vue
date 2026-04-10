@@ -32,14 +32,13 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const focus = useComponentFocusStore()
 
-// Send highlight to bridge (includes selectedGzId for scroll-back)
+// Send hover highlight to bridge
 function sendHighlight() {
-  const gzId = focus.highlightGzId
-  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:highlight', gzId: gzId ?? null, selectedGzId: focus.selectedGzId ?? null }, '*')
+  iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:highlight', gzId: focus.highlightGzId ?? null }, '*')
 }
 watch(() => focus.highlightGzId, sendHighlight)
 
-// Send selection to bridge — keeps green overlay in sync
+// Send selection to bridge — green overlay
 function sendSelection() {
   iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:showSelect', gzId: focus.selectedGzId ?? null }, '*')
 }
@@ -251,7 +250,6 @@ const BRIDGE_SCRIPT = `
     e.preventDefault();
     e.stopPropagation();
 
-    showSelect(target);
     window.parent.postMessage({ type: 'gazetta:select', gzId: target.dataset.gz }, '*');
   }, true);
 
@@ -267,22 +265,11 @@ const BRIDGE_SCRIPT = `
     }
     if (e.data && e.data.type === 'gazetta:highlight') {
       if (e.data.gzId) {
-        // Tree hover — show hover overlay, scroll if offscreen
         var el = document.querySelector('[data-gz="' + e.data.gzId + '"]');
-        if (el) {
-          showHover(el);
-          scrollIfOffscreen(el);
-        }
+        if (el) { showHover(el); scrollIfOffscreen(el); }
       } else {
-        // Tree hover end — fade out hover, scroll back to selected
         clearHover();
-        if (e.data.selectedGzId) {
-          var sel = document.querySelector('[data-gz="' + e.data.selectedGzId + '"]');
-          if (sel) {
-            showSelect(sel);
-            scrollIfOffscreen(sel);
-          }
-        }
+        if (selectedEl) scrollIfOffscreen(selectedEl);
       }
     }
     if (e.data && e.data.type === 'gazetta:showSelect') {
@@ -311,6 +298,8 @@ function injectBridge(html: string): string {
 
 function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:select' && e.data.gzId) {
+    // Instant visual feedback — show selection overlay before async processing
+    iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:showSelect', gzId: e.data.gzId }, '*')
     // In browse mode, entering edit first — setPending buffers for ComponentTree
     if (uiMode.mode === 'browse') uiMode.enterEdit()
     focus.setPending(e.data.gzId)
