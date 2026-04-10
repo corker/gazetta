@@ -134,7 +134,10 @@ const BRIDGE_SCRIPT = `
     dimOverlay.style.opacity = '0';
     setTimeout(function() { if (!scopedEl) dimOverlay.style.display = 'none'; }, 200);
 
-    if (!gzId) return;
+    if (!gzId) {
+      if (mode === 'edit' && highlight) document.body.style.cursor = 'crosshair';
+      return;
+    }
     var el = document.querySelector('[data-gz="' + gzId + '"]');
     if (!el) return;
 
@@ -142,6 +145,11 @@ const BRIDGE_SCRIPT = `
     if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
     el.style.zIndex = '99999';
     scopedEl = el;
+    // Move crosshair cursor to scoped element if in edit mode
+    if (mode === 'edit' && highlight) {
+      document.body.style.cursor = '';
+      el.style.cursor = 'crosshair';
+    }
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     dimOverlay.style.display = 'block';
     // Force reflow then fade in
