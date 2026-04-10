@@ -32,12 +32,14 @@ const nodes = computed<TreeNode[]>(() => [
     label: 'Pages',
     icon: 'pi pi-file',
     selectable: false,
-    children: site.pages.map(p => ({
-      key: `page:${p.name}`,
-      label: p.name,
-      icon: 'pi pi-file',
-      data: { type: 'page' as const, name: p.name, route: p.route },
-    })),
+    children: [...site.pages]
+      .sort((a, b) => a.route.localeCompare(b.route))
+      .map(p => ({
+        key: `page:${p.name}`,
+        label: p.name,
+        icon: 'pi pi-file',
+        data: { type: 'page' as const, name: p.name, route: p.route },
+      })),
   },
   {
     key: 'fragments',
