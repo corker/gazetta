@@ -5,7 +5,6 @@ import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
-import { useToastStore } from '../stores/toast.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
 import PublishDialog from './PublishDialog.vue'
@@ -14,7 +13,6 @@ import FetchDialog from './FetchDialog.vue'
 const site = useSiteStore()
 const selection = useSelectionStore()
 const editing = useEditingStore()
-const toast = useToastStore()
 const theme = useThemeStore()
 const uiMode = useUiModeStore()
 const showPublish = ref(false)
@@ -43,12 +41,7 @@ function handleBack() {
     </template>
     <template #center>
       <Transition name="fade">
-        <span v-if="toast.current" class="cms-toast" :class="toast.current.type === 'error' ? 'cms-toast-error' : 'cms-toast-success'">
-          <i :class="toast.current.type === 'error' ? 'pi pi-exclamation-circle' : 'pi pi-check-circle'" />
-          <a v-if="toast.current.link" :href="toast.current.link" target="_blank" rel="noopener" class="cms-toast-link">{{ toast.current.message }}</a>
-          <template v-else>{{ toast.current.message }}</template>
-        </span>
-        <span v-else-if="editing.lastSaveError" class="cms-toast cms-toast-error">
+        <span v-if="editing.lastSaveError" class="cms-toast cms-toast-error">
           <i class="pi pi-exclamation-circle" /> {{ editing.lastSaveError }}
         </span>
         <span v-else-if="editing.dirty" class="cms-toast cms-toast-dirty">
@@ -81,9 +74,7 @@ function handleBack() {
 .cms-site-name { margin-left: 1rem; color: #888; font-size: 0.875rem; }
 .cms-btn { margin-left: 0.5rem; }
 .cms-toast { font-size: 0.8125rem; display: flex; align-items: center; gap: 0.375rem; }
-.cms-toast-success { color: #16a34a; }
 .cms-toast-error { color: #dc2626; }
-.cms-toast-link { color: inherit; text-decoration: underline; }
 .cms-toast-dirty { color: #d97706; }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
