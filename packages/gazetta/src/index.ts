@@ -53,5 +53,4 @@ export { format } from './formats.js'
 // ESI assembly (for edge workers and servers)
 export { assembleEsi, parseCacheComment, splitFragment, findEsiPaths } from './assemble.js'
 
-// Editor
-export { createEditorMount } from './editor/mount.js'
+// Editor — import from 'gazetta/editor' (separate entry point to avoid pulling Tiptap into server builds)

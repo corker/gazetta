@@ -40,4 +40,22 @@ export const format = {
 
   /** File upload */
   file: () => ({ format: 'data-url' as const }),
+
+  /** Rich text editor (Tiptap) */
+  richtext: () => ({ format: 'richtext' as const }),
+
+  /** Image URL with preview thumbnail */
+  image: () => ({ format: 'image' as const }),
+
+  /** Link — URL + optional label + target */
+  link: () => ({ format: 'link' as const }),
+
+  /** Slug — auto-generated URL-safe identifier */
+  slug: () => ({ format: 'slug' as const }),
+
+  /** Code editor with syntax highlighting */
+  code: (opts?: { language?: string }) => ({ format: 'code' as const, ...opts }),
+
+  /** JSON editor with validation */
+  json: () => ({ format: 'json' as const }),
 }

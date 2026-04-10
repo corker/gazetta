@@ -1,0 +1,8 @@
+template: page-default
+content:
+  title: Editor Showcase
+  description: Demonstrates all editor input types
+components:
+  - "@header"
+  - showcase-demo
+  - "@footer"

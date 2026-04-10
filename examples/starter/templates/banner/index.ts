@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { format } from 'gazetta'
 import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
@@ -6,7 +7,7 @@ export const schema = z.object({
   text: z.string().optional().describe('Supporting text'),
   buttonText: z.string().optional().describe('Button label'),
   buttonUrl: z.string().optional().describe('Button link URL'),
-  background: z.string().optional().describe('Background color or gradient (default: #667eea)'),
+  background: z.string().meta(format.color()).optional().describe('Background color or gradient (default: #667eea)'),
 })
 
 type Content = z.infer<typeof schema>
