@@ -280,6 +280,7 @@ const BRIDGE_SCRIPT = `
       } else {
         clearHover();
         if (selectedEl) scrollIfOffscreen(selectedEl);
+        else window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
     if (e.data && e.data.type === 'gazetta:showSelect') {
@@ -295,6 +296,8 @@ const BRIDGE_SCRIPT = `
       if (e.data.gzId) {
         var scrollEl = document.querySelector('[data-gz="' + e.data.gzId + '"]');
         if (scrollEl) scrollIfOffscreen(scrollEl);
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
     if (e.data && e.data.type === 'gazetta:scope') {
@@ -336,9 +339,9 @@ function handleMessage(e: MessageEvent) {
     focus.previewHover(e.data.gzId ?? null)
     // When preview hover ends, scroll back to selected component after delay
     if (previewHoverTimer) { clearTimeout(previewHoverTimer); previewHoverTimer = null }
-    if (!e.data.gzId && focus.selectedGzId) {
+    if (!e.data.gzId) {
       previewHoverTimer = setTimeout(() => {
-        iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:scrollTo', gzId: focus.selectedGzId }, '*')
+        iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:scrollTo', gzId: focus.selectedGzId ?? null }, '*')
         previewHoverTimer = null
       }, 300)
     }
