@@ -9,3 +9,4 @@ admin-dist/
 .env.*
 .claude/settings.local.json
 CLAUDE.local.md
+test-results/
