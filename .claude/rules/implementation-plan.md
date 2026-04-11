@@ -15,8 +15,12 @@ Design the best UX solution first, then implement.
 | **Site developer** | Project setup, CLI, deploy, targets | Structure, CLI, init changes |
 | **Contributor** | Clone, run, test, submit PR | Testing, docs, onboarding |
 
-For each step: describe what each affected user sees, clicks, and types BEFORE writing code.
-Find friction points, simplify the experience, then implement the simplest correct solution.
+For each step:
+1. **Research** — how do other products solve this? Study design, styles, visuals, interactions
+   in Sanity Studio, Payload CMS, Storyblok, Notion, Linear, and other relevant tools.
+2. **Design** — describe what each affected user sees, clicks, and types. Sketch the interaction.
+3. **Simplify** — find friction points, remove unnecessary steps, question every element.
+4. **Implement** — build the simplest correct solution that matches the designed experience.
 
 ## Step 0: UI verification infrastructure
 
