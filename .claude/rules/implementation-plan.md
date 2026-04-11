@@ -3,6 +3,21 @@
 Build Gazetta as designed. First slice delivers a complete user experience (editor customization).
 Then sequential infrastructure steps. Types ship with their consumers.
 
+## Principle: UX before code
+
+Before implementing any step, walk through the experience from each affected user's perspective.
+Design the best UX solution first, then implement.
+
+| User | What they care about | When to consider |
+|------|---------------------|------------------|
+| **Content author** | Editing experience — forms, preview, save/discard, dark/light | Every editor change |
+| **Template developer** | Creating editors/fields — file structure, API, HMR, DX | Custom editor/field features |
+| **Site developer** | Project setup, CLI, deploy, targets | Structure, CLI, init changes |
+| **Contributor** | Clone, run, test, submit PR | Testing, docs, onboarding |
+
+For each step: describe what each affected user sees, clicks, and types BEFORE writing code.
+Find friction points, simplify the experience, then implement the simplest correct solution.
+
 ## Step 0: UI verification infrastructure
 
 Three approaches that give Claude eyes, assertions, and structural verification.
