@@ -8,9 +8,9 @@ code paths, storage providers, publish modes, and CLI commands apply to a given 
 | Mode | Who | What they run | What they edit |
 |------|-----|---------------|----------------|
 | **Gazetta contributor** | Core developer | `npm run dev` from monorepo root (builds core, starts starter) | `packages/gazetta/`, `apps/admin/` |
-| **Site author (new)** | End user | `npx gazetta init my-site && npx gazetta dev` | `templates/`, `fragments/`, `pages/`, `site.yaml` |
-| **Site author (existing)** | End user | `npx gazetta dev` in site dir | Same as above |
-| **Template developer** | Frontend dev | `npx gazetta dev` — builds/tests templates in a site context | `templates/` only (schema, render fn, custom editor) |
+| **Site author (new)** | End user | `npx gazetta init my-site && cd my-site && gazetta dev` | `templates/`, `sites/*/fragments/`, `sites/*/pages/`, `site.yaml` |
+| **Site author (existing)** | End user | `gazetta dev` in project dir | Same as above |
+| **Template developer** | Frontend dev | `gazetta dev` — builds/tests templates in a site context | `templates/` (schema, render fn) + `admin/editors/` (custom editors) |
 | **Admin UI developer** | Core developer | `npm run dev` from `apps/admin/` (Vite UI :3000 + Hono API :4000) | `apps/admin/src/client/`, `apps/admin/src/server/` |
 
 The monorepo `npm run dev` starts `examples/starter` which has both filesystem and Azure Blob
@@ -23,8 +23,8 @@ targets configured — exercises most code paths locally.
 | **Single site** | Standalone dir or monorepo `sites/my-site/` | 1+ targets | Most sites |
 | **Multi-site monorepo** | Multiple dirs under `sites/` sharing templates | Each site has own `site.yaml` | Agency, multi-brand |
 
-Multi-site: each site is independent. CLI operates on one site at a time (`gazetta publish sites/site-a`).
-Shared templates must be copied or symlinked — no cross-site template resolution.
+Multi-site: each site is independent. CLI operates on one site at a time (`gazetta publish --site my-site production`).
+Templates and admin are shared across all sites in the project.
 
 ## File Structures
 
@@ -208,9 +208,9 @@ production:
 
 | Source | Command / action | Runs where | Typical use |
 |--------|-----------------|------------|-------------|
-| **CLI** | `gazetta publish [-t target]` | Developer machine or CI | Full site publish |
+| **CLI** | `gazetta publish [target]` | Developer machine or CI | Full site publish |
 | **Admin UI** | Publish button → `POST /api/publish` | Browser → dev server API | Per-page/fragment publish during editing |
-| **CI/CD** | `npx gazetta publish` in GitHub Actions | CI runner | Automated publish on push |
+| **CI/CD** | `gazetta publish production` in GitHub Actions | CI runner | Automated publish on push |
 
 CLI and CI use the same publish functions and branch on `!targetConfig?.worker` to choose
 static vs ESI mode. The admin API resolves dependencies (fragments required by a page)
@@ -220,10 +220,12 @@ config (see gap in Target Configurations above).
 ### CI/CD pattern (GitHub Actions)
 
 ```yaml
-- npm ci && npm run build
-- npx tsx packages/gazetta/src/cli/index.ts publish sites/my-site
+- npm ci
+- gazetta publish production
   env: { CLOUDFLARE_API_TOKEN, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY }
-- cd sites/my-site/worker && npx wrangler deploy  # if using Cloudflare Worker
+# If deploying worker (rare — on Gazetta upgrade or first setup):
+- gazetta build
+- gazetta deploy production
 ```
 
 ## Serve Modes
@@ -231,8 +233,8 @@ config (see gap in Target Configurations above).
 | Mode | Command | Runtime | What it does |
 |------|---------|---------|-------------|
 | **Dev server** | `gazetta dev` | Node (Hono) | Renders on-the-fly from source, hot reload via SSE, admin UI at /admin |
-| **Node production** | `gazetta serve [-t target] [-p port]` | Node/Bun (Hono) | ESI assembly from storage, ETag/304, Cache-Control headers |
-| **Cloudflare Worker** | `gazetta deploy -t target` (one-time) | Cloudflare Workers (Hono) | ESI assembly from R2, Cache API, edge distribution |
+| **Node production** | `gazetta serve` | Node/Bun (Hono) | ESI assembly from storage, ETag/304, Cache-Control headers |
+| **Cloudflare Worker** | `gazetta build && gazetta deploy production` | Cloudflare Workers (Hono) | ESI assembly from R2, Cache API, edge distribution |
 | **Static file server** | Any web server (nginx, Caddy, etc.) | None | Serves pre-baked HTML files directly |
 
 `gazetta dev` and `gazetta serve` are different code paths:
