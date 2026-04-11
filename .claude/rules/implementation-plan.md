@@ -3,6 +3,23 @@
 Build Gazetta as designed. First slice delivers a complete user experience (editor customization).
 Then sequential infrastructure steps. Types ship with their consumers.
 
+## Step 0: Enhance MCP dev server for UI verification
+
+Add browser interaction tools to the existing MCP server. Claude can click through the
+admin UI, interact with editors, and take screenshots to verify visual changes.
+
+**Changes:**
+- `tools/mcp-dev/src/index.ts` — add tools:
+  - `click(selector)` — click an element (CSS selector or data-testid)
+  - `type(selector, text)` — type text into an input
+  - `wait(selector, timeout?)` — wait for element to appear
+  - `hover(selector)` — hover over an element
+  - `screenshot` — already exists, now captures state after interactions
+
+All tools reuse the existing Playwright page instance. ~50 lines of new code.
+
+**Verify:** Claude can: screenshot → click a page in tree → wait for editor → screenshot.
+
 ## Slice 1: "I can customize my template's editor"
 
 The complete editor customization experience — everything a template developer needs.
@@ -84,16 +101,36 @@ gazetta.studio (dogfooding):
 - `sites/gazetta.studio/admin/editors/` — create a custom editor for one template
 - Validates the feature works on a real site, not just the starter
 
+### 1g. Playwright e2e tests
+
+Verify every interaction programmatically. Test helper starts `gazetta dev`, provides `page`.
+
+```ts
+// tests/e2e/editor.test.ts
+test('theme toggle switches editor colors', async ({ page }) => { ... })
+test('custom editor loads for hero template', async ({ page }) => { ... })
+test('default form loads for template without editor', async ({ page }) => { ... })
+test('DefaultEditorForm embeds inside custom editor', async ({ page }) => { ... })
+test('custom editor HMR reloads on file change', async ({ page }) => { ... })
+```
+
 ### Verify Slice 1
 
-1. Toggle dark/light → editor follows theme
-2. Select hero → custom editor mounts with live preview + default form
-3. Edit content via custom editor → preview updates
-4. Switch to card → default @rjsf form
-5. Edit `admin/editors/hero.tsx` → Vite HMR reloads
-6. Both dark and light mode work in custom editor
-7. Docs describe how to create a custom editor
-8. gazetta.studio has a working custom editor
+Automated (e2e tests):
+1. Theme toggle switches editor colors (dark ↔ light)
+2. Custom editor loads for hero
+3. Default form loads for card (no custom editor)
+4. Content edit via custom editor updates preview
+5. DefaultEditorForm embeds and works inside custom editor
+
+Manual (MCP screenshot):
+6. Visual quality of dark mode editor
+7. Visual quality of light mode editor
+8. Custom editor hero layout looks correct
+
+Documentation:
+9. getting-started.md has custom editor section
+10. gazetta.studio has a working custom editor
 
 ---
 
