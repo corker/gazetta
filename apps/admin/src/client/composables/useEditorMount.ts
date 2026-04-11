@@ -5,15 +5,22 @@ export function useEditorMount(
   containerRef: Ref<HTMLElement | null>,
   editorMount: Ref<EditorMount | null>,
   content: Ref<Record<string, unknown> | null>,
+  schema: Ref<Record<string, unknown> | null>,
+  theme: Ref<'dark' | 'light'>,
   onChange: (content: Record<string, unknown>) => void,
   mountVersion?: Ref<number>
 ) {
   let mounted = false
 
   function mount() {
-    if (!containerRef.value || !editorMount.value || !content.value) return
+    if (!containerRef.value || !editorMount.value || !content.value || !schema.value) return
     if (mounted) unmount()
-    editorMount.value.mount(containerRef.value, { content: content.value, onChange })
+    editorMount.value.mount(containerRef.value, {
+      content: content.value,
+      schema: schema.value,
+      theme: theme.value,
+      onChange,
+    })
     mounted = true
   }
 

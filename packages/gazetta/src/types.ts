@@ -15,7 +15,23 @@ export type TemplateFunction<T extends Record<string, unknown> = Record<string, 
 
 /** Mount function for framework-agnostic custom editors */
 export interface EditorMount {
-  mount(el: HTMLElement, props: { content: Record<string, unknown>; onChange: (content: Record<string, unknown>) => void }): void
+  mount(el: HTMLElement, props: {
+    content: Record<string, unknown>
+    schema: Record<string, unknown>
+    theme: 'dark' | 'light'
+    onChange: (content: Record<string, unknown>) => void
+  }): void
+  unmount(el: HTMLElement): void
+}
+
+/** Mount function for framework-agnostic custom field widgets */
+export interface FieldMount {
+  mount(el: HTMLElement, props: {
+    value: unknown
+    schema: Record<string, unknown>
+    theme: 'dark' | 'light'
+    onChange: (value: unknown) => void
+  }): void
   unmount(el: HTMLElement): void
 }
 
@@ -23,7 +39,6 @@ export interface EditorMount {
 export interface TemplateModule {
   default: TemplateFunction
   schema: unknown // ZodType — kept as unknown to avoid zod dependency in shared
-  editor?: EditorMount
 }
 
 /** Component manifest (base) */

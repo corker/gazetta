@@ -24,14 +24,15 @@ const editorMountRef = computed<EditorMount | null>(() => {
 })
 
 const contentRef = computed(() => editing.content)
-
+const schemaRef = computed(() => editing.schema as Record<string, unknown> | null)
+const themeRef = computed<'dark' | 'light'>(() => theme.dark ? 'dark' : 'light')
 const mountVersionRef = computed(() => editing.mountVersion)
 
 function handleChange(content: Record<string, unknown>) {
   editing.markDirty(content)
 }
 
-useEditorMount(containerRef, editorMountRef, contentRef, handleChange, mountVersionRef)
+useEditorMount(containerRef, editorMountRef, contentRef, schemaRef, themeRef, handleChange, mountVersionRef)
 
 // Ctrl+S / Cmd+S to save
 onKeyStroke('s', (e) => {

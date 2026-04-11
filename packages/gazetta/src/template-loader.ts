@@ -6,7 +6,6 @@ import type { TemplateFunction, TemplateModule, StorageProvider } from './types.
 interface LoadedTemplate {
   render: TemplateFunction
   schema: unknown
-  editor?: TemplateModule['editor']
 }
 
 const cache = new Map<string, LoadedTemplate>()
@@ -73,7 +72,6 @@ export async function loadTemplate(storage: StorageProvider, templatesDir: strin
   const loaded: LoadedTemplate = {
     render,
     schema: mod.schema,
-    editor: mod.editor as TemplateModule['editor'],
   }
 
   cache.set(templateName, loaded)

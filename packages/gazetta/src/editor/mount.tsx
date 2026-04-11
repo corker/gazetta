@@ -740,7 +740,7 @@ export function createEditorMount(jsonSchema: object): EditorMount {
   const uiSchema = buildUiSchema(jsonSchema as JsonSchema)
 
   return {
-    mount(el, { content, onChange }) {
+    mount(el, { content, onChange }) { // schema and theme available in props but ignored — default editor uses jsonSchema from closure
       const existing = roots.get(el)
       if (existing) existing.unmount()
 
