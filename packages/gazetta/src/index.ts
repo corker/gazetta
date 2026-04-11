@@ -3,6 +3,7 @@ export type {
   RenderOutput,
   TemplateFunction,
   EditorMount,
+  FieldMount,
   TemplateModule,
   ComponentManifest,
   FragmentManifest,
@@ -17,6 +18,7 @@ export type {
   StorageProvider,
   PurgeStrategy,
 } from './types.js'
+export { getPublishMode } from './types.js'
 
 // Renderer
 export { renderComponent, renderFragment, renderPage } from './renderer.js'

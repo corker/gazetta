@@ -21,7 +21,13 @@ export async function parseSiteManifest(storage: StorageProvider, filePath: stri
   if (typeof raw.name !== 'string') {
     throw new Error(`Invalid site.yaml at ${filePath}: missing required "name" field`)
   }
-  return { name: raw.name, version: raw.version as string | undefined, systemPages: Array.isArray(raw.systemPages) ? raw.systemPages as string[] : undefined }
+  return {
+    name: raw.name,
+    version: raw.version as string | undefined,
+    locale: raw.locale as string | undefined,
+    baseUrl: raw.baseUrl as string | undefined,
+    systemPages: Array.isArray(raw.systemPages) ? raw.systemPages as string[] : undefined,
+  }
 }
 
 export async function parsePageManifest(storage: StorageProvider, filePath: string): Promise<PageManifest> {

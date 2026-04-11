@@ -280,8 +280,10 @@ async function runPublish(siteDir: string, targetName?: string) {
     }
 
     const targetConfig = siteYaml.targets![name]
-    const isStatic = !targetConfig?.worker
-    console.log(`  Publishing to ${name}${isStatic ? ' (static)' : ' (ESI)'}...`)
+    const { getPublishMode } = await import('../types.js')
+    const publishMode = targetConfig ? getPublishMode(targetConfig) : 'static'
+    const isStatic = publishMode === 'static'
+    console.log(`  Publishing to ${name} (${publishMode})...`)
     let totalFiles = 0
     let totalRemoved = 0
 

@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
+import { getPublishMode } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies } from '../../publish.js'
 import type { PublishResult } from '../../publish.js'
-import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
+import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
 import { resolveEnvVars } from '../../targets.js'
 
@@ -73,16 +74,24 @@ export function publishRoutes(
         totalFiles += copiedFiles
 
         // 2. Pre-render pages and fragments (including dependencies)
+        const config = getTargetConfig(targetName)
+        const isStatic = config ? getPublishMode(config) === 'static' : true
         for (const item of allItems) {
           if (item.startsWith('pages/')) {
             const pageName = item.replace('pages/', '')
-            const config = getTargetConfig(targetName)
-            const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache)
-            totalFiles += files
+            if (isStatic) {
+              const { files } = await publishPageStatic(pageName, sourceStorage, siteDir, targetStorage)
+              totalFiles += files
+            } else {
+              const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache)
+              totalFiles += files
+            }
           } else if (item.startsWith('fragments/')) {
-            const fragName = item.replace('fragments/', '')
-            const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage)
-            totalFiles += files
+            if (!isStatic) {
+              const fragName = item.replace('fragments/', '')
+              const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage)
+              totalFiles += files
+            }
           }
         }
 
@@ -92,7 +101,6 @@ export function publishRoutes(
         totalFiles += 2
 
         // 4. Purge CDN cache
-        const config = getTargetConfig(targetName)
         const purgeConfig = config?.cache?.purge
         if (purgeConfig?.type === 'cloudflare') {
           const apiToken = resolveEnvVars(purgeConfig.apiToken)

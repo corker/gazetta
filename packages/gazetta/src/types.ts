@@ -100,15 +100,24 @@ export interface WorkerConfig {
 export interface TargetConfig {
   storage: StorageConfig
   worker?: WorkerConfig
+  /** Publish mode — 'esi' for Workers/gazetta serve, 'static' for static hosting. Default: esi if worker configured, static otherwise. */
+  publishMode?: 'esi' | 'static'
   /** Base URL of the site (e.g. https://gazetta.studio) */
   siteUrl?: string
   cache?: CacheConfig
+}
+
+/** Determine publish mode for a target — centralised logic used by CLI and admin API */
+export function getPublishMode(target: TargetConfig): 'esi' | 'static' {
+  return target.publishMode ?? (target.worker ? 'esi' : 'static')
 }
 
 /** Site manifest (site.yaml) */
 export interface SiteManifest {
   name: string
   version?: string
+  locale?: string
+  baseUrl?: string
   systemPages?: string[]
   targets?: Record<string, TargetConfig>
 }

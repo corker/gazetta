@@ -320,3 +320,24 @@ describe('publishPageStatic', () => {
     expect(cssOrJs.length).toBe(0)
   })
 })
+
+describe('getPublishMode', () => {
+  // Import dynamically to avoid circular deps
+  it('returns esi when worker configured', async () => {
+    const { getPublishMode } = await import('../src/types.js')
+    expect(getPublishMode({ storage: { type: 'r2' }, worker: { type: 'cloudflare' } })).toBe('esi')
+  })
+
+  it('returns static when no worker', async () => {
+    const { getPublishMode } = await import('../src/types.js')
+    expect(getPublishMode({ storage: { type: 'filesystem', path: './dist' } })).toBe('static')
+  })
+
+  it('respects explicit publishMode over worker config', async () => {
+    const { getPublishMode } = await import('../src/types.js')
+    // ESI without worker (for gazetta serve)
+    expect(getPublishMode({ storage: { type: 's3' }, publishMode: 'esi' })).toBe('esi')
+    // Static even with worker (override)
+    expect(getPublishMode({ storage: { type: 'r2' }, worker: { type: 'cloudflare' }, publishMode: 'static' })).toBe('static')
+  })
+})
