@@ -344,7 +344,7 @@ That's the core loop. Everything else is secondary.
 | `gazetta init [dir]` | Scaffold project + install deps | Once, to start a new project |
 | `gazetta dev` | Dev server + CMS admin | Every day — develop, edit, customize |
 | `gazetta publish [target]` | Render + push content to target | Go live — one command, renders and uploads |
-| `gazetta deploy [what]` | Deploy infrastructure | Rare — deploy worker runtime on setup or upgrade |
+| `gazetta deploy [target] [what]` | Deploy infrastructure | Rare — deploy worker runtime on setup or upgrade |
 | `gazetta build` | Build admin UI for production | Before `gazetta serve` — only needed for self-hosted production admin |
 | `gazetta serve` | Production server | Self-hosting — serves site + admin |
 | `gazetta validate` | Check for errors | Before publish — catches broken references |
@@ -353,7 +353,7 @@ That's the core loop. Everything else is secondary.
 gazetta publish                    # render + push to default target
 gazetta publish production         # render + push to production
 gazetta publish staging            # render + push to staging
-gazetta deploy worker              # deploy edge worker (rare)
+gazetta deploy production worker   # deploy worker for production (rare)
 ```
 
 ### Auto-detection
@@ -443,12 +443,15 @@ Most developers don't need this — they use `gazetta dev` locally and `gazetta 
 - Bundles custom editors/fields with esbuild → `dist/admin/editors/`, `dist/admin/fields/`
 - Generates import map for shared deps → injected into `dist/admin/index.html`
 
-**`gazetta deploy [what]`**
+**`gazetta deploy [target] [what]`**
 
-Deploys infrastructure. Rare — only on initial setup or Gazetta upgrades.
+Deploys infrastructure for a target. Rare — only on initial setup or Gazetta upgrades.
+Each target has its own worker (different storage, cache, URL).
 
 ```
-gazetta deploy worker          # deploy edge worker runtime
+gazetta deploy production worker   # deploy worker for production target
+gazetta deploy staging worker      # deploy worker for staging target
+gazetta deploy worker              # deploy worker for default target
 ```
 
 **`gazetta serve`**
