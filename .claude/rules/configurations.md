@@ -8,7 +8,7 @@ code paths, storage providers, publish modes, and CLI commands apply to a given 
 | Mode | Who | What they run | What they edit |
 |------|-----|---------------|----------------|
 | **Gazetta contributor** | Core developer | `npm run dev` from monorepo root (builds core, starts starter) | `packages/gazetta/`, `apps/admin/` |
-| **Site author (new)** | End user | `npx gazetta init my-site && cd my-site && gazetta dev` | `templates/`, `sites/*/fragments/`, `sites/*/pages/`, `site.yaml` |
+| **Site author (new)** | End user | `npx gazetta init my-site && cd my-site && gazetta dev` | `templates/`, `sites/*/fragments/`, `sites/*/pages/`, `sites/*/site.yaml` |
 | **Site author (existing)** | End user | `gazetta dev` in project dir | Same as above |
 | **Template developer** | Frontend dev | `gazetta dev` — builds/tests templates in a site context | `templates/` (schema, render fn) + `admin/editors/` (custom editors) |
 | **Admin UI developer** | Core developer | `npm run dev` from `apps/admin/` (Vite UI :3000 + Hono API :4000) | `apps/admin/src/client/`, `apps/admin/src/server/` |
@@ -20,7 +20,7 @@ targets configured — exercises most code paths locally.
 
 | Setup | Structure | site.yaml targets | Use case |
 |-------|-----------|-------------------|----------|
-| **Single site** | Standalone dir or monorepo `sites/my-site/` | 1+ targets | Most sites |
+| **Single site** | `sites/main/` (default from `gazetta init`) | 1+ targets | Most sites |
 | **Multi-site monorepo** | Multiple dirs under `sites/` sharing templates | Each site has own `site.yaml` | Agency, multi-brand |
 
 Multi-site: each site is independent. CLI operates on one site at a time (`gazetta publish --site my-site production`).
@@ -67,7 +67,7 @@ my-project/
     fields/                    # Custom fields (reusable widgets)
       brand-color.tsx          # FieldMount — referenced in schemas as { field: 'brand-color' }
   templates/                   # Template render functions + schemas (server) — workspace
-    package.json               # deps: { react, svelte, zod, ... }
+    package.json               # deps: { gazetta, react, svelte, zod, ... }
     hero/index.tsx             # template name: "hero"
     card/index.ts              # template name: "card"
     page-default/index.tsx     # template name: "page-default"
@@ -150,17 +150,16 @@ A target = storage + optional worker + optional cache. The worker config determi
 | Target type | Worker config | Publish mode | Serve mode | Fragment updates |
 |-------------|--------------|--------------|------------|-----------------|
 | **Edge (Cloudflare)** | `worker: { type: cloudflare }` | ESI — pages have `<!--esi:-->` placeholders, fragments stored separately | Cloudflare Worker assembles at edge | Instant — republish fragment only |
-| **Self-hosted server** | No worker, use `gazetta serve` | ESI — same as edge | Node/Bun Hono server assembles at request time | Instant — republish fragment only |
+| **Self-hosted server** | `publishMode: esi` (no worker needed) | ESI — same as edge | Node/Bun Hono server via `gazetta serve` | Instant — republish fragment only |
 | **Static hosting** | No worker, no server | Static — pages fully assembled, fragments baked in | GitHub Pages / Netlify / S3 / any file server | Requires republishing all pages using that fragment |
 
-Decision logic in code (`cli/index.ts:283`): `const isStatic = !targetConfig?.worker`
+Decision logic: determined by `publishMode` field in target config (default: `static` if no worker, `esi` if worker configured).
 
 **Known gaps:**
 
-- **Publish mode is coupled to worker config.** `gazetta serve` targets need `worker: { type: cloudflare }`
-  to get ESI mode during publish, even though `gazetta serve` itself doesn't use the worker.
-  Without it, the "no worker" path always produces fully-baked static HTML. Consider adding a
-  `publishMode: esi | static` field or a `serve` worker type to decouple this.
+- **Publish mode is coupled to worker config.** Currently `gazetta serve` targets need
+  `worker: { type: cloudflare }` to get ESI mode. Fix: add `publishMode: esi | static` field
+  to target config (shown in the self-hosted example above). Default: `esi` if worker configured, `static` otherwise.
 
 - **Admin API always publishes ESI mode** (`admin-api/routes/publish.ts`). It calls
   `publishPageRendered()` / `publishFragmentRendered()` regardless of worker config. CLI branches
@@ -192,7 +191,7 @@ production:
 # Self-hosted — S3 storage, served by gazetta serve
 production:
   storage: { type: s3, endpoint: "https://s3.amazonaws.com", bucket: "my-site", region: "us-east-1", accessKeyId: "${AWS_ACCESS_KEY_ID}", secretAccessKey: "${AWS_SECRET_ACCESS_KEY}" }
-  worker: { type: cloudflare }  # needed for ESI publish mode, even with gazetta serve
+  publishMode: esi  # ESI for gazetta serve — no worker needed
 ```
 
 ### Invalid/misleading combinations
@@ -415,7 +414,7 @@ Creates:
       editors/             # (empty — ready for custom editors)
       fields/              # (empty — ready for custom fields)
     templates/
-      package.json         # react, zod
+      package.json         # gazetta, react, zod
       hero/index.tsx       # starter template
       page-default/index.tsx
     sites/
@@ -463,7 +462,7 @@ Builds the admin UI and worker code. Run before `deploy` or `serve`.
 - Builds admin SPA via Vite `build()` API → `dist/admin/`
 - Bundles custom editors/fields with esbuild → `dist/admin/editors/`, `dist/admin/fields/`
 - Generates import map for shared deps → injected into `dist/admin/index.html`
-- Generates worker code → `dist/worker/`
+- Generates worker code per target (each target has its own storage/cache config) → `dist/workers/{target}/`
 
 **`gazetta deploy [target]`**
 
@@ -471,7 +470,7 @@ Deploys the built worker to a target's edge platform. Rare — only on initial s
 Each target has its own worker (different storage, cache, URL).
 
 - Requires `gazetta build` first
-- Deploys worker from `dist/worker/` to the target's platform
+- Deploys worker from `dist/workers/{target}/` to the target's platform
 - Currently: Cloudflare Workers
 - Future: Deno Deploy, Vercel Edge, Netlify Edge
 
@@ -485,8 +484,9 @@ gazetta deploy staging         # deploy worker to staging
 Production server. For self-hosting on a VPS, container, or local machine.
 
 - Auto-detects site + target
-- Serves site: ESI assembly from target storage (published content)
-- If `dist/admin/` exists: serves admin SPA + API at `/admin`
+- Serves site: ESI assembly from target storage (published content via `gazetta publish`)
+- Serves admin: built SPA + API at `/admin` (from `dist/admin/` via `gazetta build`)
+- Requires both: target storage access (for content) AND local `dist/admin/` (for admin UI)
 - Auth middleware on `/admin/*` routes
 
 **`gazetta validate`**
@@ -504,13 +504,14 @@ targets, or CLI commands to avoid re-introducing these issues or building on bro
 | # | Gap | Severity | Location | Status |
 |---|-----|----------|----------|--------|
 | 1 | Admin API always publishes ESI, ignores static mode | Critical | `admin-api/routes/publish.ts` | Bug — CLI and admin UI produce different output for static targets |
-| 2 | Publish mode coupled to worker config | High | `cli/index.ts:283` | Design — `gazetta serve` needs fake `worker` config for ESI |
-| 3 | `gazetta init` scaffolds no targets | Medium | `cli/index.ts:78-218` | UX — new users must manually add targets before publish works |
-| 4 | Cache purge only implements Cloudflare | Medium | `cli/index.ts`, `admin-api/routes/publish.ts` | Silent no-op for S3/Azure purge configs |
-| 5 | `WorkerConfig.type` is `string`, only `'cloudflare'` works | Low | `types.ts:79` | Should be literal type |
-| 6 | `validate` doesn't check targets | Medium | `cli/index.ts:464-528` | No storage connectivity, env var, or credential checks |
-| 7 | `fetch` can't recover from static targets | Medium | `admin-api/routes/publish.ts:136-187` | Static targets have rendered HTML, not source manifests |
-| 8 | No validation of nonsensical target combos | Low | `targets.ts` | R2+no worker, filesystem+worker silently accepted |
+| 2 | Publish mode coupled to worker config — needs `publishMode` field | High | `cli/index.ts` | Design — add `publishMode: esi | static` to target config to decouple from worker |
+| 3 | Cache purge only implements Cloudflare | Medium | `cli/index.ts`, `admin-api/routes/publish.ts` | Silent no-op for S3/Azure purge configs |
+| 4 | `WorkerConfig.type` is `string`, only `'cloudflare'` works | Low | `types.ts` | Should be literal type |
+| 5 | `validate` doesn't check targets | Medium | `cli/index.ts` | No storage connectivity, env var, or credential checks |
+| 6 | `fetch` can't recover from static targets | Medium | `admin-api/routes/publish.ts` | Static targets have rendered HTML, not source manifests |
+| 7 | No validation of nonsensical target combos | Low | `targets.ts` | R2+no worker, filesystem+worker silently accepted |
+| 8 | Project structure doesn't match doc | High | `examples/starter/`, `sites/` | Current starter is flat — needs restructuring to `admin/`, `templates/`, `sites/` |
+| 9 | React is direct dep, not peer dep | Medium | `packages/gazetta/package.json` | Should be peerDependency so site controls version |
 
 ## Data Flow Summary
 
@@ -521,29 +522,30 @@ targets, or CLI commands to avoid re-introducing these issues or building on bro
                     └──────┬───────┘
                            │ creates
                     ┌──────▼───────┐
-  gazetta init ──►  │    Site      │  ◄── content author (admin UI)
-                    │  (filesystem)│
+  gazetta init ──►  │   Project    │  ◄── content author (admin UI)
+                    │  templates/  │
+                    │  admin/      │
+                    │  sites/      │
                     └──────┬───────┘
                            │
-              ┌────────────┼────────────┐
-              │            │            │
-       gazetta dev    gazetta publish   POST /api/publish
-       (on-the-fly)   (CLI / CI)       (admin UI)
-              │            │            │
-              │     ┌──────▼──────┐     │
-              │     │  Renderer   │◄────┘
-              │     │ (SSR + ESI) │
-              │     └──────┬──────┘
-              │            │
-              │     ┌──────▼──────────────────────────┐
-              │     │           Targets                │
-              │     │  ┌─────────┐  ┌──────────────┐  │
-              │     │  │ Storage │  │ Worker/Server │  │
-              │     │  │(R2/S3/..)│ │(CF/Node/none)│  │
-              │     │  └─────────┘  └──────────────┘  │
-              │     └─────────────────────────────────┘
-              │                     │
-              │              ┌──────▼──────┐
-              └──────────►   │   Browser   │
-                             └─────────────┘
+         ┌─────────────────┼──────────────────┐
+         │                 │                  │
+  gazetta dev       gazetta publish    gazetta build
+  (on-the-fly)      (render + push)    (admin + worker)
+         │                 │                  │
+         │          ┌──────▼──────┐    gazetta deploy
+         │          │  Renderer   │    (worker to edge)
+         │          │ (SSR + ESI) │           │
+         │          └──────┬──────┘           │
+         │                 │                  │
+         │          ┌──────▼──────────────────▼──┐
+         │          │          Targets            │
+         │          │  ┌─────────┐ ┌───────────┐ │
+         │          │  │ Storage │ │Worker/Srvr│ │
+         │          │  └─────────┘ └───────────┘ │
+         │          └────────────────────────────┘
+         │                       │
+         │                ┌──────▼──────┐
+         └──────────────► │   Browser   │
+                          └─────────────┘
 ```
