@@ -323,65 +323,86 @@ Split deployments require:
 
 ## CLI Commands
 
+### Principles
+
+- **Zero arguments for the common case.** Single-site, single-target = no flags needed.
+- **Auto-detect everything.** Site, target, mode — inferred from project structure.
+- **Arguments are escape hatches** for multi-site and multi-target.
+
 ### Lifecycle
 
 ```
-init → dev → validate → build → publish → deploy/serve
+init → dev → publish
 ```
+
+That's the core loop. `validate`, `build`, `deploy`, `serve` are secondary commands
+used when the developer needs more control.
 
 ### Commands
 
-| Command | Purpose | Input | Output |
-|---------|---------|-------|--------|
-| `gazetta init [dir]` | Scaffold new project | Directory name | Project with `admin/`, `templates/`, `sites/main/`, `package.json` with workspaces |
-| `gazetta dev [site]` | Dev server + CMS admin | Site name or auto-detect | Hono server + Vite dev (admin SPA + HMR) at localhost |
-| `gazetta validate [site]` | Check references + config | Site name or auto-detect | Errors/warnings to stdout |
-| `gazetta build [site]` | Build admin for production | Site name or auto-detect | `dist/admin/` — SPA + editor/field bundles + import map |
-| `gazetta publish [site] [-t target]` | Pre-render + upload content | Site name + target | Files written to target storage |
-| `gazetta deploy [-t target]` | Deploy edge runtime | Target name | Worker deployed (Cloudflare, Deno, etc.) |
-| `gazetta serve [site] [-t target]` | Production server | Site name + target | Hono server — site + admin at localhost |
+| Command | Purpose | Typical usage |
+|---------|---------|---------------|
+| `gazetta init [dir]` | Scaffold + install | `npx gazetta init my-site` — ready to `gazetta dev` immediately |
+| `gazetta dev` | Dev server + CMS | `gazetta dev` — auto-detects site, starts everything |
+| `gazetta publish` | Pre-render + upload | `gazetta publish` — auto-detects site + target |
+| `gazetta build` | Build admin for production | `gazetta build` — needed before `gazetta serve` in production |
+| `gazetta serve` | Production server | `gazetta serve` — serves site + admin |
+| `gazetta deploy` | Deploy edge runtime | `gazetta deploy` — deploys worker to edge platform |
+| `gazetta validate` | Check everything | `gazetta validate` — errors/warnings to stdout |
 
-### Site resolution
+### Auto-detection
 
-Commands that take `[site]` resolve it:
-1. If argument given: `sites/{argument}/`
-2. If only one site in `sites/`: use it (auto-detect)
-3. If multiple sites and no argument: error with list
+All commands auto-detect from project structure:
+
+| What | How | Override |
+|------|-----|----------|
+| **Site** | Only one dir in `sites/` → use it | `--site my-site` or `gazetta dev my-site` |
+| **Target** | Only one target in `site.yaml` → use it. Multiple → use first. | `--target production` or `-t production` |
+| **Mode** | Has `dist/admin/` → production admin. Else dev only. | — |
 
 ```
-gazetta dev              # auto-detects sites/main (only site)
-gazetta dev my-site      # uses sites/my-site
-gazetta dev              # error: multiple sites found — specify one
+gazetta dev                      # auto-detects sites/main
+gazetta dev my-site              # explicit: sites/my-site
+gazetta publish                  # auto-detects site + first target
+gazetta publish -t production    # explicit target
+gazetta publish my-site -t staging  # both explicit
 ```
 
 ### Command details
 
 **`gazetta init [dir]`**
-Scaffolds a new project with the full structure:
-```
-my-project/
-  package.json           # workspaces: ["admin", "templates", "sites/*"]
-  admin/
-    package.json         # gazetta, react, react-dom
-    editors/             # (empty — ready for custom editors)
-    fields/              # (empty — ready for custom fields)
-  templates/
-    package.json         # react, zod
-    hero/index.tsx       # starter template
-    page-default/index.tsx
-  sites/
-    main/
-      site.yaml          # name, targets (with filesystem staging target)
-      fragments/
-        header/
-        footer/
-      pages/
-        home/page.yaml
-```
-Runs `npm install` automatically after scaffolding.
 
-**`gazetta dev [site]`**
-- Loads site from `sites/{name}/`
+Scaffolds a new project and runs `npm install`. Ready to `gazetta dev` immediately.
+
+```
+$ npx gazetta init my-site
+$ cd my-site
+$ gazetta dev
+
+Creates:
+  my-site/
+    package.json           # workspaces: ["admin", "templates", "sites/*"]
+    admin/
+      package.json         # gazetta, react, react-dom
+      editors/             # (empty — ready for custom editors)
+      fields/              # (empty — ready for custom fields)
+    templates/
+      package.json         # react, zod
+      hero/index.tsx       # starter template
+      page-default/index.tsx
+    sites/
+      main/
+        site.yaml          # name + filesystem staging target
+        fragments/
+        pages/
+          home/page.yaml
+```
+
+**`gazetta dev`**
+
+The developer's primary command. Starts everything needed for local development.
+
+- Auto-detects site in `sites/`
 - Loads templates from `templates/`
 - Starts Hono server (site routes + admin API + preview)
 - Starts Vite dev server (admin SPA + HMR)
@@ -389,37 +410,53 @@ Runs `npm install` automatically after scaffolding.
 - Custom editors/fields loaded via Vite from `admin/editors/`, `admin/fields/`
 - Dev playground at `/admin/dev`
 - File watcher for template/content hot reload via SSE
+- Output: `http://localhost:3000` (site), `http://localhost:3000/admin` (CMS)
 
-**`gazetta build [site]`**
-- Builds admin SPA via Vite `build()` API
-- Scans `admin/editors/*.{ts,tsx}` and `admin/fields/*.{ts,tsx}`
-- Bundles each editor/field with esbuild (`external: ['react', 'react-dom', 'gazetta/editor']`)
-- Bundles shared deps (React, gazetta/editor) as standalone ESM
-- Generates import map, injects into `dist/admin/index.html`
-- Output: `dist/admin/` — ready to serve or deploy
+**`gazetta publish`**
 
-**`gazetta publish [site] [-t target]`**
+Pushes content to targets. The second most-used command after `dev`.
+
+- Auto-detects site + target
 - Pre-renders pages and fragments using templates (SSR)
 - Uploads to target storage (R2, S3, Azure Blob, filesystem)
 - Handles ESI vs static mode based on target config
 - Purges CDN cache if configured
 
-**`gazetta serve [site] [-t target]`**
-- Production Node/Bun server
-- Serves site: ESI assembly from target storage (published content)
-- Serves admin: built SPA from `dist/admin/` (if exists), API endpoints
+**`gazetta build`**
+
+Builds admin UI for production hosting. Only needed if hosting the admin in production
+(most developers only use `gazetta dev` locally and don't need this).
+
+- Builds admin SPA via Vite `build()` API
+- Scans `admin/editors/` and `admin/fields/` for custom editor/field bundles
+- Bundles each with esbuild (`external: ['react', 'react-dom', 'gazetta/editor']`)
+- Bundles shared deps (React, gazetta/editor) as standalone ESM
+- Generates import map, injects into `dist/admin/index.html`
+- Output: `dist/admin/` — ready for `gazetta serve` or static deploy
+
+**`gazetta serve`**
+
+Production server. Serves the published site and optionally the built admin.
+
+- Auto-detects site + target
+- Serves site: ESI assembly from target storage
+- If `dist/admin/` exists: serves admin SPA + API at `/admin`
 - Auth middleware on `/admin/*` routes
 
-**`gazetta deploy [-t target]`**
-- Deploys edge runtime (Worker) to the target platform
+**`gazetta deploy`**
+
+Deploys edge runtime (Worker) to the target platform.
+
+- Auto-detects target
 - Currently: Cloudflare Workers only
 - Future: Deno Deploy, Vercel Edge, Netlify Edge
 
-**`gazetta validate [site]`**
-- Checks template references (do referenced templates exist?)
-- Checks fragment references (do `@fragment` refs resolve?)
-- Checks page manifests (valid routes, valid template names?)
-- Future: target connectivity, env var validation, schema validation
+**`gazetta validate`**
+
+Checks the project for errors before publishing.
+
+- Validates template references, fragment references, page manifests
+- Future: target connectivity, env var validation, custom editor/field checks
 
 ## Known Gaps
 
