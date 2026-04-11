@@ -1,6 +1,119 @@
 # Implementation Plan
 
-Map from design docs to code. Ordered by dependency — each phase enables the next.
+Map from design docs to code. The design docs describe the final product. Implementation
+is incremental — each step ships value and validates architecture for the next step.
+
+## Immediate next steps (ship value now)
+
+Three steps that deliver real value without architecture changes. Each is independently
+mergeable. Together they validate the custom editor architecture.
+
+### Step 1: Light mode (editor theming)
+
+Fix the dark-only editor. CSS variables in mount.tsx, EditorPanel sets them from theme store.
+
+**Changes:**
+- `packages/gazetta/src/editor/mount.tsx` — replace hardcoded hex with CSS variables in STYLES
+- `apps/admin/src/client/components/EditorPanel.vue` — set CSS variables on container from `useThemeStore()`
+
+**Color variables (14):**
+
+| Variable | Dark | Light |
+|----------|------|-------|
+| `--gz-bg-input` | `#161622` | `#ffffff` |
+| `--gz-bg-card` | `#1a1a28` | `#f9fafb` |
+| `--gz-bg-toolbar` | `#1a1a2a` | `#f3f4f6` |
+| `--gz-bg-chip` | `#252538` | `#e5e7eb` |
+| `--gz-bg-code` | `#12121e` | `#f1f5f9` |
+| `--gz-text` | `#e0e0e0` | `#1a1a1a` |
+| `--gz-text-secondary` | `#ccc` | `#4b5563` |
+| `--gz-text-label` | `#8888a0` | `#6b7280` |
+| `--gz-text-hint` | `#444` | `#9ca3af` |
+| `--gz-border` | `#2a2a3a` | `#e5e7eb` |
+| `--gz-border-subtle` | `#1e1e2e` | `#f3f4f6` |
+| `--gz-accent` | `#667eea` | `#667eea` |
+| `--gz-error` | `#f87171` | `#dc2626` |
+| `--gz-success` | `#4ade80` | `#16a34a` |
+
+**Verify:** toggle dark/light in admin toolbar → editor follows theme.
+
+### Step 2: Fix admin API publish bug
+
+One-line fix: admin API checks for static vs ESI mode like the CLI already does.
+
+**Changes:**
+- `packages/gazetta/src/admin-api/routes/publish.ts` — check `!targetConfig?.worker` to choose static vs ESI mode
+
+No `publishMode` field needed yet. Use the existing logic that the CLI already has.
+
+**Verify:** publish from admin UI to a static target → produces fully assembled HTML (not ESI).
+Add test first — no publish tests exist for the admin API.
+
+### Step 3: Custom editors in dev mode
+
+Prove the architecture with one working editor. Minimum changes to existing code.
+
+**File structure (flat, no restructure):**
+```
+examples/starter/
+  editors/               # NEW — custom editors
+    hero.tsx             # EditorMount for templates/hero
+  templates/
+    hero/index.tsx
+  ...existing...
+```
+
+**Changes:**
+
+Types:
+- `packages/gazetta/src/types.ts` — add `schema` and `theme` to `EditorMount.mount()` props
+
+Editor discovery:
+- `packages/gazetta/src/template-loader.ts` — add `hasEditorFile(storage, editorsDir, name)` (checks `editors/{name}.tsx`)
+- `packages/gazetta/src/admin-api/routes/templates.ts` — schema response includes `hasEditor: boolean`
+
+Vite alias for editor loading:
+- `packages/gazetta/src/cli/index.ts` — inject `resolve.alias: { '@editors': join(siteDir, 'editors') }` + `server.fs.allow` in Vite config
+
+Admin UI:
+- `apps/admin/src/client/stores/editing.ts` — `customEditorMount` ref, load in `open()` via `import('@editors/{name}.tsx')`
+- `apps/admin/src/client/components/EditorPanel.vue` — if custom editor, use it; else default form
+- `apps/admin/src/client/composables/useEditorMount.ts` — pass `schema` and `theme` to mount
+
+DefaultEditorForm extraction:
+- `packages/gazetta/src/editor/mount.tsx` — extract @rjsf Form wrapper as `DefaultEditorForm` React component
+- Export from `gazetta/editor` alongside `createEditorMount`
+
+Reference editor:
+- `examples/starter/editors/hero.tsx` — custom editor with live preview + embedded DefaultEditorForm
+
+**Verify:**
+1. `npm run build && npm test`
+2. `gazetta dev` — select hero component → custom editor mounts
+3. Edit content via custom editor → preview updates
+4. Switch to template without editor → default form
+5. Edit `editors/hero.tsx` → Vite HMR reloads
+
+**What this does NOT include (deferred):**
+- Custom fields (FieldMount) — add when needed
+- Dev playground (/admin/dev) — add when there are enough editors to browse
+- Production build (import maps, esbuild) — add when production admin is needed
+- Project restructure (admin/, templates/, sites/) — add when multi-site is needed
+- React peer dep — add when dep isolation is actually required
+- publishMode field — add when self-hosted ESI without worker is needed
+
+---
+
+## Future batches (design docs → code, when needed)
+
+The following batches implement the full design docs vision. They are deferred until
+the immediate steps are complete and real usage reveals which features are needed next.
+The detailed gap analysis below each batch captures risks and implementation details
+discovered during planning.
+
+## Batch B: Project restructure (when multi-site is needed)
+
+Previously "Phase 1." Restructures the project to support multi-site and workspace isolation.
 
 ## Phase 1: Foundation (structure + types)
 
