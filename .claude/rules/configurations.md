@@ -1241,6 +1241,82 @@ No built-in metrics or tracing. For production monitoring, use:
 - External monitoring (UptimeRobot, Pingdom) for availability
 - Future: OpenTelemetry integration for traces/metrics
 
+### Accessibility
+
+The admin UI uses PrimeVue components which provide ARIA attributes and keyboard navigation.
+The admin should be usable with screen readers and keyboard-only navigation.
+
+Template developers are responsible for producing accessible HTML output. Guidelines:
+- Use semantic HTML (`<nav>`, `<main>`, `<article>`, `<header>`)
+- Images need `alt` attributes
+- Interactive elements need ARIA labels
+- Future: `gazetta validate --a11y` checks template output for basic accessibility issues
+
+### Rendering performance
+
+`gazetta publish` renders pages sequentially in a single Node process. Approximate times:
+
+| Site size | Render time | Upload time (parallel) |
+|-----------|-------------|----------------------|
+| 10 pages | ~2 seconds | ~1 second |
+| 100 pages | ~20 seconds | ~5 seconds |
+| 500 pages | ~100 seconds | ~15 seconds |
+
+Templates share a process — heavy SSR (image processing, API calls during render) slows
+all pages. Keep templates lightweight. Future: parallel rendering with worker threads.
+
+### Process management for `gazetta serve`
+
+For production self-hosting, use a process manager:
+
+```
+# PM2 (recommended)
+pm2 start "gazetta serve production" --name my-site
+
+# systemd
+[Service]
+ExecStart=/usr/bin/node ./node_modules/.bin/gazetta serve production
+Restart=always
+
+# Docker
+CMD ["node", "./node_modules/.bin/gazetta", "serve", "production"]
+```
+
+Process managers handle auto-restart on crash, log rotation, and zero-downtime restarts.
+
+### Disaster recovery
+
+Source of truth: **git** (templates, content YAML, site config). Published content in
+storage (R2/S3/Azure) can always be regenerated:
+
+```
+git clone <repo> && cd my-project
+npm install
+gazetta publish production     # regenerates all published content
+```
+
+For storage with uploaded assets (future), enable bucket versioning or cross-region
+replication at the storage provider level — outside Gazetta's scope.
+
+### Template native dependencies
+
+Templates using native modules (sharp, canvas, better-sqlite3) require:
+- Matching architecture between dev and CI/deploy environments
+- System libraries in Docker (e.g. `apt-get install libvips-dev` for sharp)
+- Platform-specific npm install (`npm install --platform=linux` for CI)
+
+This is a Node.js concern, not Gazetta-specific. Document in template README if
+native deps are used.
+
+### Platform support
+
+Gazetta is tested on macOS and Linux. Windows support:
+- Node.js handles path separators (`/` vs `\`) via `path.join`
+- YAML is line-ending agnostic
+- Template names are **case-sensitive** — `Hero` and `hero` are different templates,
+  even on case-insensitive filesystems. Recommendation: use lowercase-kebab-case for all
+  template and site names.
+
 ### Graceful shutdown
 
 `gazetta serve` handles SIGTERM gracefully:
