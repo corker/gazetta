@@ -1696,6 +1696,78 @@ into any DOM element. They work outside the admin UI — useful for embedding a 
 form in custom applications. Not officially supported or tested for standalone use, but
 architecturally independent of Vue/PrimeVue.
 
+### Render timeouts
+
+Templates that fetch external data during SSR may be slow. Per-page render timeout:
+- `gazetta dev`: 10 seconds — then error overlay: "Render timeout for page 'products'"
+- `gazetta publish`: 30 seconds — then page skipped with error
+
+Templates should avoid slow operations during render. Pre-fetch data and pass it as
+content, or use dynamic components (SSR at request time, not publish time).
+
+### Template side effects
+
+Templates should be **pure functions** — no side effects during render. Avoid:
+- Writing to disk (log files, temp directories)
+- Making network requests that mutate state (POST/PUT/DELETE)
+- Modifying global variables
+
+Side effects run on every render (dev preview, publish, serve). `gazetta validate` does
+not detect side effects — this is a developer responsibility.
+
+### Dev server error recovery
+
+When a template has a syntax error:
+1. jiti import fails → error logged to console with file path and line number
+2. Preview shows error overlay
+3. Developer fixes the file → file watcher detects change → jiti reloads
+4. Preview auto-refreshes with the fixed template
+
+No restart needed. Errors are debounced — rapid saves don't flood the console.
+
+### Storage quota errors
+
+When target storage quota is exceeded (e.g. R2 free tier 10 GB), `gazetta publish` shows:
+
+```
+✗ Upload failed: pages/products/index.html
+  Error: StorageQuotaExceeded — R2 bucket "my-site" has exceeded its storage quota.
+  Tip: Delete unused content or upgrade your storage plan.
+```
+
+Publishing stops on quota errors — remaining pages are not uploaded.
+
+### Admin UI server disconnect
+
+If `gazetta dev` crashes while the admin UI is open:
+- API calls fail → admin shows "Server disconnected. Waiting for reconnect..."
+- SSE connection drops → auto-reconnect attempts every 2 seconds
+- When dev server restarts → SSE reconnects → admin shows "Reconnected" → preview refreshes
+
+Unsaved changes in the editor are preserved (React state survives server disconnect).
+
+### macOS open file limit
+
+Large projects may hit the macOS default open file limit (256). Symptoms:
+`EMFILE: too many open files`. Fix:
+
+```
+ulimit -n 10240        # temporary — current shell
+# permanent: add to ~/.zshrc
+```
+
+### Version upgrade resilience
+
+When upgrading gazetta (`1.x → 2.x`):
+- **Template contract changes:** `gazetta validate` reports incompatibilities. Templates
+  must be updated to match the new contract.
+- **Storage format changes:** `gazetta publish` re-renders everything — old storage format
+  is overwritten. No migration needed for published content.
+- **Editor API changes:** Custom editors using `EditorMount` or `DefaultEditorForm` may
+  need updates. TypeScript catches most breaking changes at compile time.
+- **site.yaml changes:** New fields are optional (backward compatible). Removed fields
+  trigger validation warnings.
+
 ### Browser extensions and the admin UI
 
 Browser extensions (Grammarly, ad blockers, React DevTools) may interfere with the admin
