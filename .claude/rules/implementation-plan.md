@@ -221,17 +221,20 @@ examples/starter/
 
 **Verify:** `gazetta validate` catches errors. CI passes. Docs match code.
 
-## Summary
+## Ordering rationale
 
-| Step | Ships | Enables |
-|------|-------|---------|
-| 1. Light mode | UX fix | Theme contract |
-| 2. Publish fix | Bug fix + publishMode type | Correct static publish |
-| 3. Custom editors | Developer feature + EditorMount types | Editor ecosystem |
-| 4. Custom fields | Developer feature + FieldMount type | Field ecosystem |
-| 5. React peer dep | Dep isolation | npm publish readiness |
-| 6. Dev playground | Developer tool | Editor/field DX |
-| 7. Restructure | Multi-site + loadSite options | Workspace isolation |
-| 8. CLI | DX improvements | Auto-detection, init |
-| 9. Production build | Hosted admin | Production admin UI |
-| 10. Validate + migrate | Safety + completion | Everything matches docs |
+Light mode first (theming is foundation for editors) → custom editors (highest leverage,
+validates architecture) → everything else extends proven patterns.
+
+| Step | What | Why this order |
+|------|------|----------------|
+| 1 | Light mode | Foundation — theme contract that all editors/fields use |
+| 2 | Publish fix + publishMode | Independent fix, ships quality |
+| 3 | Custom editors | Highest leverage — validates Vite alias, dynamic import, DefaultEditorForm |
+| 4 | Custom fields | Extends proven editor infrastructure |
+| 5 | React peer dep | After editors proven, before npm publish |
+| 6 | Dev playground | DX tool — needs editors/fields to exist first |
+| 7 | Restructure | Multi-site — all features work, now organize |
+| 8 | CLI | DX improvements on stable base |
+| 9 | Production build | Research Vite vs import maps, then implement |
+| 10 | Validate + migrate | Complete the vision |
