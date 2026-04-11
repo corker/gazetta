@@ -509,6 +509,11 @@ project). Site developers don't modify the admin shell — they customize via ed
 | Monorepo | Compiled from source via Vite | Compiled from source via Vite | Everything |
 | Site project (npm) | Pre-built from package | Compiled from source via Vite | Custom code only |
 
+In site projects, `gazetta dev` runs a Vite dev server alongside the pre-built admin.
+The pre-built admin loads custom editors/fields from the Vite dev server URL (e.g.
+`http://localhost:3000/@site/admin/editors/hero.tsx`). Vite transforms TypeScript and
+provides HMR for these files. The admin shell itself is static — no HMR on Vue components.
+
 ### Project root detection
 
 CLI commands find the project root by walking up from the current directory looking for
@@ -593,6 +598,12 @@ Or with Docker — `gazetta init` creates a `Dockerfile` that runs `build` + `se
 Field files support subfolders like templates: `admin/fields/colors/brand.tsx` is
 referenced as `{ field: 'colors/brand' }`. Flat is default, subfolders for grouping.
 
+### Custom editor naming for subfolder templates
+
+Editor names mirror template paths. Template `buttons/primary` (at `templates/buttons/primary/`)
+has editor `admin/editors/buttons/primary.tsx`. The directory structure inside `admin/editors/`
+mirrors `templates/`.
+
 ### Admin UI publish button vs CLI publish
 
 Both use the same render pipeline. The admin UI `POST /api/publish` renders the specific
@@ -627,6 +638,52 @@ gazetta serve -p 8080
 `gazetta init` creates `sites/main/` by default. The name "main" has no special meaning —
 the developer can rename it to anything. Auto-detection uses "only one directory in `sites/`"
 regardless of name. For multi-site, names are chosen by the developer.
+
+### Multi-site republishing
+
+Templates are shared across sites. If a template changes, all sites using it may need
+republishing. `gazetta publish` publishes one site at a time. To republish all sites:
+
+```
+gazetta publish production my-site
+gazetta publish production another-site
+```
+
+Future: `gazetta publish --all` to publish all sites in one command.
+
+### Admin API template discovery
+
+The admin API needs access to the project root (for `templates/`) and the site dir (for
+`sites/my-site/`). `gazetta dev` passes both paths when creating the admin API. The API's
+`GET /api/templates` reads from `{projectRoot}/templates/`, not from the site dir.
+
+### `gazetta build` skips targets without workers
+
+`build` generates worker code only for targets that have `worker` config. Static targets
+and `publishMode: esi` targets (without worker) are skipped — no worker to build.
+
+### Consistent positional arguments
+
+All commands that take a target use positional args:
+
+```
+gazetta publish production        # positional target
+gazetta deploy production         # positional target
+gazetta serve production          # positional target (not --target)
+```
+
+### Gazetta version across workspaces
+
+Both `admin/package.json` and `templates/package.json` list `gazetta` as a dependency.
+They should use the same version range. npm workspaces deduplicates to one copy at the
+project root. Pin the range in both: `"gazetta": "^1.0.0"`.
+
+### React peer dependency for template-only projects
+
+`gazetta` has `peerDependencies: { react, react-dom }`. Templates that don't use React
+(Svelte, Vue, plain TS) will see a peer dep warning on install. This is acceptable —
+the warning is informational, not a failure. The peer dep is required for the editor
+(which uses React for @rjsf), even if templates don't.
 
 ### Files created by `gazetta init`
 
