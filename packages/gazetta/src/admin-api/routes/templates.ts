@@ -6,13 +6,16 @@ import { loadTemplate, hasEditorFile } from '../../template-loader.js'
 
 const EDITOR_EXTENSIONS = ['.tsx', '.ts']
 
-export function templateRoutes(siteDir: string, storage: StorageProvider, templatesDir?: string, adminDir?: string) {
+export function templateRoutes(siteDir: string, storage: StorageProvider, templatesDir?: string, adminDir?: string, production?: boolean) {
   const app = new Hono()
   const tplDir = templatesDir ?? join(siteDir, 'templates')
   const admDir = adminDir ?? join(siteDir, 'admin')
   const editorsDir = join(admDir, 'editors')
   const fieldsDir = join(admDir, 'fields')
-  const fieldsBaseUrl = `/admin/@fs/${fieldsDir}`
+
+  // In dev mode, Vite serves source files via /@fs/ URLs
+  // In production, pre-bundled JS files are served from /admin/editors/ and /admin/fields/
+  const fieldsBaseUrl = production ? '/admin/fields' : `/admin/@fs/${fieldsDir}`
 
   app.get('/api/templates', async (c) => {
     if (!await storage.exists(tplDir)) return c.json([])
@@ -30,14 +33,19 @@ export function templateRoutes(siteDir: string, storage: StorageProvider, templa
       const jsonSchema = z.toJSONSchema(loaded.schema as z.ZodType)
       const hasEditor = await hasEditorFile(storage, editorsDir, name)
 
-      // Resolve editor URL for Vite /@fs/ serving
       let editorUrl: string | undefined
       if (hasEditor) {
-        for (const ext of EDITOR_EXTENSIONS) {
-          const filePath = join(editorsDir, `${name}${ext}`)
-          if (await storage.exists(filePath)) {
-            editorUrl = `/admin/@fs/${filePath}`
-            break
+        if (production) {
+          // Production — pre-bundled JS
+          editorUrl = `/admin/editors/${name}.js`
+        } else {
+          // Dev mode — Vite /@fs/ serving
+          for (const ext of EDITOR_EXTENSIONS) {
+            const filePath = join(editorsDir, `${name}${ext}`)
+            if (await storage.exists(filePath)) {
+              editorUrl = `/admin/@fs/${filePath}`
+              break
+            }
           }
         }
       }

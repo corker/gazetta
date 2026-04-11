@@ -19,6 +19,8 @@ export interface AdminAppOptions {
   templatesDir?: string
   /** Directory containing admin customizations (editors, fields). Defaults to siteDir/admin. */
   adminDir?: string
+  /** Production mode — editors/fields are pre-bundled at /admin/editors/*.js */
+  production?: boolean
   /** Pre-initialized targets (legacy) */
   targets?: Map<string, StorageProvider>
   /** Raw target configs — targets will be initialized lazily on first publish/fetch */
@@ -48,7 +50,7 @@ export function createAdminApp(
   app.route('/', pageRoutes(opts.siteDir, opts.storage))
   app.route('/', fragmentRoutes(opts.siteDir, opts.storage))
   app.route('/', componentRoutes(opts.siteDir, opts.storage))
-  app.route('/', templateRoutes(opts.siteDir, opts.storage, templatesDir, adminDir))
+  app.route('/', templateRoutes(opts.siteDir, opts.storage, templatesDir, adminDir, opts.production))
   app.route('/', previewRoutes(opts.siteDir, opts.storage, templatesDir))
   app.route('/', publishRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir))
   app.route('/', fieldRoutes(opts.siteDir, opts.storage, adminDir))

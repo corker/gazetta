@@ -137,6 +137,48 @@ describe('runInit', () => {
   })
 })
 
+describe('runBuild', () => {
+  const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+  const outDir = join(starterDir, 'dist', 'admin')
+
+  it('builds admin SPA + bundles custom editors and fields', async () => {
+    const { execSync } = await import('node:child_process')
+    // Clean and rebuild
+    await rm(outDir, { recursive: true, force: true })
+    execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} build sites/main`, { cwd: starterDir, stdio: 'pipe' })
+
+    // Admin SPA built
+    expect(existsSync(join(outDir, 'index.html'))).toBe(true)
+    const assets = await import('node:fs').then(fs => fs.readdirSync(join(outDir, 'assets')))
+    expect(assets.some(f => f.endsWith('.js'))).toBe(true)
+    expect(assets.some(f => f.endsWith('.css'))).toBe(true)
+
+    // Custom editor bundled — small because deps are externalized
+    expect(existsSync(join(outDir, 'editors', 'hero.js'))).toBe(true)
+    const heroJs = await import('node:fs').then(fs => fs.readFileSync(join(outDir, 'editors', 'hero.js'), 'utf-8'))
+    expect(heroJs.length).toBeGreaterThan(100)
+    expect(heroJs.length).toBeLessThan(10000) // should be tiny — deps externalized
+    expect(heroJs).toContain('from"react"') // bare specifier, resolved by import map
+
+    // Custom field bundled
+    expect(existsSync(join(outDir, 'fields', 'brand-color.js'))).toBe(true)
+    const fieldJs = await import('node:fs').then(fs => fs.readFileSync(join(outDir, 'fields', 'brand-color.js'), 'utf-8'))
+    expect(fieldJs.length).toBeGreaterThan(100)
+    expect(fieldJs.length).toBeLessThan(10000)
+
+    // Shared deps built
+    expect(existsSync(join(outDir, '_shared', 'react.js'))).toBe(true)
+    expect(existsSync(join(outDir, '_shared', 'react-dom_client.js'))).toBe(true)
+    expect(existsSync(join(outDir, '_shared', 'gazetta_editor.js'))).toBe(true)
+
+    // Import map injected into index.html
+    const indexHtml = await import('node:fs').then(fs => fs.readFileSync(join(outDir, 'index.html'), 'utf-8'))
+    expect(indexHtml).toContain('"importmap"')
+    expect(indexHtml).toContain('"react"')
+    expect(indexHtml).toContain('/admin/_shared/react.js')
+  })
+})
+
 describe('findCmsDir (dev mode detection)', () => {
   function findCmsDir(): string | null {
     const candidates = [

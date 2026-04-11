@@ -417,12 +417,13 @@ Values in site.yaml can reference env vars with `${VAR_NAME}` syntax — they're
 ### Publish and deploy
 
 ```bash
+npx gazetta build                     # build admin UI + custom editors/fields
 npx gazetta publish                   # publish to default target
 npx gazetta publish production        # publish to specific target
 npx gazetta deploy production         # deploy worker (one-time setup)
 ```
 
-`publish` pre-renders pages and uploads to storage. `deploy` deploys the worker that serves them. Deploy once, publish as often as you want.
+`build` creates the production admin UI in `dist/admin/`. `publish` pre-renders pages and uploads to storage. `deploy` deploys the worker. Build and deploy once, publish as often as you want.
 
 The publish mode is automatic based on the target config:
 

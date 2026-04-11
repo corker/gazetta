@@ -46,16 +46,17 @@ targets:
 
 Find your account ID in the Cloudflare dashboard URL: `dash.cloudflare.com/<account-id>`.
 
-### 3. Deploy worker (one time)
+### 3. Build + Deploy (one time)
 
 ```bash
-npx gazetta deploy production
+npx gazetta build                # build admin UI + custom editors/fields
+npx gazetta deploy production    # deploy worker to Cloudflare
 ```
 
 ### 4. Publish content
 
 ```bash
-npx gazetta publish
+npx gazetta publish production
 ```
 
 ## Authentication

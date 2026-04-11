@@ -12,14 +12,41 @@ import { assembleEsi, parseCacheComment, splitFragment, findEsiPaths } from './a
 
 export interface ServeOptions {
   storage: StorageProvider
+  /** Serve mode: 'esi' assembles fragments at request time, 'static' serves pre-rendered HTML directly */
+  mode?: 'esi' | 'static'
 }
 
 export function createServer(options: ServeOptions) {
-  const { storage } = options
+  const { storage, mode = 'esi' } = options
   const app = new Hono()
 
   app.use(logger())
   app.get('/health', (c) => c.json({ ok: true }))
+
+  if (mode === 'static') {
+    // Static mode — serve pre-rendered HTML files directly
+    app.get('*', async (c) => {
+      const requestPath = new URL(c.req.url).pathname
+      const filePath = requestPath === '/' ? 'index.html' : `${requestPath.replace(/\/$/, '')}/index.html`
+      try {
+        const html = await storage.readFile(filePath)
+        const etag = `"${createHash('sha256').update(html).digest('hex').slice(0, 16)}"`
+        if (c.req.header('If-None-Match') === etag) return new Response(null, { status: 304, headers: { ETag: etag } })
+        return c.html(html, 200, { 'Cache-Control': 'public, max-age=0, must-revalidate', 'ETag': etag })
+      } catch {
+        // Try without /index.html (bare file)
+        try {
+          const html = await storage.readFile(requestPath.slice(1))
+          return c.html(html)
+        } catch {
+          return c.html('<h1>404 — Page not found</h1>', 404)
+        }
+      }
+    })
+    return app
+  }
+
+  // ESI mode — assemble fragments at request time
 
   // Hashed CSS/JS — immutable cache
   app.get('/pages/*', async (c) => serveAsset(c, storage))

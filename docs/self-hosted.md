@@ -42,19 +42,20 @@ Any storage type works:
 | R2 | `type: r2`, `accountId`, `bucket` |
 | Azure Blob | `type: azure-blob`, `connectionString`, `container` |
 
-### 2. Publish
+### 2. Build + Publish
 
 ```bash
-npx gazetta publish
+npx gazetta build              # build admin UI + bundle custom editors/fields
+npx gazetta publish             # pre-render pages/fragments → upload to storage
 ```
 
 ### 3. Serve
 
 ```bash
-npx gazetta serve --port 8080
+npx gazetta serve -p 8080
 ```
 
-That's it. The server reads from the target's storage and assembles pages on each request.
+The server reads from the target's storage and assembles pages on each request. If `dist/admin/` exists (from `gazetta build`), the admin CMS is available at `/admin`.
 
 ## Options
 

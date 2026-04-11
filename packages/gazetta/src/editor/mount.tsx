@@ -747,23 +747,20 @@ function getCustomFieldWidget(fieldName: string): React.FC<WidgetProps> {
         return
       }
 
-      const url = `${ctx.fieldsBaseUrl}/${fieldName}.tsx`
-      import(/* @vite-ignore */ url)
-        .then((mod) => {
-          mountRef.current = (mod.default ?? mod) as FieldMount
-          setLoading(false)
-        })
-        .catch(() => {
-          import(/* @vite-ignore */ `${ctx.fieldsBaseUrl}/${fieldName}.ts`)
-            .then((mod) => {
-              mountRef.current = (mod.default ?? mod) as FieldMount
-              setLoading(false)
-            })
-            .catch((err) => {
-              setError(`Failed to load field "${fieldName}": ${err.message}`)
-              setLoading(false)
-            })
-        })
+      const base = `${ctx.fieldsBaseUrl}/${fieldName}`
+      ;(async () => {
+        // Try extensions in order: .tsx/.ts (dev), .js (production)
+        for (const ext of ['.tsx', '.ts', '.js']) {
+          try {
+            const mod = await import(/* @vite-ignore */ `${base}${ext}`)
+            mountRef.current = (mod.default ?? mod) as FieldMount
+            setLoading(false)
+            return
+          } catch { /* try next */ }
+        }
+        setError(`Failed to load field "${fieldName}"`)
+        setLoading(false)
+      })()
     }, [ctx?.fieldsBaseUrl])
 
     // Mount the FieldMount once loaded — unmount on cleanup

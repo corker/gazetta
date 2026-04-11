@@ -7,6 +7,11 @@ targets:
     storage:
       type: filesystem
       path: ./dist/staging
+  esi-test:
+    storage:
+      type: filesystem
+      path: ./dist/esi-test
+    publishMode: esi
   production:
     storage:
       type: azure-blob

@@ -59,6 +59,7 @@ function printHelp() {
   Usage:
     gazetta init [dir]              Create a new site
     gazetta dev [site]              Start dev server + CMS at /admin
+    gazetta build                   Build admin UI for production
     gazetta publish [target] [site] Pre-render and publish to a target
     gazetta serve [target] [site]   Serve published site from target storage
     gazetta deploy [target] [site]  Deploy worker to hosting (one-time setup)
@@ -496,6 +497,160 @@ async function runPublish(siteDir: string, targetName?: string) {
   console.log(`  Done!\n`)
 }
 
+async function runBuild(siteDir: string) {
+  const projectRoot = detectProjectRoot(siteDir)
+  const outDir = join(projectRoot, 'dist', 'admin')
+
+  console.log()
+  console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green('build')}`)
+  console.log()
+
+  // Find the admin source (monorepo) or pre-built admin (npm package)
+  const cmsWebDir = findCmsDir()
+  const cmsStaticDir = findCmsStaticDir()
+
+  if (cmsWebDir) {
+    // Monorepo — build from source via Vite
+    console.log(`  ${c.dim('┃')} Admin source  ${c.dim(cmsWebDir)}`)
+    console.log(`  ${c.dim('┃')} Output        ${c.dim(outDir)}`)
+    console.log()
+
+    const { build } = await import('vite')
+    await build({
+      configFile: join(cmsWebDir, 'vite.config.ts'),
+      root: cmsWebDir,
+      base: '/admin/',
+      build: {
+        outDir,
+        emptyOutDir: true,
+        chunkSizeWarningLimit: 2000,
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              'vendor-react': ['react', 'react-dom', 'react-dom/client'],
+              'vendor-editor': ['@rjsf/core', '@rjsf/utils', '@rjsf/validator-ajv8', '@hello-pangea/dnd'],
+              'vendor-tiptap': ['@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-link', '@tiptap/extension-placeholder'],
+            },
+          },
+          onwarn(warning, defaultHandler) {
+            if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return
+            if (warning.code === 'PLUGIN_WARNING' && warning.message?.includes('dynamically imported')) return
+            defaultHandler(warning)
+          },
+        },
+      },
+      logLevel: 'warn',
+    })
+
+    console.log(`  ${c.green('✓')} Admin UI built to ${c.dim(outDir)}`)
+  } else if (cmsStaticDir) {
+    // npm package — copy pre-built admin
+    const { cp } = await import('node:fs/promises')
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(outDir, { recursive: true })
+    await cp(cmsStaticDir, outDir, { recursive: true })
+    console.log(`  ${c.green('✓')} Admin UI copied to ${c.dim(outDir)}`)
+  } else {
+    console.error(`  ${c.red('Error:')} admin UI source not found`)
+    console.error(`  ${c.dim('Run from monorepo or install gazetta from npm')}`)
+    process.exit(1)
+  }
+
+  // Bundle custom editors and fields with esbuild + shared import map
+  const adminDir = join(projectRoot, 'admin')
+  const editorsDir = join(adminDir, 'editors')
+  const fieldsDir = join(adminDir, 'fields')
+
+  const entryExtensions = ['.ts', '.tsx', '.jsx']
+  const hasEditors = existsSync(editorsDir) && (await import('node:fs')).readdirSync(editorsDir).some(f => entryExtensions.some(ext => f.endsWith(ext)))
+  const hasFields = existsSync(fieldsDir) && (await import('node:fs')).readdirSync(fieldsDir).some(f => entryExtensions.some(ext => f.endsWith(ext)))
+
+  if (hasEditors || hasFields) {
+    const { build: esbuild } = await import('esbuild')
+    const { writeFile: writeFileAsync, mkdir: mkdirAsync } = await import('node:fs/promises')
+    const sharedDir = join(outDir, '_shared')
+    await mkdirAsync(sharedDir, { recursive: true })
+
+    // Build shared dependency bundles (one copy of React, etc.)
+    const sharedDeps: Record<string, string> = {
+      'react': 'export * from "react"; import React from "react"; export default React;',
+      'react-dom/client': 'export * from "react-dom/client";',
+      'react/jsx-runtime': 'export * from "react/jsx-runtime";',
+      'gazetta/editor': 'export * from "gazetta/editor";',
+      'gazetta/types': 'export * from "gazetta/types";',
+    }
+
+    const importMap: Record<string, string> = {}
+    for (const [specifier, stub] of Object.entries(sharedDeps)) {
+      const safeName = specifier.replace(/\//g, '_')
+      const stubFile = join(sharedDir, `_stub_${safeName}.js`)
+      await writeFileAsync(stubFile, stub)
+      const outfile = join(sharedDir, `${safeName}.js`)
+      try {
+        await esbuild({
+          entryPoints: [stubFile],
+          outfile,
+          bundle: true,
+          format: 'esm',
+          platform: 'browser',
+          target: 'es2022',
+          minify: true,
+          define: { 'process.env.NODE_ENV': '"production"' },
+          logLevel: 'warning',
+        })
+        importMap[specifier] = `/admin/_shared/${safeName}.js`
+      } catch { /* skip — dep may not be installed */ }
+      await import('node:fs/promises').then(fs => fs.rm(stubFile, { force: true }))
+    }
+
+    console.log(`  ${c.green('✓')} Shared deps: ${Object.keys(importMap).join(', ')}`)
+
+    // Bundle each custom editor/field with shared deps externalized
+    const externals = Object.keys(importMap)
+    let bundledCount = 0
+
+    for (const [kind, srcDir] of [['editors', editorsDir], ['fields', fieldsDir]] as const) {
+      if (!existsSync(srcDir)) continue
+      const { readdirSync } = await import('node:fs')
+      const files = readdirSync(srcDir).filter(f => entryExtensions.some(ext => f.endsWith(ext)) && !f.startsWith('.') && !f.startsWith('_'))
+
+      for (const file of files) {
+        const name = file.replace(/\.(ts|tsx|jsx)$/, '')
+        const entryPoint = join(srcDir, file)
+        const outfile = join(outDir, kind, `${name}.js`)
+        await esbuild({
+          entryPoints: [entryPoint],
+          outfile,
+          bundle: true,
+          format: 'esm',
+          platform: 'browser',
+          target: 'es2022',
+          minify: true,
+          external: externals,
+          define: { 'process.env.NODE_ENV': '"production"' },
+          logLevel: 'warning',
+        })
+        bundledCount++
+        console.log(`  ${c.green('✓')} ${kind}/${name}.js`)
+      }
+    }
+
+    // Inject import map into index.html
+    const indexPath = join(outDir, 'index.html')
+    if (existsSync(indexPath)) {
+      let html = readFileSync(indexPath, 'utf-8')
+      const mapScript = `<script type="importmap">\n${JSON.stringify({ imports: importMap }, null, 2)}\n</script>`
+      html = html.replace('<head>', `<head>\n${mapScript}`)
+      await writeFileAsync(indexPath, html)
+      console.log(`  ${c.green('✓')} Import map injected into index.html`)
+    }
+
+    console.log(`\n  ${bundledCount} custom ${bundledCount === 1 ? 'module' : 'modules'} bundled`)
+  }
+
+  console.log()
+}
+
 async function runServe(siteDir: string, port: number, targetName?: string) {
   const siteYamlPath = join(siteDir, 'site.yaml')
   if (!existsSync(siteYamlPath)) {
@@ -519,12 +674,41 @@ async function runServe(siteDir: string, port: number, targetName?: string) {
   const { createStorageProvider } = await import('../targets.js')
   const storage = await createStorageProvider(config.storage, siteDir)
 
+  const projectRoot = detectProjectRoot(siteDir)
+  const templatesDir = join(projectRoot, 'templates')
+  const adminDir = join(projectRoot, 'admin')
+
+  const app = new Hono()
+
+  // No-op for dev-only SSE reload endpoint (admin SPA tries to connect)
+  app.get('/__reload', (ctx) => ctx.body(null, 204))
+
+  // Mount admin UI first (before catch-all page routes)
+  const builtAdminDir = join(projectRoot, 'dist', 'admin')
+  const hasBuiltAdmin = existsSync(join(builtAdminDir, 'index.html'))
+  if (hasBuiltAdmin) {
+    const fsStorage = createFilesystemProvider()
+    await setupProductionMode(app, siteDir, fsStorage, builtAdminDir, templatesDir, adminDir)
+  }
+
+  // Mount page serving routes (includes catch-all)
+  const { getPublishMode } = await import('../types.js')
+  const serveMode = config ? getPublishMode(config) : 'static'
   const { createServer } = await import('../serve.js')
-  const app = createServer({ storage })
+  const pageServer = createServer({ storage, mode: serveMode })
+  app.route('/', pageServer)
 
   const server = serve({ fetch: app.fetch, port }, () => {
-    console.log(`\n  Gazetta serving "${siteYaml.name}" from target "${name}"`)
-    console.log(`  http://localhost:${port}\n`)
+    console.log()
+    console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green('serve')} ${c.dim(siteYaml.name)} ${c.dim(`(${name})`)}`)
+    console.log()
+    console.log(`  ${c.dim('┃')} Local    ${c.cyan(`http://localhost:${port}/`)}`)
+    if (hasBuiltAdmin) {
+      console.log(`  ${c.dim('┃')} Admin    ${c.cyan(`http://localhost:${port}/admin`)}`)
+    } else {
+      console.log(`  ${c.dim('┃')} Admin    ${c.dim('not built — run gazetta build first')}`)
+    }
+    console.log()
   })
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
@@ -908,11 +1092,11 @@ async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnTy
     targetConfigs = siteYaml.targets
   }
 
-  // Mount CMS API inline at /admin
-  const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, targetConfigs })
+  // Mount CMS API inline at /admin (production mode — bundled editors/fields)
+  const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, production: true, targetConfigs })
   app.route('/admin', cmsApp)
 
-  // Serve pre-built CMS static files
+  // Serve pre-built CMS static files (includes bundled editors/fields)
   app.use('/admin/*', serveStatic({
     root: cmsStaticDir,
     rewriteRequestPath: (path) => path.replace(/^\/admin/, ''),
@@ -979,6 +1163,10 @@ async function main() {
 
   if (command === 'init') {
     await runInit(parsed.positional[0] ?? '.')
+    return
+  } else if (command === 'build') {
+    const siteDir = await resolveSiteDir(parsed.positional[0])
+    await runBuild(siteDir)
     return
   } else if (targetFirstCommands.has(command)) {
     // gazetta publish [target] [site]
