@@ -568,6 +568,94 @@ Must be done first — everything else depends on the project structure and type
     for the CLI level (resolve paths once) but doesn't need to cascade into every function —
     `Site.templatesDir` carries the value downstream.
 
+### Admin workspace details
+
+69. **`admin/` is entirely new code — no refactoring needed.** Zero code references to
+    `admin/editors/` or `admin/fields/` exist. The restructure for `admin/` is just
+    creating the directory in init. Loading editors/fields is Phase 4+5 (new code).
+
+70. **Phase 4 (custom editors) doesn't actually depend on Phase 1 (restructure).**
+    Custom editors could work with the flat structure — Vite alias `@site` points anywhere.
+    The dependency is creating `admin/editors/` directory, which init does. But editors can
+    also be created ad-hoc. The real dependency chain: Phase 3 (theme) → Phase 4 (editors).
+    Phase 1 (restructure) enables cleaner paths but isn't a blocker.
+
+71. **`@types/react` location.** Both `admin/` and `templates/` workspaces need React types.
+    Put `@types/react` and `@types/react-dom` as `devDependencies` in both workspace
+    `package.json` files. npm deduplicates — one copy hoisted to root.
+
+72. **Three `tsconfig.json` files needed per project:**
+    - `admin/tsconfig.json` — browser target, jsx, `@templates` path alias
+    - `templates/tsconfig.json` — Node target, jsx, strict
+    - Root `tsconfig.json` — base config that both extend (shared strict settings)
+    
+    ```json
+    // root tsconfig.json
+    { "compilerOptions": { "strict": true, "target": "ES2022", "module": "NodeNext" } }
+    
+    // admin/tsconfig.json
+    { "extends": "../tsconfig.json",
+      "compilerOptions": {
+        "jsx": "react-jsx",
+        "lib": ["ES2022", "DOM"],
+        "paths": { "@templates/*": ["../templates/*"] }
+      },
+      "include": ["editors", "fields"]
+    }
+    
+    // templates/tsconfig.json
+    { "extends": "../tsconfig.json",
+      "compilerOptions": { "jsx": "react-jsx" },
+      "include": ["."]
+    }
+    ```
+
+73. **AdminAppOptions needs `templatesDir`, not full `ProjectConfig`.**
+    ```ts
+    interface AdminAppOptions {
+      siteDir: string
+      templatesDir: string   // NEW — for template routes and publish
+      storage: StorageProvider
+      targets?: Map<string, StorageProvider>
+      targetConfigs?: Record<string, TargetConfig>
+    }
+    ```
+    Routes that need templates (`templates.ts`, `preview.ts`, `publish.ts`) get
+    `templatesDir` from options. Other routes use `siteDir` as before.
+
+### Complete restructured starter picture
+
+74. **Final starter structure after restructure:**
+    ```
+    examples/starter/
+      package.json             # name: @gazetta/starter, workspaces: ["admin", "templates"]
+      tsconfig.json            # base config
+      .gitignore               # node_modules, dist, .env.local
+      admin/
+        package.json           # gazetta: *, react, @types/react, @types/react-dom
+        tsconfig.json          # browser, @templates paths
+        editors/               # empty
+        fields/                # empty
+      templates/
+        package.json           # gazetta: *, react, zod, @types/react, @types/react-dom
+        tsconfig.json          # node
+        hero/index.tsx
+        card/index.ts
+        ... (21 templates)
+      sites/
+        main/
+          site.yaml            # current site.yaml
+          fragments/
+            header/            # current header fragment
+            footer/            # current footer fragment
+          pages/
+            home/              # current pages
+            about/
+            blog/
+            404/
+            showcase/
+    ```
+
 68. **The restructure can be done in 3 steps:**
     1. Add `templatesDir` to `Site` interface + `loadSite` param (non-breaking — callers pass
        `join(siteDir, 'templates')` which is the current behavior)
