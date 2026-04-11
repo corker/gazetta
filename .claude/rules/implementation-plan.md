@@ -333,6 +333,49 @@ Must be done first — everything else depends on the project structure and type
     from standalone site projects (hoisting to monorepo root vs project root). Need a test
     scenario outside the monorepo to verify standalone behavior.
 
+### React dependency audit
+
+43. **Full audit of React-dependent packages.** gazetta has 6+ packages that depend on React:
+    `@rjsf/core`, `@rjsf/utils`, `@rjsf/validator-ajv8`, `@tiptap/react`,
+    `@hello-pangea/dnd`, `@floating-ui/dom`. When React moves to peer dep, verify each
+    resolves React correctly. Run `npm ls react` after the change — must show one copy.
+
+### Core function cascade
+
+44. **`loadSite()` is the central function** — used by dev, publish, validate, preview.
+    Currently loads templates + fragments + pages all from `siteDir`. After restructure:
+    - Templates: `projectRoot/templates/`
+    - Fragments: `projectRoot/sites/{name}/fragments/`
+    - Pages: `projectRoot/sites/{name}/pages/`
+    - site.yaml: `projectRoot/sites/{name}/site.yaml`
+
+    `loadSite` signature must change from `(siteDir, storage)` to
+    `({ projectRoot, siteName, storage })`. This cascades through:
+    - `packages/gazetta/src/site-loader.ts` (function itself)
+    - `packages/gazetta/src/resolver.ts` (template resolution)
+    - `packages/gazetta/src/cli/index.ts` (dev, publish, validate calls)
+    - `packages/gazetta/src/admin-api/routes/preview.ts`
+    - `packages/gazetta/src/admin-api/routes/publish.ts`
+    - `packages/gazetta/src/admin-api/routes/templates.ts`
+    - `packages/gazetta/src/admin-api/routes/pages.ts`
+    - `packages/gazetta/src/admin-api/routes/fragments.ts`
+    - `packages/gazetta/src/admin-api/routes/components.ts`
+    - `packages/gazetta/tests/` (integration, admin-api, cli tests)
+
+    This is the largest cascade in the entire plan. Map every call site before starting.
+
+45. **File watcher needs two directories.** Currently watches `siteDir`. After restructure,
+    watch both `projectRoot/templates/` (template changes) and `projectRoot/sites/{name}/`
+    (content changes). Two `fs.watch()` calls or one `watch(projectRoot)` with path filtering.
+
+46. **`admin-dist/` must be in npm package `files` field.** When gazetta publishes to npm,
+    `admin-dist/` (pre-built admin SPA) must be included. Check `packages/gazetta/package.json`
+    `files` field. If missing, add: `"files": ["dist", "admin-dist", "src"]`.
+
+47. **Non-TTY prompt fallback.** When stdin is not interactive (piped npm script, Docker),
+    prompts can't render. Detect with `process.stdin.isTTY`. If not TTY and not CI:
+    auto-select first option with warning: "Non-interactive: using site 'main'".
+
 22. **Git strategy.** One feature branch per phase. Merge to main after phase verification.
     Each phase is a coherent set of changes that can be reviewed and reverted independently.
 
