@@ -239,6 +239,58 @@ config (see gap in Target Configurations above).
 - `dev` uses the renderer directly, watches files, supports admin UI
 - `serve` reads pre-rendered HTML from storage and assembles ESI
 
+## Future Hosting Platforms
+
+Gazetta is built on Hono, which runs on WinterTC edge runtimes, Node.js, and Bun. This opens
+many deployment targets beyond what's currently implemented.
+
+### Edge/Worker platforms (ESI page assembly at the edge)
+
+| Platform | Hono adapter | WinterTC | CDN | Free tier | Status |
+|----------|-------------|----------|-----|-----------|--------|
+| **Cloudflare Workers** | `hono/cloudflare-workers` | Yes | Global | 100K req/day | Implemented |
+| **Cloudflare Pages + Functions** | `hono/cloudflare-pages` | Yes | Global | Unlimited static, 100K fn/day | Future — static + functions in one |
+| **Deno Deploy** | `hono/deno` | Yes | 35+ regions | 1M req/mo | Future |
+| **Vercel Edge Functions** | `hono/vercel` | Yes | Global | 100 GB/mo | Future |
+| **Netlify Edge Functions** | `hono/netlify` | Yes (Deno-based) | Global | 100 GB/mo | Future |
+| **Fastly Compute** | `@fastly/hono-fastly-compute` | Yes (WASM) | Global | Trial only | Future — niche |
+| **AWS Lambda@Edge** | `hono/lambda-edge` | No (Node.js) | CloudFront | 1M req/mo | Future |
+
+### Server platforms (dynamic SSR, preview, admin hosting)
+
+| Platform | Hono adapter | Containers | Scale-to-zero | Free tier | Notes |
+|----------|-------------|-----------|---------------|-----------|-------|
+| **Node/Bun (self-hosted)** | `@hono/node-server` / `hono/bun` | N/A | N/A | N/A | Current (`gazetta serve`) |
+| **Fly.io** | Via Node/Bun | Docker | No (min 1 machine) | Pay-as-you-go | Good for always-on servers |
+| **Google Cloud Run** | Via Node/Bun | Docker | Yes | 2M req/mo | Best serverless container option |
+| **Railway** | Via Node/Bun | Docker | No | $5 trial credit | Simple DX, no free tier |
+| **Render** | Via Node/Bun | Docker | Yes (free spins down) | 512 MB / 0.1 CPU | Free tier spins down after 15 min |
+| **Azure Container Apps** | Via Node/Bun | Docker | Yes | 180K vCPU-sec/mo | Good Azure integration |
+| **AWS Lambda** | `hono/aws-lambda` | Serverless | Yes | 1M req/mo | Cold starts, not ideal for admin |
+
+### Static hosting (pre-built admin SPA or static target output)
+
+| Platform | CDN | Free tier | Notes |
+|----------|-----|-----------|-------|
+| **GitHub Pages** | Yes | Unlimited (public) | Good for docs, simple sites |
+| **Netlify** | Yes | 100 GB/mo | Popular, good DX |
+| **Vercel** | Yes | 100 GB/mo | Popular, good DX |
+| **Cloudflare Pages** | Yes | Unlimited | Best free tier |
+| **Azure Blob static website** | Via Azure CDN | 5 GB storage | Implemented as storage provider |
+| **AWS S3 + CloudFront** | Yes | 1 TB/mo (12 mo trial) | Implemented as storage provider |
+| **Firebase Hosting** | Yes | 10 GB storage | Google ecosystem |
+
+### Admin UI hosting (future)
+
+The admin UI currently only runs in dev mode (`gazetta dev`). For production admin hosting:
+
+| Option | Custom editors | Deployment | Notes |
+|--------|---------------|-----------|-------|
+| **Self-hosted (`gazetta serve` + admin)** | Full support | Single Node process | WordPress model — simplest |
+| **Docker** | Full support | Any container host | Same as self-hosted, containerized |
+| **Static deploy + API** | Needs runtime module loading | Two deployments (SPA + API) | More complex, CORS required |
+| **Cloudflare Workers** | Pre-bundled only | Single Worker | Edge constraints limit admin features |
+
 ## CLI Commands
 
 | Command | Purpose | Key code path |
