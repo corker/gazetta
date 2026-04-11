@@ -916,6 +916,99 @@ targets:                                   # required — at least one target
         apiToken: "${CLOUDFLARE_API_TOKEN}"
 ```
 
+### Shared code within templates
+
+Templates can share utilities without creating a separate package:
+
+```
+templates/
+  _shared/               # shared code — NOT a template (no index.tsx)
+    css-reset.ts
+    format-date.ts
+  hero/index.tsx         # imports from ../_shared/format-date
+  blog-post/index.tsx    # imports from ../_shared/format-date
+```
+
+Convention: directories starting with `_` are ignored by template discovery. They're
+internal code, not templates. Same applies to `admin/fields/_shared/`.
+
+### Hot reload for site.yaml
+
+`gazetta dev` watches `site.yaml` for changes. Target config changes (new target, updated
+credentials) are picked up without restart. The dev server logs: "site.yaml changed — config reloaded."
+
+### No pages in site
+
+If all pages are deleted, `gazetta dev` serves:
+- `/` → 404 (no page with route `/`)
+- `/admin` → admin UI works (empty site tree, "New page" button available)
+
+The developer creates pages from the admin UI or by adding `page.yaml` files.
+
+### Admin UI keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd + S` | Save current component |
+| `Ctrl/Cmd + Z` | Undo last edit |
+| `Ctrl/Cmd + Shift + Z` | Redo |
+| `Escape` | Close dialog / exit edit mode |
+
+### Storage connectivity check before publish
+
+`gazetta publish` checks storage connectivity before rendering:
+
+1. Attempt a lightweight read (list root directory) on the target storage
+2. If it fails → error with clear message: "Cannot connect to production (r2://my-site): Access Denied"
+3. If it succeeds → proceed with rendering and uploading
+
+This prevents wasting time rendering 500 pages only to fail on upload.
+
+### Content validation against schema
+
+Content is validated against the template's Zod schema at multiple points:
+
+| When | What happens |
+|------|-------------|
+| `gazetta dev` (preview) | Schema validation on render. Invalid content → error overlay in preview. Extra fields passed through (not stripped). |
+| `gazetta publish` | Schema validation before render. Invalid content → page skipped, error logged. |
+| `gazetta validate` | Checks all content against all schemas. Reports all mismatches. |
+| Admin UI (editor) | Live validation in the form (via @rjsf). Extra fields stripped (`omitExtraData`). |
+
+### Editor file convention
+
+Editors are flat files: `admin/editors/hero.tsx` (not `admin/editors/hero/index.tsx`).
+Templates are directories: `templates/hero/index.tsx` (because templates often have
+colocated files like tests or README).
+
+Editors are typically single files — no colocated assets. If an editor grows complex
+enough to need multiple files, use a directory: `admin/editors/hero/index.tsx` with
+supporting files alongside. Both conventions are discovered.
+
+### `gazetta dev` console output
+
+```
+$ gazetta dev
+
+  Gazetta running at http://localhost:3000
+
+  Site: My Site (sites/main)
+  Pages:
+    / → home
+    /about → about
+    /blog/:slug → blog/[slug]
+  Fragments: header, footer
+  CMS: http://localhost:3000/admin (dev mode + HMR)
+
+  Template changed: hero
+  site.yaml changed — config reloaded
+  ← GET /about 200 45ms
+  ← GET /admin/api/pages 200 12ms
+```
+
+Request logging uses hono logger. Template/config changes are highlighted.
+Colors in terminal (suppressed in CI).
+
 ### Gazetta package exports
 
 The `gazetta` npm package provides these subpath exports:
