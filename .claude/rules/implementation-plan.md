@@ -769,6 +769,19 @@ Batch E (production):     ██████ depends on Batch C+D
 
 Each batch is one branch → one review → one merge. Batch A can start today.
 
+### Batch A internal ordering
+
+Batch A items should be committed sequentially (no parallel branches):
+
+1. **React peer dep** — packages/gazetta/package.json + tsconfig types. No admin UI code.
+2. **`loadSite` options object** — site-loader, resolver, publish-rendered. No admin UI code.
+   Use overloaded signatures for backward compat (deprecated positional args + new options).
+3. **publishMode** — types.ts, cli publish, admin-api publish. Add tests first.
+4. **Theming** — mount.tsx (CSS variables), EditorPanel.vue (set variables from theme store).
+   ~12 color roles × 2 themes. Last because it touches admin UI code.
+
+Items 1-3 are in `packages/gazetta/`. Item 4 touches `apps/admin/`. No conflicts.
+
 ## Verification per phase
 
 | Phase | Verification |
