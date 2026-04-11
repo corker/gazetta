@@ -1756,6 +1756,72 @@ ulimit -n 10240        # temporary — current shell
 # permanent: add to ~/.zshrc
 ```
 
+### Storage consistency
+
+S3/R2 provide strong read-after-write consistency for new objects but eventual consistency
+for overwrite PUTs (updating existing files). After `gazetta publish`, the site may briefly
+serve stale content (~1-2 seconds). CDN cache purge propagation adds additional delay
+(Cloudflare: ~2-5 seconds globally). This is distributed storage behavior, not a Gazetta bug.
+
+For immediate consistency: use filesystem storage + `gazetta serve` (local disk is
+immediately consistent).
+
+### Template import limitations
+
+Templates run in Node.js via jiti. Supported imports:
+
+| Import type | First load (native) | Hot reload (jiti) | Notes |
+|-------------|--------------------|--------------------|-------|
+| TypeScript/TSX | ✓ | ✓ | Full support |
+| ESM JavaScript | ✓ | ✓ | Full support |
+| JSON | ✓ | ✓ | `import data from './data.json'` works |
+| WASM | ✓ (Node 22+) | May fail | Use native import only — avoid hot reload for WASM templates |
+| CSS modules | ✗ | ✗ | Not supported — templates return CSS as strings |
+| Binary files | ✗ | ✗ | Use `fs.readFileSync` instead |
+
+Templates must return CSS as strings in the `css` field — CSS imports are not supported
+because templates run in Node, not a bundler.
+
+### Symlinks in the project
+
+Symlinks are followed for template and content resolution. `templates/hero → ../shared/hero`
+works. The file watcher follows symlinks on macOS (FSEvents) and Linux (inotify).
+
+Caveats:
+- Symlink targets outside the project root may not be covered by `server.fs.allow` in dev mode
+- File watcher may not detect changes to symlink targets on all platforms
+- Recommend copying or using npm packages for shared templates instead of symlinks
+
+### Special characters in names
+
+Template and site names should use **lowercase-kebab-case**: letters, numbers, hyphens.
+
+| Character | In template names | In site names | In field names |
+|-----------|------------------|---------------|----------------|
+| Letters, numbers, hyphens | ✓ `hero`, `blog-post` | ✓ `my-site` | ✓ `brand-color` |
+| Subfolders (slash) | ✓ `buttons/primary` | ✗ | ✓ `colors/brand` |
+| Dots | Avoid — confuses URL routing | Avoid | Avoid |
+| Unicode | Works but not recommended | Works but not recommended | Works but not recommended |
+| Spaces, uppercase | ✗ | ✗ | ✗ |
+
+### Empty template schema
+
+`export const schema = z.object({})` — no content fields. Valid. Used for pure layout
+templates (header-layout, footer-layout) that only arrange children. The editor shows
+"No editable content. Edit its children instead."
+
+### Large content files
+
+YAML parsing is synchronous. Very large content files (10,000+ lines) may block the
+event loop during `gazetta dev`. Keep content fields concise — large content (long articles,
+legal documents) should use markdown or rich text fields, not inline YAML blocks.
+
+### File watcher debouncing
+
+The file watcher debounces rapid saves (IDE auto-save, batch file operations). Multiple
+saves within 100ms are coalesced into one reload. This prevents unnecessary re-renders
+and avoids loading partially-written files.
+
 ### Version upgrade resilience
 
 When upgrading gazetta (`1.x → 2.x`):
