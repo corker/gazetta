@@ -695,19 +695,44 @@ Must be done first — everything else depends on the project structure and type
     ```
     Update tests as part of the phase, not as a separate step.
 
-## Revised implementation order
+## Revised implementation order — ship-independently batches
+
+The original phase ordering (1→2→3→4→5→6→7) bundles unrelated work and blocks
+shipping. Reordered by independence — each batch can merge to main without breaking anything.
 
 ```
-Phase 1 (foundation)     ██████████ ~3-4 days (structure migration is large)
-Phase 2 (CLI)            ████████ ~3-4 days
-Phase 3 (theming)        ███ ~1 day
-Phase 4 (custom editors) ██████ ~2-3 days  (depends on Phase 3)
-Phase 5 (custom fields)  ████ ~2 days      (depends on Phase 4)
-Phase 6 (prod build)     ██████ ~2-3 days  (depends on Phase 4+5)
-Phase 7 (validate)       ███ ~1 day
+Batch A (ship now):      ████ no dependencies, pure improvements
+  - React peer dep
+  - templatesDir on Site interface (refactor steps 1-2, non-breaking)
+  - publishMode field + admin API fix
+  - Default editor theming (CSS variables)
+
+Batch B (restructure):   ██████ depends on templatesDir from Batch A
+  - Starter restructure (step 3 — the actual directory move)
+  - gazetta init update (new structure)
+  - CLI project root detection
+  - Auto-detection with prompts
+  - Dev/serve structure support
+
+Batch C (custom editors): ██████ depends on Batch A theming, Batch B optional
+  - EditorMount prop changes (schema, theme)
+  - Editor discovery API
+  - Editor loading in admin UI
+  - DefaultEditorForm extraction
+  - Dev playground
+
+Batch D (custom fields):  ████ depends on Batch C
+  - FieldMount type
+  - Field discovery API
+  - Async field loading in @rjsf
+  - Reference implementations
+
+Batch E (production):     ██████ depends on Batch C+D
+  - build command (admin SPA + editor bundling + import maps)
+  - validate improvements
 ```
 
-Phases 3→4→5→6 are strictly sequential. Phase 7 can be done anytime after Phase 5.
+Each batch is one branch → one review → one merge. Batch A can start today.
 
 ## Verification per phase
 
