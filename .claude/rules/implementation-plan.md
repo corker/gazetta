@@ -711,6 +711,70 @@ Must be done first — everything else depends on the project structure and type
     - Test publish with `publishMode: 'esi'` produces ESI placeholders
     - Test publish without `publishMode` defaults correctly
 
+### React peer dep safety — confirmed
+
+79. All React-dependent packages in gazetta declare React as peer dep:
+    - `@rjsf/core`: `react@>=18` (peer) ✓
+    - `@tiptap/react`: `react@^17||^18||^19` (peer) ✓
+    - `@hello-pangea/dnd`: `react@^18||^19` (peer) ✓
+    - `@floating-ui/dom`: no React dep ✓
+    
+    After gazetta moves React to peer, all satisfied by one hoisted React@19.
+
+### First commit specification
+
+80. Batch A item 1 — exact files for the first commit:
+    ```
+    packages/gazetta/package.json — react, react-dom → peerDependencies; @types/react, @types/react-dom → peerDependencies
+    packages/gazetta/tsconfig.json — types: ["node", "react", "react-dom"]
+    package.json (root) — add react, react-dom, @types/react, @types/react-dom to devDependencies
+    ```
+    Verify: `npm install && npm run build && npm test`
+
+### loadSite overload implementation
+
+81. Exact TypeScript pattern for backward-compatible loadSite:
+    ```ts
+    interface LoadSiteOptions {
+      siteDir: string
+      templatesDir?: string  // defaults to join(siteDir, 'templates')
+      storage: StorageProvider
+    }
+    
+    export function loadSite(opts: LoadSiteOptions): Promise<Site>
+    /** @deprecated Use options object */
+    export function loadSite(siteDir: string, storage: StorageProvider): Promise<Site>
+    export function loadSite(a: LoadSiteOptions | string, b?: StorageProvider): Promise<Site> {
+      const opts = typeof a === 'string' ? { siteDir: a, storage: b! } : a
+      // ... use opts.templatesDir ?? join(opts.siteDir, 'templates')
+    }
+    ```
+    Deprecated overload keeps all 6 test files + 7 internal callers working without changes.
+
+### Theming color values
+
+82. Complete color variable mapping (design before implementation):
+
+    | Variable | Dark | Light |
+    |----------|------|-------|
+    | `--gz-bg-input` | `#161622` | `#ffffff` |
+    | `--gz-bg-card` | `#1a1a28` | `#f9fafb` |
+    | `--gz-bg-toolbar` | `#1a1a2a` | `#f3f4f6` |
+    | `--gz-bg-chip` | `#252538` | `#e5e7eb` |
+    | `--gz-bg-code` | `#12121e` | `#f1f5f9` |
+    | `--gz-text` | `#e0e0e0` | `#1a1a1a` |
+    | `--gz-text-secondary` | `#ccc` | `#4b5563` |
+    | `--gz-text-label` | `#8888a0` | `#6b7280` |
+    | `--gz-text-hint` | `#444` | `#9ca3af` |
+    | `--gz-border` | `#2a2a3a` | `#e5e7eb` |
+    | `--gz-border-subtle` | `#1e1e2e` | `#f3f4f6` |
+    | `--gz-accent` | `#667eea` | `#667eea` |
+    | `--gz-error` | `#f87171` | `#dc2626` |
+    | `--gz-success` | `#4ade80` | `#16a34a` |
+    
+    Dark values from current mount.tsx. Light values matched to App.vue dark/light tones
+    and Tailwind gray-50 through gray-600 palette.
+
 78. **Editor theming has ~12 color roles, not 5.** Categorized from mount.tsx:
     - Backgrounds: input, card, toolbar, chip, code (5 levels)
     - Text: primary, secondary, label, description, hint (5 levels)
