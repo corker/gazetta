@@ -729,10 +729,102 @@ also run `build` before `deploy`.
 
 ### Files created by `gazetta init`
 
-Init also creates:
-- `.gitignore` — ignores `node_modules/`, `dist/`, `.env.local`
-- `tsconfig.json` — with `paths: { "@templates/*": ["./templates/*"] }` for editor type imports
-- Root `package.json` with `scripts: { dev: "gazetta dev", publish: "gazetta publish", build: "gazetta build" }`
+Init creates:
+
+```
+my-site/
+  package.json             # see below
+  .gitignore               # node_modules/, dist/, .env.local
+  .env                     # empty, with comments for common vars
+  tsconfig.json            # paths: { "@templates/*": ["./templates/*"] }
+  admin/
+    package.json           # { name: "admin", ... }
+    tsconfig.json          # jsx, strict, browser target
+  templates/
+    package.json           # { name: "templates", ... }
+    tsconfig.json          # jsx, strict, node target
+  sites/main/
+    site.yaml
+    ...
+```
+
+Root `package.json`:
+```json
+{
+  "name": "my-site",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "workspaces": ["admin", "templates"],
+  "scripts": {
+    "dev": "gazetta dev",
+    "publish": "gazetta publish",
+    "build": "gazetta build"
+  }
+}
+```
+
+Workspace names are `"admin"` and `"templates"` (short, no scope). `private: true`
+on all three prevents accidental npm publish.
+
+### Running from subdirectories
+
+`gazetta dev` (and other commands) can run from any subdirectory within the project.
+The CLI walks up from the current directory to find the project root (see project root
+detection above). `gazetta dev` from `templates/hero/` works the same as from the root.
+
+### Node.js version
+
+`gazetta init` adds `engines: { "node": ">=22" }` to root `package.json`. `gazetta dev`
+checks the Node version on startup and errors if too old:
+
+```
+gazetta dev
+> Error: Gazetta requires Node.js 22 or later. Current: 18.19.0
+```
+
+### Missing `npm install`
+
+If `node_modules/` doesn't exist, `gazetta dev` errors immediately:
+
+```
+gazetta dev
+> Error: node_modules not found. Run `npm install` first.
+```
+
+### `gazetta build` idempotency
+
+`build` cleans `dist/` before building. Running it twice produces identical output.
+Stale files from previous builds are removed. `dist/` is always a fresh, complete output.
+
+### Deploy credentials
+
+`gazetta deploy production` needs platform credentials separate from storage credentials:
+
+| Platform | Credential source | How |
+|----------|------------------|-----|
+| Cloudflare | `wrangler login` (interactive) or `CLOUDFLARE_API_TOKEN` env var | wrangler handles auth |
+| Deno Deploy (future) | `DENO_DEPLOY_TOKEN` env var | — |
+| Vercel (future) | `VERCEL_TOKEN` env var | — |
+
+Deploy credentials go in `.env` or CI secrets. They are NOT in `site.yaml` (which holds
+storage credentials). Deploy is a one-time setup — credentials are rarely needed after initial deploy.
+
+### Dev playground empty state
+
+If no custom editors or fields exist, the playground shows:
+
+```
+No custom editors or fields yet.
+
+Create an editor:  admin/editors/{template-name}.tsx
+Create a field:    admin/fields/{field-name}.tsx
+
+See docs: gazetta.studio/docs/custom-editors
+```
+
+The playground also shows the default @rjsf form for any template — useful for testing
+schemas without creating a custom editor.
 
 ### Gazetta version upgrades
 
