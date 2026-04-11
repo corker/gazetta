@@ -415,6 +415,73 @@ Must be done first — everything else depends on the project structure and type
     replace hand-written ones. The hand-written worker becomes the template for the generator.
     Until Phase 6, hand-written workers continue to work.
 
+### Path resolution architecture
+
+56. **Full path resolution chain.** After restructure, the CLI must resolve 4 paths:
+    - `projectRoot` — found by walking up from cwd
+    - `siteDir` — `projectRoot/sites/{auto-detected or specified}/`
+    - `templatesDir` — `projectRoot/templates/`
+    - `adminDir` — `projectRoot/admin/`
+    
+    Create a `ProjectConfig` type:
+    ```ts
+    interface ProjectConfig {
+      projectRoot: string
+      siteDir: string
+      siteName: string
+      templatesDir: string
+      adminDir: string
+    }
+    ```
+    Resolved once at CLI startup, passed to `loadSite`, `createAdminApp`, `runDev`,
+    `runPublish`, etc. Single source of truth for all paths.
+
+57. **`loadSite` refactor.** Change from `loadSite(siteDir, storage)` to
+    `loadSite(config: ProjectConfig, storage)`. Internally:
+    - Templates from `config.templatesDir`
+    - Fragments from `join(config.siteDir, 'fragments')`
+    - Pages from `join(config.siteDir, 'pages')`
+    - site.yaml from `join(config.siteDir, 'site.yaml')`
+
+58. **Admin API route path mapping.** Each route gets the path it needs:
+    
+    | Route | Needs projectRoot | Needs siteDir | Why |
+    |-------|:-:|:-:|-----|
+    | templates | ✓ | | Templates at projectRoot |
+    | pages | | ✓ | Pages at siteDir |
+    | fragments | | ✓ | Fragments at siteDir |
+    | components | | ✓ | Components inside pages |
+    | preview | ✓ | ✓ | Renders templates with site content |
+    | publish | ✓ | ✓ | Renders and uploads |
+    | site | | ✓ | Reads site.yaml |
+    | fields (new) | ✓ | | Fields at projectRoot/admin |
+    
+    `createAdminApp(config: ProjectConfig, storage)` — routes get paths from config.
+
+59. **`publish-rendered.ts` signature changes.** Every publish function currently takes
+    `(pageName, storage, siteDir, targetStorage)`. Must change to pass `templatesDir`
+    separately or accept `ProjectConfig`.
+
+### Documentation updates
+
+60. **Docs that need updating in the same commit as the restructure:**
+    - `docs/getting-started.md` — project structure, CLI commands
+    - `docs/design.md` — template/fragment/page structure
+    - `docs/cloudflare.md` — deployment paths, CLI commands
+    - `docs/self-hosted.md` — deployment paths
+    - `CLAUDE.md` — project structure
+    - `README.md` — project structure
+    - `CONTRIBUTING.md` — project structure
+
+### CI/CD updates
+
+61. **CI workflows affected by restructure:**
+    - `.github/workflows/ci.yml` — runs `npm test`. Passes if tests updated.
+    - `.github/workflows/deploy-site.yml` — runs `npx tsx ... publish sites/gazetta.studio`.
+      After restructure, this command needs to resolve `projectRoot` from the site path.
+      Also: paths filter needs `'templates/**'` trigger (template changes affect site).
+    - `.github/workflows/publish.yml` — check for path references.
+
 54. **Error handling strategy.** Define before implementing:
     - `GazettaError` base class with `code`, `message`, `hint` properties
     - Error codes: `TEMPLATE_NOT_FOUND`, `SITE_NOT_FOUND`, `STORAGE_ERROR`, etc.
