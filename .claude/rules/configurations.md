@@ -427,15 +427,23 @@ Prepares everything for production. Like `next build`.
 
 **`gazetta deploy`**
 
-Uploads everything to the target. Like `vercel deploy`.
+Makes changes live. The developer runs one command — the CLI figures out what needs updating.
 
 - Auto-detects site + target
-- Uploads built content from `dist/content/` to target storage (R2, S3, Azure Blob, filesystem)
-- Deploys edge runtime (Worker) if target has worker config
+- Runs `gazetta build` automatically if `dist/` is stale or missing
+- Pushes content to target storage (R2, S3, Azure Blob, filesystem)
+- Deploys edge runtime (Worker) **only if** worker code or config changed since last deploy
 - Purges CDN cache if configured
-- Runs `gazetta build` automatically if `dist/` doesn't exist
-- Currently: Cloudflare Workers for edge runtime
-- Future: Deno Deploy, Vercel Edge, Netlify Edge
+- Smart diffing: skips unchanged content, only uploads what's new
+
+```
+gazetta deploy                # auto-detect, push what changed
+gazetta deploy -t production  # explicit target
+gazetta deploy --force        # push everything, even if unchanged
+```
+
+Content push: ~2 seconds. Worker deploy: ~10 seconds (only when needed).
+The developer doesn't think about "content vs runtime" — just `deploy`.
 
 **`gazetta serve`**
 
