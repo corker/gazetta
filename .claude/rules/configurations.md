@@ -3,6 +3,20 @@
 How Gazetta is developed, configured, and deployed. Use this to reason about which
 code paths, storage providers, publish modes, and CLI commands apply to a given scenario.
 
+## What Gazetta Is and Is Not
+
+| Gazetta IS | Gazetta is NOT |
+|------------|----------------|
+| Stateless CMS — all state in storage targets | A database-backed CMS (no database) |
+| Composable — sites built from reusable components | A monolithic page builder |
+| Framework-agnostic templates (React, Svelte, Vue, plain TS) | A React framework |
+| Edge-first — Hono runtime on Workers/Deno/Node | A static site generator only (has SSR + ESI too) |
+| Disposable — lose the CMS, reconnect to targets | A single point of failure |
+
+**Not currently supported:** real-time collaboration, content versioning/drafts,
+asset management (image upload/crop), visual drag-and-drop page builder, content
+import from other CMS, webhook notifications on publish, offline editing.
+
 ## Development Modes
 
 | Mode | Who | What they run | What they edit |
@@ -1629,6 +1643,57 @@ template count. First request to each page has a cold-start delay (~50-200ms for
 UI in `serve` mode publishes directly to the target storage. Edits are immediately live
 (after publish). This is different from `dev` mode where edits are local and preview is
 on-the-fly. In `serve` mode, there is no local draft state — publish = live.
+
+### Minimum viable site
+
+The smallest Gazetta site is 5 files:
+
+```
+my-site/
+  package.json                    # workspaces, scripts
+  admin/package.json              # gazetta, react
+  templates/package.json          # gazetta, zod
+  templates/page/index.ts         # one template
+  sites/main/site.yaml            # name + one target
+  sites/main/pages/home/page.yaml # one page
+```
+
+No fragments, no custom editors, no custom fields. One template, one page.
+
+### Known scaling limits
+
+| Dimension | Tested | Expected limit |
+|-----------|--------|----------------|
+| Templates | 50+ | No hard limit — lazy loading |
+| Pages per site | 500+ | Limited by publish time (sequential render) |
+| Sites | 10+ | No hard limit — independent |
+| Components per page | 50+ | Deep nesting (100+) may stack overflow |
+| Custom editors | 20+ | No hard limit — loaded on demand |
+| Fragment nesting depth | 10+ | Circular detection, warn at 20 |
+
+### API-only mode (headless)
+
+The admin API (`/admin/api/*`) is a standard Hono API. It works without the admin SPA.
+Use cases:
+- Custom admin frontend (build your own UI that calls the API)
+- CI scripts that read/write content via API
+- Mobile app for content editing
+
+API endpoints: `GET/PUT /api/pages/:name`, `GET/PUT /api/fragments/:name`,
+`GET /api/templates`, `GET /api/templates/:name/schema`, `POST /api/publish`.
+
+### Post-publish hooks
+
+No built-in webhook or notification system. After `gazetta publish`, add notifications
+in CI scripts:
+
+```yaml
+# GitHub Actions
+- gazetta publish production
+- run: curl -X POST $SLACK_WEBHOOK -d '{"text":"Site published"}'
+```
+
+Future: `site.yaml` `hooks` field for post-publish actions.
 
 ## Known Gaps
 
