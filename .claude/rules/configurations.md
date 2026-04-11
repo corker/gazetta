@@ -975,6 +975,45 @@ Content is validated against the template's Zod schema at multiple points:
 | `gazetta validate` | Checks all content against all schemas. Reports all mismatches. |
 | Admin UI (editor) | Live validation in the form (via @rjsf). Extra fields stripped (`omitExtraData`). |
 
+### Template authoring errors
+
+Clear error messages for common mistakes:
+
+| Error | Message |
+|-------|---------|
+| No default export | "Template 'hero' has no default export. Add: export default (params) => ({ html, css, js })" |
+| No schema export | "Template 'hero' has no schema. Add: export const schema = z.object({ ... })" |
+| Render returns non-string | "Template 'hero' returned non-string html (got null). Return { html: string, css: string, js: string }" |
+| Schema is not Zod | "Template 'hero' schema is not a Zod type. Use z.object({ ... })" |
+
+All errors show the template name and file path. During `dev`, shown in the error overlay.
+During `publish`, the page is skipped with the error logged.
+
+### Template switching
+
+A content author can change which template a component uses via the admin UI. If the new
+template's schema is compatible (same or superset of fields), existing content transfers.
+Incompatible fields are dropped (with a warning). The admin UI shows a template selector
+in the component inspector.
+
+### Unused fragments
+
+Fragments referenced by no page are not an error. `gazetta publish` renders all fragments
+regardless of usage — they may be used by other sites or added to pages later.
+`gazetta validate` warns about unused fragments.
+
+### Fragment nesting
+
+Fragments can reference other fragments: `@header` can include `@logo` as a child component.
+The renderer resolves `@` references recursively. Circular references are detected and
+reported (see "Circular fragment references" above).
+
+### Template naming convention
+
+Template names cannot start with `@` — the `@` prefix is reserved for fragment references
+in component lists. Template names use lowercase-kebab-case: `hero`, `page-default`,
+`buttons/primary`.
+
 ### Editor file convention
 
 Editors are flat files: `admin/editors/hero.tsx` (not `admin/editors/hero/index.tsx`).
