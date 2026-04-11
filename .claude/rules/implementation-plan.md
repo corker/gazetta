@@ -21,6 +21,9 @@ For each step:
 2. **Design** — describe what each affected user sees, clicks, and types. Sketch the interaction.
 3. **Simplify** — find friction points, remove unnecessary steps, question every element.
 4. **Implement** — build the simplest correct solution that matches the designed experience.
+5. **Test** — write tests alongside the code, in the same commit. Unit tests for logic,
+   e2e tests for UI interactions, visual verification via MCP screenshots. No code ships
+   without tests that prove it works.
 
 ## Step 0: UI verification infrastructure
 
