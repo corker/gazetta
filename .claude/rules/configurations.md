@@ -1644,6 +1644,64 @@ UI in `serve` mode publishes directly to the target storage. Edits are immediate
 (after publish). This is different from `dev` mode where edits are local and preview is
 on-the-fly. In `serve` mode, there is no local draft state — publish = live.
 
+### Custom editor + custom field interaction
+
+When a template has both a custom editor AND schema fields with custom fields:
+- **Custom editor replaces the entire form** — custom fields inside the schema are NOT
+  automatically used. The custom editor controls everything.
+- **If the custom editor embeds `DefaultEditorForm`** — custom fields ARE used inside
+  the embedded form. The embedded form respects `meta({ field: 'name' })` as usual.
+
+Developers who want custom fields to work must either use no custom editor (default form)
+or embed `DefaultEditorForm` in their custom editor.
+
+### Custom fields in nested schemas and arrays
+
+`buildUiSchema` detects `meta({ field: 'name' })` at **all levels** — top-level properties,
+nested objects, and array items. Custom fields work inside:
+- `z.object({ color: z.string().meta({ field: 'brand-color' }) })` — top level
+- `z.object({ settings: z.object({ color: ... }) })` — nested
+- `z.array(z.object({ color: ... }))` — per array item
+
+Array items with custom fields: the field widget mounts/unmounts per item as items are
+added, removed, or reordered.
+
+### Multiple sites sharing a target
+
+Not recommended. Two sites publishing to the same storage bucket may overwrite each
+other's content (both have `pages/home/`). Each site should have its own target with
+separate storage. If sharing is needed, use different route prefixes or different
+storage paths per site.
+
+### Cross-workspace imports (forbidden)
+
+Templates must NOT import from `admin/` at runtime. Admin code is browser-only (React,
+DOM APIs). Templates are server-only (Node, SSR).
+
+Allowed: `import type` across workspaces (erased at compile time).
+Forbidden: `import { something } from '../../admin/...'` (runtime import).
+
+`gazetta validate` should detect and warn about cross-workspace runtime imports.
+
+### `gazetta publish` freshness
+
+`gazetta publish` always loads templates fresh (new Node process, empty cache). It never
+uses stale templates — even if `gazetta dev` is running simultaneously with a different
+cached version. Both processes are independent.
+
+### `DefaultEditorForm` standalone use
+
+`createEditorMount` and `DefaultEditorForm` from `gazetta/editor` mount a React form
+into any DOM element. They work outside the admin UI — useful for embedding a schema-driven
+form in custom applications. Not officially supported or tested for standalone use, but
+architecturally independent of Vue/PrimeVue.
+
+### Browser extensions and the admin UI
+
+Browser extensions (Grammarly, ad blockers, React DevTools) may interfere with the admin
+UI. If the admin behaves unexpectedly (broken layout, missing elements, form issues), try
+disabling browser extensions or using incognito mode.
+
 ### Minimum viable site
 
 The smallest Gazetta site is 5 files:
