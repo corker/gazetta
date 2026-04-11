@@ -475,6 +475,27 @@ Must be done first — everything else depends on the project structure and type
 
 ### CI/CD updates
 
+### Actual code impact is smaller than estimated
+
+62. **Only `templates` path changes in code.** Grep shows `join(siteDir, ...)` at 16 call sites.
+    After restructure:
+    - `join(siteDir, 'templates')` → `join(projectRoot, 'templates')` — **5 call sites**
+    - `join(siteDir, 'pages')` — stays (pages are site-level) — 2 call sites
+    - `join(siteDir, 'fragments')` — stays (fragments are site-level) — 2 call sites
+    - `join(siteDir, 'site.yaml')` — stays (site.yaml is site-level) — 5 call sites
+    - `join(siteDir, '.gazetta-deploy')` — stays or moves — 1 call site
+    
+    The templates path is the only change. Pages, fragments, site.yaml remain at `siteDir`.
+    `siteDir` changes from `./` (flat) to `./sites/main/` (new structure), but the relative
+    paths within `siteDir` don't change.
+
+63. **`serve.ts` does NOT need changes.** Production serve reads from storage directly — no
+    `siteDir` or `projectRoot` reference. Only `app.ts` (dev mode page serving) needs updating.
+
+64. **`AdminAppOptions` extension is surgical.** Only `templateRoutes` needs `projectRoot`.
+    Pages, fragments, components, site routes stay with `siteDir`. Preview and publish need both.
+    Not a full refactor — add `projectRoot` to `AdminAppOptions` and pass it to routes that need it.
+
 61. **CI workflows affected by restructure:**
     - `.github/workflows/ci.yml` — runs `npm test`. Passes if tests updated.
     - `.github/workflows/deploy-site.yml` — runs `npx tsx ... publish sites/gazetta.studio`.
