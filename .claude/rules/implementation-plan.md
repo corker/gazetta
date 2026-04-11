@@ -11,20 +11,26 @@ Three approaches that give Claude eyes, assertions, and structural verification.
 
 Add tools to the existing MCP dev server (`tools/mcp-dev/src/index.ts`):
 
-- `click(testId)` — click element by `data-testid` attribute
+- `goto(url)` — navigate to URL (separate from screenshot)
+- `click(testId, selector?)` — click by `data-testid` (primary) or CSS selector (fallback for PrimeVue internals)
 - `type(testId, text)` — type into input by `data-testid`
 - `wait(testId, timeout?)` — wait for element with `data-testid` to appear
-- `hover(testId)` — hover over element by `data-testid`
+- `hover(testId)` — hover by `data-testid`
 - `get_text(testId)` — read text content (cheap, no vision)
-- `get_aria()` — return ARIA tree snapshot of current page (cheap, structural)
-- `screenshot` — already exists (expensive — use sparingly, only for visual verification)
+- `get_attribute(testId, attr)` — read attribute value (cheap)
+- `get_aria()` — return full page ARIA tree as YAML (cheap, structural) — uses Playwright `page.ariaSnapshot()`
+- `screenshot(fullPage?)` — capture current page state WITHOUT navigating (expensive — use sparingly)
 
-Selectors use `data-testid` exclusively — not CSS classes or tag names (per team-preferences.md
-rule #3). Stable across PrimeVue updates and CSS refactors.
+**Selector strategy:** `data-testid` as primary (stable). CSS selector as fallback for
+PrimeVue internal elements we can't add testids to. No class-based selectors.
 
-**Cost awareness:** Screenshots consume vision tokens. Claude should prefer `get_text` and
-`get_aria` for state verification. Use screenshots ONLY for visual quality checks (theming,
-layout, colors). E2e tests and ARIA snapshots are text-based — zero vision cost.
+**Page persistence:** The page stays open between tool calls. `goto` navigates. `click`/`type`
+interact with the current page. `screenshot` captures without navigating. This enables:
+`goto('/admin')` → `click('site-page-home')` → `wait('editor-panel')` → `get_text('editor-panel')`.
+
+**Cost awareness:** `get_text`, `get_aria`, `get_attribute` are text-only — zero vision cost.
+`screenshot` is expensive (vision tokens). Default workflow: interact via `click`/`type`,
+verify via `get_text`/`get_aria`. Screenshot only for visual quality checks after CSS changes.
 
 ### 0b. Playwright e2e test setup
 
@@ -34,16 +40,17 @@ layout, colors). E2e tests and ARIA snapshots are text-based — zero vision cos
 - First test: "admin loads, site tree shows pages" (proves setup works)
 - ARIA snapshots for structural assertions (built into Playwright 1.59.1)
 
-### 0c. Dev catalog page
+### 0c. Dev catalog page (minimal)
 
-`/admin/dev` route — renders every editor widget in isolation with hardcoded props.
-Claude screenshots this page to verify visual quality after CSS changes.
+`/admin/dev` route — static page rendering editor widgets with hardcoded props.
+~100 lines of Vue. No sidebar, no dynamic import, no controls (those come in Step 5).
 
-Sections: text input (dark), text input (light), textarea, toggle, color picker, tags,
-array items, rich text editor, each in both themes.
+Sections: text input, textarea, toggle, color picker, tags, array items, rich text.
+Each widget rendered with example content. Page uses the current theme (dark/light
+toggle in toolbar still works).
 
-This is the dev playground (Step 5 in the plan) moved earlier because Claude needs it
-for visual verification during Slice 1 development.
+Claude screenshots this page after CSS changes to verify visual quality. Used rarely —
+only when changing mount.tsx STYLES.
 
 ### Why these three
 
