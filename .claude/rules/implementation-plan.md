@@ -376,6 +376,57 @@ Must be done first — everything else depends on the project structure and type
     prompts can't render. Detect with `process.stdin.isTTY`. If not TTY and not CI:
     auto-select first option with warning: "Non-interactive: using site 'main'".
 
+### Phase boundary risks
+
+48. **Phase 1 and Phase 2 are coupled — no stable state between them.** After Phase 1
+    restructures the starter, the CLI still expects the old flat layout. `gazetta dev`,
+    `publish`, `validate` all break. Phase 2 fixes them. But between merging Phase 1 and
+    completing Phase 2, the project is broken on main. Options:
+    - Implement Phase 1 + Phase 2 CLI changes as one atomic branch
+    - Phase 1 adds backward compatibility (CLI supports both old and new structure)
+    - Accept that main is broken between phases (feature branch only)
+    
+    **Recommendation:** One branch for Phase 1 + Phase 2 core changes. Merge when both work.
+
+49. **Test update order.** Two strategies:
+    - Tests-first: update tests to expect new structure (they fail) → restructure (they pass)
+    - Code-first: restructure (tests fail) → fix tests (they pass)
+    Tests-first is safer — you know exactly what the target state is.
+
+50. **`@templates` tsconfig path alias location.** Should be in `admin/tsconfig.json`
+    (editors use it), NOT root tsconfig. Vite also needs `resolve.alias: { '@templates': ... }`.
+    Two config points that must stay in sync. Consider: Vite reads from tsconfig paths
+    (via `vite-tsconfig-paths` plugin) to avoid duplication.
+
+51. **`gazetta/types` vs main export.** Currently types are exported from main entry
+    (`import { EditorMount } from 'gazetta'`). The design docs reference `gazetta/types`
+    as a separate subpath. Decide: types from main (simpler, one import) or separate
+    subpath (explicit, avoids pulling in runtime code when only types needed).
+    `import type` erases at compile time anyway — so main export is fine for types.
+    Only `gazetta/editor` needs to be separate (browser-only code).
+
+52. **Storage paths don't change.** The restructure changes the filesystem layout but NOT
+    the storage layout. Pages are still `pages/{name}/` in storage. Fragments still
+    `fragments/{name}/`. The site directory name (`sites/my-site/`) is NOT part of the
+    storage path. Verify: `publishPageRendered()` uses page names, not filesystem paths.
+
+53. **Hand-written workers vs generated workers.** `sites/gazetta.studio/worker/` has a
+    hand-written Cloudflare Worker. Phase 6 generates workers. Decision: generated workers
+    replace hand-written ones. The hand-written worker becomes the template for the generator.
+    Until Phase 6, hand-written workers continue to work.
+
+54. **Error handling strategy.** Define before implementing:
+    - `GazettaError` base class with `code`, `message`, `hint` properties
+    - Error codes: `TEMPLATE_NOT_FOUND`, `SITE_NOT_FOUND`, `STORAGE_ERROR`, etc.
+    - CLI formats errors consistently: `Error: [code] message\n  Hint: suggestion`
+    - Thrown through the call stack, caught at CLI level and formatted
+
+55. **Logging strategy.** Use a simple structured logger:
+    - `log.info(message)`, `log.warn(message)`, `log.error(message)`
+    - Context: `log.info('Template loaded', { template: 'hero', duration: '45ms' })`
+    - Verbosity: `--verbose` shows debug-level, default shows info+warn+error
+    - No external dependency — simple wrapper around console with formatting
+
 22. **Git strategy.** One feature branch per phase. Merge to main after phase verification.
     Each phase is a coherent set of changes that can be reviewed and reverted independently.
 
