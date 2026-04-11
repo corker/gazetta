@@ -255,6 +255,90 @@ Import `DefaultEditorForm` from `gazetta/editor` to embed the auto-generated for
 inside your custom editor. This gives you the best of both: custom UI on top, standard
 form fields below.
 
+## Custom fields
+
+Custom fields are reusable widgets that replace individual form fields inside the
+default @rjsf form. Unlike custom editors (which replace the entire form), custom
+fields target a single property.
+
+### Create a custom field
+
+Create `admin/fields/{field-name}.tsx`:
+
+```tsx
+// admin/fields/brand-color.tsx
+import React, { useState } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import type { FieldMount } from 'gazetta/types'
+
+const PRESETS = [
+  { label: 'Indigo', value: '#667eea' },
+  { label: 'Purple', value: '#764ba2' },
+  { label: 'Coral', value: '#f97066' },
+]
+
+function BrandColorPicker({ value, theme, onChange }) {
+  const [color, setColor] = useState(value || '#667eea')
+  const handleChange = (v) => { setColor(v); onChange(v) }
+
+  return (
+    <div>
+      <div style={{ height: 48, borderRadius: 8, background: color }} />
+      <div style={{ display: 'flex', gap: '0.375rem' }}>
+        {PRESETS.map(p => (
+          <button key={p.value} onClick={() => handleChange(p.value)}
+            style={{ width: 28, height: 28, borderRadius: 6, background: p.value, border: 'none', cursor: 'pointer' }} />
+        ))}
+      </div>
+      <input type="color" value={color} onChange={e => handleChange(e.target.value)} />
+    </div>
+  )
+}
+
+const roots = new WeakMap()
+const brandColor: FieldMount = {
+  mount(el, { value, theme, onChange }) {
+    const root = createRoot(el); roots.set(el, root)
+    root.render(<BrandColorPicker value={String(value ?? '')} theme={theme} onChange={onChange} />)
+  },
+  unmount(el) { roots.get(el)?.unmount(); roots.delete(el) },
+}
+export default brandColor
+```
+
+### Reference a custom field in a template schema
+
+Use `format.field('field-name')` in the Zod schema:
+
+```ts
+// templates/banner/index.ts
+import { z } from 'zod'
+import { format } from 'gazetta'
+
+export const schema = z.object({
+  heading: z.string().describe('Banner heading'),
+  background: z.string().meta(format.field('brand-color')).describe('Background color'),
+})
+```
+
+The `brand-color` field widget loads automatically when editing a component that uses
+the `banner` template. Other fields in the schema use the default form inputs.
+
+### What custom fields receive
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `value` | `unknown` | Current field value |
+| `schema` | `Record<string, unknown>` | JSON Schema for this property |
+| `theme` | `'dark' \| 'light'` | Current admin theme |
+| `onChange` | `(value) => void` | Call when the value changes |
+
+### Custom fields + custom editors
+
+- **No custom editor** — custom fields work inside the default @rjsf form
+- **Custom editor with `DefaultEditorForm`** — custom fields work inside the embedded form
+- **Custom editor without `DefaultEditorForm`** — custom fields are NOT used (the custom editor controls everything)
+
 ## Publishing
 
 > **Deploying to Cloudflare?** See the [Cloudflare deployment guide](./cloudflare.md).
@@ -399,24 +483,34 @@ When `cache.purge` is configured, `gazetta publish` automatically purges the CDN
 ## Site structure
 
 ```
-my-site/
-  site.yaml                  # site manifest + targets
-  templates/                 # developer-created templates
+my-project/
+  package.json
+  admin/                     # custom editors + fields (shared across sites)
+    editors/
+      hero.tsx
+    fields/
+      brand-color.tsx
+  templates/                 # developer-created templates (shared across sites)
     hero/index.ts
     nav/index.ts
     page-layout/index.ts
-  fragments/                 # shared components
-    header/fragment.yaml
-  pages/                     # routable pages
-    home/
-      page.yaml
-      hero/component.yaml
-    about/
-      page.yaml
-    blog/
-      [slug]/page.yaml       # dynamic route
-  package.json
+  sites/
+    main/                    # site content
+      site.yaml              # site manifest + targets
+      fragments/             # shared components
+        header/fragment.yaml
+      pages/                 # routable pages
+        home/
+          page.yaml
+          hero/component.yaml
+        about/
+          page.yaml
+        blog/
+          [slug]/page.yaml   # dynamic route
 ```
+
+Templates and admin customizations are at the project root, shared across all sites.
+Content (pages, fragments, site.yaml) lives inside `sites/{name}/`.
 
 ## Next steps
 

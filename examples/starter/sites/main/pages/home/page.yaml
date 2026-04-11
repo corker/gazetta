@@ -8,4 +8,5 @@ components:
   - features
   - demo
   - vue-demo
+  - banner
   - "@footer"

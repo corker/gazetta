@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
@@ -9,6 +10,10 @@ import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
 import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
+
+const route = useRoute()
+const router = useRouter()
+const isDevPage = computed(() => route.path === '/dev')
 
 const site = useSiteStore()
 const selection = useSelectionStore()
@@ -50,6 +55,10 @@ function handleBack() {
       </Transition>
     </template>
     <template #end>
+      <Button v-if="isDevPage" icon="pi pi-arrow-left" label="Editor" text
+        data-testid="back-to-editor" @click="router.push('/')" size="small" class="cms-btn" />
+      <Button v-else icon="pi pi-code" text rounded title="Dev Playground"
+        data-testid="dev-playground-link" @click="router.push('/dev')" size="small" class="cms-btn" />
       <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
       <Button v-if="uiMode.mode === 'edit' && editing.dirty" label="Discard" icon="pi pi-undo" severity="secondary" text

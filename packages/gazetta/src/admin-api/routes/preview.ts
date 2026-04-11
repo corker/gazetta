@@ -4,7 +4,7 @@ import { loadSite } from '../../site-loader.js'
 import { resolveFragment, resolvePage } from '../../resolver.js'
 import { renderFragment, renderPage } from '../../renderer.js'
 
-export function previewRoutes(siteDir: string, storage: StorageProvider) {
+export function previewRoutes(siteDir: string, storage: StorageProvider, templatesDir?: string) {
   const app = new Hono()
 
   // No caching — preview always serves fresh content for editing
@@ -14,12 +14,12 @@ export function previewRoutes(siteDir: string, storage: StorageProvider) {
   })
 
   app.get('/preview/*', async (c) => {
-    return renderPreview(c, siteDir, storage)
+    return renderPreview(c, siteDir, storage, undefined, templatesDir)
   })
 
   app.post('/preview/*', async (c) => {
     const body = await c.req.json() as { overrides?: Record<string, Record<string, unknown>> }
-    return renderPreview(c, siteDir, storage, body.overrides)
+    return renderPreview(c, siteDir, storage, body.overrides, templatesDir)
   })
 
   return app
@@ -29,9 +29,10 @@ async function renderPreview(
   c: Context,
   siteDir: string,
   storage: StorageProvider,
-  overrides?: Record<string, Record<string, unknown>>
+  overrides?: Record<string, Record<string, unknown>>,
+  templatesDir?: string
 ) {
-  const site = await loadSite(siteDir, storage)
+  const site = await loadSite({ siteDir, storage, templatesDir })
   const requestPath = c.req.path.replace(/^.*\/preview/, '') || '/'
 
   // Fragment preview: /preview/@fragmentName

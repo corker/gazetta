@@ -20,6 +20,8 @@ export interface EditorMount {
     schema: Record<string, unknown>
     theme: 'dark' | 'light'
     onChange: (content: Record<string, unknown>) => void
+    /** Base URL for loading custom field modules (dev mode: /@fs/ path) */
+    fieldsBaseUrl?: string
   }): void
   unmount(el: HTMLElement): void
 }

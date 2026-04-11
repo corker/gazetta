@@ -17,6 +17,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export interface PageSummary { name: string; route: string; template: string }
 export interface FragmentSummary { name: string; template: string }
 export interface TemplateSummary { name: string }
+export interface FieldSummary { name: string; path: string }
 export interface SiteManifest { name: string; version?: string; systemPages?: string[] }
 
 export interface PageDetail extends PageSummary {
@@ -48,6 +49,7 @@ export const api = {
   createComponent: (parentDir: string, name: string, template: string) => request<{ ok: boolean; path: string }>('/components', { method: 'POST', body: JSON.stringify({ parentDir, name, template }) }),
   getTemplates: () => request<TemplateSummary[]>('/templates'),
   getTemplateSchema: (name: string) => request<Record<string, unknown>>(`/templates/${name}/schema`),
+  getFields: () => request<FieldSummary[]>('/fields'),
   getTargets: () => request<string[]>('/targets'),
   publish: (items: string[], targets: string[]) => request<{ results: Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
   fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),

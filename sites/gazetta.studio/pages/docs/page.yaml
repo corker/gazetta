@@ -10,4 +10,5 @@ components:
   - publishing
   - cms
   - custom-editors
+  - custom-fields
   - "@footer"

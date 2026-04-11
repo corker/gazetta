@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { resolve, join } from 'node:path'
+import { resolve, join, dirname } from 'node:path'
 import { watch, existsSync, readFileSync } from 'node:fs'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
@@ -18,6 +18,26 @@ import { createAdminApp } from '../admin-api/index.js'
 
 const args = process.argv.slice(2)
 const command = args[0]
+
+/**
+ * Detect the project root from a site directory.
+ * Walks up from siteDir looking for a parent that contains templates/.
+ * Falls back to siteDir for flat projects (templates/ inside site dir).
+ */
+function detectProjectRoot(siteDir: string): string {
+  // If siteDir itself has templates/, it's a flat project
+  if (existsSync(join(siteDir, 'templates'))) return siteDir
+  // Walk up looking for templates/
+  let dir = resolve(siteDir)
+  const root = resolve('/')
+  while (dir !== root) {
+    const parent = dirname(dir)
+    if (existsSync(join(parent, 'templates'))) return parent
+    dir = parent
+  }
+  // Fallback — use siteDir (templates/ may not exist yet)
+  return siteDir
+}
 
 function printHelp() {
   console.log(`
@@ -233,9 +253,11 @@ content:
 
 async function runPublish(siteDir: string, targetName?: string) {
   const storage = createFilesystemProvider()
+  const projectRoot = detectProjectRoot(siteDir)
+  const templatesDir = join(projectRoot, 'templates')
 
   console.log(`\n  Loading site from ${siteDir}...`)
-  const site = await loadSite(siteDir, storage)
+  const site = await loadSite({ siteDir, storage, templatesDir })
 
   // Load target configs from site.yaml
   const siteYamlPath = join(siteDir, 'site.yaml')
@@ -290,20 +312,20 @@ async function runPublish(siteDir: string, targetName?: string) {
     if (isStatic) {
       // Static mode — fully assembled HTML, no fragments needed separately
       for (const pageName of site.pages.keys()) {
-        const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage)
+        const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir)
         totalFiles += files
         console.log(`    page: ${pageName} (${files} files)`)
       }
     } else {
       // ESI mode — fragments separate, pages with placeholders
       for (const fragName of site.fragments.keys()) {
-        const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage)
+        const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage, templatesDir)
         totalFiles += files
         totalRemoved += removed
         console.log(`    fragment: ${fragName} (${files} files)`)
       }
       for (const pageName of site.pages.keys()) {
-        const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache)
+        const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache, templatesDir)
         totalFiles += files
         totalRemoved += removed
         console.log(`    page: ${pageName} (${files} files)`)
@@ -465,13 +487,15 @@ async function runDeploy(siteDir: string, targetName?: string) {
 
 async function runValidate(siteDir: string) {
   const storage = createFilesystemProvider()
+  const projectRoot = detectProjectRoot(siteDir)
+  const templatesDir = join(projectRoot, 'templates')
 
   console.log(`\n  Validating ${siteDir}...\n`)
 
   // 1. Check site.yaml
   let site: Awaited<ReturnType<typeof loadSite>>
   try {
-    site = await loadSite(siteDir, storage)
+    site = await loadSite({ siteDir, storage, templatesDir })
     console.log(`  ✓ site.yaml — ${site.manifest.name}`)
   } catch (err) {
     console.error(`  ✗ site.yaml — ${(err as Error).message}`)
@@ -484,8 +508,7 @@ async function runValidate(siteDir: string) {
   for (const [fragName, frag] of site.fragments) {
     try {
       const { resolveComponent } = await import('../resolver.js')
-      const templatesDir = join(siteDir, 'templates')
-      const ctx = { site, templatesDir, visited: new Set<string>(), path: [`@${fragName}`] }
+      const ctx = { site, templatesDir: site.templatesDir, visited: new Set<string>(), path: [`@${fragName}`] }
       await resolveComponent(`@${fragName}`, '', ctx)
 
       const childCount = frag.components?.length ?? 0
@@ -511,7 +534,6 @@ async function runValidate(siteDir: string) {
   }
 
   // 4. List templates
-  const templatesDir = join(siteDir, 'templates')
   try {
     const entries = await storage.readDir(templatesDir)
     const templateCount = entries.filter(e => e.isDirectory).length
@@ -579,9 +601,12 @@ function renderErrorOverlay(err: Error): string {
 
 async function runDev(siteDir: string, port: number) {
   const storage = createFilesystemProvider()
+  const projectRoot = detectProjectRoot(siteDir)
+  const templatesDir = join(projectRoot, 'templates')
+  const adminDir = join(projectRoot, 'admin')
 
   console.log(`\n  Loading site from ${siteDir}...`)
-  const site = await loadSite(siteDir, storage)
+  const site = await loadSite({ siteDir, storage, templatesDir })
 
   const app = new Hono()
 
@@ -608,7 +633,7 @@ async function runDev(siteDir: string, port: number) {
   for (const [pageName, page] of site.pages) {
     app.get(page.route, async (c) => {
       try {
-        const freshSite = await loadSite(siteDir, storage)
+        const freshSite = await loadSite({ siteDir, storage, templatesDir })
         const resolved = await resolvePage(pageName, freshSite)
         const html = await renderPage(resolved, c.req.param())
         return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
@@ -625,10 +650,10 @@ async function runDev(siteDir: string, port: number) {
 
   if (isDevMode) {
     // Dev mode: mount CMS API inline (same process = shared template cache)
-    await setupCmsApi(app, siteDir, storage)
+    await setupCmsApi(app, siteDir, storage, templatesDir, adminDir)
   } else if (cmsStaticDir) {
     // Production mode: inline CMS API + static files
-    await setupProductionMode(app, siteDir, storage, cmsStaticDir)
+    await setupProductionMode(app, siteDir, storage, cmsStaticDir, templatesDir, adminDir)
   }
 
   // ---- 404 ----
@@ -655,8 +680,8 @@ async function runDev(siteDir: string, port: number) {
           base: '/admin/',
           resolve: {
             alias: {
-              '@editors': join(siteDir, 'admin', 'editors'),
-              '@fields': join(siteDir, 'admin', 'fields'),
+              '@editors': join(adminDir, 'editors'),
+              '@fields': join(adminDir, 'fields'),
             },
           },
           server: {
@@ -698,37 +723,46 @@ async function runDev(siteDir: string, port: number) {
   })
 
   // ---- File watching ----
+  // Watch site dir for content changes (yaml manifests)
   watch(siteDir, { recursive: true }, (_event, filename) => {
     if (!filename) return
-    if ((filename.endsWith('.ts') || filename.endsWith('.tsx')) && filename.includes('templates/')) {
-      const parts = filename.split('/')
-      const idx = parts.indexOf('templates')
-      if (idx >= 0 && idx + 1 < parts.length) {
-        console.log(`  Template changed: ${parts[idx + 1]}`)
-        invalidateTemplate(parts[idx + 1])
-      }
-    } else if (filename.endsWith('.yaml')) {
+    if (filename.endsWith('.yaml')) {
       console.log(`  Manifest changed: ${filename}`)
       invalidateAllTemplates()
-    } else return
-    notifyReload()
+      notifyReload()
+    }
   })
+
+  // Watch templates dir for template source changes
+  if (existsSync(templatesDir)) {
+    watch(templatesDir, { recursive: true }, (_event, filename) => {
+      if (!filename) return
+      if (filename.endsWith('.ts') || filename.endsWith('.tsx')) {
+        const parts = filename.split('/')
+        if (parts.length >= 1) {
+          console.log(`  Template changed: ${parts[0]}`)
+          invalidateTemplate(parts[0])
+          notifyReload()
+        }
+      }
+    })
+  }
 }
 
 // ---- Mount CMS API on the main Hono app (shared process = shared template cache) ----
-async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>) {
+async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string) {
   const siteYamlPath = join(siteDir, 'site.yaml')
   let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
   if (existsSync(siteYamlPath)) {
     const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as SiteManifest
     targetConfigs = siteYaml.targets
   }
-  const cmsApp = createAdminApp({ siteDir, storage, targetConfigs })
+  const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, targetConfigs })
   app.route('/admin', cmsApp)
 }
 
 // ---- Production mode: inline CMS API + static files from admin-dist/ ----
-async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, cmsStaticDir: string) {
+async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, cmsStaticDir: string, templatesDir: string, adminDir: string) {
   // Read target configs from site.yaml — targets are initialized lazily on first publish/fetch
   const siteYamlPath = join(siteDir, 'site.yaml')
   let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
@@ -738,7 +772,7 @@ async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnTy
   }
 
   // Mount CMS API inline at /admin
-  const cmsApp = createAdminApp({ siteDir, storage, targetConfigs })
+  const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, targetConfigs })
   app.route('/admin', cmsApp)
 
   // Serve pre-built CMS static files

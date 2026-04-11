@@ -1,0 +1,76 @@
+template: text
+content:
+  body: |
+    <p>Custom fields are reusable widgets that replace individual form fields inside the default @rjsf form. Unlike custom editors (which replace the entire form), custom fields target a single property in the schema.</p>
+
+    <h3>Create a custom field</h3>
+    <p>Add a file at <code>admin/fields/{field-name}.tsx</code>:</p>
+    <pre><code>// admin/fields/brand-color.tsx
+    import React, { useState } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import type { FieldMount } from 'gazetta/types'
+
+    const PRESETS = [
+      { label: 'Indigo', value: '#667eea' },
+      { label: 'Purple', value: '#764ba2' },
+      { label: 'Coral', value: '#f97066' },
+    ]
+
+    function BrandColorPicker({ value, theme, onChange }) {
+      const [color, setColor] = useState(value || '#667eea')
+      const handleChange = (v) =&gt; { setColor(v); onChange(v) }
+      return (
+        &lt;div&gt;
+          &lt;div style={{ height: 48, borderRadius: 8, background: color }} /&gt;
+          &lt;div style={{ display: 'flex', gap: '0.375rem' }}&gt;
+            {PRESETS.map(p =&gt; (
+              &lt;button key={p.value} onClick={() =&gt; handleChange(p.value)}
+                style={{ width: 28, height: 28, borderRadius: 6, background: p.value, border: 'none', cursor: 'pointer' }} /&gt;
+            ))}
+          &lt;/div&gt;
+          &lt;input type="color" value={color} onChange={e =&gt; handleChange(e.target.value)} /&gt;
+        &lt;/div&gt;
+      )
+    }
+
+    const roots = new WeakMap()
+    const brandColor: FieldMount = {
+      mount(el, { value, theme, onChange }) {
+        const root = createRoot(el); roots.set(el, root)
+        root.render(&lt;BrandColorPicker value={String(value ?? '')} theme={theme} onChange={onChange} /&gt;)
+      },
+      unmount(el) { roots.get(el)?.unmount(); roots.delete(el) },
+    }
+    export default brandColor</code></pre>
+
+    <h3>Reference in a template schema</h3>
+    <p>Use <code>format.field('field-name')</code> in the Zod schema to connect a property to your custom field widget:</p>
+    <pre><code>// templates/banner/index.ts
+    import { z } from 'zod'
+    import { format } from 'gazetta'
+
+    export const schema = z.object({
+      heading: z.string().describe('Banner heading'),
+      background: z.string().meta(format.field('brand-color')).describe('Background color'),
+    })</code></pre>
+    <p>The <code>brand-color</code> widget loads automatically when editing a component that uses the <code>banner</code> template. Other fields in the schema use the default form inputs.</p>
+
+    <h3>FieldMount contract</h3>
+    <p>Custom fields export a <code>FieldMount</code> object with <code>mount(el, props)</code> and <code>unmount(el)</code> methods — the same pattern as custom editors.</p>
+    <p>The <code>mount</code> function receives:</p>
+    <ul>
+      <li><code>value</code> — current field value</li>
+      <li><code>schema</code> — JSON Schema for this property</li>
+      <li><code>theme</code> — <code>'dark'</code> or <code>'light'</code></li>
+      <li><code>onChange</code> — call when the value changes</li>
+    </ul>
+
+    <h3>Custom fields + custom editors</h3>
+    <ul>
+      <li><strong>No custom editor</strong> — custom fields work inside the default @rjsf form</li>
+      <li><strong>Custom editor with <code>DefaultEditorForm</code></strong> — custom fields work inside the embedded form</li>
+      <li><strong>Custom editor without <code>DefaultEditorForm</code></strong> — custom fields are NOT used (the custom editor controls everything)</li>
+    </ul>
+
+    <h3>Hot reload</h3>
+    <p>Custom fields are served by Vite in dev mode. Edit your <code>.tsx</code> file and the field widget updates via HMR.</p>

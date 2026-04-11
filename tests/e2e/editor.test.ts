@@ -1,11 +1,19 @@
 import { test, expect } from '@playwright/test'
 
-// Helper: navigate to admin and enter edit mode on a page
+// Helper: navigate to admin, select a page, enter edit mode by clicking a component in the preview iframe
 async function openEditor(page: import('@playwright/test').Page, pageName: string) {
   await page.goto('/admin')
   await page.click(`[data-testid="site-page-${pageName}"]`)
-  // Click preview iframe to enter edit mode
-  await page.click('[data-testid="preview-iframe"]')
+
+  // Wait for preview iframe to load content
+  const iframe = page.frameLocator('[data-testid="preview-iframe"]')
+  await iframe.locator('[data-gz]').first().waitFor({ timeout: 10000 })
+
+  // Click a data-gz element inside the iframe to trigger edit mode
+  await iframe.locator('[data-gz]').first().click()
+
+  // Wait for component tree to appear (edit mode)
+  await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
 }
 
 test.describe('Admin loads', () => {
@@ -58,7 +66,6 @@ test.describe('Custom editor', () => {
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Wait for content to render — custom editor has a gradient preview
-    // The custom hero editor renders "Welcome to Gazetta" in a gradient div
     const editorPanel = page.locator('[data-testid="editor-panel"]')
     await expect(editorPanel).toContainText('Welcome to Gazetta')
 

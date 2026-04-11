@@ -5,9 +5,10 @@ import type { Hono } from 'hono'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { createAdminApp } from '../src/admin-api/index.js'
 
-const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
+const siteDir = resolve(projectRoot, 'sites/main')
 const storage = createFilesystemProvider()
-const app: Hono = createAdminApp(starterDir, storage)
+const app: Hono = createAdminApp({ siteDir, storage, templatesDir: resolve(projectRoot, 'templates'), adminDir: resolve(projectRoot, 'admin') })
 
 async function get(path: string) {
   const res = await app.request(path)
@@ -123,7 +124,7 @@ describe('GET /api/templates/:name/schema', () => {
 
 describe('GET /api/components', () => {
   it('returns component manifest', async () => {
-    const path = resolve(starterDir, 'pages/home/hero')
+    const path = resolve(siteDir, 'pages/home/hero')
     const { status, body } = await get(`/api/components?path=${encodeURIComponent(path)}`)
     expect(status).toBe(200)
     expect(body.template).toBe('hero')
@@ -182,7 +183,7 @@ describe('GET /preview/@fragment', () => {
 
 describe('POST /preview/@fragment', () => {
   it('renders fragment with content overrides', async () => {
-    const footerPath = resolve(starterDir, 'fragments/footer')
+    const footerPath = resolve(siteDir, 'fragments/footer')
     const res = await app.request('/preview/@footer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -198,7 +199,7 @@ describe('POST /preview/@fragment', () => {
 
 describe('POST /preview/*', () => {
   it('renders with content overrides', async () => {
-    const heroPath = resolve(starterDir, 'pages/home/hero')
+    const heroPath = resolve(siteDir, 'pages/home/hero')
     const res = await app.request('/preview/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -226,8 +227,8 @@ describe('POST /preview/*', () => {
 
 describe('POST /api/pages (create)', () => {
   afterAll(async () => {
-    await rm(resolve(starterDir, 'pages/test-page'), { recursive: true, force: true })
-    await rm(resolve(starterDir, 'pages/docs'), { recursive: true, force: true })
+    await rm(resolve(siteDir, 'pages/test-page'), { recursive: true, force: true })
+    await rm(resolve(siteDir, 'pages/docs'), { recursive: true, force: true })
   })
 
   it('creates a new page', async () => {
@@ -265,7 +266,7 @@ describe('POST /api/pages (create)', () => {
 
 describe('PUT /api/pages/:name', () => {
   afterAll(async () => {
-    await rm(resolve(starterDir, 'pages/update-test'), { recursive: true, force: true })
+    await rm(resolve(siteDir, 'pages/update-test'), { recursive: true, force: true })
   })
 
   it('updates page content', async () => {
@@ -301,7 +302,7 @@ describe('PUT /api/pages/:name', () => {
 
 describe('PUT /api/components', () => {
   it('updates component content', async () => {
-    const path = resolve(starterDir, 'pages/home/hero')
+    const path = resolve(siteDir, 'pages/home/hero')
     const res = await app.request(`/api/components?path=${encodeURIComponent(path)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -354,7 +355,7 @@ describe('DELETE /api/pages/:name', () => {
 
 describe('POST /api/fragments (create)', () => {
   afterAll(async () => {
-    await rm(resolve(starterDir, 'fragments/test-frag'), { recursive: true, force: true })
+    await rm(resolve(siteDir, 'fragments/test-frag'), { recursive: true, force: true })
   })
 
   it('creates a new fragment', async () => {
@@ -398,11 +399,11 @@ describe('DELETE /api/fragments/:name', () => {
 
 describe('POST /api/components (create)', () => {
   afterAll(async () => {
-    await rm(resolve(starterDir, 'pages/home/test-comp'), { recursive: true, force: true })
+    await rm(resolve(siteDir, 'pages/home/test-comp'), { recursive: true, force: true })
   })
 
   it('creates a new component', async () => {
-    const parentDir = resolve(starterDir, 'pages/home')
+    const parentDir = resolve(siteDir, 'pages/home')
     const res = await app.request('/api/components', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

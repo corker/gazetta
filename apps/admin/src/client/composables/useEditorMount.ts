@@ -8,7 +8,8 @@ export function useEditorMount(
   schema: Ref<Record<string, unknown> | null>,
   theme: Ref<'dark' | 'light'>,
   onChange: (content: Record<string, unknown>) => void,
-  mountVersion?: Ref<number>
+  mountVersion?: Ref<number>,
+  fieldsBaseUrl?: Ref<string | undefined>
 ) {
   let mounted = false
 
@@ -20,6 +21,7 @@ export function useEditorMount(
       schema: schema.value,
       theme: theme.value,
       onChange,
+      fieldsBaseUrl: fieldsBaseUrl?.value,
     })
     mounted = true
   }

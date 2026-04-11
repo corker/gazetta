@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx ../../packages/gazetta/src/cli/index.ts dev ."
+    "dev": "tsx ../../packages/gazetta/src/cli/index.ts dev sites/main"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

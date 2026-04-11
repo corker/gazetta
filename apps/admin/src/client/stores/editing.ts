@@ -19,6 +19,8 @@ export interface EditingTarget {
   hasEditor?: boolean
   /** URL to load the custom editor from (Vite /@fs/ path in dev) */
   editorUrl?: string
+  /** Base URL for loading custom field modules (Vite /@fs/ path in dev) */
+  fieldsBaseUrl?: string
   /** Persists edited content to the correct API endpoint */
   save: (content: Record<string, unknown>) => Promise<void>
 }

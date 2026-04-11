@@ -6,25 +6,27 @@ import { loadTemplate, hasEditorFile } from '../../template-loader.js'
 
 const EDITOR_EXTENSIONS = ['.tsx', '.ts']
 
-export function templateRoutes(siteDir: string, storage: StorageProvider) {
+export function templateRoutes(siteDir: string, storage: StorageProvider, templatesDir?: string, adminDir?: string) {
   const app = new Hono()
-  const editorsDir = join(siteDir, 'admin', 'editors')
+  const tplDir = templatesDir ?? join(siteDir, 'templates')
+  const admDir = adminDir ?? join(siteDir, 'admin')
+  const editorsDir = join(admDir, 'editors')
+  const fieldsDir = join(admDir, 'fields')
+  const fieldsBaseUrl = `/admin/@fs/${fieldsDir}`
 
   app.get('/api/templates', async (c) => {
-    const templatesDir = join(siteDir, 'templates')
-    if (!await storage.exists(templatesDir)) return c.json([])
+    if (!await storage.exists(tplDir)) return c.json([])
 
-    const entries = await storage.readDir(templatesDir)
+    const entries = await storage.readDir(tplDir)
     const templates = entries.filter(e => e.isDirectory).map(e => ({ name: e.name }))
     return c.json(templates)
   })
 
   app.get('/api/templates/:name/schema', async (c) => {
     const name = c.req.param('name')
-    const templatesDir = join(siteDir, 'templates')
 
     try {
-      const loaded = await loadTemplate(storage, templatesDir, name)
+      const loaded = await loadTemplate(storage, tplDir, name)
       const jsonSchema = z.toJSONSchema(loaded.schema as z.ZodType)
       const hasEditor = await hasEditorFile(storage, editorsDir, name)
 
@@ -40,7 +42,7 @@ export function templateRoutes(siteDir: string, storage: StorageProvider) {
         }
       }
 
-      return c.json({ ...jsonSchema as Record<string, unknown>, hasEditor, editorUrl })
+      return c.json({ ...jsonSchema as Record<string, unknown>, hasEditor, editorUrl, fieldsBaseUrl })
     } catch (err) {
       return c.json({ error: `Failed to load schema for template "${name}": ${(err as Error).message}` }, 500)
     }

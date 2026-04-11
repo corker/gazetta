@@ -163,7 +163,9 @@ describe('resolveDependencies', () => {
 })
 
 describe('publishRendered', () => {
-  const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+  const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
+  const starterDir = resolve(projectRoot, 'sites/main')
+  const templatesDir = resolve(projectRoot, 'templates')
   const storage = createFilesystemProvider()
   const renderTargetDir = join(tmpdir(), 'gazetta-render-test-' + Date.now())
 
@@ -173,7 +175,7 @@ describe('publishRendered', () => {
 
   it('publishes a page as HTML with ESI placeholders and hashed CSS', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    const { files } = await publishPageRendered('home', storage, starterDir, target)
+    const { files } = await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     // Check page HTML exists with ESI tags and title from content
@@ -192,7 +194,7 @@ describe('publishRendered', () => {
 
   it('publishes a fragment as HTML with hashed CSS', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    const { files } = await publishFragmentRendered('header', storage, starterDir, target)
+    const { files } = await publishFragmentRendered('header', storage, starterDir, target, templatesDir)
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     const html = await target.readFile('fragments/header/index.html')
@@ -209,7 +211,7 @@ describe('publishRendered', () => {
     const target = createFilesystemProvider(renderTargetDir)
 
     // First publish
-    await publishFragmentRendered('header', storage, starterDir, target)
+    await publishFragmentRendered('header', storage, starterDir, target, templatesDir)
     const entries1 = await target.readDir('fragments/header')
     const css1 = entries1.find(e => e.name.endsWith('.css'))!.name
 
@@ -219,7 +221,7 @@ describe('publishRendered', () => {
     expect(entriesBefore.filter(e => e.name.endsWith('.css')).length).toBe(2)
 
     // Publish again — same content, same hash
-    await publishFragmentRendered('header', storage, starterDir, target)
+    await publishFragmentRendered('header', storage, starterDir, target, templatesDir)
     const entriesAfter = await target.readDir('fragments/header')
     const cssAfter = entriesAfter.filter(e => e.name.endsWith('.css'))
 
@@ -232,14 +234,14 @@ describe('publishRendered', () => {
     const target = createFilesystemProvider(renderTargetDir)
 
     // First publish
-    await publishPageRendered('home', storage, starterDir, target)
+    await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
 
     // Write fake old files
     await target.writeFile('pages/home/styles.00000000.css', '.old {}')
     await target.writeFile('pages/home/script.00000000.js', '// old')
 
     // Publish again
-    await publishPageRendered('home', storage, starterDir, target)
+    await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
     const entries = await target.readDir('pages/home')
     const oldCss = entries.filter(e => e.name === 'styles.00000000.css')
     const oldJs = entries.filter(e => e.name === 'script.00000000.js')
@@ -249,7 +251,7 @@ describe('publishRendered', () => {
 
   it('bakes cache config comment into page HTML with defaults', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', storage, starterDir, target)
+    await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
     const html = await target.readFile('pages/home/index.html')
     expect(html).toMatch(/^<!--cache:browser=0,edge=86400-->/)
     expect(html).toContain('<!DOCTYPE html>')
@@ -257,14 +259,14 @@ describe('publishRendered', () => {
 
   it('bakes target cache config into page HTML', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', storage, starterDir, target, { browser: 120, edge: 3600 })
+    await publishPageRendered('home', storage, starterDir, target, { browser: 120, edge: 3600 }, templatesDir)
     const html = await target.readFile('pages/home/index.html')
     expect(html).toMatch(/^<!--cache:browser=120,edge=3600-->/)
   })
 
   it('cache comment is on first line before DOCTYPE', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', storage, starterDir, target)
+    await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
     const html = await target.readFile('pages/home/index.html')
     const lines = html.split('\n')
     expect(lines[0]).toMatch(/^<!--cache:/)
@@ -273,7 +275,9 @@ describe('publishRendered', () => {
 })
 
 describe('publishPageStatic', () => {
-  const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+  const projectRoot2 = resolve(import.meta.dirname, '../../../examples/starter')
+  const starterDir = resolve(projectRoot2, 'sites/main')
+  const templatesDir = resolve(projectRoot2, 'templates')
   const storage = createFilesystemProvider()
   const staticTargetDir = join(tmpdir(), 'gazetta-static-test-' + Date.now())
 
@@ -283,7 +287,7 @@ describe('publishPageStatic', () => {
 
   it('publishes fully assembled HTML at URL path', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    await publishPageStatic('home', storage, starterDir, target)
+    await publishPageStatic('home', storage, starterDir, target, templatesDir)
     const html = await target.readFile('index.html')
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('Welcome to Gazetta')
@@ -297,7 +301,7 @@ describe('publishPageStatic', () => {
 
   it('publishes about page at /about/index.html', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    await publishPageStatic('about', storage, starterDir, target)
+    await publishPageStatic('about', storage, starterDir, target, templatesDir)
     const html = await target.readFile('about/index.html')
     expect(html).toContain('About Gazetta')
     expect(html).not.toContain('<!--esi')
@@ -305,7 +309,7 @@ describe('publishPageStatic', () => {
 
   it('includes inline CSS and JS', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    await publishPageStatic('home', storage, starterDir, target)
+    await publishPageStatic('home', storage, starterDir, target, templatesDir)
     const html = await target.readFile('index.html')
     expect(html).toContain('<style>')
     // Counter JS should be inline
@@ -314,7 +318,7 @@ describe('publishPageStatic', () => {
 
   it('no separate CSS/JS files', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    await publishPageStatic('home', storage, starterDir, target)
+    await publishPageStatic('home', storage, starterDir, target, templatesDir)
     const entries = await target.readDir('.')
     const cssOrJs = entries.filter(e => e.name.endsWith('.css') || e.name.endsWith('.js'))
     expect(cssOrJs.length).toBe(0)

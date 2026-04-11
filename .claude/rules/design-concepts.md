@@ -250,32 +250,40 @@ components:
 ## Site Structure
 
 ```
-site/
-  site.yaml
-  templates/          # developer-created, each with own package.json
+my-project/
+  package.json
+  admin/              # custom editors + fields (shared across sites)
+    editors/
+    fields/
+  templates/          # developer-created (shared across sites)
     hero/
     card/
     article/
     header-layout/
     page-default/
-  fragments/          # shared components (reusable across pages)
-    header/
-      fragment.yaml
-      logo/
-      nav/
-      search/
-    footer/
-    newsletter/
-  pages/              # routable components
-    home/
-      page.yaml
-      hero/
-      featured/
-    about/
-      page.yaml
-      bio/
-    blog/
-      [slug]/
-        page.yaml
-        article/
+  sites/
+    main/             # site content
+      site.yaml
+      fragments/      # shared components (reusable across pages)
+        header/
+          fragment.yaml
+          logo/
+          nav/
+        footer/
+      pages/          # routable components
+        home/
+          page.yaml
+          hero/
+          featured/
+        about/
+          page.yaml
+          bio/
+        blog/
+          [slug]/
+            page.yaml
+            article/
 ```
+
+Templates and admin live at the project root, shared across all sites.
+Content (pages, fragments, site.yaml) lives inside `sites/{name}/`.
+Flat structure (everything at one level) still works for simple projects.

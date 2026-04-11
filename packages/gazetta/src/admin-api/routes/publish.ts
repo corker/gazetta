@@ -11,7 +11,8 @@ export function publishRoutes(
   siteDir: string,
   sourceStorage: StorageProvider,
   preInitTargets?: Map<string, StorageProvider>,
-  targetConfigs?: Record<string, TargetConfig>
+  targetConfigs?: Record<string, TargetConfig>,
+  templatesDir?: string
 ) {
   const app = new Hono()
 
@@ -112,7 +113,7 @@ export function publishRoutes(
               await purge.purgeAll()
               console.log(`    ${targetName}: cache purged (all)`)
             } else if (config?.siteUrl) {
-              const site = await loadSite(siteDir, sourceStorage)
+              const site = await loadSite({ siteDir, storage: sourceStorage, templatesDir })
               const urls = allItems
                 .filter(i => i.startsWith('pages/'))
                 .map(i => {

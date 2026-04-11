@@ -4,9 +4,9 @@ import type { StorageProvider } from '../../types.js'
 
 const FIELD_EXTENSIONS = ['.ts', '.tsx']
 
-export function fieldRoutes(siteDir: string, storage: StorageProvider) {
+export function fieldRoutes(siteDir: string, storage: StorageProvider, adminDir?: string) {
   const app = new Hono()
-  const fieldsDir = join(siteDir, 'admin', 'fields')
+  const fieldsDir = join(adminDir ?? join(siteDir, 'admin'), 'fields')
 
   app.get('/api/fields', async (c) => {
     if (!await storage.exists(fieldsDir)) return c.json([])

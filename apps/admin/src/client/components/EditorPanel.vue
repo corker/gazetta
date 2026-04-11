@@ -29,12 +29,13 @@ const contentRef = computed(() => editing.content)
 const schemaRef = computed(() => editing.schema as Record<string, unknown> | null)
 const themeRef = computed<'dark' | 'light'>(() => theme.dark ? 'dark' : 'light')
 const mountVersionRef = computed(() => editing.mountVersion)
+const fieldsBaseUrlRef = computed(() => editing.target?.fieldsBaseUrl)
 
 function handleChange(content: Record<string, unknown>) {
   editing.markDirty(content)
 }
 
-useEditorMount(containerRef, editorMountRef, contentRef, schemaRef, themeRef, handleChange, mountVersionRef)
+useEditorMount(containerRef, editorMountRef, contentRef, schemaRef, themeRef, handleChange, mountVersionRef, fieldsBaseUrlRef)
 
 // Ctrl+S / Cmd+S to save
 onKeyStroke('s', (e) => {

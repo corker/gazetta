@@ -58,4 +58,7 @@ export const format = {
 
   /** JSON editor with validation */
   json: () => ({ format: 'json' as const }),
+
+  /** Custom field widget — loads from admin/fields/{name}.tsx */
+  field: (name: string) => ({ field: name }),
 }

@@ -15,6 +15,10 @@ import type { WidgetProps, ArrayFieldTemplateProps, ArrayFieldItemTemplateProps,
 /** Form context passed to all templates and widgets */
 interface GzFormContext {
   reorderArray: (fieldPath: string, fromIndex: number, toIndex: number) => void
+  /** Base URL for loading custom field modules (e.g. /admin/@fs/path/to/fields) */
+  fieldsBaseUrl?: string
+  /** Current theme — passed to custom field widgets */
+  theme?: 'dark' | 'light'
 }
 
 const roots = new WeakMap<HTMLElement, Root>()
@@ -313,6 +317,13 @@ function buildUiSchema(jsonSchema: JsonSchema): Record<string, unknown> {
   for (const [name, prop] of Object.entries(properties)) {
     const format = prop.format as string | undefined
     const type = prop.type as string | undefined
+    const customField = prop.field as string | undefined
+
+    // Custom field — highest priority
+    if (customField) {
+      ui[name] = { 'ui:widget': `custom-field:${customField}` }
+      continue
+    }
 
     if (format === 'markdown' || format === 'richtext' || format === 'image' || format === 'link' || format === 'slug' || format === 'code' || format === 'json') {
       ui[name] = { 'ui:widget': format }
@@ -708,10 +719,94 @@ function GzAddButton(props: IconButtonProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Custom Field Widget (async loader)
+// ---------------------------------------------------------------------------
+
+import type { FieldMount } from '../types.js'
+
+const fieldWidgetCache = new Map<string, React.FC<WidgetProps>>()
+
+/** Create an async widget that loads a FieldMount module and mounts it */
+function getCustomFieldWidget(fieldName: string): React.FC<WidgetProps> {
+  const cached = fieldWidgetCache.get(fieldName)
+  if (cached) return cached
+
+  const CustomFieldWidget: React.FC<WidgetProps> = (props) => {
+    const containerRef = React.useRef<HTMLDivElement>(null)
+    const mountRef = React.useRef<FieldMount | null>(null)
+    const mountedRef = React.useRef(false)
+    const [loading, setLoading] = React.useState(true)
+    const [error, setError] = React.useState<string | null>(null)
+    const ctx = (props as unknown as { registry?: { formContext?: GzFormContext } }).registry?.formContext
+
+    // Load the field module once
+    React.useEffect(() => {
+      if (!ctx?.fieldsBaseUrl) {
+        setError('No fields base URL configured')
+        setLoading(false)
+        return
+      }
+
+      const url = `${ctx.fieldsBaseUrl}/${fieldName}.tsx`
+      import(/* @vite-ignore */ url)
+        .then((mod) => {
+          mountRef.current = (mod.default ?? mod) as FieldMount
+          setLoading(false)
+        })
+        .catch(() => {
+          import(/* @vite-ignore */ `${ctx.fieldsBaseUrl}/${fieldName}.ts`)
+            .then((mod) => {
+              mountRef.current = (mod.default ?? mod) as FieldMount
+              setLoading(false)
+            })
+            .catch((err) => {
+              setError(`Failed to load field "${fieldName}": ${err.message}`)
+              setLoading(false)
+            })
+        })
+    }, [ctx?.fieldsBaseUrl])
+
+    // Mount the FieldMount once loaded — unmount on cleanup
+    React.useEffect(() => {
+      if (loading || !containerRef.current || !mountRef.current) return
+      const el = containerRef.current
+      const fm = mountRef.current
+      fm.mount(el, {
+        value: props.value,
+        schema: props.schema as Record<string, unknown>,
+        theme: (ctx?.theme as 'dark' | 'light') ?? 'dark',
+        onChange: (v) => props.onChange(v),
+      })
+      mountedRef.current = true
+      return () => { fm.unmount(el); mountedRef.current = false }
+    }, [loading])
+
+    // Update value without re-mounting — call mount again with new value
+    // FieldMount implementations should handle being called multiple times
+    React.useEffect(() => {
+      if (!mountedRef.current || !containerRef.current || !mountRef.current) return
+      mountRef.current.mount(containerRef.current, {
+        value: props.value,
+        schema: props.schema as Record<string, unknown>,
+        theme: (ctx?.theme as 'dark' | 'light') ?? 'dark',
+        onChange: (v) => props.onChange(v),
+      })
+    }, [props.value])
+
+    if (loading) return <div style={{ color: 'var(--gz-text-hint)', fontSize: '0.75rem', padding: '0.5rem 0' }}>Loading {fieldName}...</div>
+    if (error) return <div style={{ color: 'var(--gz-error)', fontSize: '0.75rem' }}>{error}</div>
+    return <div ref={containerRef} />
+  }
+
+  fieldWidgetCache.set(fieldName, CustomFieldWidget)
+  return CustomFieldWidget
+}
+
+// ---------------------------------------------------------------------------
 // Registries
 // ---------------------------------------------------------------------------
 
-const customWidgets = {
+const builtinWidgets: Record<string, React.FC<WidgetProps>> = {
   markdown: MarkdownWidget,
   toggle: ToggleWidget,
   color: ColorWidget,
@@ -722,6 +817,21 @@ const customWidgets = {
   slug: SlugWidget,
   code: CodeWidget,
   json: JsonWidget,
+}
+
+/** Build widgets object including any custom field widgets referenced in the schema */
+function buildWidgets(jsonSchema: JsonSchema): Record<string, React.FC<WidgetProps>> {
+  const widgets = { ...builtinWidgets }
+  const properties = jsonSchema.properties as Record<string, JsonSchema> | undefined
+  if (!properties) return widgets
+
+  for (const prop of Object.values(properties)) {
+    const fieldName = prop.field as string | undefined
+    if (fieldName) {
+      widgets[`custom-field:${fieldName}`] = getCustomFieldWidget(fieldName)
+    }
+  }
+  return widgets
 }
 
 const customTemplates = {
@@ -740,6 +850,10 @@ const customTemplates = {
 export interface DefaultEditorFormProps {
   schema: Record<string, unknown>
   content: Record<string, unknown>
+  /** Base URL for loading custom field modules (optional — only needed if schema has custom fields) */
+  fieldsBaseUrl?: string
+  /** Current theme — forwarded to custom field widgets */
+  theme?: 'dark' | 'light'
   onChange: (content: Record<string, unknown>) => void
 }
 
@@ -747,8 +861,9 @@ export interface DefaultEditorFormProps {
  * The default @rjsf form editor as a React component.
  * Custom editors can embed this: `<DefaultEditorForm schema={schema} content={content} onChange={onChange} />`
  */
-export function DefaultEditorForm({ schema: jsonSchema, content, onChange }: DefaultEditorFormProps) {
+export function DefaultEditorForm({ schema: jsonSchema, content, onChange, fieldsBaseUrl, theme }: DefaultEditorFormProps) {
   const uiSchema = React.useMemo(() => buildUiSchema(jsonSchema as JsonSchema), [jsonSchema])
+  const widgets = React.useMemo(() => buildWidgets(jsonSchema as JsonSchema), [jsonSchema])
 
   const [formData, setFormData] = React.useState(content)
   const formDataRef = React.useRef(formData)
@@ -817,7 +932,7 @@ export function DefaultEditorForm({ schema: jsonSchema, content, onChange }: Def
     })
   }, [onChange])
 
-  const formContext: GzFormContext = React.useMemo(() => ({ reorderArray }), [reorderArray])
+  const formContext: GzFormContext = React.useMemo(() => ({ reorderArray, fieldsBaseUrl, theme }), [reorderArray, fieldsBaseUrl, theme])
 
   return (
     <>
@@ -829,7 +944,7 @@ export function DefaultEditorForm({ schema: jsonSchema, content, onChange }: Def
           formData={formData}
           onChange={handleChange}
           validator={validator}
-          widgets={customWidgets}
+          widgets={widgets}
           templates={customTemplates}
           formContext={formContext}
           liveValidate={false}
@@ -847,13 +962,13 @@ export function DefaultEditorForm({ schema: jsonSchema, content, onChange }: Def
 
 export function createEditorMount(jsonSchema: object): EditorMount {
   return {
-    mount(el, { content, schema, onChange }) {
+    mount(el, { content, schema, theme, onChange, fieldsBaseUrl }) {
       const existing = roots.get(el)
       if (existing) existing.unmount()
 
       const root = createRoot(el)
       roots.set(el, root)
-      root.render(<DefaultEditorForm schema={schema ?? jsonSchema as Record<string, unknown>} content={content} onChange={onChange} />)
+      root.render(<DefaultEditorForm schema={schema ?? jsonSchema as Record<string, unknown>} content={content} theme={theme} fieldsBaseUrl={fieldsBaseUrl} onChange={onChange} />)
     },
 
     unmount(el) {

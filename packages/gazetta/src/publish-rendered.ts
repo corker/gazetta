@@ -44,8 +44,9 @@ export async function publishPageRendered(
   sourceDir: string,
   targetStorage: StorageProvider,
   targetCache?: CacheConfig,
+  templatesDir?: string,
 ): Promise<{ files: number; removed: number }> {
-  const site = await loadSite(sourceDir, sourceStorage)
+  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
@@ -163,8 +164,9 @@ export async function publishPageStatic(
   sourceStorage: StorageProvider,
   sourceDir: string,
   targetStorage: StorageProvider,
+  templatesDir?: string,
 ): Promise<{ files: number }> {
-  const site = await loadSite(sourceDir, sourceStorage)
+  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
@@ -192,13 +194,13 @@ export async function publishFragmentRendered(
   sourceStorage: StorageProvider,
   sourceDir: string,
   targetStorage: StorageProvider,
+  templatesDir?: string,
 ): Promise<{ files: number; removed: number }> {
-  const site = await loadSite(sourceDir, sourceStorage)
+  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const fragment = site.fragments.get(fragmentName)
   if (!fragment) throw new Error(`Fragment "${fragmentName}" not found`)
 
-  const templatesDir = join(sourceDir, 'templates')
-  const ctx = { site, templatesDir, visited: new Set<string>(), path: [`@${fragmentName}`] }
+  const ctx = { site, templatesDir: site.templatesDir, visited: new Set<string>(), path: [`@${fragmentName}`] }
   const resolved = await resolveComponent(`@${fragmentName}`, '', ctx)
 
   // Scope IDs are now deterministic (hash-based), no reset needed
@@ -258,7 +260,7 @@ export async function publishSiteManifest(
   sourceDir: string,
   targetStorage: StorageProvider,
 ): Promise<void> {
-  const site = await loadSite(sourceDir, sourceStorage)
+  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage })
   const manifest = { name: site.manifest.name, version: site.manifest.version }
   await targetStorage.writeFile('site.json', JSON.stringify(manifest))
 }
@@ -272,7 +274,7 @@ export async function publishFragmentIndex(
   sourceDir: string,
   targetStorage: StorageProvider,
 ): Promise<Record<string, string[]>> {
-  const site = await loadSite(sourceDir, sourceStorage)
+  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage })
   const index: Record<string, string[]> = {}
 
   for (const [_pageName, page] of site.pages) {
@@ -363,7 +365,7 @@ export async function publishPageWithPurge(
 ): Promise<{ files: number; purgedUrls: string[] }> {
   const result = await publishPageRendered(pageName, sourceStorage, sourceDir, targetStorage)
 
-  const site = await loadSite(sourceDir, sourceStorage)
+  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage })
   const page = site.pages.get(pageName)
   if (page) await purge.purgeUrls([page.route])
 

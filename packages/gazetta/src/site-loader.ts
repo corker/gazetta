@@ -13,6 +13,8 @@ export interface Site {
   pages: Map<string, PageManifest & { dir: string }>
   fragments: Map<string, FragmentManifest & { dir: string }>
   siteDir: string
+  /** Directory containing template packages. Defaults to siteDir/templates for flat projects. */
+  templatesDir: string
   storage: StorageProvider
 }
 
@@ -78,18 +80,31 @@ async function discoverFragments(
   return fragments
 }
 
-export async function loadSite(siteDir: string, storage: StorageProvider): Promise<Site> {
+export interface LoadSiteOptions {
+  siteDir: string
+  storage: StorageProvider
+  /** Override templates directory (default: siteDir/templates) */
+  templatesDir?: string
+}
+
+export async function loadSite(siteDirOrOpts: string | LoadSiteOptions, storage?: StorageProvider): Promise<Site> {
+  const opts = typeof siteDirOrOpts === 'string'
+    ? { siteDir: siteDirOrOpts, storage: storage! }
+    : siteDirOrOpts
+  const { siteDir } = opts
+  const templatesDir = opts.templatesDir ?? join(siteDir, 'templates')
+
   const siteYaml = join(siteDir, 'site.yaml')
-  if (!await storage.exists(siteYaml)) {
+  if (!await opts.storage.exists(siteYaml)) {
     throw new Error(`No site.yaml found at ${siteDir}. Is this a Gazetta site directory?`)
   }
-  const manifest = await parseSiteManifest(storage, siteYaml)
-  const pages = await discoverPages(storage, join(siteDir, 'pages'))
-  const fragments = await discoverFragments(storage, join(siteDir, 'fragments'))
+  const manifest = await parseSiteManifest(opts.storage, siteYaml)
+  const pages = await discoverPages(opts.storage, join(siteDir, 'pages'))
+  const fragments = await discoverFragments(opts.storage, join(siteDir, 'fragments'))
 
   if (pages.size === 0) {
     console.warn(`  Warning: no pages found in ${join(siteDir, 'pages')}`)
   }
 
-  return { manifest, pages, fragments, siteDir, storage }
+  return { manifest, pages, fragments, siteDir, templatesDir, storage: opts.storage }
 }

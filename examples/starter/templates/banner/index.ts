@@ -7,7 +7,7 @@ export const schema = z.object({
   text: z.string().optional().describe('Supporting text'),
   buttonText: z.string().optional().describe('Button label'),
   buttonUrl: z.string().optional().describe('Button link URL'),
-  background: z.string().meta(format.color()).optional().describe('Background color or gradient (default: #667eea)'),
+  background: z.string().meta(format.field('brand-color')).optional().describe('Background color (default: #667eea)'),
 })
 
 type Content = z.infer<typeof schema>

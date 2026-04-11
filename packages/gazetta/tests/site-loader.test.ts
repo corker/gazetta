@@ -117,8 +117,8 @@ describe('loadSite', () => {
   })
 
   it('loads the real starter site', async () => {
-    const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
-    const site = await loadSite(starterDir, storage)
+    const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
+    const site = await loadSite({ siteDir: resolve(projectRoot, 'sites/main'), storage, templatesDir: resolve(projectRoot, 'templates') })
     expect(site.manifest.name).toBe('Gazetta Starter')
     expect(site.pages.size).toBeGreaterThanOrEqual(3)
     expect(site.fragments.size).toBe(2)

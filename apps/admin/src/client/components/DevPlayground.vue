@@ -1,0 +1,414 @@
+<script setup lang="ts">
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useThemeStore } from '../stores/theme.js'
+import { api } from '../api/client.js'
+import type { EditorMount, FieldMount } from 'gazetta/types'
+
+const theme = useThemeStore()
+
+// --- Data ---
+interface TemplateItem { name: string; hasEditor: boolean }
+interface FieldItem { name: string; path: string }
+type SelectedEditor = { type: 'editor'; name: string; hasEditor: boolean; editorUrl?: string; fieldsBaseUrl?: string; schema: Record<string, unknown>; realContent?: Record<string, unknown> }
+type SelectedField = { type: 'field'; name: string; fieldsBaseUrl: string }
+type Selected = SelectedEditor | SelectedField
+
+const templates = ref<TemplateItem[]>([])
+const fields = ref<FieldItem[]>([])
+const loading = ref(true)
+const selected = ref<Selected | null>(null)
+const schemaLoading = ref(false)
+const mountError = ref<string | null>(null)
+const showAllTemplates = ref(false)
+
+// Value inspector
+const currentValue = ref<unknown>(null)
+const showInspector = ref(true)
+
+// Mount refs
+const mountRef = ref<HTMLElement | null>(null)
+let currentMount: { unmount: (el: HTMLElement) => void } | null = null
+
+// --- Load sidebar items (fast — no schema fetching) ---
+async function loadSidebar() {
+  loading.value = true
+  try {
+    const [tpl, fld] = await Promise.all([api.getTemplates(), api.getFields()])
+
+    // Check which templates have custom editors — one lightweight call each
+    const items: TemplateItem[] = []
+    for (const t of tpl) {
+      try {
+        const resp = await api.getTemplateSchema(t.name) as Record<string, unknown> & { hasEditor?: boolean }
+        items.push({ name: t.name, hasEditor: !!resp.hasEditor })
+      } catch {
+        items.push({ name: t.name, hasEditor: false })
+      }
+    }
+    templates.value = items
+    fields.value = fld
+  } catch (err) {
+    console.error('Failed to load playground items:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+loadSidebar()
+
+// --- Computed ---
+const customEditors = computed(() => templates.value.filter(t => t.hasEditor))
+const defaultEditors = computed(() => templates.value.filter(t => !t.hasEditor))
+const themeMode = computed<'dark' | 'light'>(() => theme.dark ? 'dark' : 'light')
+const valueJson = computed(() => {
+  try { return JSON.stringify(currentValue.value, null, 2) }
+  catch { return String(currentValue.value) }
+})
+
+// --- Select an editor (lazy schema load) ---
+async function selectEditor(name: string) {
+  schemaLoading.value = true
+  mountError.value = null
+  try {
+    const resp = await api.getTemplateSchema(name) as Record<string, unknown> & { hasEditor?: boolean; editorUrl?: string; fieldsBaseUrl?: string }
+    const { hasEditor, editorUrl, fieldsBaseUrl, ...schema } = resp
+
+    // Try to find real content from a page that uses this template
+    const realContent = await findRealContent(name)
+
+    selected.value = { type: 'editor', name, hasEditor: !!hasEditor, editorUrl, fieldsBaseUrl, schema, realContent }
+  } catch (err) {
+    mountError.value = `Failed to load schema for "${name}": ${(err as Error).message}`
+    selected.value = null
+  } finally {
+    schemaLoading.value = false
+  }
+}
+
+async function selectField(name: string) {
+  // Get fieldsBaseUrl from first template
+  let fieldsBaseUrl = ''
+  if (templates.value.length) {
+    try {
+      const resp = await api.getTemplateSchema(templates.value[0].name) as Record<string, unknown> & { fieldsBaseUrl?: string }
+      fieldsBaseUrl = resp.fieldsBaseUrl ?? ''
+    } catch { /* ignore */ }
+  }
+  if (!fieldsBaseUrl) { mountError.value = 'No fieldsBaseUrl available'; return }
+  selected.value = { type: 'field', name, fieldsBaseUrl }
+}
+
+// --- Find real content from any component that uses this template ---
+async function findRealContent(templateName: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    // Check top-level pages and fragments first
+    const [pages, frags] = await Promise.all([api.getPages(), api.getFragments()])
+
+    for (const p of pages) {
+      if (p.template === templateName) {
+        const detail = await api.getPage(p.name)
+        if (detail.content && Object.keys(detail.content).length > 0) return detail.content
+      }
+    }
+    for (const f of frags) {
+      if (f.template === templateName) {
+        const detail = await api.getFragment(f.name)
+        if (detail.content && Object.keys(detail.content).length > 0) return detail.content
+      }
+    }
+
+    // Search nested components within pages and fragments
+    for (const p of pages) {
+      const detail = await api.getPage(p.name)
+      if (!detail.components) continue
+      for (const compName of detail.components) {
+        if (compName.startsWith('@')) continue // skip fragment refs
+        const found = await searchComponent(detail.dir, compName, templateName)
+        if (found) return found
+      }
+    }
+    for (const f of frags) {
+      const detail = await api.getFragment(f.name)
+      if (!detail.components) continue
+      for (const compName of detail.components) {
+        if (compName.startsWith('@')) continue
+        const found = await searchComponent(detail.dir, compName, templateName)
+        if (found) return found
+      }
+    }
+  } catch { /* ignore — fallback to generated mock */ }
+  return undefined
+}
+
+async function searchComponent(parentDir: string, name: string, targetTemplate: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    const comp = await api.getComponent(`${parentDir}/${name}`)
+    if ((comp.template as string) === targetTemplate && comp.content && Object.keys(comp.content as object).length > 0) {
+      return comp.content as Record<string, unknown>
+    }
+    // Recurse into children
+    if (comp.components) {
+      for (const child of comp.components as string[]) {
+        if (child.startsWith('@')) continue
+        const found = await searchComponent(`${parentDir}/${name}`, child, targetTemplate)
+        if (found) return found
+      }
+    }
+  } catch { /* component may not have manifest */ }
+  return undefined
+}
+
+// --- Mount/unmount ---
+function unmountCurrent() {
+  if (currentMount && mountRef.value) {
+    try { currentMount.unmount(mountRef.value) } catch { /* ignore */ }
+    currentMount = null
+  }
+  mountError.value = null
+}
+
+async function mountSelected() {
+  unmountCurrent()
+  if (!selected.value || !mountRef.value) return
+  const el = mountRef.value
+
+  try {
+    if (selected.value.type === 'editor') {
+      const item = selected.value
+      const content = item.realContent ?? generateMockContent(item.schema)
+      currentValue.value = content
+
+      if (item.hasEditor && item.editorUrl) {
+        const mod = await import(/* @vite-ignore */ item.editorUrl)
+        const mount = (mod.default ?? mod) as EditorMount
+        mount.mount(el, { content, schema: item.schema, theme: themeMode.value, onChange: (c) => { currentValue.value = c }, fieldsBaseUrl: item.fieldsBaseUrl })
+        currentMount = mount
+      } else {
+        const { createEditorMount } = await import('gazetta/editor')
+        const mount = createEditorMount(item.schema)
+        mount.mount(el, { content, schema: item.schema, theme: themeMode.value, onChange: (c) => { currentValue.value = c }, fieldsBaseUrl: item.fieldsBaseUrl })
+        currentMount = mount
+      }
+    } else {
+      const item = selected.value
+      currentValue.value = ''
+      const url = `${item.fieldsBaseUrl}/${item.name}.tsx`
+      let mod: unknown
+      try { mod = await import(/* @vite-ignore */ url) }
+      catch { mod = await import(/* @vite-ignore */ `${item.fieldsBaseUrl}/${item.name}.ts`) }
+      const mount = ((mod as Record<string, unknown>).default ?? mod) as FieldMount
+      mount.mount(el, { value: '', schema: {}, theme: themeMode.value, onChange: (v) => { currentValue.value = v } })
+      currentMount = mount
+    }
+  } catch (err) {
+    mountError.value = (err as Error).message
+  }
+}
+
+function reset() { if (selected.value) mountSelected() }
+
+watch(selected, () => mountSelected(), { flush: 'post' })
+onBeforeUnmount(() => unmountCurrent())
+
+// --- Mock data ---
+function generateMockContent(schema: Record<string, unknown>): Record<string, unknown> {
+  const props = schema.properties as Record<string, Record<string, unknown>> | undefined
+  if (!props) return {}
+  const mock: Record<string, unknown> = {}
+  for (const [key, prop] of Object.entries(props)) {
+    const type = prop.type as string
+    if (type === 'string') mock[key] = prop.default as string ?? `Sample ${key}`
+    else if (type === 'number' || type === 'integer') mock[key] = 42
+    else if (type === 'boolean') mock[key] = false
+    else if (type === 'array') mock[key] = []
+    else if (type === 'object') mock[key] = {}
+  }
+  return mock
+}
+
+// --- Theme CSS vars ---
+const themeVars = computed(() => {
+  if (theme.dark) {
+    return {
+      '--gz-bg-input': '#161622', '--gz-bg-card': '#1a1a28', '--gz-bg-toolbar': '#1a1a2a',
+      '--gz-bg-chip': '#252538', '--gz-bg-code': '#12121e', '--gz-text': '#e0e0e0',
+      '--gz-text-secondary': '#ccc', '--gz-text-label': '#8888a0', '--gz-text-hint': '#444',
+      '--gz-border': '#2a2a3a', '--gz-border-subtle': '#1e1e2e', '--gz-accent': '#667eea',
+      '--gz-error': '#f87171', '--gz-success': '#4ade80',
+    }
+  }
+  return {
+    '--gz-bg-input': '#ffffff', '--gz-bg-card': '#f9fafb', '--gz-bg-toolbar': '#f3f4f6',
+    '--gz-bg-chip': '#e5e7eb', '--gz-bg-code': '#f1f5f9', '--gz-text': '#1a1a1a',
+    '--gz-text-secondary': '#4b5563', '--gz-text-label': '#6b7280', '--gz-text-hint': '#9ca3af',
+    '--gz-border': '#e5e7eb', '--gz-border-subtle': '#f3f4f6', '--gz-accent': '#667eea',
+    '--gz-error': '#dc2626', '--gz-success': '#16a34a',
+  }
+})
+</script>
+
+<template>
+  <div class="playground" data-testid="dev-playground">
+    <!-- Sidebar -->
+    <div class="playground-sidebar">
+      <div class="sidebar-header">Dev Playground</div>
+
+      <div v-if="loading" class="sidebar-loading">Loading...</div>
+      <template v-else-if="templates.length || fields.length">
+        <!-- Custom Editors — top priority -->
+        <div v-if="customEditors.length" class="sidebar-section">
+          <div class="section-label">Custom Editors</div>
+          <div v-for="t in customEditors" :key="'ce:' + t.name"
+            :class="['sidebar-item', { active: selected?.type === 'editor' && selected.name === t.name }]"
+            :data-testid="`playground-editor-${t.name}`"
+            @click="selectEditor(t.name)">
+            <i class="pi pi-pencil item-icon" />
+            <span class="item-name">{{ t.name }}</span>
+          </div>
+        </div>
+
+        <!-- Custom Fields -->
+        <div v-if="fields.length" class="sidebar-section">
+          <div class="section-label">Custom Fields</div>
+          <div v-for="f in fields" :key="'f:' + f.name"
+            :class="['sidebar-item', { active: selected?.type === 'field' && selected.name === f.name }]"
+            :data-testid="`playground-field-${f.name}`"
+            @click="selectField(f.name)">
+            <i class="pi pi-sliders-h item-icon" />
+            <span class="item-name">{{ f.name }}</span>
+          </div>
+        </div>
+
+        <!-- All Templates — collapsed by default -->
+        <div class="sidebar-section">
+          <div class="section-label section-label-toggle" @click="showAllTemplates = !showAllTemplates">
+            <i :class="showAllTemplates ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="toggle-icon" />
+            All Templates ({{ templates.length }})
+          </div>
+          <template v-if="showAllTemplates">
+            <div v-for="t in defaultEditors" :key="'te:' + t.name"
+              :class="['sidebar-item', { active: selected?.type === 'editor' && selected.name === t.name }]"
+              :data-testid="`playground-editor-${t.name}`"
+              @click="selectEditor(t.name)">
+              <i class="pi pi-file item-icon" />
+              <span class="item-name">{{ t.name }}</span>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <div v-else class="sidebar-empty">
+        <p>No custom editors or fields yet.</p>
+        <p class="hint">Create an editor:<br><code>admin/editors/{name}.tsx</code></p>
+        <p class="hint">Create a field:<br><code>admin/fields/{name}.tsx</code></p>
+      </div>
+    </div>
+
+    <!-- Main area -->
+    <div class="playground-main">
+      <div v-if="!selected && !schemaLoading" class="main-empty">
+        <i class="pi pi-code" style="font-size: 2rem; opacity: 0.3; margin-bottom: 0.5rem;" />
+        <p>Select an editor or field to preview</p>
+      </div>
+      <div v-else-if="schemaLoading" class="main-empty">
+        <p>Loading schema...</p>
+      </div>
+      <template v-else-if="selected">
+        <!-- Toolbar -->
+        <div class="main-toolbar">
+          <span class="toolbar-label">
+            <span class="toolbar-type">{{ selected.type === 'editor' ? 'Editor' : 'Field' }}</span>
+            <strong>{{ selected.name }}</strong>
+            <span v-if="selected.type === 'editor' && selected.realContent" class="toolbar-hint">using real content</span>
+          </span>
+          <button class="toolbar-btn" data-testid="playground-reset" @click="reset" title="Reset to initial state">
+            <i class="pi pi-refresh" /> Reset
+          </button>
+          <button class="toolbar-btn" data-testid="playground-toggle-inspector" @click="showInspector = !showInspector">
+            <i class="pi pi-code" /> {{ showInspector ? 'Hide' : 'Show' }} Value
+          </button>
+        </div>
+
+        <!-- Content: editor + optional inspector side by side -->
+        <div class="main-body">
+          <div class="main-content" :style="themeVars">
+            <div v-if="mountError" class="mount-error">{{ mountError }}</div>
+            <div ref="mountRef" class="mount-container" data-testid="playground-mount" />
+          </div>
+
+          <!-- Value inspector — side panel -->
+          <div v-if="showInspector" class="value-inspector" data-testid="playground-inspector">
+            <div class="inspector-header">Value</div>
+            <pre class="inspector-value">{{ valueJson }}</pre>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.playground { display: flex; height: calc(100% - 60px); }
+
+/* Sidebar */
+.playground-sidebar { width: 220px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid #e5e7eb; padding: 0.75rem 0; }
+.sidebar-header { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 1rem; margin-bottom: 0.75rem; color: #6b7280; }
+.sidebar-loading { padding: 1rem; color: #9ca3af; font-size: 0.8125rem; }
+.sidebar-section { margin-bottom: 0.5rem; }
+.section-label { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; padding: 0.375rem 1rem; font-weight: 600; }
+.section-label-toggle { cursor: pointer; display: flex; align-items: center; gap: 0.375rem; user-select: none; }
+.section-label-toggle:hover { color: #6b7280; }
+.toggle-icon { font-size: 0.5rem; }
+.sidebar-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.3125rem 1rem; cursor: pointer; font-size: 0.8125rem; color: #6b7280; }
+.sidebar-item:hover { background: rgba(128, 128, 128, 0.08); color: #374151; }
+.sidebar-item.active { background: rgba(102, 126, 234, 0.1); color: #667eea; }
+.item-icon { font-size: 0.6875rem; width: 14px; text-align: center; flex-shrink: 0; }
+.item-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-empty { padding: 1.5rem 1rem; color: #9ca3af; font-size: 0.8125rem; line-height: 1.6; }
+.sidebar-empty .hint { margin-top: 0.75rem; }
+.sidebar-empty code { font-family: monospace; font-size: 0.75rem; background: rgba(128, 128, 128, 0.1); padding: 1px 4px; border-radius: 3px; }
+
+/* Main */
+.playground-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.main-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #9ca3af; font-size: 0.875rem; }
+.main-toolbar { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; border-bottom: 1px solid #e5e7eb; font-size: 0.8125rem; flex-shrink: 0; }
+.toolbar-label { flex: 1; display: flex; align-items: baseline; gap: 0.5rem; color: #6b7280; }
+.toolbar-type { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.toolbar-label strong { color: #374151; font-size: 0.875rem; }
+.toolbar-hint { font-size: 0.6875rem; color: #9ca3af; font-style: italic; }
+.toolbar-btn { display: flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border: 1px solid #e5e7eb; border-radius: 6px; background: transparent; color: #6b7280; font-size: 0.75rem; cursor: pointer; white-space: nowrap; }
+.toolbar-btn:hover { background: rgba(128, 128, 128, 0.08); color: #374151; }
+
+/* Body — side by side */
+.main-body { flex: 1; display: flex; overflow: hidden; }
+.main-content { flex: 1; overflow-y: auto; padding: 1.5rem; min-width: 0; }
+.mount-container { max-width: 600px; }
+.mount-error { color: #dc2626; font-size: 0.8125rem; margin-bottom: 1rem; padding: 0.75rem; background: rgba(220, 38, 38, 0.08); border-radius: 6px; }
+
+/* Value inspector — side panel */
+.value-inspector { width: 300px; flex-shrink: 0; border-left: 1px solid #e5e7eb; overflow-y: auto; display: flex; flex-direction: column; }
+.inspector-header { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; padding: 0.5rem 0.75rem; font-weight: 600; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+.inspector-value { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.6875rem; line-height: 1.5; padding: 0.75rem; color: #374151; margin: 0; white-space: pre-wrap; word-break: break-all; flex: 1; }
+
+</style>
+
+<!-- Dark mode — non-scoped to avoid HMR issues with :global() in scoped blocks -->
+<style>
+.dark .playground-sidebar { border-right-color: #27272a; }
+.dark .sidebar-header { color: #666; }
+.dark .section-label { color: #555; }
+.dark .section-label-toggle:hover { color: #999; }
+.dark .sidebar-item { color: #bbb; }
+.dark .sidebar-item:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
+.dark .sidebar-item.active { background: rgba(102, 126, 234, 0.15); color: #667eea; }
+.dark .main-toolbar { border-bottom-color: #27272a; }
+.dark .toolbar-label { color: #999; }
+.dark .toolbar-label strong { color: #e4e4e7; }
+.dark .toolbar-hint { color: #555; }
+.dark .toolbar-btn { border-color: #333; color: #999; }
+.dark .toolbar-btn:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
+.dark .mount-error { color: #f87171; background: rgba(248, 113, 113, 0.08); }
+.dark .value-inspector { border-left-color: #27272a; background: #0c0c14; }
+.dark .inspector-header { color: #666; border-bottom-color: #27272a; }
+.dark .inspector-value { color: #e4e4e7; }
+</style>
