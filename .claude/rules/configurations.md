@@ -495,6 +495,26 @@ Checks the project for errors before publishing.
 
 ## Edge Cases & Behavior
 
+### Admin UI in dev mode — source vs pre-built
+
+In the monorepo, `gazetta dev` runs Vite against `apps/admin/` source — full HMR on admin UI.
+
+In a site project (gazetta installed from npm), the admin SPA is **pre-built** inside the
+gazetta package (`admin-dist/`). `gazetta dev` serves it as static files. No Vite needed
+for the admin shell. Custom editors/fields still get HMR via Vite (they're in the developer's
+project). Site developers don't modify the admin shell — they customize via editors/fields.
+
+| Context | Admin UI | Custom editors/fields | HMR scope |
+|---------|----------|----------------------|-----------|
+| Monorepo | Compiled from source via Vite | Compiled from source via Vite | Everything |
+| Site project (npm) | Pre-built from package | Compiled from source via Vite | Custom code only |
+
+### Project root detection
+
+CLI commands find the project root by walking up from the current directory looking for
+`package.json` with `workspaces` containing `"admin"` and `"templates"`. Templates are
+at `{projectRoot}/templates/`, admin at `{projectRoot}/admin/`, sites at `{projectRoot}/sites/`.
+
 ### CLI availability
 
 `admin/package.json` lists `gazetta` as a dependency. npm hoists it to the project root.
@@ -548,6 +568,59 @@ If `templates/hero/` is deleted but `admin/editors/hero.tsx` still exists, the e
 is never loaded (no template = no component = no editor mount). `gazetta validate` reports
 it as a warning. The `import type` in the editor would fail TypeScript compilation, catching
 it at dev time.
+
+### `gazetta serve` target selection
+
+`serve` auto-detects the first target in `site.yaml`. For sites with multiple targets
+(staging + production), the developer should specify: `gazetta serve --target production`.
+Default is the first target — usually staging/filesystem for local development.
+
+### Self-hosting deployment workflow
+
+```
+# On VPS or container:
+git clone <repo> && cd my-project
+npm install
+gazetta build                    # build admin + worker
+gazetta publish production       # render + push content to storage
+gazetta serve --target production --port 3000   # start server
+```
+
+Or with Docker — `gazetta init` creates a `Dockerfile` that runs `build` + `serve`.
+
+### Custom field naming
+
+Field files support subfolders like templates: `admin/fields/colors/brand.tsx` is
+referenced as `{ field: 'colors/brand' }`. Flat is default, subfolders for grouping.
+
+### Admin UI publish button vs CLI publish
+
+Both use the same render pipeline. The admin UI `POST /api/publish` renders the specific
+page/fragment being edited and pushes it to the target. CLI `gazetta publish` renders
+all pages and fragments. Same SSR, same storage upload, different scope (single item vs full site).
+
+### Auth for production admin
+
+`gazetta serve` protects `/admin/*` routes via auth middleware. Auth method configured
+in `site.yaml`:
+
+```yaml
+admin:
+  auth: basic                    # HTTP Basic Auth
+  users:
+    - { username: admin, password: "${ADMIN_PASSWORD}" }
+```
+
+Future: OAuth, API key, custom middleware. For now, Basic Auth behind HTTPS (reverse proxy).
+
+### Port configuration
+
+`gazetta dev` and `gazetta serve` default to port 3000. Override with `--port` or `-p`:
+
+```
+gazetta dev --port 4000
+gazetta serve -p 8080
+```
 
 ### Site naming
 
