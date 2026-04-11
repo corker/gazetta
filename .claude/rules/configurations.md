@@ -1110,6 +1110,62 @@ See docs: gazetta.studio/docs/custom-editors
 The playground also shows the default @rjsf form for any template — useful for testing
 schemas without creating a custom editor.
 
+### Security considerations
+
+**Preview iframe:** The admin UI's preview iframe uses the `sandbox` attribute to restrict
+scripts and navigation. Templates should sanitize user-controlled content — Gazetta does
+not sanitize template output.
+
+**`.env` files:** `gazetta init` creates `.env` (committed, safe defaults) and `.env.local`
+(gitignored, for secrets). Credentials go in `.env.local`, never `.env`. The `.gitignore`
+excludes `.env.local` and `.env*.local`.
+
+**Rate limiting:** `gazetta serve` does not include rate limiting. For production, use a
+reverse proxy (Caddy, nginx, Cloudflare) for rate limiting and DDoS protection. Future:
+built-in rate limiting on auth endpoints.
+
+**CORS:** Same-origin by default (single process serves SPA + API). For split deployments,
+configure allowed origins in `site.yaml`:
+
+```yaml
+admin:
+  cors:
+    origins: ["https://admin.mysite.com"]
+```
+
+**Content author permissions:** Basic auth is binary — authenticated users have full access.
+No role-based permissions (e.g. "can edit but not publish"). Future: role-based access
+control with editor/publisher/admin roles.
+
+**Audit log:** No built-in audit log for publishes. Content changes tracked via git
+(`sites/` is committed). Publish actions logged to stdout — pipe to a log aggregator
+for audit trail.
+
+### Health check and monitoring
+
+`gazetta serve` exposes:
+
+```
+/health              # returns 200 OK — for container health checks
+/admin/api/health    # returns 200 + { status: "ok", version: "1.0.0" }
+```
+
+No built-in metrics or tracing. For production monitoring, use:
+- Reverse proxy access logs for request metrics
+- Process manager (PM2, systemd) for uptime
+- External monitoring (UptimeRobot, Pingdom) for availability
+- Future: OpenTelemetry integration for traces/metrics
+
+### Graceful shutdown
+
+`gazetta serve` handles SIGTERM gracefully:
+1. Stop accepting new connections
+2. Wait for in-flight requests to complete (up to 10s timeout)
+3. Close storage connections
+4. Exit with code 0
+
+Important for zero-downtime deploys on container platforms (rolling restarts).
+
 ### Gazetta version upgrades
 
 No migration tooling exists. When upgrading gazetta (e.g. `1.x → 2.x`), developers update
