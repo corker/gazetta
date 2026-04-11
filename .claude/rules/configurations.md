@@ -577,7 +577,7 @@ it at dev time.
 ### `gazetta serve` target selection
 
 `serve` auto-detects the first target in `site.yaml`. For sites with multiple targets
-(staging + production), the developer should specify: `gazetta serve --target production`.
+(staging + production), the developer should specify: `gazetta serve production`.
 Default is the first target — usually staging/filesystem for local development.
 
 ### Self-hosting deployment workflow
@@ -588,7 +588,7 @@ git clone <repo> && cd my-project
 npm install
 gazetta build                    # build admin + worker
 gazetta publish production       # render + push content to storage
-gazetta serve --target production --port 3000   # start server
+gazetta serve production -p 3000   # start server
 ```
 
 Or with Docker — `gazetta init` creates a `Dockerfile` that runs `build` + `serve`.
@@ -684,6 +684,48 @@ project root. Pin the range in both: `"gazetta": "^1.0.0"`.
 (Svelte, Vue, plain TS) will see a peer dep warning on install. This is acceptable —
 the warning is informational, not a failure. The peer dep is required for the editor
 (which uses React for @rjsf), even if templates don't.
+
+### Error messages for invalid arguments
+
+CLI shows helpful errors when arguments don't match:
+
+```
+gazetta publish productoin
+> Error: target "productoin" not found in site.yaml.
+> Available targets: staging, production
+```
+
+### `gazetta init` in existing directory
+
+`gazetta init .` in a non-empty directory errors if conflicting files exist (package.json,
+templates/, etc.). Safe to run in a directory with only `.git` or unrelated files.
+`gazetta init my-site` always creates a new directory — errors if it already exists.
+
+### Template hot reload
+
+During `gazetta dev`, file watcher detects changes:
+- **Template `.ts`/`.tsx` change** → invalidates template cache, triggers SSE reload. Preview
+  refreshes automatically. No server restart needed (jiti hot-reloads the module).
+- **Content YAML change** → triggers SSE reload. Preview refreshes.
+- **Custom editor/field change** → Vite HMR updates the editor in-place (no page refresh).
+
+### Incremental publish
+
+`gazetta publish` currently renders ALL pages and fragments on every run. For large sites
+(100+ pages), this is slow. Future: incremental publish that tracks which templates/content
+changed and only re-renders affected pages. For now, full publish is the only mode.
+
+### TypeScript configuration
+
+`gazetta init` creates `tsconfig.json` at the project root covering `admin/` with `@templates`
+paths alias. Templates have their own `tsconfig.json` inside `templates/` with appropriate
+compiler options (jsx, strict, etc.). Two tsconfigs — one per compilation context (browser vs server).
+
+### `dist/` is never committed
+
+`dist/` is in `.gitignore`. After `git clone`, the developer must run `gazetta build` to
+regenerate it. The self-hosting workflow (above) includes this step. CI/CD pipelines should
+also run `build` before `deploy`.
 
 ### Files created by `gazetta init`
 
