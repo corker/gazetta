@@ -493,6 +493,75 @@ Checks the project for errors before publishing.
 - Validates template references, fragment references, page manifests
 - Future: target connectivity, env var validation, custom editor/field checks
 
+## Edge Cases & Behavior
+
+### CLI availability
+
+`admin/package.json` lists `gazetta` as a dependency. npm hoists it to the project root.
+After `npm install`, the `gazetta` binary is available at `./node_modules/.bin/gazetta`.
+Scripts in root `package.json` can use `gazetta` directly. For shell usage, developers
+use `npx gazetta dev` or add to PATH. `gazetta init` uses `npx gazetta init` (before install).
+
+### Empty admin/ (no custom editors or fields)
+
+Works. The admin UI loads the default @rjsf form for all templates. `admin/editors/` and
+`admin/fields/` are empty directories — no files needed. Custom editors/fields are opt-in.
+
+### Multi-site target resolution
+
+Resolution order: site first, then target.
+1. Auto-detect or specify site → determines which `site.yaml` to read
+2. Auto-detect or specify target → looked up in that site's `site.yaml`
+
+Two sites can have targets with the same name (e.g. both have "production") — they're
+independent. `gazetta publish production my-site` resolves unambiguously.
+
+### `gazetta serve` without `gazetta build`
+
+If `dist/admin/` doesn't exist, `serve` runs the site without the admin UI. The site
+works (ESI assembly from storage). `/admin` returns a message: "Run `gazetta build` to
+enable the admin UI."
+
+### `.env` loading
+
+CLI loads `.env` and `.env.local` from the **project root** (where `package.json` with
+workspaces lives), not from inside `sites/`. This is where credentials and environment
+variables are configured. Skipped when `CI=true`.
+
+### Who creates custom fields?
+
+Site authors and template developers can both create custom fields. The development modes
+table shows template developers editing `admin/editors/`, but site authors may also add
+fields to `admin/fields/`. Any developer with access to `admin/` can create editors or fields.
+
+### Validation of custom editors and fields
+
+`gazetta validate` should check:
+- Every `admin/editors/{name}.tsx` has a matching `templates/{name}/` directory
+- Every `meta({ field: 'name' })` in a template schema has a matching `admin/fields/{name}.tsx`
+- Orphaned editors (editor exists but template doesn't) are warnings
+- Missing fields (schema references a field that doesn't exist) are errors
+
+### Orphaned editors
+
+If `templates/hero/` is deleted but `admin/editors/hero.tsx` still exists, the editor
+is never loaded (no template = no component = no editor mount). `gazetta validate` reports
+it as a warning. The `import type` in the editor would fail TypeScript compilation, catching
+it at dev time.
+
+### Site naming
+
+`gazetta init` creates `sites/main/` by default. The name "main" has no special meaning —
+the developer can rename it to anything. Auto-detection uses "only one directory in `sites/`"
+regardless of name. For multi-site, names are chosen by the developer.
+
+### Files created by `gazetta init`
+
+Init also creates:
+- `.gitignore` — ignores `node_modules/`, `dist/`, `.env.local`
+- `tsconfig.json` — with `paths: { "@templates/*": ["./templates/*"] }` for editor type imports
+- Root `package.json` with `scripts: { dev: "gazetta dev", publish: "gazetta publish", build: "gazetta build" }`
+
 ## Known Gaps
 
 Summary of configuration gaps and inconsistencies. Reference this when working on publish,
