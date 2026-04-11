@@ -343,14 +343,18 @@ That's the core loop. `serve` and `validate` are secondary commands.
 |---------|-------------|-------------|
 | `gazetta init [dir]` | Scaffold project + install deps | Once, to start a new project |
 | `gazetta dev` | Dev server + CMS admin | Every day — develop templates, edit content, customize editors |
-| `gazetta build` | Render content + build admin | Before deploying — prepares everything for production |
-| `gazetta deploy` | Upload to target + deploy runtime | Push to production — uploads content, deploys worker if configured |
+| `gazetta build` | Render content + build admin | Before publishing — prepares everything for production |
+| `gazetta publish [target]` | Push content to target storage | After build — pushes rendered pages/fragments to a target |
+| `gazetta deploy [target] [what]` | Deploy runtime or admin | Rare — deploy a worker, admin UI, or other infrastructure |
 | `gazetta serve` | Run production server locally | Self-hosting — serves site + admin from a VPS/container |
-| `gazetta validate` | Check for errors | Before build/deploy — catches broken references, invalid config |
+| `gazetta validate` | Check for errors | Before build — catches broken references, invalid config |
 
-Note: `publish` (the admin UI button) is a content operation — makes a draft page live by
-pushing it to a target. `deploy` (the CLI command) is a full deployment — all content + runtime.
-Different actions, different contexts.
+```
+gazetta publish                    # push content to default target
+gazetta publish production         # push content to production target
+gazetta deploy production worker   # deploy the worker runtime for production
+gazetta deploy production admin    # deploy the built admin to production
+```
 
 ### Auto-detection
 
@@ -365,9 +369,9 @@ All commands auto-detect from project structure:
 ```
 gazetta dev                      # auto-detects sites/main
 gazetta dev my-site              # explicit: sites/my-site
-gazetta deploy                   # auto-detects site + first target
-gazetta deploy -t production     # explicit target
-gazetta deploy my-site -t staging   # both explicit
+gazetta publish                  # auto-detects site, publishes to default target
+gazetta publish production       # explicit target
+gazetta publish --site my-site production   # both explicit
 ```
 
 ### Command details
@@ -425,25 +429,29 @@ Prepares everything for production. Like `next build`.
 - Generates import map for shared deps → injected into `dist/admin/index.html`
 - Output: `dist/` — everything needed for deployment
 
-**`gazetta deploy`**
+**`gazetta publish [target]`**
 
-Makes changes live. The developer runs one command — the CLI figures out what needs updating.
+Pushes built content to a target. The most common production command.
 
-- Auto-detects site + target
-- Runs `gazetta build` automatically if `dist/` is stale or missing
-- Pushes content to target storage (R2, S3, Azure Blob, filesystem)
-- Deploys edge runtime (Worker) **only if** worker code or config changed since last deploy
+- Auto-detects site + target (first target if not specified)
+- Uploads rendered pages and fragments from `dist/` to target storage
+- Handles ESI vs static mode based on target config
 - Purges CDN cache if configured
-- Smart diffing: skips unchanged content, only uploads what's new
 
 ```
-gazetta deploy                # auto-detect, push what changed
-gazetta deploy -t production  # explicit target
-gazetta deploy --force        # push everything, even if unchanged
+gazetta publish                # default target
+gazetta publish production     # explicit target
+gazetta publish staging        # different target
 ```
 
-Content push: ~2 seconds. Worker deploy: ~10 seconds (only when needed).
-The developer doesn't think about "content vs runtime" — just `deploy`.
+**`gazetta deploy [target] [what]`**
+
+Deploys infrastructure — worker runtime, admin UI. Rare — only on setup or upgrades.
+
+```
+gazetta deploy production worker   # deploy edge worker
+gazetta deploy production admin    # deploy built admin UI
+```
 
 **`gazetta serve`**
 
