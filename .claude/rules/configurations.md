@@ -946,6 +946,51 @@ EditorMount/FieldMount contracts are framework-agnostic, editors that import `cr
 or `DefaultEditorForm` use React. Vanilla JS/TS editors (no React import) are also supported —
 they use DOM APIs directly.
 
+### Internationalization (i18n)
+
+Multi-language sites use separate pages per locale:
+
+```
+sites/my-site/
+  pages/
+    home/page.yaml           # English (default)
+    fr/home/page.yaml        # French
+    de/home/page.yaml        # German
+```
+
+Each locale is a separate page with its own content and route (`/`, `/fr/`, `/de/`).
+Templates are shared — the same `hero` template renders English or French content
+depending on what's in `page.yaml`. No built-in translation framework — content is
+managed per-page.
+
+`site.yaml` `locale` field sets the default locale for metadata (lang attribute, etc.).
+
+### Template and editor testing
+
+Templates have their own `package.json` — add test scripts:
+
+```json
+// templates/package.json
+{ "scripts": { "test": "vitest run" } }
+```
+
+Template tests: import the render function, call it with mock content, assert HTML output.
+Editor tests: mount the EditorMount into a DOM element (jsdom), simulate onChange.
+`gazetta init` scaffolds a basic test setup in `templates/package.json`.
+
+### Preview accuracy
+
+`gazetta dev` renders on-the-fly using the same renderer as `gazetta publish`. Output
+should be identical. Exception: templates using non-deterministic values (`Date.now()`,
+`Math.random()`) will produce different output between dev preview and published content.
+Templates should avoid non-deterministic rendering for consistency.
+
+### Startup performance
+
+`gazetta dev` loads templates lazily — only when a page is first requested. File watcher
+registers all template files but doesn't import them. Startup is fast regardless of
+template count. First request to each page has a cold-start delay (~50-200ms for jiti import).
+
 ### `gazetta serve` — editing vs published content
 
 `gazetta serve` shows published content from storage — not local filesystem edits. The admin
