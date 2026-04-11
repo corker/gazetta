@@ -496,6 +496,40 @@ Must be done first — everything else depends on the project structure and type
     Pages, fragments, components, site routes stay with `siteDir`. Preview and publish need both.
     Not a full refactor — add `projectRoot` to `AdminAppOptions` and pass it to routes that need it.
 
+### Complete file change map for restructure
+
+65. **Exact files and line counts for the templates path change:**
+    
+    Files needing `projectRoot` for templates (6 path changes):
+    - `cli/index.ts` — 3 occurrences of `join(siteDir, 'templates')`
+    - `admin-api/routes/templates.ts` — 2 occurrences
+    - `publish-rendered.ts` — 1 occurrence
+    
+    Files needing `loadSite` signature change:
+    - `site-loader.ts` — function definition
+    - `cli/index.ts` — 3+ call sites
+    - `publish-rendered.ts` — 7 call sites
+    - `admin-api/routes/preview.ts` — 1 call site
+    - `admin-api/routes/publish.ts` — via publish-rendered
+    - `app.ts` — 1 call site
+    
+    Files needing NO change:
+    - `serve.ts` — reads from storage, no siteDir
+    - `admin-api/routes/pages.ts` — pages stay at siteDir
+    - `admin-api/routes/fragments.ts` — fragments stay at siteDir
+    - `admin-api/routes/components.ts` — components stay at siteDir
+    - `admin-api/routes/site.ts` — site.yaml stays at siteDir
+    - `targets.ts` — filesystem paths relative to siteDir
+    - `renderer.ts`, `resolver.ts`, `assemble.ts`, `scope.ts` — no path construction
+    
+    Tests affected (6 files reference starter):
+    - `admin-api.test.ts`, `integration.test.ts`, `publish.test.ts`
+    - `site-loader.test.ts`, `template-loader.test.ts`, `cli.test.ts`
+
+66. **`gazetta deploy` (Phase 6.4) is already implemented.** Generates worker from template,
+    runs wrangler deploy, cleans up. Only needs `siteDir` for reading site.yaml — the worker
+    template doesn't reference the filesystem structure. No change needed for deploy.
+
 61. **CI workflows affected by restructure:**
     - `.github/workflows/ci.yml` — runs `npm test`. Passes if tests updated.
     - `.github/workflows/deploy-site.yml` — runs `npx tsx ... publish sites/gazetta.studio`.
