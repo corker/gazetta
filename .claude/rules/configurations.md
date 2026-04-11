@@ -852,6 +852,84 @@ fragment-index.json         # fragment → pages dependency map
 pages/{route}/index.html    # fully assembled HTML per route
 ```
 
+### Deleting a site
+
+Delete the `sites/{name}/` directory. Published content in the target storage is NOT
+automatically removed — it remains as orphaned files. Future: `gazetta clean [target]`
+command to remove published content for a deleted site from storage.
+
+### Renaming templates
+
+Renaming a template (e.g. `hero` → `banner-hero`) requires updating:
+1. Template directory: `templates/hero/` → `templates/banner-hero/`
+2. All YAML references: `template: hero` → `template: banner-hero`
+3. Custom editor: `admin/editors/hero.tsx` → `admin/editors/banner-hero.tsx`
+4. Type imports: `from '@templates/hero'` → `from '@templates/banner-hero'`
+
+`gazetta validate` catches broken references after the rename. No automated rename
+command (future: `gazetta rename template hero banner-hero`).
+
+### Schema changes and content compatibility
+
+If a template's schema changes (new required field, type change), existing content may
+not satisfy the new schema. `gazetta validate` should check content against template
+schemas — reporting which pages/fragments have incompatible content.
+
+During `gazetta dev`, preview shows an error overlay for schema mismatches.
+During `gazetta publish`, pages with invalid content are skipped (same as template errors).
+
+### Partial publish from CLI
+
+`gazetta publish` renders all pages by default. To publish a single page:
+
+```
+gazetta publish production --page home
+gazetta publish production --fragment header
+```
+
+Useful for fixing one page without re-rendering the entire site. The admin UI already
+supports per-page publish via the Publish button.
+
+### Content recovery from storage
+
+ESI targets store page/fragment manifests (JSON) — content is recoverable via
+`gazetta fetch` (pulls manifests back from storage into local YAML files).
+Static targets store rendered HTML — source content is lost. Recovery not possible.
+
+Content is also in git (YAML files in `sites/`). Git is the primary backup mechanism.
+
+### Accidental publish to production from dev
+
+`gazetta dev` allows publishing to any configured target, including production. First
+publish to a non-filesystem target shows a confirmation prompt:
+
+```
+gazetta dev
+> [Admin UI] Publishing to "production" (r2://my-site)
+> ⚠ This will update live content. Continue? [y/N]
+```
+
+CI (`CI=true`) skips the prompt. Future: target-level `confirm: true` flag in site.yaml.
+
+### Storage upload behavior
+
+| Provider | Upload mode | Concurrency | Retry | Rate limits |
+|----------|-----------|-------------|-------|-------------|
+| Filesystem | Sequential | 1 | No | N/A |
+| R2 (REST) | Sequential | 1 | No | N/A |
+| R2 (S3 API) | Parallel | 10 | Yes (3 retries) | 1000 req/s |
+| S3 | Parallel | 10 | Yes (3 retries) | 3500 PUT/s |
+| Azure Blob | Parallel | 10 | Yes (3 retries) | 20000 req/s |
+
+Parallel upload with concurrency of 10 is the default for cloud providers. Filesystem
+and R2 REST are sequential due to API constraints.
+
+### Credential validation
+
+`gazetta validate --target production` checks storage credentials by attempting a
+small read operation (e.g. listing the root directory). Reports clear error if
+credentials are expired, invalid, or missing.
+
 ### Migration from flat to new structure
 
 Existing sites (flat structure) continue to work — the CLI detects the structure by
