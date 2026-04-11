@@ -1141,6 +1141,91 @@ control with editor/publisher/admin roles.
 (`sites/` is committed). Publish actions logged to stdout — pipe to a log aggregator
 for audit trail.
 
+### Caching
+
+**`gazetta dev`:** No caching. Every request re-renders from source. Dev server sends
+`Cache-Control: no-store` to prevent browser caching. Always fresh.
+
+**`gazetta serve`:** In-memory template cache (LRU). Cache-Control headers from target config:
+- `browser: 0` → `Cache-Control: public, max-age=0, must-revalidate` + ETag for 304
+- `browser: 86400` → `Cache-Control: public, max-age=86400` (browser caches 24h)
+- `edge: 86400` → `s-maxage=86400` (CDN caches 24h)
+
+ETag enables conditional requests — browser sends `If-None-Match`, server returns 304 if unchanged.
+
+**Cloudflare Worker:** Uses Cache API. `edge` TTL controls how long the CDN caches pages.
+`cache.purge` runs on publish — purges updated URLs from CDN. Browser cache (`browser` TTL)
+is NOT purgeable — users see stale content until it expires.
+
+**Recommended strategy:** `browser: 0` (always revalidate) + `edge: 86400` (CDN caches, purged on publish).
+This gives instant updates after publish while minimizing origin requests.
+
+The admin SPA uses content-hashed filenames (`app.3fa2b1.js`) — cached forever by browsers,
+cache-busted on each build.
+
+### CSS and JS assembly
+
+Templates return `{ html, css, js, head? }`. The renderer assembles these per-page:
+- **CSS:** collected from all components, deduplicated, injected as `<style>` in `<head>`
+- **JS:** collected from all components, injected before `</body>`
+- **head:** collected from all components (fonts, meta tags), injected in `<head>`
+
+Static and SSR components ship zero JS. Only islands ship JS to the browser. See
+design-concepts.md for the islands architecture and import map deduplication.
+
+### Route parameters in templates
+
+Templates receive route parameters via the `params` argument:
+
+```tsx
+const template: TemplateFunction = ({ content, params }) => {
+  // params.slug is available for dynamic routes (/blog/:slug)
+  return { html: `<h1>${content.title} - ${params?.slug}</h1>`, css: '', js: '' }
+}
+```
+
+### Error pages in dev mode
+
+When visiting site pages directly (not through admin preview):
+- **Template error:** styled error overlay with stack trace, file path, and line number.
+  Similar to Vite's error overlay. Auto-refreshes when the template file is fixed.
+- **404:** plain "Page not found" with a list of available routes.
+
+The admin preview uses the same error overlay inside the iframe.
+
+### Browser auto-open
+
+`gazetta dev` does NOT auto-open the browser. The developer manually navigates to
+the printed URL. Future: `--open` flag to auto-open. Root `package.json` scripts can
+add `--open`: `"dev": "gazetta dev --open"`.
+
+### Running `gazetta` commands
+
+Three ways to run CLI commands:
+
+```
+npm run dev                     # via root package.json scripts (recommended)
+npx gazetta dev                 # via npx (always works)
+./node_modules/.bin/gazetta dev # direct binary path
+```
+
+`npm run dev` is recommended — no PATH issues, works everywhere. `npx` is for
+one-off commands before scripts are set up. Global install (`npm install -g gazetta`)
+is not recommended — keeps the version tied to the project.
+
+### Gazetta version mismatch across workspaces
+
+If `admin/package.json` has `gazetta@^1.0` and `templates/package.json` has `gazetta@^2.0`,
+npm may install two copies. `gazetta validate` checks for version mismatches across
+workspaces and warns:
+
+```
+⚠ gazetta version mismatch:
+  admin: 1.2.0
+  templates: 2.0.0
+  Use the same version range in both workspaces.
+```
+
 ### Health check and monitoring
 
 `gazetta serve` exposes:
