@@ -1682,6 +1682,53 @@ Use cases:
 API endpoints: `GET/PUT /api/pages/:name`, `GET/PUT /api/fragments/:name`,
 `GET /api/templates`, `GET /api/templates/:name/schema`, `POST /api/publish`.
 
+### Publish idempotency and diffing
+
+`gazetta publish` currently uploads ALL rendered files on every run. No content hashing
+or skip-if-unchanged logic. For cloud storage (R2/S3/Azure), this means paying for PUT
+operations on every publish even if content hasn't changed.
+
+Future: content-hash diffing that compares local render output against remote storage
+and only uploads changed files. `gazetta publish --force` to bypass diffing.
+
+### Template development without a site
+
+Template developers creating a reusable template library can run `gazetta dev` with a
+minimal site. `gazetta init` scaffolds a starter site for this purpose. There is no
+template-only preview mode — templates need at least one page to render.
+
+For template libraries distributed as npm packages: the library exports templates from
+its package. The consuming project installs the package and references templates by
+package path:
+
+```
+# In consuming project's page.yaml:
+template: "@company/templates/hero"
+```
+
+Future: template package resolution from node_modules.
+
+### Template hot reload vs editor state
+
+Template file change → SSE triggers preview iframe reload. The editor panel is NOT
+reloaded — form state (undo stack, unsaved changes, scroll position) is preserved.
+
+If the template's **schema** changes (field added/removed), the editor detects the
+schema mismatch on next save attempt and offers to remount with the new schema.
+The developer can also manually refresh the editor by reselecting the component.
+
+### `gazetta validate` and template code execution
+
+`validate` imports templates via jiti to access their Zod schemas. This executes
+template module code (top-level side effects). Templates should avoid side effects
+on import — keep initialization inside the render function, not at module scope.
+
+### `gazetta init` failure recovery
+
+If `npm install` fails after scaffolding (network error, wrong Node version), the
+project directory is kept with all scaffolded files. The developer fixes the issue
+and runs `npm install` manually. Init does NOT delete the directory on failure.
+
 ### Post-publish hooks
 
 No built-in webhook or notification system. After `gazetta publish`, add notifications
