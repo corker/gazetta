@@ -133,27 +133,91 @@ Must be done first — everything else depends on the project structure and type
 - Generate worker code per target with worker config
 - Output: `dist/workers/{target}/`
 
-## Implementation order
+## Gaps and risks in this plan
+
+### Dependency issues
+
+1. **Phase 1.1 (React peer dep) breaks monorepo build.** `packages/gazetta/` compiles `mount.tsx`
+   which imports React. After moving to peer dep, React must still be available for compilation.
+   Fix: add React as `devDependency` in root `package.json` (hoisted to monorepo root).
+
+2. **Phase 1.2 (EditorMount props change) breaks all callers.** Must update:
+   - `apps/admin/src/client/composables/useEditorMount.ts`
+   - `apps/admin/src/client/components/EditorPanel.vue`
+   - `packages/gazetta/src/editor/mount.tsx` (createEditorMount)
+   - All tests that call mount()
+
+3. **Phase 2.5 (build command) depends on Phase 4+5.** Build bundles editors/fields, but they
+   aren't implemented until Phase 4-5. Fix: Phase 2 `build` only builds admin SPA + worker.
+   Editor/field bundling added in Phase 6 after Phase 4-5.
+
+4. **Phase 4 hard-depends on Phase 3** (theme in mount props). Not "partially overlapping."
+
+### Structure migration
+
+5. **Phase 1.4-1.5 is the largest task** — restructure starter, update all paths, update
+   all tests. Must also handle `sites/gazetta.studio/`. This is easily 2 days by itself.
+   Break into sub-tasks:
+   - Restructure `examples/starter/` directories
+   - Update `examples/starter/package.json` (workspaces)
+   - Update all test file paths in `packages/gazetta/tests/`
+   - Update `sites/gazetta.studio/` structure
+   - Update monorepo root workspaces
+   - Verify `npm run dev` and `npm test` still work
+
+6. **No backward compatibility.** All changes are breaking. Existing sites that use the flat
+   structure break. Fix: CLI detects structure (flat vs workspace) and supports both during
+   migration period. Or: one big migration commit that updates everything.
+
+### Admin API path changes
+
+7. **Admin API needs project root, not just site dir.** Currently `createAdminApp(siteDir, storage)`.
+   Must become `createAdminApp({ projectRoot, siteDir, storage })` so the API can find
+   templates at `{projectRoot}/templates/` and editors at `{projectRoot}/admin/editors/`.
+
+### Dev vs production editor loading
+
+8. **Custom editor import paths differ between dev and production.**
+   - Dev: `import('@site/admin/editors/hero.tsx')` (Vite alias)
+   - Production: `import('/admin/editors/hero.js')` (pre-built from dist)
+   - The admin UI code needs to detect the mode and use the right path.
+   - Fix: admin API returns the editor URL. Dev returns Vite alias path. Production returns
+     dist path. Admin UI always uses the URL from the API.
+
+### Missing from the plan
+
+9. **`gazetta validate` improvements** — not listed anywhere. Should be a phase:
+   - Check content against template Zod schemas
+   - Check for orphaned editors (editor without template)
+   - Check for missing fields (schema references nonexistent field)
+   - Check for cross-workspace runtime imports
+   - Check gazetta version mismatch across workspaces
+
+10. **Test updates per phase** — each phase changes behavior that tests validate. Identify
+    affected test files before starting each phase.
+
+## Revised implementation order
 
 ```
-Phase 1 (foundation)     ██████ ~2-3 days
+Phase 1 (foundation)     ██████████ ~3-4 days (structure migration is large)
 Phase 2 (CLI)            ████████ ~3-4 days
 Phase 3 (theming)        ███ ~1 day
-Phase 4 (custom editors) ██████ ~2-3 days
-Phase 5 (custom fields)  ████ ~2 days
-Phase 6 (prod build)     ██████ ~2-3 days
+Phase 4 (custom editors) ██████ ~2-3 days  (depends on Phase 3)
+Phase 5 (custom fields)  ████ ~2 days      (depends on Phase 4)
+Phase 6 (prod build)     ██████ ~2-3 days  (depends on Phase 4+5)
+Phase 7 (validate)       ███ ~1 day
 ```
 
-Start with Phase 1 — everything depends on it. Phases 3-5 can partially overlap.
-Phase 6 can be deferred if production admin hosting isn't needed yet.
+Phases 3→4→5→6 are strictly sequential. Phase 7 can be done anytime after Phase 5.
 
 ## Verification per phase
 
 | Phase | Verification |
 |-------|-------------|
-| 1 | `npm run build && npm test` pass. `gazetta init` creates new structure. |
+| 1 | `npm run build && npm test` pass. `gazetta init` creates new structure. React is peer dep. |
 | 2 | `gazetta dev` works with new structure. Auto-detection prompts. `publishMode` respected. |
-| 3 | Toggle dark/light → editor follows theme. |
-| 4 | Custom editor mounts. DefaultEditorForm embeddable. Dev playground works. |
-| 5 | Custom field renders inside @rjsf form. Nested + array fields work. |
-| 6 | `gazetta build` produces dist/admin/ with import maps. `gazetta serve` serves it. |
+| 3 | Toggle dark/light → editor follows theme. CSS variables set on container. |
+| 4 | Custom editor mounts. DefaultEditorForm embeddable. Dev playground works. Editor URL from API. |
+| 5 | Custom field renders inside @rjsf form. Nested + array fields work. Async loading handles flash. |
+| 6 | `gazetta build` produces dist/admin/ with editor bundles + import maps. `gazetta serve` serves it. |
+| 7 | `gazetta validate` catches orphaned editors, missing fields, schema mismatches. |
