@@ -162,12 +162,19 @@ function nodeStyle(depth: number): Record<string, string> | undefined {
 
 // --- Editing helpers: build an EditingTarget with the correct save callback ---
 
+/** Fetch schema and extract hasEditor flag */
+async function fetchSchema(template: string) {
+  const response = await api.getTemplateSchema(template)
+  const { hasEditor, ...schema } = response as Record<string, unknown> & { hasEditor?: boolean }
+  return { schema, hasEditor: !!hasEditor }
+}
+
 async function openComponentEditor(path: string, template: string) {
   try {
     const comp = await api.getComponent(path)
     const content = (comp.content as Record<string, unknown>) ?? {}
-    const schema = await api.getTemplateSchema(template)
-    editing.open({ template, path, content, schema, save: (c) => api.updateComponent(path, { content: c }).then(() => {}) })
+    const { schema, hasEditor } = await fetchSchema(template)
+    editing.open({ template, path, content, schema, hasEditor, save: (c) => api.updateComponent(path, { content: c }).then(() => {}) })
   } catch (err) {
     toast.showError(err, 'Failed to load component')
   }
@@ -179,11 +186,11 @@ async function openPageContentEditor() {
   if (!d || !sel) return
   try {
     const content = (d.content as Record<string, unknown>) ?? {}
-    const schema = await api.getTemplateSchema(d.template)
+    const { schema, hasEditor } = await fetchSchema(d.template)
     const save = sel.type === 'page'
       ? (c: Record<string, unknown>) => api.updatePage(sel.name, { content: c }).then(() => {})
       : (c: Record<string, unknown>) => api.updateFragment(sel.name, { content: c }).then(() => {})
-    editing.open({ template: d.template, path: d.dir, content, schema, save })
+    editing.open({ template: d.template, path: d.dir, content, schema, hasEditor, save })
   } catch (err) {
     toast.showError(err, 'Failed to load content')
   }
@@ -193,8 +200,8 @@ async function openFragmentEditor(fragName: string) {
   try {
     const frag = await api.getFragment(fragName)
     const content = (frag.content as Record<string, unknown>) ?? {}
-    const schema = await api.getTemplateSchema(frag.template)
-    editing.open({ template: frag.template, path: frag.dir, content, schema, save: (c) => api.updateFragment(fragName, { content: c }).then(() => {}) })
+    const { schema, hasEditor } = await fetchSchema(frag.template)
+    editing.open({ template: frag.template, path: frag.dir, content, schema, hasEditor, save: (c) => api.updateFragment(fragName, { content: c }).then(() => {}) })
   } catch (err) {
     toast.showError(err, `Failed to load fragment "${fragName}"`)
   }

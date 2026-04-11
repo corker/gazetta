@@ -2,10 +2,11 @@ import { Hono } from 'hono'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { StorageProvider } from '../../types.js'
-import { loadTemplate } from '../../template-loader.js'
+import { loadTemplate, hasEditorFile } from '../../template-loader.js'
 
 export function templateRoutes(siteDir: string, storage: StorageProvider) {
   const app = new Hono()
+  const editorsDir = join(siteDir, 'admin', 'editors')
 
   app.get('/api/templates', async (c) => {
     const templatesDir = join(siteDir, 'templates')
@@ -23,7 +24,8 @@ export function templateRoutes(siteDir: string, storage: StorageProvider) {
     try {
       const loaded = await loadTemplate(storage, templatesDir, name)
       const jsonSchema = z.toJSONSchema(loaded.schema as z.ZodType)
-      return c.json(jsonSchema)
+      const hasEditor = await hasEditorFile(storage, editorsDir, name)
+      return c.json({ ...jsonSchema as Record<string, unknown>, hasEditor })
     } catch (err) {
       return c.json({ error: `Failed to load schema for template "${name}": ${(err as Error).message}` }, 500)
     }

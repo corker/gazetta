@@ -78,6 +78,22 @@ export async function loadTemplate(storage: StorageProvider, templatesDir: strin
   return loaded
 }
 
+const EDITOR_FILES = ['editor.ts', 'editor.tsx']
+
+/** Check if a custom editor file exists for a template */
+export async function hasEditorFile(storage: StorageProvider, editorsDir: string, templateName: string): Promise<boolean> {
+  for (const file of EDITOR_FILES) {
+    // Try flat: admin/editors/hero.ts
+    if (await storage.exists(join(editorsDir, `${templateName}.ts`))) return true
+    if (await storage.exists(join(editorsDir, `${templateName}.tsx`))) return true
+  }
+  // Try directory: admin/editors/hero/index.ts
+  for (const file of ['index.ts', 'index.tsx']) {
+    if (await storage.exists(join(editorsDir, templateName, file))) return true
+  }
+  return false
+}
+
 export function invalidateTemplate(templateName: string): void {
   cache.delete(templateName)
 }

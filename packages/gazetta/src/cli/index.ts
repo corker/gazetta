@@ -646,13 +646,18 @@ async function runDev(siteDir: string, port: number) {
     if (isDevMode && cmsWebDir) {
       try {
         const { createServer: createViteServer } = await import('vite')
+        const { searchForWorkspaceRoot } = await import('vite')
         const vite = await createViteServer({
           configFile: join(cmsWebDir, 'vite.config.ts'),
           root: cmsWebDir,
           base: '/admin/',
+          resolve: {
+            alias: { '@editors': join(siteDir, 'admin', 'editors') },
+          },
           server: {
             middlewareMode: true,
             hmr: { server: nodeServer as unknown as import('node:http').Server },
+            fs: { allow: [searchForWorkspaceRoot(cmsWebDir), siteDir] },
           },
         })
 

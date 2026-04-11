@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useToastStore } from './toast.js'
 import { usePreviewStore } from './preview.js'
+import type { EditorMount } from 'gazetta/types'
 
 export interface EditingTarget {
   /** Display label (template name) */
@@ -14,6 +15,8 @@ export interface EditingTarget {
   content: Record<string, unknown>
   /** JSON Schema for form generation */
   schema: Record<string, unknown>
+  /** Whether a custom editor exists for this template */
+  hasEditor?: boolean
   /** Persists edited content to the correct API endpoint */
   save: (content: Record<string, unknown>) => Promise<void>
 }
@@ -28,6 +31,8 @@ export const useEditingStore = defineStore('editing', () => {
   const lastSaveError = ref<string | null>(null)
   /** Bumped on open/discard to trigger editor re-mount */
   const mountVersion = ref(0)
+  /** Custom editor mount (loaded dynamically when template has one) */
+  const customEditorMount = ref<EditorMount | null>(null)
 
   // Convenience accessors
   const template = computed(() => target.value?.template ?? null)
@@ -44,13 +49,26 @@ export const useEditingStore = defineStore('editing', () => {
     return window.confirm('You have unsaved changes. Discard them?')
   }
 
-  function open(t: EditingTarget) {
+  async function open(t: EditingTarget) {
     if (!confirmIfDirty()) return
     target.value = t
     content.value = deepClone(t.content)
     saved.value = deepClone(t.content)
     saving.value = false
     lastSaveError.value = null
+    customEditorMount.value = null
+
+    // Load custom editor if available
+    if (t.hasEditor) {
+      try {
+        const mod = await import(/* @vite-ignore */ `@editors/${t.template}.tsx`)
+        customEditorMount.value = (mod.default ?? mod) as EditorMount
+      } catch (err) {
+        console.warn(`Custom editor for "${t.template}" failed to load:`, err)
+        // Fall back to default editor
+      }
+    }
+
     mountVersion.value++
     usePreviewStore().invalidateDraft()
   }
@@ -102,5 +120,5 @@ export const useEditingStore = defineStore('editing', () => {
     }
   }
 
-  return { target, content, saved, saving, lastSaveError, template, path, schema, dirty, mountVersion, open, clear, markDirty, discard, save }
+  return { target, content, saved, saving, lastSaveError, template, path, schema, dirty, mountVersion, customEditorMount, open, clear, markDirty, discard, save }
 })
