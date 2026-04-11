@@ -733,115 +733,127 @@ const customTemplates = {
 }
 
 // ---------------------------------------------------------------------------
-// Mount
+// DefaultEditorForm — standalone React component
+// ---------------------------------------------------------------------------
+
+/** Props for the DefaultEditorForm component */
+export interface DefaultEditorFormProps {
+  schema: Record<string, unknown>
+  content: Record<string, unknown>
+  onChange: (content: Record<string, unknown>) => void
+}
+
+/**
+ * The default @rjsf form editor as a React component.
+ * Custom editors can embed this: `<DefaultEditorForm schema={schema} content={content} onChange={onChange} />`
+ */
+export function DefaultEditorForm({ schema: jsonSchema, content, onChange }: DefaultEditorFormProps) {
+  const uiSchema = React.useMemo(() => buildUiSchema(jsonSchema as JsonSchema), [jsonSchema])
+
+  const [formData, setFormData] = React.useState(content)
+  const formDataRef = React.useRef(formData)
+  formDataRef.current = formData
+
+  const undoStack = React.useRef<Record<string, unknown>[]>([])
+  const redoStack = React.useRef<Record<string, unknown>[]>([])
+  const isUndoRedo = React.useRef(false)
+
+  const pushHistory = (prev: Record<string, unknown>) => {
+    if (isUndoRedo.current) return
+    undoStack.current.push(prev)
+    if (undoStack.current.length > 50) undoStack.current.shift()
+    redoStack.current = []
+  }
+
+  const applyFormData = (data: Record<string, unknown>) => {
+    setFormData(data)
+    onChange(data)
+  }
+
+  const handleChange = (e: IChangeEvent) => {
+    pushHistory(formDataRef.current)
+    setFormData(e.formData)
+    onChange(e.formData as Record<string, unknown>)
+  }
+
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          if (redoStack.current.length === 0) return
+          const next = redoStack.current.pop()!
+          undoStack.current.push(formDataRef.current)
+          isUndoRedo.current = true
+          applyFormData(next)
+          isUndoRedo.current = false
+        } else {
+          if (undoStack.current.length === 0) return
+          const prev = undoStack.current.pop()!
+          redoStack.current.push(formDataRef.current)
+          isUndoRedo.current = true
+          applyFormData(prev)
+          isUndoRedo.current = false
+        }
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
+  const reorderArray = React.useCallback((fieldPath: string, fromIndex: number, toIndex: number) => {
+    setFormData((prev: Record<string, unknown>) => {
+      pushHistory(prev)
+      const parts = fieldPath.replace(/^root_/, '').split('_')
+      const key = parts[0]
+      const arr = prev[key]
+      if (!Array.isArray(arr)) return prev
+      const next = [...arr]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      const updated = { ...prev, [key]: next }
+      onChange(updated)
+      return updated
+    })
+  }, [onChange])
+
+  const formContext: GzFormContext = React.useMemo(() => ({ reorderArray }), [reorderArray])
+
+  return (
+    <>
+      <style>{STYLES}</style>
+      <div className="gz-editor">
+        <Form
+          schema={jsonSchema as JsonSchema}
+          uiSchema={uiSchema}
+          formData={formData}
+          onChange={handleChange}
+          validator={validator}
+          widgets={customWidgets}
+          templates={customTemplates}
+          formContext={formContext}
+          liveValidate={false}
+          omitExtraData
+          noHtml5Validate
+        />
+      </div>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Mount — wraps DefaultEditorForm for the mount/unmount lifecycle
 // ---------------------------------------------------------------------------
 
 export function createEditorMount(jsonSchema: object): EditorMount {
-  const uiSchema = buildUiSchema(jsonSchema as JsonSchema)
-
   return {
-    mount(el, { content, onChange }) { // schema and theme available in props but ignored — default editor uses jsonSchema from closure
+    mount(el, { content, schema, onChange }) {
       const existing = roots.get(el)
       if (existing) existing.unmount()
 
       const root = createRoot(el)
       roots.set(el, root)
-
-      function EditorForm() {
-        const [formData, setFormData] = React.useState(content)
-        const formDataRef = React.useRef(formData)
-        formDataRef.current = formData
-
-        const undoStack = React.useRef<Record<string, unknown>[]>([])
-        const redoStack = React.useRef<Record<string, unknown>[]>([])
-        const isUndoRedo = React.useRef(false)
-
-        const pushHistory = (prev: Record<string, unknown>) => {
-          if (isUndoRedo.current) return
-          undoStack.current.push(prev)
-          if (undoStack.current.length > 50) undoStack.current.shift()
-          redoStack.current = []
-        }
-
-        const applyFormData = (data: Record<string, unknown>) => {
-          setFormData(data)
-          onChange(data)
-        }
-
-        const handleChange = (e: IChangeEvent) => {
-          pushHistory(formDataRef.current)
-          setFormData(e.formData)
-          onChange(e.formData as Record<string, unknown>)
-        }
-
-        React.useEffect(() => {
-          const handler = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-              e.preventDefault()
-              if (e.shiftKey) {
-                // Redo
-                if (redoStack.current.length === 0) return
-                const next = redoStack.current.pop()!
-                undoStack.current.push(formDataRef.current)
-                isUndoRedo.current = true
-                applyFormData(next)
-                isUndoRedo.current = false
-              } else {
-                // Undo
-                if (undoStack.current.length === 0) return
-                const prev = undoStack.current.pop()!
-                redoStack.current.push(formDataRef.current)
-                isUndoRedo.current = true
-                applyFormData(prev)
-                isUndoRedo.current = false
-              }
-            }
-          }
-          document.addEventListener('keydown', handler)
-          return () => document.removeEventListener('keydown', handler)
-        }, [])
-
-        const reorderArray = React.useCallback((fieldPath: string, fromIndex: number, toIndex: number) => {
-          setFormData((prev: Record<string, unknown>) => {
-            pushHistory(prev)
-            const parts = fieldPath.replace(/^root_/, '').split('_')
-            const key = parts[0]
-            const arr = prev[key]
-            if (!Array.isArray(arr)) return prev
-            const next = [...arr]
-            const [moved] = next.splice(fromIndex, 1)
-            next.splice(toIndex, 0, moved)
-            const updated = { ...prev, [key]: next }
-            onChange(updated)
-            return updated
-          })
-        }, [onChange])
-
-        const formContext: GzFormContext = React.useMemo(() => ({ reorderArray }), [reorderArray])
-
-        return (
-          <>
-            <style>{STYLES}</style>
-            <div className="gz-editor">
-              <Form
-                schema={jsonSchema as JsonSchema}
-                uiSchema={uiSchema}
-                formData={formData}
-                onChange={handleChange}
-                validator={validator}
-                widgets={customWidgets}
-                templates={customTemplates}
-                formContext={formContext}
-                liveValidate={false}
-                omitExtraData
-                noHtml5Validate
-              />
-            </div>
-          </>
-        )
-      }
-
-      root.render(<EditorForm />)
+      root.render(<DefaultEditorForm schema={schema ?? jsonSchema as Record<string, unknown>} content={content} onChange={onChange} />)
     },
 
     unmount(el) {
