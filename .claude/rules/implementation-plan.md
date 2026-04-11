@@ -268,10 +268,9 @@ Must be done first — everything else depends on the project structure and type
     (through Phase 4). Everything else is enhancement. The plan should explicitly mark MVP
     vs nice-to-have phases.
 
-28. **Restructure-first vs feature-first ordering.**
-    Option A (current plan): restructure → CLI → theming → editors → fields → build
-    Option B (feature-first): theming → editors → fields → restructure → CLI updates → build
-    Option B delivers visible value sooner. Option A is architecturally cleaner but risky.
+28. **Decision: restructure first.** The structure is the foundation. Building features on
+    the old flat structure means rewriting them when restructuring. One migration, then build
+    on solid ground.
 
 ### Cascade effects
 
