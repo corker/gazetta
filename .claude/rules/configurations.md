@@ -778,6 +778,89 @@ Works. Dev mode renders on-the-fly from source and doesn't need targets. The adm
 Publish button is disabled if no targets are configured. `gazetta publish` errors:
 "No targets configured in site.yaml."
 
+### HTTPS in dev mode
+
+`gazetta dev` serves over HTTP. For browser APIs requiring HTTPS (clipboard, geolocation),
+use a reverse proxy (e.g. `caddy reverse-proxy --from https://localhost:3443 --to localhost:3000`).
+Future: `--https` flag using a self-signed cert.
+
+### Static assets (images, fonts, CSS)
+
+Static assets (images, videos, fonts, CSS files) live in `sites/my-site/public/`. During
+`gazetta dev`, they're served at the root URL. During `gazetta publish`, they're uploaded
+alongside rendered pages. Templates reference them with absolute paths (`/images/hero.jpg`).
+
+Content authors add images via URL in the CMS editor (image field widget). For uploaded
+files, a future asset management system will handle uploads to target storage.
+
+### Template errors during publish
+
+`gazetta publish` renders all pages. If a template throws during SSR:
+- The error is logged with the page name and template
+- The page is skipped — not uploaded
+- Publishing continues with remaining pages
+- Exit code is non-zero if any page failed
+- Summary at the end: "Published 48/50 pages. 2 failed."
+
+### Fragment dependency tracking
+
+For ESI mode: fragments are stored independently. The runtime assembles them on request.
+No dependency tracking needed — changing a fragment and republishing it updates all pages
+instantly (the runtime fetches the latest version).
+
+For static mode: pages bake fragments inline. `gazetta publish` re-renders ALL pages by
+default (no dependency tracking). Future: dependency graph that tracks which pages use
+which fragments, enabling incremental publish for static mode.
+
+### Site-specific configuration
+
+`site.yaml` supports site-level settings beyond name and targets:
+
+```yaml
+name: My Site
+locale: en
+baseUrl: https://mysite.com
+systemPages:
+  - 404
+targets:
+  production: ...
+```
+
+Custom site-level settings can be added as top-level fields — accessible to templates via
+the render context. Not currently validated — future schema for site.yaml.
+
+### CLI exit codes
+
+All CLI commands use standard exit codes:
+- `0` — success
+- `1` — error (validation failures, publish errors, missing config)
+- Non-zero exit is critical for CI pipelines.
+
+### Publish storage layout
+
+`gazetta publish` uploads to target storage with this layout:
+
+```
+# ESI mode:
+pages/{name}.json           # page manifest (route, components, metadata)
+pages/{name}/*.html         # pre-rendered component HTML
+fragments/{name}/*.html     # pre-rendered fragment HTML
+site.json                   # site manifest
+fragment-index.json         # fragment → pages dependency map
+
+# Static mode:
+pages/{route}/index.html    # fully assembled HTML per route
+```
+
+### Migration from flat to new structure
+
+Existing sites (flat structure) continue to work — the CLI detects the structure by
+checking for `admin/` and `templates/` directories. If not found, it falls back to the
+current flat behavior (templates and content in the same directory).
+
+Migration is manual: create `admin/`, `templates/`, `sites/main/`, move files. Future:
+`gazetta migrate` command to automate this.
+
 ### Editor/field file extensions
 
 Editors and fields can be `.ts`, `.tsx`, `.jsx`. Vite transforms all of them. While the
