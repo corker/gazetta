@@ -530,6 +530,53 @@ Must be done first — everything else depends on the project structure and type
     runs wrangler deploy, cleans up. Only needs `siteDir` for reading site.yaml — the worker
     template doesn't reference the filesystem structure. No change needed for deploy.
 
+### The simplest restructure approach
+
+67. **Add `templatesDir` to `Site` interface — not `ProjectConfig` everywhere.** The `Site`
+    object is already threaded through resolver, publish, and preview. Adding `templatesDir`
+    to `Site` means downstream code reads `site.templatesDir` instead of constructing it.
+    
+    ```ts
+    // site-loader.ts
+    export interface Site {
+      manifest: SiteManifest
+      pages: Map<string, PageManifest & { dir: string }>
+      fragments: Map<string, FragmentManifest & { dir: string }>
+      siteDir: string
+      templatesDir: string   // NEW
+      storage: StorageProvider
+    }
+    
+    export async function loadSite(siteDir: string, templatesDir: string, storage: StorageProvider): Promise<Site> {
+      // ... existing discovery logic ...
+      return { manifest, pages, fragments, siteDir, templatesDir, storage }
+    }
+    ```
+    
+    Total changes:
+    - `site-loader.ts` — add `templatesDir` to interface + `loadSite` param (2 lines)
+    - `resolver.ts` — `site.templatesDir` instead of `join(site.siteDir, 'templates')` (2 lines)
+    - `publish-rendered.ts` — `site.templatesDir` instead of `join(sourceDir, 'templates')` (1 line)
+    - `cli/index.ts` — pass `templatesDir` to `loadSite` (3 call sites)
+    - `admin-api/routes/templates.ts` — use `templatesDir` from config (2 occurrences)
+    - `admin-api/routes/preview.ts` — passes through `loadSite`
+    - `admin-api/routes/publish.ts` — passes through `publish-rendered`
+    - `app.ts` — pass `templatesDir` to `loadSite` (1 call site)
+    - 6 test files — pass `templatesDir` to `loadSite` calls
+    
+    **8 code changes + 6 test updates.** Not a rewrite. The `ProjectConfig` type is still useful
+    for the CLI level (resolve paths once) but doesn't need to cascade into every function —
+    `Site.templatesDir` carries the value downstream.
+
+68. **The restructure can be done in 3 steps:**
+    1. Add `templatesDir` to `Site` interface + `loadSite` param (non-breaking — callers pass
+       `join(siteDir, 'templates')` which is the current behavior)
+    2. Update resolver + publish-rendered to use `site.templatesDir` (behavior-preserving)
+    3. Update the starter structure + CLI to pass `projectRoot/templates/` instead
+    
+    Steps 1-2 are pure refactors (no behavior change). Step 3 is the actual restructure.
+    This means we can merge steps 1-2 to main without breaking anything, then do step 3.
+
 61. **CI workflows affected by restructure:**
     - `.github/workflows/ci.yml` — runs `npm test`. Passes if tests updated.
     - `.github/workflows/deploy-site.yml` — runs `npx tsx ... publish sites/gazetta.studio`.
