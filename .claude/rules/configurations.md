@@ -41,6 +41,7 @@ gazetta/
         editor/                # Default editor — @rjsf form, Tiptap, custom widgets
         types.ts               # EditorMount, FieldMount, TemplateModule, etc.
       package.json             # peerDependencies: { react, react-dom }
+  tools/
     mcp-dev/                   # MCP dev server (screenshot tool)
   apps/
     admin/                  # CMS admin frontend — Vue 3 + PrimeVue shell

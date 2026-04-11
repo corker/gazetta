@@ -37,7 +37,7 @@ CMS (stateless web app)  <---->  Targets (state holders)
 |---------|------|---------|
 | admin | `apps/admin/` | Admin frontend — Vue 3 + PrimeVue shell, editor mounting, preview |
 | gazetta | `packages/gazetta/` | Core — renderer, CLI, admin API, editor, storage providers, types |
-| mcp-dev | `packages/mcp-dev/` | MCP dev server (screenshot tool for Claude Code) |
+| mcp-dev | `tools/mcp-dev/` | MCP dev server (screenshot tool for Claude Code) |
 
 ## Admin UI Architecture (apps/admin)
 
