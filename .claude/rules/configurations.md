@@ -332,23 +332,25 @@ Split deployments require:
 ### Lifecycle
 
 ```
-init → dev → publish
+init → dev → build → deploy
 ```
 
-That's the core loop. `validate`, `build`, `deploy`, `serve` are secondary commands
-used when the developer needs more control.
+That's the core loop. `serve` and `validate` are secondary commands.
 
 ### Commands
 
-| Command | Purpose | Typical usage |
-|---------|---------|---------------|
-| `gazetta init [dir]` | Scaffold + install | `npx gazetta init my-site` — ready to `gazetta dev` immediately |
-| `gazetta dev` | Dev server + CMS | `gazetta dev` — auto-detects site, starts everything |
-| `gazetta publish` | Pre-render + upload | `gazetta publish` — auto-detects site + target |
-| `gazetta build` | Build admin for production | `gazetta build` — needed before `gazetta serve` in production |
-| `gazetta serve` | Production server | `gazetta serve` — serves site + admin |
-| `gazetta deploy` | Deploy edge runtime | `gazetta deploy` — deploys worker to edge platform |
-| `gazetta validate` | Check everything | `gazetta validate` — errors/warnings to stdout |
+| Command | What it does | When to use |
+|---------|-------------|-------------|
+| `gazetta init [dir]` | Scaffold project + install deps | Once, to start a new project |
+| `gazetta dev` | Dev server + CMS admin | Every day — develop templates, edit content, customize editors |
+| `gazetta build` | Render content + build admin | Before deploying — prepares everything for production |
+| `gazetta deploy` | Upload to target + deploy runtime | Push to production — uploads content, deploys worker if configured |
+| `gazetta serve` | Run production server locally | Self-hosting — serves site + admin from a VPS/container |
+| `gazetta validate` | Check for errors | Before build/deploy — catches broken references, invalid config |
+
+Note: `publish` (the admin UI button) is a content operation — makes a draft page live by
+pushing it to a target. `deploy` (the CLI command) is a full deployment — all content + runtime.
+Different actions, different contexts.
 
 ### Auto-detection
 
@@ -363,9 +365,9 @@ All commands auto-detect from project structure:
 ```
 gazetta dev                      # auto-detects sites/main
 gazetta dev my-site              # explicit: sites/my-site
-gazetta publish                  # auto-detects site + first target
-gazetta publish -t production    # explicit target
-gazetta publish my-site -t staging  # both explicit
+gazetta deploy                   # auto-detects site + first target
+gazetta deploy -t production     # explicit target
+gazetta deploy my-site -t staging   # both explicit
 ```
 
 ### Command details
@@ -412,44 +414,37 @@ The developer's primary command. Starts everything needed for local development.
 - File watcher for template/content hot reload via SSE
 - Output: `http://localhost:3000` (site), `http://localhost:3000/admin` (CMS)
 
-**`gazetta publish`**
-
-Pushes content to targets. The second most-used command after `dev`.
-
-- Auto-detects site + target
-- Pre-renders pages and fragments using templates (SSR)
-- Uploads to target storage (R2, S3, Azure Blob, filesystem)
-- Handles ESI vs static mode based on target config
-- Purges CDN cache if configured
-
 **`gazetta build`**
 
-Builds admin UI for production hosting. Only needed if hosting the admin in production
-(most developers only use `gazetta dev` locally and don't need this).
+Prepares everything for production. Like `next build`.
 
-- Builds admin SPA via Vite `build()` API
-- Scans `admin/editors/` and `admin/fields/` for custom editor/field bundles
-- Bundles each with esbuild (`external: ['react', 'react-dom', 'gazetta/editor']`)
-- Bundles shared deps (React, gazetta/editor) as standalone ESM
-- Generates import map, injects into `dist/admin/index.html`
-- Output: `dist/admin/` — ready for `gazetta serve` or static deploy
-
-**`gazetta serve`**
-
-Production server. Serves the published site and optionally the built admin.
-
-- Auto-detects site + target
-- Serves site: ESI assembly from target storage
-- If `dist/admin/` exists: serves admin SPA + API at `/admin`
-- Auth middleware on `/admin/*` routes
+- Auto-detects site
+- Pre-renders pages and fragments using templates (SSR) → `dist/content/`
+- Builds admin SPA via Vite `build()` API → `dist/admin/`
+- Bundles custom editors/fields with esbuild → `dist/admin/editors/`, `dist/admin/fields/`
+- Generates import map for shared deps → injected into `dist/admin/index.html`
+- Output: `dist/` — everything needed for deployment
 
 **`gazetta deploy`**
 
-Deploys edge runtime (Worker) to the target platform.
+Uploads everything to the target. Like `vercel deploy`.
 
-- Auto-detects target
-- Currently: Cloudflare Workers only
+- Auto-detects site + target
+- Uploads built content from `dist/content/` to target storage (R2, S3, Azure Blob, filesystem)
+- Deploys edge runtime (Worker) if target has worker config
+- Purges CDN cache if configured
+- Runs `gazetta build` automatically if `dist/` doesn't exist
+- Currently: Cloudflare Workers for edge runtime
 - Future: Deno Deploy, Vercel Edge, Netlify Edge
+
+**`gazetta serve`**
+
+Production server. For self-hosting on a VPS, container, or local machine.
+
+- Auto-detects site + target
+- Serves site: ESI assembly from target storage (published content)
+- If `dist/admin/` exists: serves admin SPA + API at `/admin`
+- Auth middleware on `/admin/*` routes
 
 **`gazetta validate`**
 
