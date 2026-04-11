@@ -810,6 +810,126 @@ Stale files from previous builds are removed. `dist/` is always a fresh, complet
 Deploy credentials go in `.env` or CI secrets. They are NOT in `site.yaml` (which holds
 storage credentials). Deploy is a one-time setup — credentials are rarely needed after initial deploy.
 
+### Multi-site switching in admin UI
+
+When running `gazetta dev` with multiple sites, the auto-detected (or specified) site is
+shown in the admin UI. To switch sites, restart the server: `gazetta dev other-site`.
+Future: site picker in the admin UI toolbar without restart.
+
+### Admin UI URL structure
+
+The admin UI is a Vue SPA with client-side routing:
+
+```
+/admin              # main editor view (site tree + editor + preview)
+/admin/dev          # custom editor/field development playground
+```
+
+All routes are handled client-side — the server returns `index.html` for any `/admin/*` URL.
+Browser back/forward works. Bookmarkable state (selected page, component) is future work.
+
+### System pages (404, 500)
+
+`gazetta init` scaffolds a 404 page:
+
+```
+sites/main/
+  pages/
+    404/page.yaml    # template: page-default, route: /404
+    home/page.yaml
+```
+
+The runtime serves the 404 page for unmatched routes. If no 404 page exists, the runtime
+returns a plain text "Not found" response. 500 errors show a generic error page (no
+custom template — future).
+
+`site.yaml` `systemPages` field lists system pages: `systemPages: [404]`
+
+### Fragment preview URLs
+
+During `gazetta dev`, fragments can be previewed in isolation:
+
+```
+/preview/@header     # renders the header fragment
+/preview/@footer     # renders the footer fragment
+```
+
+These URLs are used by the admin UI's preview panel when a fragment is selected.
+Not intended for end users — only for the admin preview iframe.
+
+### Dynamic routes and content
+
+Pages with dynamic routes (`route: /blog/:slug`) represent parameterized content:
+
+```
+sites/my-site/pages/
+  blog/
+    [slug]/
+      page.yaml       # route: /blog/:slug, template: blog-post
+      article/         # component with content
+```
+
+During `gazetta dev`, the slug is extracted from the URL. The page renders with the
+content from the page directory. Multiple "instances" of a dynamic route are separate
+directories (e.g. `blog/hello-world/`, `blog/another-post/`).
+
+During `gazetta publish`, each instance directory is rendered separately — producing
+one HTML file per slug in storage.
+
+### Component list in page.yaml
+
+The `components` list in `page.yaml` is the source of truth for component ordering.
+The admin UI's component tree shows this list. Content authors can:
+- **Reorder** components via drag-and-drop → updates `page.yaml`
+- **Add** components via the "Add component" dialog → adds to `page.yaml`
+- **Remove** components → removes from `page.yaml`
+
+The component list is fully editable through the admin UI.
+
+### `site.yaml` complete schema
+
+```yaml
+name: My Site                              # required — display name
+locale: en                                 # optional — default locale (default: en)
+baseUrl: https://mysite.com                # optional — production URL for SEO/meta
+systemPages: [404]                         # optional — system page names
+
+admin:                                     # optional — admin UI configuration
+  auth: basic                              # auth method (basic | none)
+  users:                                   # users for basic auth
+    - username: admin
+      password: "${ADMIN_PASSWORD}"
+
+targets:                                   # required — at least one target
+  staging:
+    storage: { type: filesystem, path: ./dist/staging }
+  production:
+    storage: { type: r2, ... }
+    worker: { type: cloudflare, name: my-site }
+    publishMode: esi                       # optional — esi | static (auto-detected from worker)
+    siteUrl: https://mysite.com            # optional — for cache purge URL resolution
+    cache:                                 # optional — caching configuration
+      browser: 0                           # browser cache TTL in seconds
+      edge: 86400                          # CDN cache TTL in seconds
+      purge:                               # CDN cache purge
+        type: cloudflare
+        apiToken: "${CLOUDFLARE_API_TOKEN}"
+```
+
+### Gazetta package exports
+
+The `gazetta` npm package provides these subpath exports:
+
+```
+gazetta              # main — TemplateFunction, format helpers, renderer
+gazetta/types        # TypeScript types — EditorMount, FieldMount, etc.
+gazetta/editor       # browser-only — createEditorMount, DefaultEditorForm
+```
+
+Both `admin/` and `templates/` workspaces import from `gazetta`. npm deduplicates to
+one installation at the project root. `gazetta/editor` is browser-only — templates
+should never import it (it pulls in React, @rjsf, Tiptap).
+
 ### Content editor onboarding (non-developer)
 
 Content editors don't use the CLI. They access the admin UI via URL:
