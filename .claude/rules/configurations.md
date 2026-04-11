@@ -110,6 +110,8 @@ Templates, editors, and fields are shared across all sites in the project. Fragm
 
 Editors are conceptually 1:1 with templates but dependency-coupled to the admin. `admin/editors/hero.tsx` is the editor for `templates/hero/` — connected by name, not file path.
 
+**Type access:** Editors import **types only** from templates via `import type` (erased at runtime, no cross-workspace dependency). Templates export a content type: `export type HeroContent = z.infer<typeof schema>`. Editors import it: `import type { HeroContent } from '@templates/hero'`. The `@templates` alias is configured in `tsconfig.json` paths.
+
 **Dependencies:**
 - All three (`admin/`, `templates/`, `sites/*`) are npm workspaces — **one `npm install`** at the project root.
 - By default, templates share the project's React version. Non-React templates (Svelte, Vue, plain TS) don't conflict.
