@@ -68,25 +68,13 @@ my-project/
       brand-color.tsx          # FieldMount — referenced in schemas as { field: 'brand-color' }
   templates/                   # Template render functions + schemas (server) — workspace
     package.json               # deps: { react, svelte, zod, ... }
-    pages/                     # Page-level templates
-      default.tsx
-      blog-post.tsx
-      landing.tsx
-    fragments/                 # Fragment-level templates
-      header.tsx
-      footer.tsx
-      newsletter.tsx
-    components/                # Component templates — supports subfolders (design system)
-      hero/
-        index.tsx
-      buttons/
-        primary.tsx
-        cta.tsx
-      cards/
-        product.tsx
-        blog.tsx
-      layout/
-        two-column.tsx
+    hero/index.tsx             # template name: "hero"
+    card/index.ts              # template name: "card"
+    page-default/index.tsx     # template name: "page-default"
+    nav/index.svelte           # non-React template
+    buttons/                   # optional subfolders for design systems
+      primary/index.tsx        # template name: "buttons/primary"
+      cta/index.tsx            # template name: "buttons/cta"
   sites/
     my-site/                   # A site — content + config
       site.yaml                # Site manifest — name, targets
@@ -113,13 +101,13 @@ my-project/
 
 | Concept | Scope | Runs where | Deps aligned with | Lives in |
 |---------|-------|-----------|-------------------|----------|
-| Page template | Project | Server (Node) | Shared (workspace) | `templates/pages/` |
-| Fragment template | Project | Server (Node) | Shared (workspace) | `templates/fragments/` |
-| Component template | Project | Server (Node) | Shared (workspace) | `templates/components/` (supports subfolders) |
+| Template (render + schema) | Project | Server (Node) | Shared (workspace) | `templates/` (flat, optional subfolders) |
 | Editor (custom editing UI) | Project | Browser (admin) | Admin UI (same React) | `admin/editors/` |
 | Field (custom widget) | Project | Browser (admin, inside @rjsf) | Admin UI (same React) | `admin/fields/` |
 | Fragment (content) | Site | Server (rendered) | Templates | `sites/x/fragments/` |
 | Page (content) | Site | Server (rendered) | Templates | `sites/x/pages/` |
+
+Templates are flat by default. Subfolders are opt-in for grouping (e.g. `buttons/primary`, `cards/product`). A template doesn't inherently know its usage — the same template can serve as a page, fragment, or component template. The type is decided by the content (page.yaml, fragment.yaml), not by the template.
 
 Templates, editors, and fields are shared across all sites in the project. Fragments and pages are per-site.
 
