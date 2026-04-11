@@ -1,0 +1,6 @@
+template: section
+content:
+  heading: "Custom Editors"
+  subheading: "Replace the default form with a custom editing experience."
+components:
+  - content

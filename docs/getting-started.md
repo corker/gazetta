@@ -192,6 +192,69 @@ Reference in any page with `"@header"`. Update the fragment once — every page 
 6. Click **Save** → writes to disk
 7. Click **Publish** → pre-renders and uploads to target
 
+## Custom editors
+
+The CMS auto-generates forms from template schemas using @rjsf. You can replace the
+default form with a custom editor for any template.
+
+### Create a custom editor
+
+Create `admin/editors/{template-name}.tsx`:
+
+```tsx
+// admin/editors/hero.tsx
+import React, { useState } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { DefaultEditorForm } from 'gazetta/editor'
+import type { EditorMount } from 'gazetta/types'
+
+function HeroEditor({ content, schema, onChange }) {
+  const [data, setData] = useState(content)
+  const handleChange = (c) => { setData(c); onChange(c) }
+
+  return (
+    <div>
+      {/* Your custom preview */}
+      <div style={{ padding: '1.5rem', background: 'linear-gradient(135deg, #667eea, #764ba2)', borderRadius: 8, color: '#fff', textAlign: 'center', marginBottom: '1rem' }}>
+        <h2>{data.title || 'Untitled'}</h2>
+        {data.subtitle && <p style={{ opacity: 0.85 }}>{data.subtitle}</p>}
+      </div>
+
+      {/* Default form for the fields */}
+      <DefaultEditorForm schema={schema} content={data} onChange={handleChange} />
+    </div>
+  )
+}
+
+const roots = new WeakMap()
+const editor: EditorMount = {
+  mount(el, props) {
+    const root = createRoot(el); roots.set(el, root)
+    root.render(<HeroEditor {...props} />)
+  },
+  unmount(el) { roots.get(el)?.unmount(); roots.delete(el) },
+}
+export default editor
+```
+
+The custom editor loads automatically when you select a hero component in the CMS.
+Templates without a custom editor use the default auto-generated form.
+
+### What custom editors receive
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `content` | `Record<string, unknown>` | Current content values |
+| `schema` | `Record<string, unknown>` | JSON Schema for the template |
+| `theme` | `'dark' \| 'light'` | Current admin theme |
+| `onChange` | `(content) => void` | Call when content changes |
+
+### Embedding the default form
+
+Import `DefaultEditorForm` from `gazetta/editor` to embed the auto-generated form
+inside your custom editor. This gives you the best of both: custom UI on top, standard
+form fields below.
+
 ## Publishing
 
 > **Deploying to Cloudflare?** See the [Cloudflare deployment guide](./cloudflare.md).

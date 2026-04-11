@@ -9,4 +9,5 @@ components:
   - fragments
   - publishing
   - cms
+  - custom-editors
   - "@footer"
