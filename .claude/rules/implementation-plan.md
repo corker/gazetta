@@ -196,6 +196,71 @@ Must be done first — everything else depends on the project structure and type
 10. **Test updates per phase** — each phase changes behavior that tests validate. Identify
     affected test files before starting each phase.
 
+### Dependency chain details
+
+11. **@rjsf and Tiptap React deps.** Both declare React as peer dep. When gazetta moves
+    React to peer, npm resolves @rjsf's and Tiptap's peer from the same source. Verify
+    with `npm ls react` after the change — should show one copy, no duplicates.
+
+12. **`gazetta init` version pinning.** Init should pin the exact gazetta version it's running:
+    `"gazetta": "^{currentVersion}"` in both `admin/` and `templates/` package.json.
+
+13. **Monorepo nested workspaces.** After restructuring `examples/starter/` to have its own
+    `workspaces: ["admin", "templates"]`, the monorepo root doesn't need to list sub-workspaces.
+    npm resolves nested workspace configs. Root keeps `"examples/*"`, starter's package.json
+    declares its own workspaces.
+
+14. **Project root detection in monorepo.** Two detection modes needed:
+    - Site project: walks up, finds `package.json` with `workspaces` containing `"admin"` + `"templates"`
+    - Monorepo: contributor runs from `examples/starter/` — finds starter's package.json (which
+      has the right workspaces). Running from monorepo root without specifying a site → error.
+
+15. **Vite setup for npm-installed gazetta.** In site projects, admin SPA is pre-built
+    (`node_modules/gazetta/admin-dist/`). `gazetta dev` serves pre-built admin as static files
+    AND runs a minimal Vite server for custom editors only (transforms `admin/editors/` and
+    `admin/fields/`). Two servers: static for admin shell, Vite for custom code. The pre-built
+    admin loads editors from the Vite dev URL.
+
+16. **`getPublishMode()` shared function.** Centralize publish mode logic:
+    ```ts
+    function getPublishMode(target: TargetConfig): 'esi' | 'static' {
+      return target.publishMode ?? (target.worker ? 'esi' : 'static')
+    }
+    ```
+    Used by CLI `publish`, admin API `POST /api/publish`, and `gazetta validate`.
+
+17. **Dev playground mock data.** Generate from JSON Schema `default` values. If no defaults,
+    use Zod schema to generate a minimal valid object (empty strings, 0 for numbers, false for
+    booleans). The playground shows a "Reset to defaults" button.
+
+18. **`buildUiSchema` recursive field detection.** Walk the full JSON Schema tree:
+    `properties` → nested `properties` → `items.properties` (for arrays). Collect `meta.field`
+    at all levels. Map each to an async widget wrapper with the correct import path.
+
+19. **`gazetta/editor` bundle size.** DefaultEditorForm pulls in @rjsf + React + Tiptap.
+    Standalone ESM bundle ~500KB+. Consider: split `gazetta/editor` into two exports:
+    - `gazetta/editor` — lightweight (createEditorMount only)
+    - `gazetta/editor/form` — full (DefaultEditorForm + @rjsf + Tiptap)
+    Custom editors that don't embed the default form get the lightweight import.
+
+20. **Interactive prompts library.** Add `@clack/prompts` (MIT, 5KB, modern UX, built for CLIs).
+    Used for: site selection, target selection, confirmation dialogs. Skipped when `CI=true`.
+
+21. **`sites/gazetta.studio/` migration.** Separate task — not part of Phase 1. Production site
+    with CI/CD, Cloudflare deployment. Migrate after the new structure is proven with starter.
+    Add as a follow-up task, not a blocker.
+
+22. **Git strategy.** One feature branch per phase. Merge to main after phase verification.
+    Each phase is a coherent set of changes that can be reviewed and reverted independently.
+
+23. **Test update strategy.** Before starting each phase, grep for affected paths/functions:
+    ```
+    grep -r "examples/starter" packages/gazetta/tests/
+    grep -r "siteDir" packages/gazetta/tests/
+    grep -r "createAdminApp" apps/admin/tests/
+    ```
+    Update tests as part of the phase, not as a separate step.
+
 ## Revised implementation order
 
 ```
