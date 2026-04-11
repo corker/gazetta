@@ -23,7 +23,7 @@ targets configured — exercises most code paths locally.
 | **Single site** | `sites/main/` (default from `gazetta init`) | 1+ targets | Most sites |
 | **Multi-site monorepo** | Multiple dirs under `sites/` sharing templates | Each site has own `site.yaml` | Agency, multi-brand |
 
-Multi-site: each site is independent. CLI operates on one site at a time (`gazetta publish --site my-site production`).
+Multi-site: each site is independent. CLI operates on one site at a time (`gazetta publish production --site my-site`).
 Templates and admin are shared across all sites in the project.
 
 ## File Structures
@@ -36,7 +36,7 @@ gazetta/
   packages/
     gazetta/                   # Core package — renderer, CLI, admin API, editor, storage providers
       src/
-        cli/                   # CLI commands (dev, publish, serve, deploy, validate)
+        cli/                   # CLI commands (dev, publish, build, deploy, serve, validate)
         admin-api/             # Hono API routes (pages, fragments, templates, preview, publish)
         editor/                # Default editor — @rjsf form, Tiptap, custom widgets
         types.ts               # EditorMount, FieldMount, TemplateModule, etc.
@@ -59,7 +59,7 @@ Templates and admin are project-level (shared across sites). Content (fragments,
 
 ```
 my-project/
-  package.json                 # workspaces: ["admin", "templates", "sites/*"]
+  package.json                 # workspaces: ["admin", "templates"]
   admin/                       # Custom editors + fields (browser, CMS-aligned) — workspace
     package.json               # deps: { gazetta, react, react-dom, @radix-ui, ... }
     editors/                   # Custom editors (per-template full replacements)
@@ -116,7 +116,7 @@ Editors are conceptually 1:1 with templates but dependency-coupled to the admin.
 **Type access:** Editors import **types only** from templates via `import type` (erased at runtime, no cross-workspace dependency). Templates export a content type: `export type HeroContent = z.infer<typeof schema>`. Editors import it: `import type { HeroContent } from '@templates/hero'`. The `@templates` alias is configured in `tsconfig.json` paths.
 
 **Dependencies:**
-- All three (`admin/`, `templates/`, `sites/*`) are npm workspaces — **one `npm install`** at the project root.
+- `admin/` and `templates/` are npm workspaces — **one `npm install`** at the project root. `sites/` are just directories (no code, no deps).
 - By default, templates share the project's React version. Non-React templates (Svelte, Vue, plain TS) don't conflict.
 - Edge case: if templates need a different React version, remove `templates` from workspaces and run `cd templates && npm install` separately (or use pnpm which handles version isolation natively).
 
@@ -145,7 +145,7 @@ R2 has two auth modes:
 
 ## Target Configurations
 
-A target = storage + optional worker + optional cache. The worker config determines the publish mode.
+A target = storage + optional worker + optional cache + optional publishMode.
 
 | Target type | Worker config | Publish mode | Serve mode | Fragment updates |
 |-------------|--------------|--------------|------------|-----------------|
@@ -165,10 +165,6 @@ Decision logic: determined by `publishMode` field in target config (default: `st
   `publishPageRendered()` / `publishFragmentRendered()` regardless of worker config. CLI branches
   correctly. This means CLI and admin UI produce different output for static targets. Fix: admin API
   must check `!targetConfig?.worker` and branch like the CLI does.
-
-- **`gazetta serve` against static-published targets works by accident.** Static pages have no ESI
-  placeholders, so ESI assembly is a no-op. But the intent is wrong — serve expects ESI content.
-  If a target is meant for `gazetta serve`, it must have worker config to trigger ESI publish.
 
 ### Real-world target examples
 
@@ -211,10 +207,10 @@ production:
 | **Admin UI** | Publish button → `POST /api/publish` | Browser → dev server API | Per-page/fragment publish during editing |
 | **CI/CD** | `gazetta publish production` in GitHub Actions | CI runner | Automated publish on push |
 
-CLI and CI use the same publish functions and branch on `!targetConfig?.worker` to choose
-static vs ESI mode. The admin API resolves dependencies (fragments required by a page)
-and handles per-item cache purge, but **always uses ESI mode** — does not branch on worker
-config (see gap in Target Configurations above).
+CLI and CI use the same publish functions. Publish mode (ESI vs static) is determined by
+the target's `publishMode` field (default: `esi` if worker configured, `static` otherwise).
+The admin API resolves dependencies (fragments required by a page) and handles per-item
+cache purge, but **always uses ESI mode** — does not check `publishMode` (see gap #1 above).
 
 ### CI/CD pattern (GitHub Actions)
 
@@ -408,7 +404,7 @@ $ gazetta dev
 
 Creates:
   my-site/
-    package.json           # workspaces: ["admin", "templates", "sites/*"]
+    package.json           # workspaces: ["admin", "templates"]
     admin/
       package.json         # gazetta, react, react-dom
       editors/             # (empty — ready for custom editors)
