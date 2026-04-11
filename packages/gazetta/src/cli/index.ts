@@ -654,7 +654,10 @@ async function runDev(siteDir: string, port: number) {
           root: cmsWebDir,
           base: '/admin/',
           resolve: {
-            alias: { '@editors': join(siteDir, 'admin', 'editors') },
+            alias: {
+              '@editors': join(siteDir, 'admin', 'editors'),
+              '@fields': join(siteDir, 'admin', 'fields'),
+            },
           },
           server: {
             middlewareMode: true,

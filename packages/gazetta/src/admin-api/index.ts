@@ -9,6 +9,7 @@ import { componentRoutes } from './routes/components.js'
 import { templateRoutes } from './routes/templates.js'
 import { previewRoutes } from './routes/preview.js'
 import { publishRoutes } from './routes/publish.js'
+import { fieldRoutes } from './routes/fields.js'
 
 export interface AdminAppOptions {
   siteDir: string
@@ -42,6 +43,7 @@ export function createAdminApp(
   app.route('/', templateRoutes(opts.siteDir, opts.storage))
   app.route('/', previewRoutes(opts.siteDir, opts.storage))
   app.route('/', publishRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs))
+  app.route('/', fieldRoutes(opts.siteDir, opts.storage))
 
   return app
 }
