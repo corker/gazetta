@@ -810,6 +810,77 @@ Stale files from previous builds are removed. `dist/` is always a fresh, complet
 Deploy credentials go in `.env` or CI secrets. They are NOT in `site.yaml` (which holds
 storage credentials). Deploy is a one-time setup — credentials are rarely needed after initial deploy.
 
+### Content editor onboarding (non-developer)
+
+Content editors don't use the CLI. They access the admin UI via URL:
+- Dev mode: `http://localhost:3000/admin` (someone runs `gazetta dev`)
+- Production: `https://admin.mysite.com` (via `gazetta serve` or cloud deploy)
+
+Access is controlled by auth (see "Auth for production admin" above). The content editor
+opens the URL, logs in, and edits content. No terminal, no git, no npm.
+
+For team setups: a developer runs `gazetta dev` on a shared machine or deploys `gazetta serve`
+to a VPS. Content editors access it remotely. Or each content editor clones the repo and
+runs `gazetta dev` locally — but this requires Node.js and npm knowledge.
+
+### Adding a new storage provider
+
+Storage providers implement `StorageProvider` interface in `packages/gazetta/src/`:
+1. Create `storage/{name}.ts` implementing `readFile`, `readDir`, `exists`, `writeFile`, `mkdir`, `rm`
+2. Register in `targets.ts` factory (`createStorageProvider`)
+3. Add `type` option to `StorageConfig` union in `types.ts`
+4. Document in this file under Storage Providers
+
+### Adding a new edge platform
+
+Edge platforms require:
+1. Worker adapter code in `packages/gazetta/src/workers/{platform}.ts`
+2. Deploy logic in `cli/index.ts` (under `gazetta deploy`)
+3. `worker.type` value in `site.yaml` (e.g. `worker: { type: deno }`)
+4. Document in this file under Future Hosting Platforms
+
+### Broken references during dev
+
+`gazetta dev` renders pages with errors inline — not a crash:
+- Missing template → error overlay in preview: "Template 'newsletter' not found"
+- Missing fragment (`@nonexistent`) → error overlay: "Fragment 'nonexistent' not found"
+- Template SSR error → error overlay with stack trace
+- The admin tree still works — the developer can fix the reference and preview auto-refreshes
+
+### Circular fragment references
+
+The renderer tracks visited fragments during page assembly. If a cycle is detected
+(`@A → @B → @A`), it errors: "Circular fragment reference: A → B → A". The page
+is not rendered. `gazetta validate` checks for cycles.
+
+### Component nesting depth
+
+No hard limit on nesting depth. The renderer is recursive. For extremely deep nesting
+(100+ levels), Node's call stack may overflow. In practice, sites rarely exceed 5-10
+levels. `gazetta validate` warns if nesting exceeds 20 levels.
+
+### Publish progress output
+
+`gazetta publish` shows progress:
+
+```
+gazetta publish production
+  Rendering pages...
+    ✓ home (120ms)
+    ✓ about (85ms)
+    ✗ blog/broken-post — Template error: Cannot read property 'title' of undefined
+    ✓ blog/hello-world (95ms)
+  Rendering fragments...
+    ✓ header (45ms)
+    ✓ footer (30ms)
+  Uploading to production (r2://my-site)...
+    ✓ 5 pages, 2 fragments uploaded (1.2s)
+  Published 4/5 pages, 2/2 fragments. 1 failed.
+```
+
+Verbose mode (`--verbose`) shows individual file uploads. Quiet mode (`--quiet`) shows
+only the summary line.
+
 ### Dev playground empty state
 
 If no custom editors or fields exist, the playground shows:
