@@ -337,15 +337,22 @@ async function addComponent(name: string, template: string) {
 .component-tree { font-size: 13px; line-height: 22px; }
 .empty { color: #aaa; }
 .node-item { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; margin: 0 2px; cursor: pointer; border-radius: 3px; }
-.node-item:hover, .node-item.hovered { background: rgba(255, 255, 255, 0.05); }
+.node-item:hover, .node-item.hovered { background: rgba(128, 128, 128, 0.08); }
 .node-item.selected { background: rgba(167, 139, 250, 0.15); box-shadow: inset 2px 0 0 #a78bfa; }
-.node-root { font-weight: 600; padding: 0 6px; height: 26px; line-height: 26px; border-radius: 0; margin: 0 0 2px 0; border-bottom: 1px solid #27272a; }
+.node-root { font-weight: 600; padding: 0 6px; height: 26px; line-height: 26px; border-radius: 0; margin: 0 0 2px 0; border-bottom: 1px solid rgba(128, 128, 128, 0.15); }
 .node-root.selected { background: rgba(167, 139, 250, 0.1); box-shadow: none; border-bottom-color: #a78bfa; }
-.node-icon { width: 16px; text-align: center; font-size: 10px; color: #666; flex-shrink: 0; }
-.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #bbb; }
-.node-item.selected .node-label { color: #e4e4e7; }
-.node-item:hover .node-label, .node-item.hovered .node-label { color: #e4e4e7; }
-.node-root .node-label { color: #e4e4e7; }
+.node-icon { width: 16px; text-align: center; font-size: 10px; color: #999; flex-shrink: 0; }
+.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6b7280; }
+.node-item.selected .node-label { color: #374151; }
+.node-item:hover .node-label, .node-item.hovered .node-label { color: #374151; }
+.node-root .node-label { color: #1f2937; }
+:global(.dark) .node-item:hover, :global(.dark) .node-item.hovered { background: rgba(255, 255, 255, 0.05); }
+:global(.dark) .node-root { border-bottom-color: #27272a; }
+:global(.dark) .node-icon { color: #666; }
+:global(.dark) .node-label { color: #bbb; }
+:global(.dark) .node-item.selected .node-label { color: #e4e4e7; }
+:global(.dark) .node-item:hover .node-label, :global(.dark) .node-item.hovered .node-label { color: #e4e4e7; }
+:global(.dark) .node-root .node-label { color: #e4e4e7; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-actions { opacity: 1; }
 .add-btn { margin-top: 6px; }

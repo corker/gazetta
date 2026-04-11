@@ -133,15 +133,22 @@ async function handleDelete(node: SiteNode, e: Event) {
 
 <style scoped>
 .site-tree { font-size: 13px; line-height: 22px; }
-.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #666; padding: 4px 8px; font-weight: 600; }
-.section-divider { border-top: 1px solid #27272a; margin: 4px 8px; }
+.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; padding: 4px 8px; font-weight: 600; }
+.section-divider { border-top: 1px solid rgba(128, 128, 128, 0.15); margin: 4px 8px; }
 .node-item { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; margin: 0 2px; cursor: pointer; border-radius: 3px; }
-.node-item:hover { background: rgba(255, 255, 255, 0.05); }
+.node-item:hover { background: rgba(128, 128, 128, 0.08); }
 .node-item.selected { background: rgba(167, 139, 250, 0.15); box-shadow: inset 2px 0 0 #a78bfa; }
-.node-icon { width: 16px; text-align: center; font-size: 10px; color: #666; flex-shrink: 0; }
-.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #bbb; }
-.node-item.selected .node-label { color: #e4e4e7; }
-.node-item:hover .node-label { color: #e4e4e7; }
+.node-icon { width: 16px; text-align: center; font-size: 10px; color: #999; flex-shrink: 0; }
+.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6b7280; }
+.node-item.selected .node-label { color: #374151; }
+.node-item:hover .node-label { color: #374151; }
+:global(.dark) .section-label { color: #666; }
+:global(.dark) .section-divider { border-top-color: #27272a; }
+:global(.dark) .node-item:hover { background: rgba(255, 255, 255, 0.05); }
+:global(.dark) .node-icon { color: #666; }
+:global(.dark) .node-label { color: #bbb; }
+:global(.dark) .node-item.selected .node-label { color: #e4e4e7; }
+:global(.dark) .node-item:hover .node-label { color: #e4e4e7; }
 .node-delete { opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-delete { opacity: 1; }
 .new-btns { display: flex; gap: 0.5rem; margin-top: 8px; padding: 0 6px; }
