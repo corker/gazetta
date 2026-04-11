@@ -162,9 +162,12 @@ Docs (same commit as the feature):
 - `.claude/rules/architecture.md` — add `admin/editors/` to package table
 - `CLAUDE.md` — mention `admin/` directory
 
-gazetta.studio (dogfooding):
-- `sites/gazetta.studio/admin/editors/` — create a custom editor for one template
-- Validates the feature works on a real site, not just the starter
+gazetta.studio (published documentation):
+- `sites/gazetta.studio/pages/docs/custom-editors/` — documentation page about custom editors
+  on the live site, covering creation, EditorMount contract, embedding DefaultEditorForm, HMR
+- gazetta.studio is a published site — its content IS the documentation that users read
+- Custom editors in admin/ are a dev-mode feature (Vite /@fs/ paths) — they won't work
+  on the published site until production build (Step 8) is implemented
 
 ### 1g. Tests
 
@@ -188,7 +191,7 @@ test('content edit via custom editor updates preview', ...)
 
 Automated: `npx playwright test tests/e2e/editor.test.ts` — all pass
 Visual: MCP screenshot of `/admin/dev` in both themes — looks correct
-Docs: getting-started.md + gazetta.studio custom editor
+Docs: getting-started.md custom editors section + gazetta.studio docs page published
 
 ---
 
@@ -208,7 +211,7 @@ Independent bug fix + type addition.
 - `packages/gazetta/src/admin-api/routes/fields.ts` — NEW: `GET /api/fields`
 - `packages/gazetta/src/editor/mount.tsx` — `buildUiSchema()` detects `meta.field` recursively, async widget wrapper
 - `examples/starter/admin/fields/brand-color.tsx` — reference field
-- `sites/gazetta.studio/admin/fields/` — custom field on the real site
+- `sites/gazetta.studio/pages/docs/` — add "Custom Fields" docs section to the published site
 - Docs: add "Custom fields" section to getting-started.md, update custom-editors.md
 
 ## Step 4: React peer dependency
