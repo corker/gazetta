@@ -23,7 +23,7 @@ targets configured — exercises most code paths locally.
 | **Single site** | `sites/main/` (default from `gazetta init`) | 1+ targets | Most sites |
 | **Multi-site monorepo** | Multiple dirs under `sites/` sharing templates | Each site has own `site.yaml` | Agency, multi-brand |
 
-Multi-site: each site is independent. CLI operates on one site at a time (`gazetta publish production --site my-site`).
+Multi-site: each site is independent. CLI operates on one site at a time (`gazetta publish production my-site`).
 Templates and admin are shared across all sites in the project.
 
 ## File Structures
@@ -388,7 +388,7 @@ CI=true gazetta publish
 # Explicit always works:
 gazetta dev my-site
 gazetta publish production
-gazetta publish production --site my-site
+gazetta publish production my-site
 ```
 
 ### Command details
