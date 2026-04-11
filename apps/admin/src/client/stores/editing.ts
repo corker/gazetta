@@ -17,6 +17,8 @@ export interface EditingTarget {
   schema: Record<string, unknown>
   /** Whether a custom editor exists for this template */
   hasEditor?: boolean
+  /** URL to load the custom editor from (Vite /@fs/ path in dev) */
+  editorUrl?: string
   /** Persists edited content to the correct API endpoint */
   save: (content: Record<string, unknown>) => Promise<void>
 }
@@ -59,13 +61,12 @@ export const useEditingStore = defineStore('editing', () => {
     customEditorMount.value = null
 
     // Load custom editor if available
-    if (t.hasEditor) {
+    if (t.hasEditor && t.editorUrl) {
       try {
-        const mod = await import(/* @vite-ignore */ `@editors/${t.template}.tsx`)
+        const mod = await import(/* @vite-ignore */ t.editorUrl)
         customEditorMount.value = (mod.default ?? mod) as EditorMount
       } catch (err) {
         console.warn(`Custom editor for "${t.template}" failed to load:`, err)
-        // Fall back to default editor
       }
     }
 
