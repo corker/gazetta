@@ -16,7 +16,7 @@
     "dev": "npm run build && npm run dev -w examples/starter",
     "dev:site": "npm run build && npm run dev -w @gazetta/website",
     "deploy:site": "npm run build && cd sites/gazetta.studio/worker && npm run seed && npm run deploy",
-    "dev:admin": "npm run build && npm run dev:api -w @gazetta/admin-ui & npm run dev:ui -w @gazetta/admin-ui",
+    "dev:admin": "npm run build && npm run dev:api -w @gazetta/admin & npm run dev:ui -w @gazetta/admin",
     "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {

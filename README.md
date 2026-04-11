@@ -32,7 +32,7 @@ packages/
   gazetta/          Core package — renderer, CLI, admin API, editor, storage providers
   mcp-dev/          MCP dev server (screenshot tool for Claude Code)
 apps/
-  admin-ui/         CMS admin frontend (Vue 3 + PrimeVue)
+  admin/         CMS admin frontend (Vue 3 + PrimeVue)
 examples/
   starter/          Sample site with templates, fragments, and pages
 sites/

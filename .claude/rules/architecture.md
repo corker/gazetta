@@ -19,7 +19,7 @@ Component (base)
 
 ```
 CMS (stateless web app)  <---->  Targets (state holders)
-  apps/admin-ui/                   Storage + Hono runtime
+  apps/admin/                   Storage + Hono runtime
         \                          /
          \                        /
           +-- Renderer (Hono) ---+
@@ -35,11 +35,11 @@ CMS (stateless web app)  <---->  Targets (state holders)
 
 | Package | Path | Purpose |
 |---------|------|---------|
-| admin-ui | `apps/admin-ui/` | Admin frontend — Vue 3 + PrimeVue shell, editor mounting, preview |
+| admin | `apps/admin/` | Admin frontend — Vue 3 + PrimeVue shell, editor mounting, preview |
 | gazetta | `packages/gazetta/` | Core — renderer, CLI, admin API, editor, storage providers, types |
 | mcp-dev | `packages/mcp-dev/` | MCP dev server (screenshot tool for Claude Code) |
 
-## Admin UI Architecture (apps/admin-ui)
+## Admin UI Architecture (apps/admin)
 
 The CMS is a shell that manages layout, navigation, and editor mounting.
 Built with Vue 3 + Vite + PrimeVue (Tree, Splitter, Drawer, Toolbar).

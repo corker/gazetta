@@ -21,7 +21,7 @@ packages/
   gazetta/          Core — renderer, CLI, admin API, editor, storage providers
   mcp-dev/          MCP dev server (screenshot tool for Claude Code)
 apps/
-  admin-ui/         CMS admin frontend (Vue 3 + PrimeVue)
+  admin/         CMS admin frontend (Vue 3 + PrimeVue)
 examples/
   starter/          Sample site with templates, fragments, and pages
 sites/
@@ -43,7 +43,7 @@ npm test                          # all tests (excluding Docker-dependent)
 npm test -- --reporter verbose    # verbose output
 
 # Docker integration tests (S3/MinIO, Azure Blob/Azurite):
-npm test -w @gazetta/admin-ui -- tests/docker.test.ts
+npm test -w @gazetta/admin -- tests/docker.test.ts
 ```
 
 ## Code Conventions

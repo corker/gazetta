@@ -616,7 +616,7 @@ async function runDev(siteDir: string, port: number) {
     })
   }
 
-  // ---- Detect mode: dev (monorepo with apps/admin-ui source) vs production (pre-built) ----
+  // ---- Detect mode: dev (monorepo with apps/admin source) vs production (pre-built) ----
   const cmsWebDir = findCmsDir()
   const cmsStaticDir = findCmsStaticDir()
   const isDevMode = cmsWebDir !== null
@@ -754,12 +754,12 @@ async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnTy
   })
 }
 
-/** Find apps/admin-ui source dir (monorepo dev mode) */
+/** Find apps/admin source dir (monorepo dev mode) */
 function findCmsDir(): string | null {
   const candidates = [
-    resolve('apps/admin-ui'),
-    resolve(import.meta.dirname, '../../../../apps/admin-ui'),
-    resolve(import.meta.dirname, '../../../apps/admin-ui'),
+    resolve('apps/admin'),
+    resolve(import.meta.dirname, '../../../../apps/admin'),
+    resolve(import.meta.dirname, '../../../apps/admin'),
   ]
   for (const dir of candidates) {
     if (existsSync(join(dir, 'src/server/dev.ts'))) return dir

@@ -4,7 +4,7 @@ Stateless CMS that structures websites as composable fragments. All state lives 
 
 ## Structure
 
-- `apps/admin-ui/` — CMS admin frontend (Vue 3 + PrimeVue editor shell)
+- `apps/admin/` — CMS admin frontend (Vue 3 + PrimeVue editor shell)
 - `packages/gazetta/` — Core package (renderer, CLI, admin API, editor, storage providers)
 - `packages/mcp-dev/` — MCP dev server (screenshot tool)
 - `examples/starter/` — Sample site with templates, fragments, pages

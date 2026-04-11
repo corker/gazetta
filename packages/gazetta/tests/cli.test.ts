@@ -57,9 +57,9 @@ describe('parseArgs', () => {
 describe('findCmsDir (dev mode detection)', () => {
   function findCmsDir(): string | null {
     const candidates = [
-      resolve('apps/admin-ui'),
-      resolve(import.meta.dirname, '../../../../apps/admin-ui'),
-      resolve(import.meta.dirname, '../../../apps/admin-ui'),
+      resolve('apps/admin'),
+      resolve(import.meta.dirname, '../../../../apps/admin'),
+      resolve(import.meta.dirname, '../../../apps/admin'),
     ]
     for (const dir of candidates) {
       if (existsSync(join(dir, 'src/server/dev.ts'))) return dir
@@ -67,10 +67,10 @@ describe('findCmsDir (dev mode detection)', () => {
     return null
   }
 
-  it('finds admin-ui dir in monorepo', () => {
+  it('finds admin dir in monorepo', () => {
     const dir = findCmsDir()
     expect(dir).not.toBeNull()
-    expect(dir).toContain('apps/admin-ui')
+    expect(dir).toContain('apps/admin')
   })
 })
 

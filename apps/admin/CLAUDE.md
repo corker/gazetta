@@ -1,4 +1,4 @@
-# Admin UI
+# Admin
 
 CMS admin frontend — Vue 3 + PrimeVue shell with editor mounting and preview.
 
