@@ -1,17 +1,17 @@
 # Implementation Plan
 
-Build Gazetta as designed. Each step ships value AND builds foundation for the next.
-Types ship with their consumers, not ahead of them.
+Build Gazetta as designed. First slice delivers a complete user experience (editor customization).
+Then sequential infrastructure steps. Types ship with their consumers.
 
-## Step 1: Editor theming (light mode)
+## Slice 1: "I can customize my template's editor"
 
-User-visible value. Proves the theme contract for custom editors.
+The complete editor customization experience — everything a template developer needs.
+Theming + custom editor loading + DefaultEditorForm + reference editor. One deliverable.
 
-**Changes:**
+### 1a. Editor theming
+
 - `packages/gazetta/src/editor/mount.tsx` — replace hardcoded hex with CSS variables
 - `apps/admin/src/client/components/EditorPanel.vue` — set CSS variables from theme store
-
-**14 color variables:**
 
 | Variable | Dark | Light |
 |----------|------|-------|
@@ -30,41 +30,25 @@ User-visible value. Proves the theme contract for custom editors.
 | `--gz-error` | `#f87171` | `#dc2626` |
 | `--gz-success` | `#4ade80` | `#16a34a` |
 
-**Verify:** toggle dark/light → editor follows theme.
+### 1b. EditorMount type changes
 
-## Step 2: Publish fix + publishMode
+- `packages/gazetta/src/types.ts` — add `schema` and `theme` to `EditorMount.mount()` props, remove `editor?` from `TemplateModule`
+- `apps/admin/src/client/composables/useEditorMount.ts` — pass `schema` and `theme`
+- `apps/admin/src/client/components/EditorPanel.vue` — pass `schema` and `theme`
+- `packages/gazetta/src/editor/mount.tsx` — accept `schema` and `theme` in mount props
 
-Fix Known Gap #1 and add the publishMode type together. One coherent change.
+### 1c. DefaultEditorForm extraction
 
-**Changes:**
-- `packages/gazetta/src/types.ts` — add `publishMode?: 'esi' | 'static'` to `TargetConfig`
-- `packages/gazetta/src/types.ts` — add `locale?: string`, `baseUrl?: string` to `SiteManifest`
-- `packages/gazetta/src/manifest.ts` — parse new fields from site.yaml
-- Shared function:
-  ```ts
-  function getPublishMode(target: TargetConfig): 'esi' | 'static' {
-    return target.publishMode ?? (target.worker ? 'esi' : 'static')
-  }
-  ```
-- `packages/gazetta/src/cli/index.ts` — use `getPublishMode()` instead of `!targetConfig?.worker`
-- `packages/gazetta/src/admin-api/routes/publish.ts` — use `getPublishMode()` (fixes bug)
-- Add admin API publish tests
+- `packages/gazetta/src/editor/mount.tsx` — extract @rjsf Form wrapper as `DefaultEditorForm` React component
+- Export from `gazetta/editor` alongside `createEditorMount`
+- Custom editors can embed: `<DefaultEditorForm schema={schema} content={content} onChange={onChange} theme={theme} />`
 
-**Verify:** publish from admin UI to static target → assembled HTML, not ESI.
+### 1d. Custom editor discovery + loading
 
-## Step 3: Custom editors in dev mode
-
-Types (`EditorMount` prop changes) ship WITH the implementation, not ahead.
-Editors live in `admin/editors/` from the start — no later move needed.
-
-**Type changes (in this step):**
-- `packages/gazetta/src/types.ts` — add `schema` and `theme` to `EditorMount.mount()` props
-- Remove `editor?` from `TemplateModule`
-
-**File structure:**
+File structure:
 ```
 examples/starter/
-  admin/                     # NEW directory (no package.json yet — just editors)
+  admin/                     # NEW directory
     editors/
       hero.tsx               # custom editor
   templates/
@@ -72,169 +56,97 @@ examples/starter/
   pages/
 ```
 
-**Editor discovery:**
+Discovery:
 - `packages/gazetta/src/template-loader.ts` — add `hasEditorFile(storage, editorsDir, name)`
 - `packages/gazetta/src/admin-api/routes/templates.ts` — schema response includes `hasEditor`
 
-**Vite alias:**
+Vite alias:
 - `packages/gazetta/src/cli/index.ts` — inject `resolve.alias: { '@editors': join(siteDir, 'admin/editors') }` + `server.fs.allow`
 
-**Admin UI:**
-- `apps/admin/src/client/composables/useEditorMount.ts` — pass `schema` and `theme`
-- `apps/admin/src/client/components/EditorPanel.vue` — pass `schema` and `theme`, branch custom/default
-- `apps/admin/src/client/stores/editing.ts` — `customEditorMount` ref, load via dynamic import
+Admin UI:
+- `apps/admin/src/client/stores/editing.ts` — `customEditorMount` ref, load via `import('@editors/{name}.tsx')`
+- `apps/admin/src/client/components/EditorPanel.vue` — if custom editor, use it; else default
 
-**DefaultEditorForm extraction:**
-- `packages/gazetta/src/editor/mount.tsx` — extract @rjsf Form as `DefaultEditorForm`
-- Export from `gazetta/editor`
+### 1e. Reference editor
 
-**Reference editor:**
-- `examples/starter/admin/editors/hero.tsx` — live preview + embedded DefaultEditorForm
+- `examples/starter/admin/editors/hero.tsx` — live preview + embedded DefaultEditorForm, uses CSS variables for theme-aware styling
 
-**Verify:** hero → custom editor. card → default form. Edit hero.tsx → HMR.
+### Verify Slice 1
 
-## Step 4: Custom fields
+1. Toggle dark/light → editor follows theme
+2. Select hero → custom editor mounts with live preview + default form
+3. Edit content via custom editor → preview updates
+4. Switch to card → default @rjsf form
+5. Edit `admin/editors/hero.tsx` → Vite HMR reloads
+6. Both dark and light mode work in custom editor
 
-`FieldMount` type ships WITH the implementation.
+---
 
-**Type changes (in this step):**
+## Step 2: Publish fix + publishMode
+
+Independent bug fix + type addition.
+
+- `packages/gazetta/src/types.ts` — add `publishMode?: 'esi' | 'static'` to `TargetConfig`, add `locale?`, `baseUrl?` to `SiteManifest`
+- `packages/gazetta/src/manifest.ts` — parse new fields
+- Shared `getPublishMode(target)` function
+- Fix `admin-api/routes/publish.ts` to use `getPublishMode()`
+- Add publish tests (none exist)
+
+## Step 3: Custom fields
+
 - `packages/gazetta/src/types.ts` — add `FieldMount` interface
-
-**Discovery:**
 - `packages/gazetta/src/admin-api/routes/fields.ts` — NEW: `GET /api/fields`
-- `packages/gazetta/src/admin-api/index.ts` — register field routes
+- `packages/gazetta/src/editor/mount.tsx` — `buildUiSchema()` detects `meta.field` recursively, async widget wrapper
+- `examples/starter/admin/fields/brand-color.tsx` — reference field
 
-**Loading in @rjsf:**
-- `packages/gazetta/src/editor/mount.tsx` — `buildUiSchema()` detects `meta.field` recursively
-- Async widget wrapper: imports field module, mounts `FieldMount`
+## Step 4: React peer dependency
 
-**File structure:**
-```
-examples/starter/
-  admin/
-    editors/hero.tsx
-    fields/                  # NEW
-      brand-color.tsx
-```
-
-**Verify:** banner with `meta({ field: 'brand-color' })` → custom picker renders.
-
-## Step 5: React peer dependency
-
-Decouple after custom editors are proven working.
-
-**Changes:**
 - `packages/gazetta/package.json` — react, react-dom → peerDependencies
-- `packages/gazetta/tsconfig.json` — add `"react"`, `"react-dom"` to types array
-- `package.json` (root) — add react to devDependencies
+- `packages/gazetta/tsconfig.json` — add react to types array
+- Root `package.json` — react to devDependencies
 
-All React-dependent packages already use peer deps (confirmed: @rjsf/core, @tiptap/react, @hello-pangea/dnd).
+## Step 5: Dev playground
 
-**Verify:** `npm install && npm run build && npm test && npm ls react` (one copy).
-
-## Step 6: Dev playground
-
-Developer tool for building editors/fields in isolation.
-
-**Changes:**
 - `apps/admin/src/client/components/DevPlayground.vue` — NEW
-- `apps/admin/src/client/router.ts` — add `/dev` route
-- Sidebar: editors + fields from API
-- Main area: mount selected with mock data
-- Controls: theme toggle, value inspector, reset
+- `apps/admin/src/client/router.ts` — `/dev` route
+- Sidebar listing editors/fields, main area with mock data, theme toggle
 
-**Verify:** `/admin/dev` → select editor → renders with mock data.
+## Step 6: Project restructure
 
-## Step 7: Project restructure
+Three sub-steps (each verifiable):
 
-Three sub-steps, each independently verifiable.
+6a. `loadSite` options object + `templatesDir` on `Site` interface (non-breaking refactor)
+6b. Restructure starter: `admin/package.json`, `templates/package.json`, `sites/main/`, workspaces, tsconfigs
+6c. CLI: project root detection, template path (5 call sites), `AdminAppOptions`, tests, docs, CI
 
-**7a. loadSite options object** (non-breaking refactor):
-- `packages/gazetta/src/site-loader.ts` — add `templatesDir` to `Site` interface, overloaded `loadSite`
-- `packages/gazetta/src/resolver.ts` — use `site.templatesDir` (2 changes)
-- `packages/gazetta/src/publish-rendered.ts` — use `site.templatesDir` (1 change)
-- Update callers to options form, remove deprecated overload
+## Step 7: CLI improvements
 
-**7b. Restructure starter** (directory moves):
-```
-examples/starter/
-  package.json               # workspaces: ["admin", "templates"]
-  admin/
-    package.json             # gazetta, react
-    tsconfig.json            # browser, @templates paths
-    editors/hero.tsx
-    fields/brand-color.tsx
-  templates/
-    package.json             # gazetta, react, zod
-    tsconfig.json            # node
-    hero/index.tsx ... (21 templates)
-  sites/main/
-    site.yaml
-    fragments/
-    pages/
-```
-
-**7c. CLI for new structure:**
-- Project root detection
-- Template path: `join(projectRoot, 'templates')` (5 call sites)
-- `AdminAppOptions` + `templatesDir`
-- Update 6 test files, 7 docs, 3 CI workflows
-
-**Verify:** `npm run build && npm test`. `gazetta dev` works.
-
-## Step 8: CLI improvements
-
-**Changes:**
 - `@clack/prompts` for interactive prompts
-- Multi-site/target auto-detection + prompts (CI: error)
+- Multi-site/target auto-detection
 - `gazetta init` scaffolds new structure
-- Positional args: `gazetta publish production my-site`
+- Positional args
 
-**Verify:** auto-detection prompts locally, fails in CI.
+## Step 8: Production admin build
 
-## Step 9: Production admin build
-
-**Research first:** Vite build (code splitting, automatic React dedup) vs import maps
-(manual ESM bundles, runtime resolution). Spike both approaches before implementing.
-
-**Changes (after research):**
+- Research Vite build vs import maps first
 - `gazetta build` command
-- Admin SPA build
-- Editor/field bundling with shared React
-- Worker generation per target (already implemented in `gazetta deploy`)
 - `gazetta serve` serves built admin
 
-**Verify:** `gazetta build && gazetta serve` → custom editors work in production.
+## Step 9: Validate + migrate sites
 
-## Step 10: Validate + migrate sites
-
-**Validate improvements:**
-- Content vs schema validation
-- Orphaned editors, missing fields
-- Cross-workspace imports, version mismatches
-- Target connectivity
-
-**Migrate existing sites:**
-- `sites/gazetta.studio/` restructured
-- CI workflows updated
-- All docs updated
-
-**Verify:** `gazetta validate` catches errors. CI passes. Docs match code.
+- Content vs schema validation, orphaned editors, missing fields
+- Migrate `sites/gazetta.studio/`, update CI/docs
 
 ## Ordering rationale
 
-Light mode first (theming is foundation for editors) → custom editors (highest leverage,
-validates architecture) → everything else extends proven patterns.
-
-| Step | What | Why this order |
-|------|------|----------------|
-| 1 | Light mode | Foundation — theme contract that all editors/fields use |
-| 2 | Publish fix + publishMode | Independent fix, ships quality |
-| 3 | Custom editors | Highest leverage — validates Vite alias, dynamic import, DefaultEditorForm |
-| 4 | Custom fields | Extends proven editor infrastructure |
-| 5 | React peer dep | After editors proven, before npm publish |
-| 6 | Dev playground | DX tool — needs editors/fields to exist first |
-| 7 | Restructure | Multi-site — all features work, now organize |
-| 8 | CLI | DX improvements on stable base |
-| 9 | Production build | Research Vite vs import maps, then implement |
-| 10 | Validate + migrate | Complete the vision |
+| Step | Why this order |
+|------|----------------|
+| Slice 1 | Highest leverage — validates architecture, delivers complete user experience |
+| 2. Publish fix | Independent, ships quality |
+| 3. Custom fields | Extends proven editor infrastructure from Slice 1 |
+| 4. React peer dep | After editors proven, before npm publish |
+| 5. Dev playground | DX tool — needs editors/fields to exist |
+| 6. Restructure | All features work, now organize for multi-site |
+| 7. CLI | DX improvements on stable base |
+| 8. Production build | Research first, then implement |
+| 9. Validate + migrate | Complete the vision |
