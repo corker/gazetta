@@ -55,57 +55,69 @@ gazetta/
 
 ### Site project (site author / template developer)
 
+Templates and admin are project-level (shared across sites). Content (fragments, pages) lives in `sites/`.
+
 ```
-my-site/
-  package.json                 # workspaces: ["admin"], deps: { gazetta }
-  site.yaml                    # Site manifest — name, targets
-  admin/              # Browser-side code (editors, fields) — workspace
-    package.json               # deps: { gazetta, react, react-dom, ... }
+my-project/
+  package.json                 # workspaces: ["admin", "templates", "sites/*"]
+  admin/                       # Custom editors + fields (browser, CMS-aligned) — workspace
+    package.json               # deps: { gazetta, react, react-dom, @radix-ui, ... }
     editors/                   # Custom editors (per-template full replacements)
       hero.tsx                 # EditorMount for templates/hero
-    fields/                    # Custom fields (site-level reusable widgets)
+    fields/                    # Custom fields (reusable widgets)
       brand-color.tsx          # FieldMount — referenced in schemas as { field: 'brand-color' }
-  templates/                   # Server-side code (template rendering) — NOT a workspace
-    package.json               # deps: { react, svelte, ... } — own version, own node_modules
+  templates/                   # Template render functions + schemas (server) — workspace
+    package.json               # deps: { react, svelte, zod, ... }
     hero/
       index.tsx                # render fn + Zod schema
     card/
       index.ts
-  fragments/                   # Shared components (reusable across pages)
-    header/
-      fragment.yaml
-      logo/
-      nav/
-    footer/
-  pages/                       # Routable components
-    home/
-      page.yaml
-      hero/
-      features/
-    about/
-      page.yaml
+    nav/
+      index.svelte             # non-React template, no conflict
+  sites/
+    my-site/                   # A site — content + config
+      site.yaml                # Site manifest — name, targets
+      fragments/               # Shared components (reusable across pages)
+        header/
+          fragment.yaml
+          logo/
+          nav/
+        footer/
+      pages/                   # Routable components
+        home/
+          page.yaml
+          hero/
+          features/
+        about/
+          page.yaml
+    another-site/              # Another site — same templates, different content
+      site.yaml
+      fragments/
+      pages/
 ```
 
 **Modularity — what belongs to what:**
 
-| Concept | Runs where | Deps aligned with | Lives in |
-|---------|-----------|-------------------|----------|
-| Template (render + schema) | Server (Node) | Own choice (any framework, any version) | `templates/` |
-| Editor (custom editing UI) | Browser (admin) | Admin UI (same React) | `admin/editors/` |
-| Field (custom widget) | Browser (admin, inside @rjsf) | Admin UI (same React) | `admin/fields/` |
-| Fragment | Server (rendered) | Templates | `fragments/` |
-| Page | Server (rendered) | Templates | `pages/` |
+| Concept | Scope | Runs where | Deps aligned with | Lives in |
+|---------|-------|-----------|-------------------|----------|
+| Template (render + schema) | Project | Server (Node) | Shared (workspace) | `templates/` |
+| Editor (custom editing UI) | Project | Browser (admin) | Admin UI (same React) | `admin/editors/` |
+| Field (custom widget) | Project | Browser (admin, inside @rjsf) | Admin UI (same React) | `admin/fields/` |
+| Fragment | Site | Server (rendered) | Templates | `sites/x/fragments/` |
+| Page | Site | Server (rendered) | Templates | `sites/x/pages/` |
+
+Templates, editors, and fields are shared across all sites in the project. Fragments and pages are per-site.
 
 Editors are conceptually 1:1 with templates but dependency-coupled to the admin. `admin/editors/hero.tsx` is the editor for `templates/hero/` — connected by name, not file path.
 
-**Dependency isolation:**
-- `admin/` is a workspace → deps (react, matching admin version) hoist to `my-site/node_modules/`. Gazetta peer dep satisfied. Custom editors, fields, and the default @rjsf form share one React.
-- `templates/` is NOT a workspace → separate `npm install`, own `node_modules/`. Free to use any React version or other frameworks for SSR.
+**Dependencies:**
+- All three (`admin/`, `templates/`, `sites/*`) are npm workspaces — **one `npm install`** at the project root.
+- By default, templates share the project's React version. Non-React templates (Svelte, Vue, plain TS) don't conflict.
+- Edge case: if templates need a different React version, remove `templates` from workspaces and run `cd templates && npm install` separately (or use pnpm which handles version isolation natively).
 
 **Install:**
 ```
-cd my-site && npm install              # gazetta + admin deps
-cd my-site/templates && npm install    # template SSR deps
+cd my-project && npm install    # everything — admin, templates, sites
 ```
 
 ## Storage Providers
