@@ -3,22 +3,52 @@
 Build Gazetta as designed. First slice delivers a complete user experience (editor customization).
 Then sequential infrastructure steps. Types ship with their consumers.
 
-## Step 0: Enhance MCP dev server for UI verification
+## Step 0: UI verification infrastructure
 
-Add browser interaction tools to the existing MCP server. Claude can click through the
-admin UI, interact with editors, and take screenshots to verify visual changes.
+Three approaches that give Claude eyes, assertions, and structural verification.
 
-**Changes:**
-- `tools/mcp-dev/src/index.ts` — add tools:
-  - `click(selector)` — click an element (CSS selector or data-testid)
-  - `type(selector, text)` — type text into an input
-  - `wait(selector, timeout?)` — wait for element to appear
-  - `hover(selector)` — hover over an element
-  - `screenshot` — already exists, now captures state after interactions
+### 0a. MCP browser interactions
 
-All tools reuse the existing Playwright page instance. ~50 lines of new code.
+Add tools to the existing MCP dev server (`tools/mcp-dev/src/index.ts`):
 
-**Verify:** Claude can: screenshot → click a page in tree → wait for editor → screenshot.
+- `click(selector)` — click element by CSS selector or data-testid
+- `type(selector, text)` — type into input
+- `wait(selector, timeout?)` — wait for element to appear
+- `hover(selector)` — hover over element
+- `screenshot` — already exists
+
+All reuse the existing Playwright page. ~50 lines new code.
+
+### 0b. Playwright e2e test setup
+
+- `playwright.config.ts` at project root — `webServer` starts `gazetta dev`
+- `tests/e2e/` directory for e2e tests
+- Test helper: start dev server, wait for ready, provide `page`
+- First test: "admin loads, site tree shows pages" (proves setup works)
+- ARIA snapshots for structural assertions (built into Playwright 1.59.1)
+
+### 0c. Dev catalog page
+
+`/admin/dev` route — renders every editor widget in isolation with hardcoded props.
+Claude screenshots this page to verify visual quality after CSS changes.
+
+Sections: text input (dark), text input (light), textarea, toggle, color picker, tags,
+array items, rich text editor, each in both themes.
+
+This is the dev playground (Step 5 in the plan) moved earlier because Claude needs it
+for visual verification during Slice 1 development.
+
+### Why these three
+
+| Approach | What Claude sees | What it catches |
+|----------|-----------------|-----------------|
+| MCP interactions + screenshot | Visual images | Colors, layout, visual quality |
+| Playwright e2e + ARIA | Pass/fail text | Integration, structure |
+| Dev catalog | Static visual states | Per-widget appearance in both themes |
+
+Skip: jsdom component tests (can't test React-in-Vue mount), visual regression (Claude can't interpret pixel diffs).
+
+**Verify:** Claude runs e2e test → reads pass/fail. Screenshots dev catalog → sees widgets in both themes.
 
 ## Slice 1: "I can customize my template's editor"
 
@@ -101,36 +131,29 @@ gazetta.studio (dogfooding):
 - `sites/gazetta.studio/admin/editors/` — create a custom editor for one template
 - Validates the feature works on a real site, not just the starter
 
-### 1g. Playwright e2e tests
+### 1g. Tests
 
-Verify every interaction programmatically. Test helper starts `gazetta dev`, provides `page`.
-
+**E2e tests** (Playwright — programmatic verification):
 ```ts
-// tests/e2e/editor.test.ts
-test('theme toggle switches editor colors', async ({ page }) => { ... })
-test('custom editor loads for hero template', async ({ page }) => { ... })
-test('default form loads for template without editor', async ({ page }) => { ... })
-test('DefaultEditorForm embeds inside custom editor', async ({ page }) => { ... })
-test('custom editor HMR reloads on file change', async ({ page }) => { ... })
+test('theme toggle switches editor colors', ...)
+test('custom editor loads for hero', ...)
+test('default form loads for card', ...)
+test('content edit via custom editor updates preview', ...)
 ```
+
+**ARIA snapshots** (structural — text output Claude reads):
+- Editor panel ARIA tree after selecting hero: shows custom editor content
+- Editor panel ARIA tree after selecting card: shows @rjsf form fields
+
+**Dev catalog screenshots** (visual — Claude sees images via MCP):
+- `/admin/dev` showing all widgets in dark mode
+- `/admin/dev` showing all widgets in light mode
 
 ### Verify Slice 1
 
-Automated (e2e tests):
-1. Theme toggle switches editor colors (dark ↔ light)
-2. Custom editor loads for hero
-3. Default form loads for card (no custom editor)
-4. Content edit via custom editor updates preview
-5. DefaultEditorForm embeds and works inside custom editor
-
-Manual (MCP screenshot):
-6. Visual quality of dark mode editor
-7. Visual quality of light mode editor
-8. Custom editor hero layout looks correct
-
-Documentation:
-9. getting-started.md has custom editor section
-10. gazetta.studio has a working custom editor
+Automated: `npx playwright test tests/e2e/editor.test.ts` — all pass
+Visual: MCP screenshot of `/admin/dev` in both themes — looks correct
+Docs: getting-started.md + gazetta.studio custom editor
 
 ---
 
@@ -159,11 +182,13 @@ Independent bug fix + type addition.
 - `packages/gazetta/tsconfig.json` — add react to types array
 - Root `package.json` — react to devDependencies
 
-## Step 5: Dev playground
+## Step 5: Dev playground (extend Step 0c)
 
-- `apps/admin/src/client/components/DevPlayground.vue` — NEW
-- `apps/admin/src/client/router.ts` — `/dev` route
-- Sidebar listing editors/fields, main area with mock data, theme toggle
+Step 0c creates a basic dev catalog for widget states. This step extends it:
+- Sidebar listing custom editors + fields (from API)
+- Dynamic import of selected editor/field, mount with mock data
+- Theme toggle, value inspector, reset controls
+- Full playground for developing editors in isolation
 
 ## Step 6: Project restructure
 
