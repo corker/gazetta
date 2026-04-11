@@ -360,20 +360,38 @@ gazetta deploy production          # deploy worker to production
 
 ### Auto-detection
 
-All commands auto-detect from project structure:
+| What | One | Multiple (local) | Multiple (CI) | Override |
+|------|-----|-------------------|---------------|----------|
+| **Site** | Auto-select | Prompt user to choose | Fail with error | `gazetta dev my-site` |
+| **Target** | Auto-select | Prompt user to choose | Fail with error | `gazetta publish production` |
 
-| What | How | Override |
-|------|-----|----------|
-| **Site** | Only one dir in `sites/` → use it | `--site my-site` or `gazetta dev my-site` |
-| **Target** | Only one target in `site.yaml` → use it. Multiple → use first. | `gazetta publish production` (positional) |
-| **Mode** | Has `dist/admin/` → production admin. Else dev only. | — |
+CI is detected via `CI=true` environment variable (set by GitHub Actions, GitLab CI, etc.).
 
 ```
-gazetta dev                               # auto-detects sites/main
-gazetta dev my-site                       # explicit: sites/my-site
-gazetta publish                           # render + push to default target
-gazetta publish production                # explicit target
-gazetta publish production --site my-site # both explicit (multi-site)
+# One site, one target — zero arguments:
+gazetta dev                               # auto-detects
+gazetta publish                           # auto-detects
+
+# Multiple sites — local prompts, CI fails:
+gazetta dev
+> ? Select site: (use arrow keys)
+>   my-site
+>   another-site
+
+# Multiple targets — same:
+gazetta publish
+> ? Select target: (use arrow keys)
+>   staging
+>   production
+
+# CI — must be explicit:
+CI=true gazetta publish
+> Error: multiple targets found. Specify one: gazetta publish staging
+
+# Explicit always works:
+gazetta dev my-site
+gazetta publish production
+gazetta publish production --site my-site
 ```
 
 ### Command details
