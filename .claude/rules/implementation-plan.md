@@ -250,6 +250,54 @@ Must be done first — everything else depends on the project structure and type
     with CI/CD, Cloudflare deployment. Migrate after the new structure is proven with starter.
     Add as a follow-up task, not a blocker.
 
+### Fundamental questions
+
+24. **Should we restructure first or build features first?** The restructure (Phase 1.4-1.5)
+    is the largest, riskiest change with zero user-visible benefit. Custom editors can work
+    with the current flat structure — the Vite alias handles any layout. Consider: implement
+    custom editors first (prove the architecture), restructure later (apply proven patterns).
+
+25. **Types before consumers?** Phase 1 adds `FieldMount` and changes `EditorMount` props
+    for consumers that don't exist until Phase 4-5. Untested interfaces are guesses. Better:
+    add types when implementing their consumers.
+
+26. **`build` command before there's anything to build?** Phase 2 adds `build` but
+    custom editors (the main build target) arrive in Phase 4-5. Move `build` to Phase 6.
+
+27. **What's the MVP?** The minimum that delivers value: custom editors working in dev mode
+    (through Phase 4). Everything else is enhancement. The plan should explicitly mark MVP
+    vs nice-to-have phases.
+
+28. **Restructure-first vs feature-first ordering.**
+    Option A (current plan): restructure → CLI → theming → editors → fields → build
+    Option B (feature-first): theming → editors → fields → restructure → CLI updates → build
+    Option B delivers visible value sooner. Option A is architecturally cleaner but risky.
+
+### Cascade effects
+
+29. **`createAdminApp` signature change** cascades through 5+ files:
+    - `packages/gazetta/src/admin-api/index.ts`
+    - `packages/gazetta/src/cli/index.ts` (two call sites)
+    - `apps/admin/src/server/dev.ts`
+    - `apps/admin/tests/api.test.ts`
+    - Every route handler needing project root
+
+30. **`findCmsDir()` needs a third search path** for npm-installed gazetta:
+    - Current: `apps/admin/` (monorepo source) or `admin-dist/` (pre-built)
+    - Needed: `node_modules/gazetta/admin-dist/` (npm package)
+
+31. **Nested workspaces in monorepo** — starter's `admin/` and `templates/` hoist deps to
+    monorepo root, not to starter root. Different behavior from standalone site projects.
+    Must test both scenarios.
+
+32. **CLI framework.** Current CLI uses manual `process.argv` parsing. Adding prompts
+    (@clack/prompts) and growing command complexity suggests considering a CLI framework
+    (citty, cleye). Evaluate before adding more commands.
+
+33. **Docs updates per phase.** Per team-preferences.md rule #8: update docs in the same
+    commit as the feature. getting-started.md, CLAUDE.md, design docs all need updating
+    as behavior changes.
+
 22. **Git strategy.** One feature branch per phase. Merge to main after phase verification.
     Each phase is a coherent set of changes that can be reviewed and reverted independently.
 
