@@ -323,14 +323,103 @@ Split deployments require:
 
 ## CLI Commands
 
-| Command | Purpose | Key code path |
-|---------|---------|---------------|
-| `gazetta init [dir]` | Scaffold new site | Writes template files to disk. **No targets in site.yaml** — user must add manually |
-| `gazetta dev [site-dir]` | Dev server + CMS | `cli/index.ts` → renderer + admin-api + SSE watcher |
-| `gazetta publish [site-dir]` | Pre-render and upload | `publish-rendered.ts` → storage provider |
-| `gazetta serve [site-dir]` | Production Node server | `serve.ts` → ESI assembly from storage |
-| `gazetta deploy -t <name>` | Deploy Cloudflare Worker | Generates worker, runs `wrangler deploy` |
-| `gazetta validate [site-dir]` | Check broken references | Validates templates, fragments, pages. **Does not check** target connectivity, env vars, or storage access |
+### Lifecycle
+
+```
+init → dev → validate → build → publish → deploy/serve
+```
+
+### Commands
+
+| Command | Purpose | Input | Output |
+|---------|---------|-------|--------|
+| `gazetta init [dir]` | Scaffold new project | Directory name | Project with `admin/`, `templates/`, `sites/main/`, `package.json` with workspaces |
+| `gazetta dev [site]` | Dev server + CMS admin | Site name or auto-detect | Hono server + Vite dev (admin SPA + HMR) at localhost |
+| `gazetta validate [site]` | Check references + config | Site name or auto-detect | Errors/warnings to stdout |
+| `gazetta build [site]` | Build admin for production | Site name or auto-detect | `dist/admin/` — SPA + editor/field bundles + import map |
+| `gazetta publish [site] [-t target]` | Pre-render + upload content | Site name + target | Files written to target storage |
+| `gazetta deploy [-t target]` | Deploy edge runtime | Target name | Worker deployed (Cloudflare, Deno, etc.) |
+| `gazetta serve [site] [-t target]` | Production server | Site name + target | Hono server — site + admin at localhost |
+
+### Site resolution
+
+Commands that take `[site]` resolve it:
+1. If argument given: `sites/{argument}/`
+2. If only one site in `sites/`: use it (auto-detect)
+3. If multiple sites and no argument: error with list
+
+```
+gazetta dev              # auto-detects sites/main (only site)
+gazetta dev my-site      # uses sites/my-site
+gazetta dev              # error: multiple sites found — specify one
+```
+
+### Command details
+
+**`gazetta init [dir]`**
+Scaffolds a new project with the full structure:
+```
+my-project/
+  package.json           # workspaces: ["admin", "templates", "sites/*"]
+  admin/
+    package.json         # gazetta, react, react-dom
+    editors/             # (empty — ready for custom editors)
+    fields/              # (empty — ready for custom fields)
+  templates/
+    package.json         # react, zod
+    hero/index.tsx       # starter template
+    page-default/index.tsx
+  sites/
+    main/
+      site.yaml          # name, targets (with filesystem staging target)
+      fragments/
+        header/
+        footer/
+      pages/
+        home/page.yaml
+```
+Runs `npm install` automatically after scaffolding.
+
+**`gazetta dev [site]`**
+- Loads site from `sites/{name}/`
+- Loads templates from `templates/`
+- Starts Hono server (site routes + admin API + preview)
+- Starts Vite dev server (admin SPA + HMR)
+- Injects Vite config: `resolve.alias: { '@site': projectRoot }`, `server.fs.allow`
+- Custom editors/fields loaded via Vite from `admin/editors/`, `admin/fields/`
+- Dev playground at `/admin/dev`
+- File watcher for template/content hot reload via SSE
+
+**`gazetta build [site]`**
+- Builds admin SPA via Vite `build()` API
+- Scans `admin/editors/*.{ts,tsx}` and `admin/fields/*.{ts,tsx}`
+- Bundles each editor/field with esbuild (`external: ['react', 'react-dom', 'gazetta/editor']`)
+- Bundles shared deps (React, gazetta/editor) as standalone ESM
+- Generates import map, injects into `dist/admin/index.html`
+- Output: `dist/admin/` — ready to serve or deploy
+
+**`gazetta publish [site] [-t target]`**
+- Pre-renders pages and fragments using templates (SSR)
+- Uploads to target storage (R2, S3, Azure Blob, filesystem)
+- Handles ESI vs static mode based on target config
+- Purges CDN cache if configured
+
+**`gazetta serve [site] [-t target]`**
+- Production Node/Bun server
+- Serves site: ESI assembly from target storage (published content)
+- Serves admin: built SPA from `dist/admin/` (if exists), API endpoints
+- Auth middleware on `/admin/*` routes
+
+**`gazetta deploy [-t target]`**
+- Deploys edge runtime (Worker) to the target platform
+- Currently: Cloudflare Workers only
+- Future: Deno Deploy, Vercel Edge, Netlify Edge
+
+**`gazetta validate [site]`**
+- Checks template references (do referenced templates exist?)
+- Checks fragment references (do `@fragment` refs resolve?)
+- Checks page manifests (valid routes, valid template names?)
+- Future: target connectivity, env var validation, schema validation
 
 ## Known Gaps
 
