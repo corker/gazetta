@@ -123,7 +123,7 @@ Editors are conceptually 1:1 with templates but dependency-coupled to the admin.
 
 **Install:**
 ```
-cd my-project && npm install    # everything — admin, templates, sites
+cd my-project && npm install    # everything — admin + templates workspaces
 ```
 
 ## Storage Providers
@@ -163,9 +163,9 @@ Decision logic: determined by `publishMode` field in target config (default: `st
   to target config (shown in the self-hosted example above). Default: `esi` if worker configured, `static` otherwise.
 
 - **Admin API always publishes ESI mode** (`admin-api/routes/publish.ts`). It calls
-  `publishPageRendered()` / `publishFragmentRendered()` regardless of worker config. CLI branches
+  `publishPageRendered()` / `publishFragmentRendered()` regardless of target config. CLI branches
   correctly. This means CLI and admin UI produce different output for static targets. Fix: admin API
-  must check `!targetConfig?.worker` and branch like the CLI does.
+  must check `publishMode` and branch like the CLI does.
 
 ### Real-world target examples
 
