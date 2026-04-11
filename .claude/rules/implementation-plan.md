@@ -11,13 +11,20 @@ Three approaches that give Claude eyes, assertions, and structural verification.
 
 Add tools to the existing MCP dev server (`tools/mcp-dev/src/index.ts`):
 
-- `click(selector)` — click element by CSS selector or data-testid
-- `type(selector, text)` — type into input
-- `wait(selector, timeout?)` — wait for element to appear
-- `hover(selector)` — hover over element
-- `screenshot` — already exists
+- `click(testId)` — click element by `data-testid` attribute
+- `type(testId, text)` — type into input by `data-testid`
+- `wait(testId, timeout?)` — wait for element with `data-testid` to appear
+- `hover(testId)` — hover over element by `data-testid`
+- `get_text(testId)` — read text content (cheap, no vision)
+- `get_aria()` — return ARIA tree snapshot of current page (cheap, structural)
+- `screenshot` — already exists (expensive — use sparingly, only for visual verification)
 
-All reuse the existing Playwright page. ~50 lines new code.
+Selectors use `data-testid` exclusively — not CSS classes or tag names (per team-preferences.md
+rule #3). Stable across PrimeVue updates and CSS refactors.
+
+**Cost awareness:** Screenshots consume vision tokens. Claude should prefer `get_text` and
+`get_aria` for state verification. Use screenshots ONLY for visual quality checks (theming,
+layout, colors). E2e tests and ARIA snapshots are text-based — zero vision cost.
 
 ### 0b. Playwright e2e test setup
 
@@ -40,15 +47,17 @@ for visual verification during Slice 1 development.
 
 ### Why these three
 
-| Approach | What Claude sees | What it catches |
-|----------|-----------------|-----------------|
-| MCP interactions + screenshot | Visual images | Colors, layout, visual quality |
-| Playwright e2e + ARIA | Pass/fail text | Integration, structure |
-| Dev catalog | Static visual states | Per-widget appearance in both themes |
+| Approach | Output | Vision cost | What it catches |
+|----------|--------|:-----------:|-----------------|
+| MCP `get_text` / `get_aria` | Text | None | State, structure, content |
+| Playwright e2e + ARIA | Pass/fail text | None | Integration, behavior |
+| MCP `screenshot` | Image | High | Visual quality (use sparingly) |
+| Dev catalog + screenshot | Image | High | Per-widget appearance (rare, after CSS changes) |
+
+**Default workflow:** make change → run e2e tests (text) → read pass/fail. Screenshot only
+after theming/CSS changes that need visual verification.
 
 Skip: jsdom component tests (can't test React-in-Vue mount), visual regression (Claude can't interpret pixel diffs).
-
-**Verify:** Claude runs e2e test → reads pass/fail. Screenshots dev catalog → sees widgets in both themes.
 
 ## Slice 1: "I can customize my template's editor"
 
