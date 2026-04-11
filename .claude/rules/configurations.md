@@ -282,14 +282,44 @@ many deployment targets beyond what's currently implemented.
 
 ### Admin UI hosting (future)
 
-The admin UI currently only runs in dev mode (`gazetta dev`). For production admin hosting:
+The admin UI currently only runs in dev mode (`gazetta dev`). For production admin hosting,
+the admin needs three things: static SPA assets, the Hono API (server-side, needs storage + template access),
+and custom editor/field bundles (site-specific browser code).
 
-| Option | Custom editors | Deployment | Notes |
-|--------|---------------|-----------|-------|
-| **Self-hosted (`gazetta serve` + admin)** | Full support | Single Node process | WordPress model — simplest |
-| **Docker** | Full support | Any container host | Same as self-hosted, containerized |
-| **Static deploy + API** | Needs runtime module loading | Two deployments (SPA + API) | More complex, CORS required |
-| **Cloudflare Workers** | Pre-bundled only | Single Worker | Edge constraints limit admin features |
+**All-in-one (SPA + API in single process) — recommended:**
+
+| Platform | How | Custom editors | Preview SSR | Auth | Notes |
+|----------|-----|---------------|-------------|------|-------|
+| **`gazetta serve` + admin** | Node/Bun process serves SPA + API on one port | Full — filesystem access to editor bundles | Full — Node SSR | Middleware | WordPress model. Simplest. Add behind reverse proxy (Caddy/nginx) for HTTPS |
+| **Docker** | Containerized Node/Bun. Same as above | Full | Full | Middleware | Deploy to Fly.io, Railway, Render, Cloud Run, Azure Container Apps, any VPS |
+| **Fly.io** | Docker container, global edge network | Full | Full | Middleware | Good for always-on admin. ~$2/mo min |
+| **Google Cloud Run** | Docker container, scale-to-zero | Full | Full | IAM or middleware | Best serverless container. Cold start ~1s |
+| **Railway** | Docker container, no scale-to-zero | Full | Full | Middleware | Simple DX. $5/mo min |
+| **Render** | Docker container, free tier spins down | Full | Full | Middleware | Free tier has 15-min spin-down — bad for admin UX |
+
+**Split deployment (SPA separate from API):**
+
+| SPA host | API host | Custom editors | Notes |
+|----------|----------|---------------|-------|
+| **Vercel/Netlify/CF Pages** (static) | **Serverless function** (same platform) | Pre-bundled — editors built into SPA or served from API | SPA at `admin.mysite.com`, API as serverless. CORS needed if different origins |
+| **Vercel** (static + Edge) | **Vercel Serverless** | Pre-bundled | One platform, two runtimes. Edge for SPA, serverless for API |
+| **Cloudflare Pages** (static + Workers) | **Cloudflare Workers** | Pre-bundled | Pages for SPA, Worker for API. R2 for storage. All Cloudflare |
+| **Netlify** (static + Edge) | **Netlify Functions** | Pre-bundled | Pages for SPA, Functions for API |
+
+Split deployments require:
+- CORS configuration (SPA and API on different origins/subdomains)
+- Custom editors must be pre-bundled during `gazetta build` (no on-the-fly serving)
+- Two deploys to coordinate on every admin change
+- Auth on both SPA (protect routes) and API (validate tokens)
+
+**Not viable for admin:**
+
+| Platform | Why not |
+|----------|---------|
+| **Pure edge (Workers/Deno Deploy)** | Admin API needs Node.js for template loading (jiti), preview SSR, and storage provider SDKs. WinterTC runtimes lack these |
+| **GitHub Pages** | Static only — no API |
+| **S3/Azure Blob static** | Static only — no API |
+| **AWS Lambda@Edge** | 5s timeout, 1MB response limit, Node.js only (no Bun). Too constrained for preview rendering |
 
 ## CLI Commands
 
