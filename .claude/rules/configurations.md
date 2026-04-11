@@ -68,12 +68,25 @@ my-project/
       brand-color.tsx          # FieldMount — referenced in schemas as { field: 'brand-color' }
   templates/                   # Template render functions + schemas (server) — workspace
     package.json               # deps: { react, svelte, zod, ... }
-    hero/
-      index.tsx                # render fn + Zod schema
-    card/
-      index.ts
-    nav/
-      index.svelte             # non-React template, no conflict
+    pages/                     # Page-level templates
+      default.tsx
+      blog-post.tsx
+      landing.tsx
+    fragments/                 # Fragment-level templates
+      header.tsx
+      footer.tsx
+      newsletter.tsx
+    components/                # Component templates — supports subfolders (design system)
+      hero/
+        index.tsx
+      buttons/
+        primary.tsx
+        cta.tsx
+      cards/
+        product.tsx
+        blog.tsx
+      layout/
+        two-column.tsx
   sites/
     my-site/                   # A site — content + config
       site.yaml                # Site manifest — name, targets
@@ -100,11 +113,13 @@ my-project/
 
 | Concept | Scope | Runs where | Deps aligned with | Lives in |
 |---------|-------|-----------|-------------------|----------|
-| Template (render + schema) | Project | Server (Node) | Shared (workspace) | `templates/` |
+| Page template | Project | Server (Node) | Shared (workspace) | `templates/pages/` |
+| Fragment template | Project | Server (Node) | Shared (workspace) | `templates/fragments/` |
+| Component template | Project | Server (Node) | Shared (workspace) | `templates/components/` (supports subfolders) |
 | Editor (custom editing UI) | Project | Browser (admin) | Admin UI (same React) | `admin/editors/` |
 | Field (custom widget) | Project | Browser (admin, inside @rjsf) | Admin UI (same React) | `admin/fields/` |
-| Fragment | Site | Server (rendered) | Templates | `sites/x/fragments/` |
-| Page | Site | Server (rendered) | Templates | `sites/x/pages/` |
+| Fragment (content) | Site | Server (rendered) | Templates | `sites/x/fragments/` |
+| Page (content) | Site | Server (rendered) | Templates | `sites/x/pages/` |
 
 Templates, editors, and fields are shared across all sites in the project. Fragments and pages are per-site.
 
