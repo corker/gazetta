@@ -734,6 +734,64 @@ Init also creates:
 - `tsconfig.json` — with `paths: { "@templates/*": ["./templates/*"] }` for editor type imports
 - Root `package.json` with `scripts: { dev: "gazetta dev", publish: "gazetta publish", build: "gazetta build" }`
 
+### Gazetta version upgrades
+
+No migration tooling exists. When upgrading gazetta (e.g. `1.x → 2.x`), developers update
+the version in `admin/package.json` and `templates/package.json`, run `npm install`, and check
+for breaking changes. `gazetta validate` should detect incompatibilities (future). Breaking changes
+documented in CHANGELOG per release.
+
+### Multiple developers, same project
+
+Each developer runs their own `gazetta dev` on a different port:
+
+```
+gazetta dev -p 3000       # developer A
+gazetta dev -p 3001       # developer B
+```
+
+Content changes (YAML) may conflict in git — standard merge conflict resolution applies.
+No collaborative real-time editing (each dev has their own server).
+
+### Git and content authoring
+
+Content (YAML in `sites/`) is committed to git. The admin UI writes to the local filesystem.
+Content authors must commit their changes manually (or via a git hook). No auto-commit —
+the developer controls when changes are committed. Git conflicts in YAML are resolved like
+any other merge conflict.
+
+### Concurrent publish safety
+
+`gazetta publish` and admin UI publish (`POST /api/publish`) can run concurrently without
+corruption — each renders independently and uploads to the same storage. Last write wins.
+For team workflows, publish from CI (on merge to main) is the recommended pattern — avoids
+conflicting manual publishes.
+
+### Sites without `site.yaml`
+
+A directory in `sites/` without `site.yaml` is ignored by auto-detection. Not an error.
+`gazetta dev` and `publish` only recognize directories that contain `site.yaml`.
+
+### `gazetta dev` without targets
+
+Works. Dev mode renders on-the-fly from source and doesn't need targets. The admin UI's
+Publish button is disabled if no targets are configured. `gazetta publish` errors:
+"No targets configured in site.yaml."
+
+### Editor/field file extensions
+
+Editors and fields can be `.ts`, `.tsx`, `.jsx`. Vite transforms all of them. While the
+EditorMount/FieldMount contracts are framework-agnostic, editors that import `createEditorMount`
+or `DefaultEditorForm` use React. Vanilla JS/TS editors (no React import) are also supported —
+they use DOM APIs directly.
+
+### `gazetta serve` — editing vs published content
+
+`gazetta serve` shows published content from storage — not local filesystem edits. The admin
+UI in `serve` mode publishes directly to the target storage. Edits are immediately live
+(after publish). This is different from `dev` mode where edits are local and preview is
+on-the-fly. In `serve` mode, there is no local draft state — publish = live.
+
 ## Known Gaps
 
 Summary of configuration gaps and inconsistencies. Reference this when working on publish,
