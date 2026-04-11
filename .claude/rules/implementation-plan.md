@@ -687,6 +687,41 @@ Must be done first — everything else depends on the project structure and type
 22. **Git strategy.** One feature branch per phase. Merge to main after phase verification.
     Each phase is a coherent set of changes that can be reviewed and reverted independently.
 
+### Batch A specific risks
+
+75. **React peer dep + tsconfig `types: ["node"]`.** The gazetta tsconfig explicitly limits
+    type resolution to `@types/node`. After peer dep change, `@types/react` is at root but
+    TypeScript won't find it. Fix: add `"react"`, `"react-dom"` to the `types` array in
+    `packages/gazetta/tsconfig.json`.
+
+76. **`loadSite` is a public export.** Changing its signature is a public API change. Use
+    an options object for extensibility:
+    ```ts
+    // Before: positional
+    loadSite(siteDir: string, storage: StorageProvider)
+    // After: options object
+    loadSite(opts: { siteDir: string, templatesDir?: string, storage: StorageProvider })
+    ```
+    `templatesDir` is optional — defaults to `join(siteDir, 'templates')` for backward
+    compatibility. No breaking change. Callers gradually adopt the new parameter.
+
+77. **No tests for admin API publish.** The publishMode fix has no test coverage.
+    Add tests first:
+    - Test publish with `publishMode: 'static'` produces fully assembled HTML
+    - Test publish with `publishMode: 'esi'` produces ESI placeholders
+    - Test publish without `publishMode` defaults correctly
+
+78. **Editor theming has ~12 color roles, not 5.** Categorized from mount.tsx:
+    - Backgrounds: input, card, toolbar, chip, code (5 levels)
+    - Text: primary, secondary, label, description, hint (5 levels)
+    - Border: default, subtle (2 levels)
+    - Accent: primary, glow
+    - Semantic: error (red), success (green)
+    
+    Each needs dark AND light values. The editor is outside PrimeVue — can't use its theme
+    tokens directly. Use CSS variables that match PrimeVue's Aura dark/light color palette
+    for visual consistency.
+
 23. **Test update strategy.** Before starting each phase, grep for affected paths/functions:
     ```
     grep -r "examples/starter" packages/gazetta/tests/
@@ -705,7 +740,7 @@ Batch A (ship now):      ████ no dependencies, pure improvements
   - React peer dep
   - templatesDir on Site interface (refactor steps 1-2, non-breaking)
   - publishMode field + admin API fix
-  - Default editor theming (CSS variables)
+  - Default editor theming (CSS variables — ~12 color roles, not 5)
 
 Batch B (restructure):   ██████ depends on templatesDir from Batch A
   - Starter restructure (step 3 — the actual directory move)
