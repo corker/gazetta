@@ -297,6 +297,42 @@ Must be done first — everything else depends on the project structure and type
     commit as the feature. getting-started.md, CLAUDE.md, design docs all need updating
     as behavior changes.
 
+### Plan structure issues
+
+34. **Phase 1 mixes types and structure.** Split into 1A (types + package changes, verifiable
+    with build+test) and 1B (structure migration, large and risky). Types first, then structure.
+
+35. **No spike phase for risky assumptions.** Vite dual-server setup (Gap 15), import maps
+    (Phase 6.3), nested workspaces (Gap 13) — all researched theoretically but never tested
+    end-to-end. Add Phase 0: Spikes — throwaway prototypes to validate risky assumptions
+    before committing to the architecture.
+
+36. **CLI framework decision must happen before Phase 2.** Research citty, cleye, @clack/prompts.
+    Decide before building CLI features on manual arg parsing.
+
+37. **Phase 2.3 conflates monorepo and npm-install dev modes.** Vite injection (alias, fs.allow)
+    only applies to monorepo. npm-install dev uses a dual-server setup (static admin + Vite for
+    custom code). These are two architectures — Phase 2 should implement both explicitly.
+
+38. **Phase 4.3 DefaultEditorForm extraction is a major refactor.** mount.tsx is a monolith
+    (widgets, templates, styles, state, registry). Extracting DefaultEditorForm means
+    untangling undo stack, formData state, widget/template registries, style injection.
+    This is 2+ days by itself, not one bullet point.
+
+39. **Phase 6 import maps never tested end-to-end.** Individual steps verified but the full
+    chain (Vite build → esbuild editors → import map → serve → load → render) untested.
+    Needs an integration test or spike.
+
+40. **File creation order in `gazetta init`.** Workspace package.json files (admin/, templates/)
+    must all exist before `npm install` runs. Init must create all files first, then install.
+
+41. **Monorepo dev script changes.** `npm run dev` currently runs starter directly via tsx.
+    After restructure, starter's dev script changes. Need to update monorepo root scripts too.
+
+42. **No standalone test project.** The starter is a monorepo example — npm behavior differs
+    from standalone site projects (hoisting to monorepo root vs project root). Need a test
+    scenario outside the monorepo to verify standalone behavior.
+
 22. **Git strategy.** One feature branch per phase. Merge to main after phase verification.
     Each phase is a coherent set of changes that can be reviewed and reverted independently.
 
