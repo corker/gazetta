@@ -71,6 +71,19 @@ Admin UI:
 
 - `examples/starter/admin/editors/hero.tsx` — live preview + embedded DefaultEditorForm, uses CSS variables for theme-aware styling
 
+### 1f. Documentation + gazetta.studio
+
+Docs (same commit as the feature):
+- `docs/getting-started.md` — add "Custom editors" section with example
+- `docs/design.md` — update editor section with `admin/editors/` pattern
+- `.claude/rules/custom-editors.md` — update with actual implementation details
+- `.claude/rules/architecture.md` — add `admin/editors/` to package table
+- `CLAUDE.md` — mention `admin/` directory
+
+gazetta.studio (dogfooding):
+- `sites/gazetta.studio/admin/editors/` — create a custom editor for one template
+- Validates the feature works on a real site, not just the starter
+
 ### Verify Slice 1
 
 1. Toggle dark/light → editor follows theme
@@ -79,6 +92,8 @@ Admin UI:
 4. Switch to card → default @rjsf form
 5. Edit `admin/editors/hero.tsx` → Vite HMR reloads
 6. Both dark and light mode work in custom editor
+7. Docs describe how to create a custom editor
+8. gazetta.studio has a working custom editor
 
 ---
 
@@ -98,6 +113,8 @@ Independent bug fix + type addition.
 - `packages/gazetta/src/admin-api/routes/fields.ts` — NEW: `GET /api/fields`
 - `packages/gazetta/src/editor/mount.tsx` — `buildUiSchema()` detects `meta.field` recursively, async widget wrapper
 - `examples/starter/admin/fields/brand-color.tsx` — reference field
+- `sites/gazetta.studio/admin/fields/` — custom field on the real site
+- Docs: add "Custom fields" section to getting-started.md, update custom-editors.md
 
 ## Step 4: React peer dependency
 
@@ -117,7 +134,14 @@ Three sub-steps (each verifiable):
 
 6a. `loadSite` options object + `templatesDir` on `Site` interface (non-breaking refactor)
 6b. Restructure starter: `admin/package.json`, `templates/package.json`, `sites/main/`, workspaces, tsconfigs
-6c. CLI: project root detection, template path (5 call sites), `AdminAppOptions`, tests, docs, CI
+6c. CLI: project root detection, template path (5 call sites), `AdminAppOptions`, tests
+
+Docs + site (same commits):
+- Update CLAUDE.md, README.md, CONTRIBUTING.md (project structure)
+- Update getting-started.md (init output, project structure)
+- Update docs/cloudflare.md, docs/self-hosted.md (deployment paths)
+- Update `.github/workflows/deploy-site.yml` (paths trigger + command syntax)
+- Restructure `sites/gazetta.studio/` to match new structure
 
 ## Step 7: CLI improvements
 
@@ -132,10 +156,11 @@ Three sub-steps (each verifiable):
 - `gazetta build` command
 - `gazetta serve` serves built admin
 
-## Step 9: Validate + migrate sites
+## Step 9: Validate + migrate
 
 - Content vs schema validation, orphaned editors, missing fields
-- Migrate `sites/gazetta.studio/`, update CI/docs
+- Verify gazetta.studio works end-to-end with all changes
+- Final doc pass — all docs match current code
 
 ## Ordering rationale
 
