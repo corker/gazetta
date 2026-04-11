@@ -333,27 +333,29 @@ Split deployments require:
 
 ```
 init → dev → publish
+         ↘ build → deploy  (setup / upgrade)
 ```
 
-That's the core loop. Everything else is secondary.
+`publish` is the daily command. `build` + `deploy` are for infrastructure setup.
 
 ### Commands
 
 | Command | What it does | When to use |
 |---------|-------------|-------------|
-| `gazetta init [dir]` | Scaffold project + install deps | Once, to start a new project |
+| `gazetta init [dir]` | Scaffold project + install deps | Once — start a new project |
 | `gazetta dev` | Dev server + CMS admin | Every day — develop, edit, customize |
-| `gazetta publish [target]` | Render + push content to target | Go live — one command, renders and uploads |
-| `gazetta deploy [target] [what]` | Deploy infrastructure | Rare — deploy worker runtime on setup or upgrade |
-| `gazetta build` | Build admin UI for production | Before `gazetta serve` — only needed for self-hosted production admin |
-| `gazetta serve` | Production server | Self-hosting — serves site + admin |
+| `gazetta publish [target]` | Render content + push to storage | Go live — frequent, on every content change |
+| `gazetta build` | Build admin UI + worker code | Before deploy or serve — infrastructure prep |
+| `gazetta deploy [target]` | Deploy built worker to edge | Rare — initial setup or Gazetta upgrade |
+| `gazetta serve` | Production server | Self-hosting — serves site + built admin |
 | `gazetta validate` | Check for errors | Before publish — catches broken references |
 
 ```
 gazetta publish                    # render + push to default target
 gazetta publish production         # render + push to production
 gazetta publish staging            # render + push to staging
-gazetta deploy production worker   # deploy worker for production (rare)
+gazetta build                      # build admin UI + worker
+gazetta deploy production          # deploy worker to production
 ```
 
 ### Auto-detection
@@ -420,7 +422,7 @@ The developer's primary command. Starts everything needed for local development.
 
 **`gazetta publish [target]`**
 
-Renders content and pushes it to a target. One command to go live.
+Renders content and pushes it to a target. The daily production command.
 
 - Auto-detects site + target (first target if not specified)
 - Renders pages and fragments using templates (SSR)
@@ -436,22 +438,26 @@ gazetta publish staging        # different target
 
 **`gazetta build`**
 
-Builds the admin UI for production. Only needed if self-hosting the admin with `gazetta serve`.
-Most developers don't need this — they use `gazetta dev` locally and `gazetta publish` to go live.
+Builds the admin UI and worker code. Run before `deploy` or `serve`.
 
 - Builds admin SPA via Vite `build()` API → `dist/admin/`
 - Bundles custom editors/fields with esbuild → `dist/admin/editors/`, `dist/admin/fields/`
 - Generates import map for shared deps → injected into `dist/admin/index.html`
+- Generates worker code → `dist/worker/`
 
-**`gazetta deploy [target] [what]`**
+**`gazetta deploy [target]`**
 
-Deploys infrastructure for a target. Rare — only on initial setup or Gazetta upgrades.
+Deploys the built worker to a target's edge platform. Rare — only on initial setup or Gazetta upgrades.
 Each target has its own worker (different storage, cache, URL).
 
+- Requires `gazetta build` first
+- Deploys worker from `dist/worker/` to the target's platform
+- Currently: Cloudflare Workers
+- Future: Deno Deploy, Vercel Edge, Netlify Edge
+
 ```
-gazetta deploy production worker   # deploy worker for production target
-gazetta deploy staging worker      # deploy worker for staging target
-gazetta deploy worker              # deploy worker for default target
+gazetta deploy production      # deploy worker to production
+gazetta deploy staging         # deploy worker to staging
 ```
 
 **`gazetta serve`**
