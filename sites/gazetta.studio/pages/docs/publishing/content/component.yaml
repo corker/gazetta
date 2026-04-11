@@ -9,13 +9,13 @@ content:
       <li><code>worker: cloudflare</code> — Cloudflare Workers (edge assembly)</li>
     </ul>
     <p><strong>Publish content:</strong></p>
-    <p><code>npx gazetta publish</code> — publishes to all targets<br>
-    <code>npx gazetta publish -t production</code> — specific target</p>
+    <p><code>npx gazetta publish</code> — publishes to default target<br>
+    <code>npx gazetta publish production</code> — specific target</p>
     <p><strong>Serve locally:</strong></p>
     <p><code>npx gazetta serve</code> — serves from first target<br>
-    <code>npx gazetta serve -t staging -p 8080</code> — specific target and port</p>
+    <code>npx gazetta serve staging -p 8080</code> — specific target and port</p>
     <p><strong>Deploy Cloudflare Worker (one-time):</strong></p>
-    <p><code>npx gazetta deploy -t production</code></p>
+    <p><code>npx gazetta deploy production</code></p>
     <p>Publish as often as you want. Deploy/serve once.</p>
     <p><strong>Authentication:</strong> Run <code>npx wrangler login</code> for local R2 access. For CI, set <code>CLOUDFLARE_API_TOKEN</code>. The CLI loads <code>.env</code> from the site directory automatically.</p>
     <p><strong>Cache:</strong></p>

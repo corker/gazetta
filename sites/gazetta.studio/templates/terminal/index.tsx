@@ -72,6 +72,11 @@ const template: TemplateFunction<Content> = ({ content }) => {
 .term-cmd { color: #e4e4e7; }
 .term-output { color: #71717a; }
 .term-cursor { color: #22c55e; animation: blink 0.8s step-end infinite; }
+.t-green { color: #4ade80; }
+.t-cyan { color: #67e8f9; }
+.t-dim { color: #52525b; }
+.t-bold { font-weight: 700; color: #e4e4e7; }
+.t-badge { background: #166534; color: #fff; padding: 1px 6px; border-radius: 3px; font-weight: 700; }
 @keyframes blink { 50% { opacity: 0; } }`,
     js: `{
   const el = document.getElementById('${id}')
@@ -90,9 +95,21 @@ const template: TemplateFunction<Content> = ({ content }) => {
     if (cursorEl) cursorEl.style.display = 'none'
   }
 
+  function colorize(text) {
+    return text
+      .replace(/\\x1b\\[([0-9;]+)m/g, '') // strip real ANSI (shouldn't appear, safety)
+      .replace(/\{green\}(.*?)\{\/\}/g, '<span class="t-green">$1</span>')
+      .replace(/\{cyan\}(.*?)\{\/\}/g, '<span class="t-cyan">$1</span>')
+      .replace(/\{dim\}(.*?)\{\/\}/g, '<span class="t-dim">$1</span>')
+      .replace(/\{bold\}(.*?)\{\/\}/g, '<span class="t-bold">$1</span>')
+      .replace(/\{badge\}(.*?)\{\/\}/g, '<span class="t-badge">$1</span>')
+  }
+
   async function showOutput(lineEl, text) {
     lineEl.style.opacity = '1'
-    lineEl.querySelector('.term-output').textContent = text
+    const outEl = lineEl.querySelector('.term-output')
+    if (text.includes('{')) { outEl.innerHTML = colorize(text) }
+    else { outEl.textContent = text }
   }
 
   async function run() {

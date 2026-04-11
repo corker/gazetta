@@ -60,9 +60,9 @@ That's it. The server reads from the target's storage and assembles pages on eac
 
 ```bash
 gazetta serve                      # first target, port 3000
-gazetta serve -t production        # specific target
+gazetta serve production           # specific target
 gazetta serve -p 8080              # custom port
-gazetta serve -t staging -p 3001   # combine
+gazetta serve staging -p 3001     # combine
 ```
 
 ## Cache headers

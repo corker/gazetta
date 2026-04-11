@@ -417,9 +417,9 @@ Values in site.yaml can reference env vars with `${VAR_NAME}` syntax — they're
 ### Publish and deploy
 
 ```bash
-npx gazetta publish                   # publish content to all targets
-npx gazetta publish -t production     # publish to specific target
-npx gazetta deploy -t production      # deploy worker (one-time setup)
+npx gazetta publish                   # publish to default target
+npx gazetta publish production        # publish to specific target
+npx gazetta deploy production         # deploy worker (one-time setup)
 ```
 
 `publish` pre-renders pages and uploads to storage. `deploy` deploys the worker that serves them. Deploy once, publish as often as you want.

@@ -1,34 +1,35 @@
-import { describe, it, expect } from 'vitest'
-import { resolve, join } from 'node:path'
+import { describe, it, expect, afterEach } from 'vitest'
+import { resolve, join, dirname } from 'node:path'
 import { existsSync } from 'node:fs'
+import { mkdir, rm, writeFile, readdir } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 
 // Test the helper functions from the CLI by extracting the logic
 // Since the CLI is a script with side effects, we test the pure functions
 
 describe('parseArgs', () => {
-  // Inline the parseArgs logic for testing
-  function parseArgs(input: string[]): { siteDir: string; port?: number } {
-    let siteDir = '.'
+  function parseArgs(input: string[]): { positional: string[]; port?: number } {
+    const positional: string[] = []
     let port: number | undefined
     for (let i = 0; i < input.length; i++) {
       if (input[i] === '--port' || input[i] === '-p') {
         port = parseInt(input[++i], 10)
       } else if (!input[i].startsWith('-')) {
-        siteDir = input[i]
+        positional.push(input[i])
       }
     }
-    return { siteDir: resolve(siteDir), port }
+    return { positional, port }
   }
 
-  it('defaults to current dir', () => {
-    const { siteDir, port } = parseArgs([])
-    expect(siteDir).toBe(resolve('.'))
+  it('defaults to empty positional', () => {
+    const { positional, port } = parseArgs([])
+    expect(positional).toEqual([])
     expect(port).toBeUndefined()
   })
 
-  it('parses site dir', () => {
-    const { siteDir } = parseArgs(['./my-site'])
-    expect(siteDir).toBe(resolve('./my-site'))
+  it('collects positional args', () => {
+    const { positional } = parseArgs(['production', 'my-site'])
+    expect(positional).toEqual(['production', 'my-site'])
   })
 
   it('parses --port flag', () => {
@@ -41,16 +42,98 @@ describe('parseArgs', () => {
     expect(port).toBe(4000)
   })
 
-  it('parses site dir with port', () => {
-    const { siteDir, port } = parseArgs(['./site', '--port', '9000'])
-    expect(siteDir).toBe(resolve('./site'))
+  it('mixes positional and flags', () => {
+    const { positional, port } = parseArgs(['production', '-p', '9000', 'my-site'])
+    expect(positional).toEqual(['production', 'my-site'])
     expect(port).toBe(9000)
   })
+})
 
-  it('parses port before site dir', () => {
-    const { siteDir, port } = parseArgs(['-p', '3001', './site'])
-    expect(siteDir).toBe(resolve('./site'))
-    expect(port).toBe(3001)
+describe('detectProjectRoot', () => {
+  function detectProjectRoot(siteDir: string): string {
+    if (existsSync(join(siteDir, 'templates'))) return siteDir
+    let dir = resolve(siteDir)
+    const root = resolve('/')
+    while (dir !== root) {
+      const parent = dirname(dir)
+      if (existsSync(join(parent, 'templates'))) return parent
+      dir = parent
+    }
+    return siteDir
+  }
+
+  it('returns siteDir when templates/ is inside it (flat project)', () => {
+    const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+    // Starter has templates/ at root — flat detection
+    expect(detectProjectRoot(starterDir)).toBe(starterDir)
+  })
+
+  it('finds project root from sites/main/ (restructured project)', () => {
+    const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+    const siteDir = join(starterDir, 'sites/main')
+    // Should walk up to find templates/ in the parent
+    expect(detectProjectRoot(siteDir)).toBe(starterDir)
+  })
+
+  it('falls back to siteDir when no templates/ found', () => {
+    const tmpDir = join(tmpdir(), 'gazetta-no-templates-' + Date.now())
+    // Doesn't exist, so no templates/ anywhere
+    expect(detectProjectRoot(tmpDir)).toBe(tmpDir)
+  })
+})
+
+describe('runInit', () => {
+  const testDir = join(tmpdir(), 'gazetta-init-test-' + Date.now())
+
+  afterEach(async () => {
+    await rm(testDir, { recursive: true, force: true })
+  })
+
+  it('scaffolds the correct project structure', async () => {
+    // Run init via the compiled CLI
+    const { execSync } = await import('node:child_process')
+    execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} init ${testDir}`, { stdio: 'pipe' })
+
+    // Verify structure
+    expect(existsSync(join(testDir, 'package.json'))).toBe(true)
+    expect(existsSync(join(testDir, 'templates/hero/index.ts'))).toBe(true)
+    expect(existsSync(join(testDir, 'templates/page-layout/index.ts'))).toBe(true)
+    expect(existsSync(join(testDir, 'templates/nav/index.ts'))).toBe(true)
+    expect(existsSync(join(testDir, 'templates/text-block/index.ts'))).toBe(true)
+    expect(existsSync(join(testDir, 'admin/.gitkeep'))).toBe(true)
+    expect(existsSync(join(testDir, 'sites/main/site.yaml'))).toBe(true)
+    expect(existsSync(join(testDir, 'sites/main/pages/home/page.yaml'))).toBe(true)
+    expect(existsSync(join(testDir, 'sites/main/pages/home/hero/component.yaml'))).toBe(true)
+    expect(existsSync(join(testDir, 'sites/main/fragments/header/fragment.yaml'))).toBe(true)
+    expect(existsSync(join(testDir, 'sites/main/pages/404/page.yaml'))).toBe(true)
+
+    // No old flat structure
+    expect(existsSync(join(testDir, 'site.yaml'))).toBe(false)
+    expect(existsSync(join(testDir, 'pages'))).toBe(false)
+    expect(existsSync(join(testDir, 'fragments'))).toBe(false)
+  })
+
+  it('package.json has correct fields', async () => {
+    const { execSync } = await import('node:child_process')
+    execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} init ${testDir}`, { stdio: 'pipe' })
+
+    const pkg = JSON.parse(await import('node:fs').then(fs => fs.readFileSync(join(testDir, 'package.json'), 'utf-8')))
+    expect(pkg.private).toBe(true)
+    expect(pkg.type).toBe('module')
+    expect(pkg.engines.node).toBe('>=22')
+    expect(pkg.scripts.dev).toBe('gazetta dev')
+    expect(pkg.dependencies.react).toBeDefined()
+    expect(pkg.dependencies.zod).toBeDefined()
+  })
+
+  it('refuses to init in existing project', async () => {
+    const { execSync } = await import('node:child_process')
+    execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} init ${testDir}`, { stdio: 'pipe' })
+
+    // Try again — should fail
+    expect(() => {
+      execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} init ${testDir}`, { stdio: 'pipe' })
+    }).toThrow()
   })
 })
 
@@ -75,7 +158,6 @@ describe('findCmsDir (dev mode detection)', () => {
 })
 
 describe('renderErrorOverlay', () => {
-  // Inline the function for testing
   function renderErrorOverlay(err: Error): string {
     const message = err.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const stack = (err.stack ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -102,29 +184,5 @@ describe('renderErrorOverlay', () => {
     err.stack = `Error: bad\n    at Object.<anonymous> (/Users/dev/templates/hero/index.ts:5:10)`
     const html = renderErrorOverlay(err)
     expect(html).toContain('/Users/dev/templates/hero/index.ts:5')
-  })
-})
-
-describe('findCmsStaticDir (production mode detection)', () => {
-  function findCmsStaticDir(): string | null {
-    const candidates = [
-      resolve(import.meta.dirname, '../admin-dist'),
-      resolve(import.meta.dirname, '../../admin-dist'),
-    ]
-    for (const dir of candidates) {
-      if (existsSync(join(dir, 'index.html'))) return dir
-    }
-    return null
-  }
-
-  it('finds admin-dist when built', () => {
-    const dir = findCmsStaticDir()
-    // May or may not exist depending on whether build:admin has been run
-    if (existsSync(resolve(import.meta.dirname, '../admin-dist/index.html'))) {
-      expect(dir).not.toBeNull()
-      expect(dir).toContain('admin-dist')
-    } else {
-      expect(dir).toBeNull()
-    }
   })
 })

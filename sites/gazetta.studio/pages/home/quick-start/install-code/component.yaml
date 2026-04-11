@@ -4,18 +4,16 @@ content:
   lines:
     - command: "npx gazetta init my-site"
       delay: 300
-    - output: "  Created site in /projects/my-site"
+    - output: "  {green}Created{/} my-site/"
       delay: 400
-    - command: "cd my-site && npm install"
-      delay: 500
-    - output: "  added 42 packages in 3s"
+    - output: "  {dim}Installing dependencies...{/}"
       delay: 800
-    - command: "npx gazetta dev"
+    - output: "  {green}Dependencies installed{/}"
+      delay: 400
+    - command: "cd my-site && npx gazetta dev"
       delay: 500
-    - output: "  Gazetta running at http://localhost:3000"
+    - output: "  {badge} gazetta {/} {green}my-site{/} {dim}ready in 120 ms{/}"
       delay: 300
     - output: ""
-    - output: "  Site: my-site"
-    - output: "  Pages:"
-    - output: "    / → home"
-    - output: "  CMS:  http://localhost:3000/admin"
+    - output: "  {dim}┃{/} Local    {cyan}http://localhost:3000/{/}"
+    - output: "  {dim}┃{/} CMS      {cyan}http://localhost:3000/admin{/}"

@@ -49,7 +49,7 @@ Find your account ID in the Cloudflare dashboard URL: `dash.cloudflare.com/<acco
 ### 3. Deploy worker (one time)
 
 ```bash
-npx gazetta deploy -t production
+npx gazetta deploy production
 ```
 
 ### 4. Publish content

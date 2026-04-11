@@ -16,6 +16,19 @@ import { invalidateTemplate, invalidateAllTemplates } from '../template-loader.j
 import type { SiteManifest } from '../types.js'
 import { createAdminApp } from '../admin-api/index.js'
 
+// ANSI color helpers — no dependency, suppressed when NO_COLOR or CI
+const noColor = !!process.env.NO_COLOR || !process.stdout.isTTY
+const c = {
+  bold: (s: string) => noColor ? s : `\x1b[1m${s}\x1b[22m`,
+  dim: (s: string) => noColor ? s : `\x1b[2m${s}\x1b[22m`,
+  cyan: (s: string) => noColor ? s : `\x1b[36m${s}\x1b[39m`,
+  green: (s: string) => noColor ? s : `\x1b[32m${s}\x1b[39m`,
+  yellow: (s: string) => noColor ? s : `\x1b[33m${s}\x1b[39m`,
+  red: (s: string) => noColor ? s : `\x1b[31m${s}\x1b[39m`,
+  magenta: (s: string) => noColor ? s : `\x1b[35m${s}\x1b[39m`,
+  bgGreen: (s: string) => noColor ? s : `\x1b[42m\x1b[30m${s}\x1b[39m\x1b[49m`,
+}
+
 const args = process.argv.slice(2)
 const command = args[0]
 
@@ -44,59 +57,148 @@ function printHelp() {
   gazetta - Stateless CMS for composable websites
 
   Usage:
-    gazetta init [dir]        Create a new site
-    gazetta dev [site-dir]    Start dev server + CMS at /admin
-    gazetta publish [site-dir] Pre-render and publish to targets
-    gazetta serve [site-dir]  Serve published site from target storage
-    gazetta deploy -t <name>  Deploy worker to hosting (one-time setup)
-    gazetta validate [site-dir] Check site for broken references
-    gazetta help              Show this help message
+    gazetta init [dir]              Create a new site
+    gazetta dev [site]              Start dev server + CMS at /admin
+    gazetta publish [target] [site] Pre-render and publish to a target
+    gazetta serve [target] [site]   Serve published site from target storage
+    gazetta deploy [target] [site]  Deploy worker to hosting (one-time setup)
+    gazetta validate [site]         Check site for broken references
+    gazetta help                    Show this help message
 
   Options:
-    --port, -p <port>         Server port (default: 3000)
-    --target, -t <name>       Target to publish/deploy/serve (default: first)
+    --port, -p <port>               Server port (default: 3000)
+
+  Auto-detection:
+    Site is auto-detected from sites/ directory. If multiple sites exist,
+    you'll be prompted to choose (or pass it as an argument).
+
+    Target is auto-detected as the first target in site.yaml. If multiple
+    targets exist, you'll be prompted to choose (or pass it as an argument).
 
   Examples:
-    gazetta init my-site            # scaffold a new site
-    gazetta dev                     # dev server + CMS
-    gazetta publish                  # publish to all targets
-    gazetta publish -t production   # publish to specific target
-    gazetta serve                   # serve from first target
-    gazetta serve -t staging -p 8080 # serve staging on port 8080
-    gazetta deploy -t production    # deploy worker (one-time)
-    gazetta validate                # check site for broken references
+    gazetta init my-site                # scaffold a new site
+    gazetta dev                         # dev server (auto-detect site)
+    gazetta publish                     # publish to default target
+    gazetta publish production          # publish to production
+    gazetta publish production my-site  # publish specific site to production
+    gazetta serve production -p 8080    # serve production on port 8080
+    gazetta validate                    # check site for errors
 `)
 }
 
-function parseArgs(input: string[]): { siteDir: string; port?: number; target?: string } {
-  let siteDir = '.'
+interface ParsedArgs { positional: string[]; port?: number }
+
+function parseArgs(input: string[]): ParsedArgs {
+  const positional: string[] = []
   let port: number | undefined
-  let target: string | undefined
   for (let i = 0; i < input.length; i++) {
     if (input[i] === '--port' || input[i] === '-p') {
       port = parseInt(input[++i], 10)
-    } else if (input[i] === '--target' || input[i] === '-t') {
-      target = input[++i]
     } else if (!input[i].startsWith('-')) {
-      siteDir = input[i]
+      positional.push(input[i])
     }
   }
-  return { siteDir: resolve(siteDir), port, target }
+  return { positional, port }
+}
+
+/**
+ * Resolve the site directory from positional args or auto-detection.
+ * For commands like `dev` and `validate`, the first positional is the site.
+ * For commands like `publish` and `serve`, the first positional is the target
+ * and the second is the site.
+ */
+async function resolveSiteDir(positionalSite?: string): Promise<string> {
+  // Explicit site dir provided
+  if (positionalSite) {
+    const dir = resolve(positionalSite)
+    if (existsSync(join(dir, 'site.yaml'))) return dir
+    // Maybe it's a site name under sites/
+    const sitesSubdir = resolve('sites', positionalSite)
+    if (existsSync(join(sitesSubdir, 'site.yaml'))) return sitesSubdir
+    // Maybe it's a project root with sites/
+    const mainSite = resolve(dir, 'sites/main')
+    if (existsSync(join(mainSite, 'site.yaml'))) return mainSite
+    return dir // let loadSite produce a clear error
+  }
+
+  // Auto-detect: check current dir first
+  if (existsSync(join(resolve('.'), 'site.yaml'))) return resolve('.')
+
+  // Check sites/ directory
+  const sitesDir = resolve('sites')
+  if (existsSync(sitesDir)) {
+    const { readdirSync, statSync } = await import('node:fs')
+    const sites = readdirSync(sitesDir)
+      .filter(name => {
+        const dir = join(sitesDir, name)
+        return statSync(dir).isDirectory() && existsSync(join(dir, 'site.yaml'))
+      })
+
+    if (sites.length === 1) return join(sitesDir, sites[0])
+    if (sites.length > 1) {
+      if (process.env.CI) {
+        console.error(`\n  Error: multiple sites found. Specify one: gazetta ${command} <site>\n  Available: ${sites.join(', ')}\n`)
+        process.exit(1)
+      }
+      const { select } = await import('@clack/prompts')
+      const result = await select({
+        message: 'Select site:',
+        options: sites.map(s => ({ value: s, label: s })),
+      })
+      if (typeof result === 'symbol') process.exit(0) // cancelled
+      return join(sitesDir, result as string)
+    }
+  }
+
+  // No site found — give a helpful error
+  console.error(`\n  Error: no site found in current directory.\n`)
+  console.error(`  To create a new project:  gazetta init my-site`)
+  console.error(`  To use an existing site:  gazetta ${command} <path-to-site>\n`)
+  process.exit(1)
+}
+
+/**
+ * Resolve target from positional args or auto-detection.
+ * Prompts if multiple targets and no explicit choice.
+ */
+async function resolveTarget(positionalTarget: string | undefined, siteDir: string): Promise<string | undefined> {
+  if (positionalTarget) return positionalTarget
+
+  const siteYamlPath = join(siteDir, 'site.yaml')
+  if (!existsSync(siteYamlPath)) return undefined
+
+  const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as SiteManifest
+  const targets = Object.keys(siteYaml.targets ?? {})
+
+  if (targets.length <= 1) return targets[0] // auto-select if 0 or 1
+
+  if (process.env.CI) {
+    console.error(`\n  Error: multiple targets found. Specify one: gazetta ${command} <target>\n  Available: ${targets.join(', ')}\n`)
+    process.exit(1)
+  }
+
+  const { select } = await import('@clack/prompts')
+  const result = await select({
+    message: 'Select target:',
+    options: targets.map(t => ({ value: t, label: t })),
+  })
+  if (typeof result === 'symbol') process.exit(0)
+  return result as string
 }
 
 async function runInit(dir: string) {
   const { writeFile, mkdir } = await import('node:fs/promises')
   const target = resolve(dir)
 
-  if (existsSync(join(target, 'site.yaml'))) {
-    console.error(`\n  Error: site.yaml already exists in ${target}\n`)
+  if (existsSync(join(target, 'sites')) || existsSync(join(target, 'site.yaml'))) {
+    console.error(`\n  Error: project already exists in ${target}\n`)
     process.exit(1)
   }
 
   const name = target.split('/').pop() ?? 'my-site'
 
   const files: Record<string, string> = {
-    'site.yaml': `name: ${name}\nversion: 1.0.0\n`,
+    'sites/main/site.yaml': `name: ${name}\nversion: 1.0.0\n`,
 
     'templates/page-layout/index.ts': `import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
@@ -190,7 +292,7 @@ const template: TemplateFunction = ({ content = {} }) => {
 export default template
 `,
 
-    'fragments/header/fragment.yaml': `template: nav
+    'sites/main/fragments/header/fragment.yaml': `template: nav
 content:
   brand: ${name}
   links:
@@ -198,7 +300,7 @@ content:
       href: /
 `,
 
-    'pages/home/page.yaml': `template: page-layout
+    'sites/main/pages/home/page.yaml': `template: page-layout
 content:
   title: ${name}
   description: A site built with Gazetta
@@ -208,32 +310,33 @@ components:
   - intro
 `,
 
-    'pages/home/hero/component.yaml': `template: hero
+    'sites/main/pages/home/hero/component.yaml': `template: hero
 content:
   title: Welcome to ${name}
   subtitle: A site built with Gazetta
 `,
 
-    'pages/home/intro/component.yaml': `template: text-block
+    'sites/main/pages/home/intro/component.yaml': `template: text-block
 content:
   body: "<p>Edit this content in the CMS at <a href='/admin'>/admin</a>.</p>"
 `,
 
-    'pages/404/page.yaml': `template: page-layout
+    'sites/main/pages/404/page.yaml': `template: page-layout
 content:
   title: "Page Not Found"
   description: "The page you're looking for doesn't exist."
 `,
 
-    '.gitignore': `node_modules/\ndist/\n.env\n.env.local\n`,
+    'admin/.gitkeep': '',
+    '.gitignore': `node_modules/\ndist/\n.env.local\n`,
 
     'package.json': JSON.stringify({
       name,
       private: true,
       type: 'module',
-      scripts: { dev: 'gazetta dev .' },
-      dependencies: { gazetta: '*' },
-      devDependencies: { tsx: '^4.21.0', zod: '^4.3.6' },
+      engines: { node: '>=22' },
+      scripts: { dev: 'gazetta dev' },
+      dependencies: { gazetta: '*', react: '^19.0.0', 'react-dom': '^19.0.0', zod: '^4.0.0' },
     }, null, 2) + '\n',
   }
 
@@ -243,12 +346,34 @@ content:
     await writeFile(fullPath, content)
   }
 
-  console.log(`\n  Created site in ${target}\n`)
-  console.log(`  Next steps:`)
-  if (dir !== '.') console.log(`    cd ${dir}`)
-  console.log(`    npm install`)
-  console.log(`    npx gazetta dev`)
-  console.log()
+  const { intro, outro, note, spinner } = await import('@clack/prompts')
+  intro(c.bgGreen(c.bold(' gazetta ')))
+
+  note(
+    `${c.bold('templates/')}          ${c.dim('4 templates (hero, nav, page-layout, text-block)')}\n` +
+    `${c.bold('admin/')}              ${c.dim('custom editors and fields')}\n` +
+    `${c.bold('sites/main/')}         ${c.dim('site content')}\n` +
+    `  ${c.dim('pages/home/')}       ${c.dim('home page with hero + intro')}\n` +
+    `  ${c.dim('pages/404/')}        ${c.dim('error page')}\n` +
+    `  ${c.dim('fragments/header/')} ${c.dim('shared header nav')}\n` +
+    `  ${c.dim('site.yaml')}         ${c.dim('site config')}\n` +
+    `${c.bold('package.json')}`,
+    `Created ${c.green(name)}/`
+  )
+
+  // Run npm install
+  const s = spinner()
+  s.start('Installing dependencies')
+  try {
+    const { execSync } = await import('node:child_process')
+    execSync('npm install', { cwd: target, stdio: 'pipe' })
+    s.stop('Dependencies installed')
+  } catch {
+    s.stop('npm install failed — run it manually')
+  }
+
+  const cdStep = dir !== '.' ? `cd ${dir} && ` : ''
+  outro(`Done! Run: ${c.cyan(`${cdStep}npx gazetta dev`)}`)
 }
 
 async function runPublish(siteDir: string, targetName?: string) {
@@ -256,18 +381,21 @@ async function runPublish(siteDir: string, targetName?: string) {
   const projectRoot = detectProjectRoot(siteDir)
   const templatesDir = join(projectRoot, 'templates')
 
-  console.log(`\n  Loading site from ${siteDir}...`)
   const site = await loadSite({ siteDir, storage, templatesDir })
 
   // Load target configs from site.yaml
   const siteYamlPath = join(siteDir, 'site.yaml')
   if (!existsSync(siteYamlPath)) {
-    console.error(`\n  Error: No site.yaml found at ${siteDir}\n`)
+    console.error(`\n  ${c.red('Error:')} No site.yaml found at ${siteDir}\n`)
     process.exit(1)
   }
   const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as import('../types.js').SiteManifest
   if (!siteYaml.targets || Object.keys(siteYaml.targets).length === 0) {
-    console.error(`\n  Error: No targets configured in site.yaml\n`)
+    console.error(`\n  Error: no targets configured in ${siteYamlPath}`)
+    console.error(`\n  Add a target to site.yaml:\n`)
+    console.error(`    targets:`)
+    console.error(`      staging:`)
+    console.error(`        storage: { type: filesystem, path: ./dist/staging }\n`)
     process.exit(1)
   }
 
@@ -289,10 +417,13 @@ async function runPublish(siteDir: string, targetName?: string) {
 
   const { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } = await import('../publish-rendered.js')
 
-  console.log(`\n  Site: ${site.manifest.name}`)
-  console.log(`  Pages: ${[...site.pages.keys()].join(', ')}`)
-  console.log(`  Fragments: ${[...site.fragments.keys()].join(', ')}`)
-  console.log(`  Targets: ${targetNames.join(', ')}\n`)
+  console.log()
+  console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green('publish')} ${c.dim(site.manifest.name)}`)
+  console.log()
+  console.log(`  ${c.dim('┃')} Pages      ${c.dim([...site.pages.keys()].join(', '))}`)
+  console.log(`  ${c.dim('┃')} Fragments  ${c.dim([...site.fragments.keys()].join(', '))}`)
+  console.log(`  ${c.dim('┃')} Targets    ${targetNames.join(', ')}`)
+  console.log()
 
   for (const name of targetNames) {
     const targetStorage = targets.get(name)
@@ -305,7 +436,7 @@ async function runPublish(siteDir: string, targetName?: string) {
     const { getPublishMode } = await import('../types.js')
     const publishMode = targetConfig ? getPublishMode(targetConfig) : 'static'
     const isStatic = publishMode === 'static'
-    console.log(`  Publishing to ${name} (${publishMode})...`)
+    console.log(`  ${c.bold(name)} ${c.dim(`(${publishMode})`)}`)
     let totalFiles = 0
     let totalRemoved = 0
 
@@ -314,7 +445,7 @@ async function runPublish(siteDir: string, targetName?: string) {
       for (const pageName of site.pages.keys()) {
         const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir)
         totalFiles += files
-        console.log(`    page: ${pageName} (${files} files)`)
+        console.log(`    ${c.green('✓')} ${pageName}`)
       }
     } else {
       // ESI mode — fragments separate, pages with placeholders
@@ -322,13 +453,13 @@ async function runPublish(siteDir: string, targetName?: string) {
         const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage, templatesDir)
         totalFiles += files
         totalRemoved += removed
-        console.log(`    fragment: ${fragName} (${files} files)`)
+        console.log(`    ${c.green('✓')} @${fragName}`)
       }
       for (const pageName of site.pages.keys()) {
         const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache, templatesDir)
         totalFiles += files
         totalRemoved += removed
-        console.log(`    page: ${pageName} (${files} files)`)
+        console.log(`    ${c.green('✓')} ${pageName}`)
       }
     }
 
@@ -337,8 +468,8 @@ async function runPublish(siteDir: string, targetName?: string) {
     await publishFragmentIndex(storage, siteDir, targetStorage)
     totalFiles += 2
 
-    const removedMsg = totalRemoved > 0 ? `, ${totalRemoved} old files cleaned up` : ''
-    console.log(`  ${name}: ${totalFiles} files published${removedMsg}\n`)
+    const removedMsg = totalRemoved > 0 ? c.dim(` (${totalRemoved} old files cleaned)`) : ''
+    console.log(`\n  ${c.green('✓')} ${c.bold(name)}: ${totalFiles} files published${removedMsg}\n`)
   }
 
   // Purge CDN cache per target
@@ -419,7 +550,7 @@ async function runDeploy(siteDir: string, targetName?: string) {
     process.exit(1)
   }
   if (!targetName) {
-    console.error(`\n  Error: --target is required for deploy\n  Usage: gazetta deploy -t <target-name>\n`)
+    console.error(`\n  ${c.red('Error:')} target is required for deploy\n  Usage: gazetta deploy <target-name>\n`)
     process.exit(1)
   }
   const target = siteYaml.targets[targetName]
@@ -482,7 +613,7 @@ async function runDeploy(siteDir: string, targetName?: string) {
     await rm(tmpDir, { recursive: true, force: true })
   }
 
-  console.log(`\n  Worker deployed. Now publish content:\n    gazetta publish -t ${targetName}\n`)
+  console.log(`\n  ${c.green('✓')} Worker deployed. Now publish content:\n    ${c.cyan(`gazetta publish ${targetName}`)}\n`)
 }
 
 async function runValidate(siteDir: string) {
@@ -490,15 +621,17 @@ async function runValidate(siteDir: string) {
   const projectRoot = detectProjectRoot(siteDir)
   const templatesDir = join(projectRoot, 'templates')
 
-  console.log(`\n  Validating ${siteDir}...\n`)
+  console.log()
+  console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green('validate')} ${c.dim(siteDir)}`)
+  console.log()
 
   // 1. Check site.yaml
   let site: Awaited<ReturnType<typeof loadSite>>
   try {
     site = await loadSite({ siteDir, storage, templatesDir })
-    console.log(`  ✓ site.yaml — ${site.manifest.name}`)
+    console.log(`  ${c.green('✓')} site.yaml ${c.dim(`— ${site.manifest.name}`)}`)
   } catch (err) {
-    console.error(`  ✗ site.yaml — ${(err as Error).message}`)
+    console.error(`  ${c.red('✗')} site.yaml ${c.dim(`— ${(err as Error).message}`)}`)
     process.exit(1)
   }
 
@@ -512,9 +645,9 @@ async function runValidate(siteDir: string) {
       await resolveComponent(`@${fragName}`, '', ctx)
 
       const childCount = frag.components?.length ?? 0
-      console.log(`  ✓ fragment: ${fragName} (${childCount} components)`)
+      console.log(`  ${c.green('✓')} @${fragName} ${c.dim(`(${childCount} components)`)}`)
     } catch (err) {
-      console.error(`  ✗ fragment: ${fragName} — ${(err as Error).message}`)
+      console.error(`  ${c.red('✗')} @${fragName} ${c.dim(`— ${(err as Error).message}`)}`)
       errors++
     }
   }
@@ -525,10 +658,10 @@ async function runValidate(siteDir: string) {
       await resolvePage(pageName, site)
 
       const componentCount = page.components?.length ?? 0
-      const fragmentCount = page.components?.filter(c => c.startsWith('@')).length ?? 0
-      console.log(`  ✓ page: ${pageName} (${componentCount} components, ${fragmentCount} fragments)`)
+      const fragmentCount = page.components?.filter(cc => cc.startsWith('@')).length ?? 0
+      console.log(`  ${c.green('✓')} ${pageName} ${c.dim(`(${componentCount} components, ${fragmentCount} fragments)`)}`)
     } catch (err) {
-      console.error(`  ✗ page: ${pageName} — ${(err as Error).message}`)
+      console.error(`  ${c.red('✗')} ${pageName} ${c.dim(`— ${(err as Error).message}`)}`)
       errors++
     }
   }
@@ -537,9 +670,9 @@ async function runValidate(siteDir: string) {
   try {
     const entries = await storage.readDir(templatesDir)
     const templateCount = entries.filter(e => e.isDirectory).length
-    console.log(`  ✓ ${templateCount} templates found`)
+    console.log(`  ${c.green('✓')} ${c.dim(`${templateCount} templates`)}`)
   } catch {
-    console.log(`  ⚠ templates/ directory not found`)
+    console.log(`  ${c.yellow('⚠')} ${c.dim('templates/ directory not found')}`)
   }
 
   console.log()
@@ -605,7 +738,6 @@ async function runDev(siteDir: string, port: number) {
   const templatesDir = join(projectRoot, 'templates')
   const adminDir = join(projectRoot, 'admin')
 
-  console.log(`\n  Loading site from ${siteDir}...`)
   const site = await loadSite({ siteDir, storage, templatesDir })
 
   const app = new Hono()
@@ -663,12 +795,20 @@ async function runDev(siteDir: string, port: number) {
   })
 
   // ---- Start server ----
+  const startTime = performance.now()
   const nodeServer = serve({ fetch: app.fetch, port }, async () => {
-    console.log(`\n  Gazetta running at http://localhost:${port}\n`)
-    console.log(`  Site: ${site.manifest.name}`)
-    console.log(`  Pages:`)
-    for (const [name, page] of site.pages) console.log(`    ${page.route} → ${name}`)
-    console.log(`  Fragments: ${[...site.fragments.keys()].join(', ') || '(none)'}`)
+    const elapsed = Math.round(performance.now() - startTime)
+    console.log()
+    console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green(site.manifest.name)} ${c.dim(`ready in ${elapsed} ms`)}`)
+    console.log()
+    console.log(`  ${c.dim('┃')} Local    ${c.cyan(`http://localhost:${port}/`)}`)
+    if (isDevMode) {
+      console.log(`  ${c.dim('┃')} CMS      ${c.cyan(`http://localhost:${port}/admin`)}`)
+      console.log(`  ${c.dim('┃')} Dev      ${c.cyan(`http://localhost:${port}/admin/dev`)}`)
+    }
+    console.log()
+    console.log(`  ${c.dim('┃')} Pages    ${[...site.pages.entries()].map(([n, p]) => `${c.dim(p.route)} ${c.dim('→')} ${n}`).join(c.dim(', '))}`)
+    console.log(`  ${c.dim('┃')} Frags    ${c.dim([...site.fragments.keys()].join(', ') || '(none)')}`)
 
     if (isDevMode && cmsWebDir) {
       try {
@@ -712,12 +852,9 @@ async function runDev(siteDir: string, port: number) {
           }
         })
 
-        console.log(`  CMS:  http://localhost:${port}/admin (dev mode + HMR)`)
       } catch (err) {
         console.warn(`  Warning: CMS UI failed to start: ${(err as Error).message}`)
       }
-    } else if (cmsStaticDir) {
-      console.log(`  CMS:  http://localhost:${port}/admin`)
     }
     console.log()
   })
@@ -832,42 +969,71 @@ async function main() {
 
   const parsed = parseArgs(args.slice(1))
 
-  // Load .env from site directory (skipped in CI)
+  // Commands that take [target] [site] positional args
+  const targetFirstCommands = new Set(['publish', 'serve', 'deploy'])
+  // Commands that take [site] positional arg
+  const siteOnlyCommands = new Set(['dev', 'validate'])
+
+  let siteDir: string
+  let targetName: string | undefined
+
+  if (command === 'init') {
+    await runInit(parsed.positional[0] ?? '.')
+    return
+  } else if (targetFirstCommands.has(command)) {
+    // gazetta publish [target] [site]
+    const [first, second] = parsed.positional
+    // If first arg looks like a site path (contains / or has site.yaml), it's the site
+    const firstIsSite = first && (first.includes('/') || existsSync(join(resolve(first), 'site.yaml')))
+    if (firstIsSite) {
+      siteDir = await resolveSiteDir(first)
+      targetName = await resolveTarget(undefined, siteDir)
+    } else {
+      siteDir = await resolveSiteDir(second)
+      targetName = await resolveTarget(first, siteDir)
+    }
+  } else if (siteOnlyCommands.has(command)) {
+    siteDir = await resolveSiteDir(parsed.positional[0])
+  } else {
+    console.error(`  Unknown command: ${command}\n`)
+    printHelp()
+    process.exit(1)
+    return
+  }
+
+  // Load .env from project root and site dir (skipped in CI)
   if (!process.env.CI) {
-    for (const name of ['.env', '.env.local']) {
-      const envPath = join(resolve(parsed.siteDir), name)
-      if (existsSync(envPath)) {
-        for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
-          const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/)
-          if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
+    const projectRoot = detectProjectRoot(siteDir)
+    const envDirs = projectRoot !== siteDir ? [projectRoot, siteDir] : [siteDir]
+    for (const dir of envDirs) {
+      for (const name of ['.env', '.env.local']) {
+        const envPath = join(dir, name)
+        if (existsSync(envPath)) {
+          for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+            const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/)
+            if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
+          }
         }
       }
     }
   }
 
   switch (command) {
-    case 'init':
-      await runInit(args[1] ?? '.')
-      break
     case 'publish':
-      await runPublish(parsed.siteDir, parsed.target)
+      await runPublish(siteDir, targetName)
       break
     case 'serve':
-      await runServe(parsed.siteDir, parsed.port ?? 3000, parsed.target)
+      await runServe(siteDir, parsed.port ?? 3000, targetName)
       break
     case 'deploy':
-      await runDeploy(parsed.siteDir, parsed.target)
+      await runDeploy(siteDir, targetName)
       break
     case 'validate':
-      await runValidate(parsed.siteDir)
+      await runValidate(siteDir)
       break
     case 'dev':
-      await runDev(parsed.siteDir, parsed.port ?? 3000)
+      await runDev(siteDir, parsed.port ?? 3000)
       break
-    default:
-      console.error(`  Unknown command: ${command}\n`)
-      printHelp()
-      process.exit(1)
   }
 }
 
