@@ -5,6 +5,7 @@ import { useSelectionStore } from './stores/selection.js'
 import { useThemeStore } from './stores/theme.js'
 import { useToastStore } from './stores/toast.js'
 import Toolbar from './components/CmsToolbar.vue'
+import UnsavedDialog from './components/UnsavedDialog.vue'
 
 const site = useSiteStore()
 const selection = useSelectionStore()
@@ -23,6 +24,8 @@ onMounted(async () => {
     <div v-if="site.error" class="cms-error">{{ site.error }}</div>
     <div v-else-if="site.loading" class="cms-loading">Loading site...</div>
     <router-view v-else />
+
+    <UnsavedDialog />
 
     <!-- Global toast — visible over everything including fullscreen -->
     <Transition name="toast">

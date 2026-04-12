@@ -138,6 +138,71 @@ test.describe('Rapid selection', () => {
   })
 })
 
+test.describe('Unsaved changes dialog', () => {
+  test('shows styled dialog with Save/Discard/Cancel when leaving with unsaved changes', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Click hero component to start editing
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Type into a field to make it dirty
+    const input = page.locator('[data-testid="editor-container"] input').first()
+    await input.fill('changed content')
+
+    // Click back button in toolbar — should show unsaved dialog
+    await page.click('[data-testid="back-to-browse"]')
+
+    // Verify styled dialog appears (not native confirm)
+    const dialog = page.locator('.p-dialog')
+    await expect(dialog).toBeVisible({ timeout: 5000 })
+    await expect(dialog).toContainText('Unsaved Changes')
+    await expect(dialog.locator('button', { hasText: 'Save' })).toBeVisible()
+    await expect(dialog.locator('button', { hasText: 'Discard' })).toBeVisible()
+    await expect(dialog.locator('button', { hasText: 'Cancel' })).toBeVisible()
+  })
+
+  test('Cancel keeps the editor open', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    const input = page.locator('[data-testid="editor-container"] input').first()
+    await input.fill('changed content')
+
+    await page.click('[data-testid="back-to-browse"]')
+    await page.locator('.p-dialog').waitFor({ timeout: 5000 })
+
+    // Click Cancel
+    await page.locator('.p-dialog button', { hasText: 'Cancel' }).click()
+
+    // Dialog closes, still in edit mode with editor visible
+    await expect(page.locator('.p-dialog')).not.toBeVisible()
+    await expect(page.locator('[data-testid="editor-container"]')).toBeVisible()
+  })
+
+  test('Discard exits edit mode', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    const input = page.locator('[data-testid="editor-container"] input').first()
+    await input.fill('changed content')
+
+    await page.click('[data-testid="back-to-browse"]')
+    await page.locator('.p-dialog').waitFor({ timeout: 5000 })
+
+    // Click Discard
+    await page.locator('.p-dialog button', { hasText: 'Discard' }).click()
+
+    // Dialog closes, back to browse mode (SiteTree visible)
+    await expect(page.locator('.p-dialog')).not.toBeVisible()
+    await expect(page.locator('[data-testid="site-page-home"]')).toBeVisible()
+  })
+})
+
 test.describe('Dev playground', () => {
   test('loads and shows sidebar with editors and fields', async ({ page }) => {
     await page.goto('/admin/dev')

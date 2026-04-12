@@ -5,6 +5,7 @@ import { useSiteStore } from '../stores/site.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
+import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { api } from '../api/client.js'
 import CreatePageDialog from './CreatePageDialog.vue'
 import CreateFragmentDialog from './CreateFragmentDialog.vue'
@@ -20,6 +21,7 @@ interface SiteNode {
 const site = useSiteStore()
 const selection = useSelectionStore()
 const editing = useEditingStore()
+const unsavedGuard = useUnsavedGuardStore()
 const toast = useToastStore()
 const selectedKey = ref<string | null>(null)
 const showCreatePage = ref(false)
@@ -53,8 +55,12 @@ const fragments = computed<SiteNode[]>(() =>
     .sort((a, b) => a.label.localeCompare(b.label))
 )
 
-function onSelect(node: SiteNode) {
-  if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
+async function onSelect(node: SiteNode) {
+  if (editing.dirty) {
+    const result = await unsavedGuard.guard()
+    if (result === 'cancel') return
+    if (result === 'save') await editing.save()
+  }
   editing.clear()
   selectedKey.value = node.key
   if (node.type === 'page') selection.selectPage(node.name)

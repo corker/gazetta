@@ -8,6 +8,7 @@ import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
+import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
 
@@ -20,6 +21,7 @@ const selection = useSelectionStore()
 const editing = useEditingStore()
 const theme = useThemeStore()
 const uiMode = useUiModeStore()
+const unsavedGuard = useUnsavedGuardStore()
 const showPublish = ref(false)
 const showFetch = ref(false)
 
@@ -27,8 +29,12 @@ const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fr
 const publishItemName = computed(() => selection.name ?? '')
 const canPublish = computed(() => selection.name && !editing.dirty)
 
-function handleBack() {
-  if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
+async function handleBack() {
+  if (editing.dirty) {
+    const result = await unsavedGuard.guard()
+    if (result === 'cancel') return
+    if (result === 'save') await editing.save()
+  }
   uiMode.enterBrowse()
 }
 </script>

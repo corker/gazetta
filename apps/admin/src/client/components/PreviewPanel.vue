@@ -8,6 +8,7 @@ import { usePreviewStore } from '../stores/preview.js'
 import { useToastStore } from '../stores/toast.js'
 import { useSiteStore } from '../stores/site.js'
 import { useUiModeStore } from '../stores/uiMode.js'
+import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
@@ -26,6 +27,7 @@ const preview = usePreviewStore()
 const toast = useToastStore()
 const site = useSiteStore()
 const uiMode = useUiModeStore()
+const unsavedGuard = useUnsavedGuardStore()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let currentHtml = ''
@@ -337,7 +339,7 @@ function injectBridge(html: string): string {
     .replace('</body>', `${BRIDGE_SCRIPT}\n</body>`)
 }
 
-function handleMessage(e: MessageEvent) {
+async function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:escape') {
     if (uiMode.mode === 'fullscreen') uiMode.toggleFullscreen()
   }
@@ -353,7 +355,11 @@ function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:navigate' && e.data.route) {
     const page = site.pages.find(p => p.route === e.data.route)
     if (page) {
-      if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
+      if (editing.dirty) {
+        const result = await unsavedGuard.guard()
+        if (result === 'cancel') return
+        if (result === 'save') await editing.save()
+      }
       editing.clear()
       selection.selectPage(page.name)
     } else {

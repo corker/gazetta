@@ -8,11 +8,13 @@ import EditorPanel from './EditorPanel.vue'
 import PreviewPanel from './PreviewPanel.vue'
 import { useUiModeStore } from '../stores/uiMode.js'
 import { useEditingStore } from '../stores/editing.js'
+import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 
 const uiMode = useUiModeStore()
 const editing = useEditingStore()
+const unsavedGuard = useUnsavedGuardStore()
 
-onKeyStroke('Escape', () => {
+onKeyStroke('Escape', async () => {
   if (uiMode.mode === 'fullscreen') { uiMode.toggleFullscreen(); return }
   if (uiMode.mode !== 'edit') return
   const active = document.activeElement as HTMLElement | null
@@ -20,7 +22,11 @@ onKeyStroke('Escape', () => {
     active.blur()
     return
   }
-  if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
+  if (editing.dirty) {
+    const result = await unsavedGuard.guard()
+    if (result === 'cancel') return
+    if (result === 'save') await editing.save()
+  }
   uiMode.enterBrowse()
 })
 </script>

@@ -47,14 +47,7 @@ export const useEditingStore = defineStore('editing', () => {
     return JSON.stringify(content.value) !== JSON.stringify(saved.value)
   })
 
-  /** Returns true if safe to proceed (not dirty, or user confirmed) */
-  function confirmIfDirty(): boolean {
-    if (!dirty.value) return true
-    return window.confirm('You have unsaved changes. Discard them?')
-  }
-
   async function open(t: EditingTarget) {
-    if (!confirmIfDirty()) return
     target.value = t
     content.value = deepClone(t.content)
     saved.value = deepClone(t.content)
@@ -77,7 +70,6 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   function clear() {
-    if (!confirmIfDirty()) return
     target.value = null
     content.value = null
     saved.value = null

@@ -6,6 +6,7 @@ import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
 import { usePreviewStore } from '../stores/preview.js'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
+import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { api } from '../api/client.js'
 import AddComponentDialog from './AddComponentDialog.vue'
 
@@ -42,6 +43,7 @@ const editing = useEditingStore()
 const toast = useToastStore()
 const preview = usePreviewStore()
 const focus = useComponentFocusStore()
+const unsavedGuard = useUnsavedGuardStore()
 const selectedNodeKey = ref<string | null>(null)
 const hoveredNodeKey = ref<string | null>(null)
 const componentNodes = ref<ComponentNode[]>([])
@@ -231,9 +233,13 @@ function onHoverEnd() {
 
 // --- Node selection ---
 
-function onSelect(node: ComponentNode) {
+async function onSelect(node: ComponentNode) {
   if (!node.data) return
-  if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
+  if (editing.dirty) {
+    const result = await unsavedGuard.guard()
+    if (result === 'cancel') return
+    if (result === 'save') await editing.save()
+  }
   selectedNodeKey.value = node.key
   const treePath = node.data.treePath
   focus.select(treePath ? hashPath(treePath) : null)
@@ -262,9 +268,14 @@ function findNodeByKey(nodes: ComponentNode[], predicate: (data: NodeData) => bo
 }
 
 // Select a component by its data-gz hash (called from PreviewPanel)
-function selectByGzId(gzId: string) {
+async function selectByGzId(gzId: string) {
   const entry = gzMap.value.get(gzId)
   if (!entry) return
+  if (editing.dirty) {
+    const result = await unsavedGuard.guard()
+    if (result === 'cancel') return
+    if (result === 'save') await editing.save()
+  }
   focus.select(gzId)
   if ('isFragment' in entry) {
     const found = findNodeByKey(componentNodes.value, d => d.fragName === entry.fragName)
@@ -293,6 +304,11 @@ async function moveComponent(index: number, direction: -1 | 1) {
 async function removeComponent(index: number) {
   const d = detail.value
   if (!d?.components) return
+  if (editing.dirty) {
+    const result = await unsavedGuard.guard()
+    if (result === 'cancel') return
+    if (result === 'save') await editing.save()
+  }
   const components = [...d.components]
   const removed = components.splice(index, 1)[0]
   editing.clear()
