@@ -400,11 +400,10 @@ async function fetchPreview(morph = true) {
   if (!previewPath.value) { currentHtml = ''; return }
   loading.value = true
   try {
-    const hasDraft = editing.dirty && editing.path && editing.content
+    const overrides = editing.allOverrides
+    const hasOverrides = Object.keys(overrides).length > 0
     let res: Response
-    if (hasDraft) {
-      const overrides: Record<string, Record<string, unknown>> = {}
-      overrides[editing.path!] = editing.content!
+    if (hasOverrides) {
       res = await fetch(previewPath.value, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

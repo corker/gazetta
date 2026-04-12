@@ -1,28 +1,27 @@
 function deepClone<T>(obj: T): T { return JSON.parse(JSON.stringify(obj)) }
 
 import { defineStore } from 'pinia'
-import { ref, computed, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useToastStore } from './toast.js'
 import { usePreviewStore } from './preview.js'
+import { useSelectionStore } from './selection.js'
+import { api } from '../api/client.js'
 import type { EditorMount } from 'gazetta/types'
 
 export interface EditingTarget {
-  /** Display label (template name) */
   template: string
-  /** Filesystem path (used by preview for content overrides) */
   path: string
-  /** Content to edit */
   content: Record<string, unknown>
-  /** JSON Schema for form generation */
   schema: Record<string, unknown>
-  /** Whether a custom editor exists for this template */
   hasEditor?: boolean
-  /** URL to load the custom editor from (Vite /@fs/ path in dev) */
   editorUrl?: string
-  /** Base URL for loading custom field modules (Vite /@fs/ path in dev) */
   fieldsBaseUrl?: string
-  /** Persists edited content to the correct API endpoint */
   save: (content: Record<string, unknown>) => Promise<void>
+}
+
+interface StashedEdit {
+  target: EditingTarget
+  editedContent: Record<string, unknown>
 }
 
 export const useEditingStore = defineStore('editing', () => {
@@ -33,12 +32,10 @@ export const useEditingStore = defineStore('editing', () => {
   const saved = ref<Record<string, unknown> | null>(null)
   const saving = ref(false)
   const lastSaveError = ref<string | null>(null)
-  /** Bumped on open/discard to trigger editor re-mount */
   const mountVersion = ref(0)
-  /** Custom editor mount (loaded dynamically when template has one) */
   const customEditorMount = ref<EditorMount | null>(null)
+  const pendingEdits = reactive<Map<string, StashedEdit>>(new Map())
 
-  // Convenience accessors
   const template = computed(() => target.value?.template ?? null)
   const path = computed(() => target.value?.path ?? null)
   const schema = computed(() => target.value?.schema ?? null)
@@ -46,16 +43,39 @@ export const useEditingStore = defineStore('editing', () => {
     if (!content.value || !saved.value) return false
     return JSON.stringify(content.value) !== JSON.stringify(saved.value)
   })
+  const pendingCount = computed(() => pendingEdits.size + (dirty.value ? 1 : 0))
+  const hasPendingEdits = computed(() => pendingCount.value > 0)
+  const allOverrides = computed(() => {
+    const result: Record<string, Record<string, unknown>> = {}
+    for (const [p, entry] of pendingEdits) result[p] = entry.editedContent
+    if (path.value && content.value && dirty.value) result[path.value] = content.value
+    return result
+  })
 
-  async function open(t: EditingTarget) {
+  function hasPendingEdit(componentPath: string): boolean {
+    return pendingEdits.has(componentPath)
+  }
+
+  function stashCurrent() {
+    if (dirty.value && target.value && content.value) {
+      pendingEdits.set(target.value.path, { target: target.value, editedContent: deepClone(content.value) })
+    }
+  }
+
+  async function fetchSchema(templateName: string) {
+    const response = await api.getTemplateSchema(templateName)
+    const { hasEditor, editorUrl, fieldsBaseUrl, ...schema } = response as Record<string, unknown> & { hasEditor?: boolean; editorUrl?: string; fieldsBaseUrl?: string }
+    return { schema, hasEditor: !!hasEditor, editorUrl, fieldsBaseUrl }
+  }
+
+  async function open(t: EditingTarget, editedContent?: Record<string, unknown>) {
     target.value = t
-    content.value = deepClone(t.content)
+    content.value = editedContent ? deepClone(editedContent) : deepClone(t.content)
     saved.value = deepClone(t.content)
     saving.value = false
     lastSaveError.value = null
     customEditorMount.value = null
 
-    // Load custom editor if available
     if (t.hasEditor && t.editorUrl) {
       try {
         const mod = await import(/* @vite-ignore */ t.editorUrl)
@@ -69,17 +89,80 @@ export const useEditingStore = defineStore('editing', () => {
     usePreviewStore().invalidateDraft()
   }
 
+  async function openComponent(componentPath: string, templateName: string) {
+    stashCurrent()
+    const stashed = pendingEdits.get(componentPath)
+    if (stashed) {
+      pendingEdits.delete(componentPath)
+      await open(stashed.target, stashed.editedContent)
+      return
+    }
+    try {
+      const comp = await api.getComponent(componentPath)
+      const componentContent = (comp.content as Record<string, unknown>) ?? {}
+      const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(templateName)
+      await open({ template: templateName, path: componentPath, content: componentContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateComponent(componentPath, { content: c }).then(() => {}) })
+    } catch (err) {
+      toast.showError(err, 'Failed to load component')
+    }
+  }
+
+  async function openPageRoot() {
+    stashCurrent()
+    const sel = useSelectionStore()
+    const d = sel.detail
+    const selection = sel.selection
+    if (!d || !selection) return
+    const pagePath = d.dir
+    const stashed = pendingEdits.get(pagePath)
+    if (stashed) {
+      pendingEdits.delete(pagePath)
+      await open(stashed.target, stashed.editedContent)
+      return
+    }
+    try {
+      const pageContent = (d.content as Record<string, unknown>) ?? {}
+      const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(d.template)
+      const saveFn = selection.type === 'page'
+        ? (c: Record<string, unknown>) => api.updatePage(selection.name, { content: c }).then(() => {})
+        : (c: Record<string, unknown>) => api.updateFragment(selection.name, { content: c }).then(() => {})
+      await open({ template: d.template, path: pagePath, content: pageContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: saveFn })
+    } catch (err) {
+      toast.showError(err, 'Failed to load content')
+    }
+  }
+
+  async function openFragment(fragName: string) {
+    stashCurrent()
+    const stashed = pendingEdits.get(fragName)
+    try {
+      const frag = await api.getFragment(fragName)
+      const fragPath = frag.dir
+      const existingStash = stashed ?? pendingEdits.get(fragPath)
+      if (existingStash) {
+        pendingEdits.delete(existingStash === stashed ? fragName : fragPath)
+        await open(existingStash.target, existingStash.editedContent)
+        return
+      }
+      const fragContent = (frag.content as Record<string, unknown>) ?? {}
+      const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(frag.template)
+      await open({ template: frag.template, path: fragPath, content: fragContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateFragment(fragName, { content: c }).then(() => {}) })
+    } catch (err) {
+      toast.showError(err, `Failed to load fragment "${fragName}"`)
+    }
+  }
+
   function clear() {
     target.value = null
     content.value = null
     saved.value = null
     saving.value = false
     lastSaveError.value = null
+    pendingEdits.clear()
   }
 
-  // Warn on browser close/refresh with unsaved changes
   const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
-    if (dirty.value) { e.preventDefault(); e.returnValue = '' }
+    if (hasPendingEdits.value) { e.preventDefault(); e.returnValue = '' }
   }
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', beforeUnloadHandler)
@@ -90,12 +173,16 @@ export const useEditingStore = defineStore('editing', () => {
     usePreviewStore().invalidateDraft()
   }
 
+  function revertStashed(componentPath: string) {
+    pendingEdits.delete(componentPath)
+    usePreviewStore().invalidateDraft()
+  }
+
   function discard() {
-    if (saved.value) {
-      content.value = deepClone(saved.value)
-      mountVersion.value++
-      usePreviewStore().invalidateDraft()
-    }
+    if (!target.value || !saved.value) return
+    content.value = deepClone(saved.value)
+    mountVersion.value++
+    usePreviewStore().invalidateDraft()
   }
 
   async function save() {
@@ -105,6 +192,10 @@ export const useEditingStore = defineStore('editing', () => {
     try {
       await target.value.save(content.value)
       saved.value = deepClone(content.value)
+      for (const [p, entry] of pendingEdits) {
+        await entry.target.save(entry.editedContent)
+      }
+      pendingEdits.clear()
       usePreviewStore().invalidate()
       toast.show('Saved')
     } catch (err) {
@@ -115,5 +206,11 @@ export const useEditingStore = defineStore('editing', () => {
     }
   }
 
-  return { target, content, saved, saving, lastSaveError, template, path, schema, dirty, mountVersion, customEditorMount, open, clear, markDirty, discard, save }
+  return {
+    target, content, saved, saving, lastSaveError, template, path, schema,
+    dirty, mountVersion, customEditorMount, pendingEdits, pendingCount,
+    hasPendingEdits, allOverrides,
+    open, openComponent, openPageRoot, openFragment,
+    clear, markDirty, discard, revertStashed, save, hasPendingEdit,
+  }
 })

@@ -27,10 +27,10 @@ const showFetch = ref(false)
 
 const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fragments')
 const publishItemName = computed(() => selection.name ?? '')
-const canPublish = computed(() => selection.name && !editing.dirty)
+const canPublish = computed(() => selection.name && !editing.hasPendingEdits)
 
 async function handleBack() {
-  if (editing.dirty) {
+  if (editing.hasPendingEdits) {
     const result = await unsavedGuard.guard()
     if (result === 'cancel') return
     if (result === 'save') await editing.save()
@@ -57,9 +57,6 @@ async function handleBack() {
         <span v-if="editing.lastSaveError" class="cms-toast cms-toast-error">
           <i class="pi pi-exclamation-circle" /> {{ editing.lastSaveError }}
         </span>
-        <span v-else-if="editing.dirty" class="cms-toast cms-toast-dirty">
-          Unsaved changes
-        </span>
       </Transition>
     </template>
     <template #end>
@@ -67,10 +64,8 @@ async function handleBack() {
         data-testid="dev-playground-link" @click="router.push('/dev')" size="small" class="cms-btn" />
       <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
-      <Button v-if="uiMode.mode === 'edit' && editing.dirty" label="Discard" icon="pi pi-undo" severity="secondary" text
-        data-testid="discard-btn" @click="editing.discard()" size="small" class="cms-btn" />
       <Button v-if="uiMode.mode === 'edit'" label="Save" icon="pi pi-save" severity="primary" :loading="editing.saving"
-        data-testid="save-btn" :disabled="!editing.dirty" @click="editing.save()" size="small" class="cms-btn" />
+        data-testid="save-btn" :disabled="!editing.hasPendingEdits" @click="editing.save()" size="small" class="cms-btn" />
       <Button label="Fetch" icon="pi pi-cloud-download" severity="info"
         data-testid="fetch-btn" @click="showFetch = true" size="small" class="cms-btn" />
       <Button label="Publish" icon="pi pi-cloud-upload" severity="success"
@@ -90,7 +85,6 @@ async function handleBack() {
 .cms-btn { margin-left: 0.5rem; }
 .cms-toast { font-size: 0.8125rem; display: flex; align-items: center; gap: 0.375rem; }
 .cms-toast-error { color: #dc2626; }
-.cms-toast-dirty { color: #d97706; }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

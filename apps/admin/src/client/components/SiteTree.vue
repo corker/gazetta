@@ -56,7 +56,7 @@ const fragments = computed<SiteNode[]>(() =>
 )
 
 async function onSelect(node: SiteNode) {
-  if (editing.dirty) {
+  if (editing.hasPendingEdits) {
     const result = await unsavedGuard.guard()
     if (result === 'cancel') return
     if (result === 'save') await editing.save()

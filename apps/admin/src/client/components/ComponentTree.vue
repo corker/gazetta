@@ -173,50 +173,13 @@ function nodeStyle(depth: number): Record<string, string> | undefined {
   return { paddingLeft: depth * 10 + 'px' }
 }
 
-// --- Editing helpers: build an EditingTarget with the correct save callback ---
+// --- Editing helpers — delegated to editing store ---
 
-/** Fetch schema and extract hasEditor flag + editorUrl + fieldsBaseUrl */
-async function fetchSchema(template: string) {
-  const response = await api.getTemplateSchema(template)
-  const { hasEditor, editorUrl, fieldsBaseUrl, ...schema } = response as Record<string, unknown> & { hasEditor?: boolean; editorUrl?: string; fieldsBaseUrl?: string }
-  return { schema, hasEditor: !!hasEditor, editorUrl, fieldsBaseUrl }
-}
-
-async function openComponentEditor(path: string, template: string) {
-  try {
-    const comp = await api.getComponent(path)
-    const content = (comp.content as Record<string, unknown>) ?? {}
-    const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(template)
-    editing.open({ template, path, content, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateComponent(path, { content: c }).then(() => {}) })
-  } catch (err) {
-    toast.showError(err, 'Failed to load component')
-  }
-}
-
-async function openPageContentEditor() {
-  const d = detail.value
-  const sel = selection.selection
-  if (!d || !sel) return
-  try {
-    const content = (d.content as Record<string, unknown>) ?? {}
-    const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(d.template)
-    const save = sel.type === 'page'
-      ? (c: Record<string, unknown>) => api.updatePage(sel.name, { content: c }).then(() => {})
-      : (c: Record<string, unknown>) => api.updateFragment(sel.name, { content: c }).then(() => {})
-    editing.open({ template: d.template, path: d.dir, content, schema, hasEditor, editorUrl, fieldsBaseUrl, save })
-  } catch (err) {
-    toast.showError(err, 'Failed to load content')
-  }
-}
-
-async function openFragmentEditor(fragName: string) {
-  try {
-    const frag = await api.getFragment(fragName)
-    const content = (frag.content as Record<string, unknown>) ?? {}
-    const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(frag.template)
-    editing.open({ template: frag.template, path: frag.dir, content, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateFragment(fragName, { content: c }).then(() => {}) })
-  } catch (err) {
-    toast.showError(err, `Failed to load fragment "${fragName}"`)
+function revertComponent(componentPath: string) {
+  if (editing.path === componentPath) {
+    editing.discard()
+  } else {
+    editing.revertStashed(componentPath)
   }
 }
 
@@ -235,24 +198,19 @@ function onHoverEnd() {
 
 async function onSelect(node: ComponentNode) {
   if (!node.data) return
-  if (editing.dirty) {
-    const result = await unsavedGuard.guard()
-    if (result === 'cancel') return
-    if (result === 'save') await editing.save()
-  }
   selectedNodeKey.value = node.key
   const treePath = node.data.treePath
   focus.select(treePath ? hashPath(treePath) : null)
   if (node.data.isFragment && node.data.fragName) {
-    openFragmentEditor(node.data.fragName!)
+    editing.openFragment(node.data.fragName!)
     return
   }
   if (node.data.isPage) {
-    openPageContentEditor()
+    editing.openPageRoot()
     return
   }
   if (!node.data.path || !node.data.template) return
-  openComponentEditor(node.data.path!, node.data.template!)
+  editing.openComponent(node.data.path!, node.data.template!)
 }
 
 // Find a node by walking the tree
@@ -268,24 +226,19 @@ function findNodeByKey(nodes: ComponentNode[], predicate: (data: NodeData) => bo
 }
 
 // Select a component by its data-gz hash (called from PreviewPanel)
-async function selectByGzId(gzId: string) {
+function selectByGzId(gzId: string) {
   const entry = gzMap.value.get(gzId)
   if (!entry) return
-  if (editing.dirty) {
-    const result = await unsavedGuard.guard()
-    if (result === 'cancel') return
-    if (result === 'save') await editing.save()
-  }
   focus.select(gzId)
   if ('isFragment' in entry) {
     const found = findNodeByKey(componentNodes.value, d => d.fragName === entry.fragName)
     if (found) selectedNodeKey.value = found.key
-    openFragmentEditor(entry.fragName)
+    editing.openFragment(entry.fragName)
     return
   }
   const found = findNodeByKey(componentNodes.value, d => d.path === entry.path)
   if (found) selectedNodeKey.value = found.key
-  openComponentEditor(entry.path, entry.template)
+  editing.openComponent(entry.path, entry.template)
 }
 
 // --- Component operations ---
@@ -341,7 +294,11 @@ async function addComponent(name: string, template: string) {
         @mouseenter="onHover(node)"
         @mouseleave="onHoverEnd()">
         <i :class="nodeIcon(node, depth)" class="node-icon" />
+        <span v-if="node.data?.path && (editing.hasPendingEdit(node.data.path) || (editing.dirty && editing.path === node.data.path))" class="node-dirty-dot" />
         <span class="node-label">{{ node.label }}</span>
+        <Button v-if="node.data?.path && (editing.hasPendingEdit(node.data.path) || (editing.dirty && editing.path === node.data.path))"
+          icon="pi pi-undo" text rounded size="small" class="node-revert"
+          title="Discard changes" @click.stop="revertComponent(node.data.path!)" />
         <span v-if="node.data?.isTopLevel && depth !== -1" class="node-actions">
           <Button icon="pi pi-arrow-up" text rounded size="small"
             :data-testid="`move-up-${node.label}`"
@@ -387,6 +344,10 @@ async function addComponent(name: string, template: string) {
 :global(.dark) .node-item.selected .node-label { color: #e4e4e7; }
 :global(.dark) .node-item:hover .node-label, :global(.dark) .node-item.hovered .node-label { color: #e4e4e7; }
 :global(.dark) .node-root .node-label { color: #e4e4e7; }
+.node-dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: #d97706; flex-shrink: 0; }
+:global(.dark) .node-dirty-dot { background: #f59e0b; }
+.node-revert { opacity: 0; transition: opacity 0.1s; width: 18px; height: 18px; flex-shrink: 0; }
+.node-item:hover .node-revert { opacity: 1; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-actions { opacity: 1; }
 .add-btn { margin-top: 6px; }

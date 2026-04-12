@@ -203,6 +203,74 @@ test.describe('Unsaved changes dialog', () => {
   })
 })
 
+test.describe('Component stashing', () => {
+  test('switching components stashes edits and shows dot', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Edit hero
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+    const input = page.locator('[data-testid="editor-container"] input').first()
+    await input.fill('stashed edit')
+
+    // Switch to features — no dialog, hero should show dot
+    await page.click('[data-testid="component-features"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Hero should have a dirty dot
+    const heroDot = page.locator('[data-testid="component-hero"] .node-dirty-dot')
+    await expect(heroDot).toBeVisible()
+  })
+
+  test('switching back restores stashed edits', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Edit hero
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+    const input = page.locator('[data-testid="editor-container"] input').first()
+    await input.fill('restored edit')
+
+    // Switch to features
+    await page.click('[data-testid="component-features"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Switch back to hero — click the label to avoid hitting the revert button
+    await page.locator('[data-testid="component-hero"] .node-label').click()
+    const restoredInput = page.locator('[data-testid="editor-container"] input').first()
+    await expect(restoredInput).toHaveValue('restored edit', { timeout: 10000 })
+  })
+
+  test('discard clears current dot, stashed dots remain', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Edit hero
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+    await page.locator('[data-testid="editor-container"] input').first().fill('hero pending')
+
+    // Switch to features — hero stashed with dot
+    await page.click('[data-testid="component-features"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Hero should have stashed dot
+    const heroDot = page.locator('[data-testid="component-hero"] .node-dirty-dot')
+    await expect(heroDot).toBeVisible({ timeout: 5000 })
+
+    // Edit features to make it dirty
+    await page.locator('[data-testid="editor-container"] input').first().fill('features pending')
+
+    // Hover hero to reveal revert button, click it
+    await page.hover('[data-testid="component-hero"]')
+    const revertBtn = page.locator('[data-testid="component-hero"] .node-revert')
+    await expect(revertBtn).toBeVisible({ timeout: 3000 })
+    await revertBtn.click()
+
+    // Hero dot gone, features still dirty (current editor)
+    await expect(heroDot).not.toBeVisible()
+  })
+})
+
 test.describe('Dev playground', () => {
   test('loads and shows sidebar with editors and fields', async ({ page }) => {
     await page.goto('/admin/dev')

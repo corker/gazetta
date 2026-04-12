@@ -22,7 +22,7 @@ onKeyStroke('Escape', async () => {
     active.blur()
     return
   }
-  if (editing.dirty) {
+  if (editing.hasPendingEdits) {
     const result = await unsavedGuard.guard()
     if (result === 'cancel') return
     if (result === 'save') await editing.save()
