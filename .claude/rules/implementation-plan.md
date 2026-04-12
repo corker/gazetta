@@ -1,4 +1,6 @@
-# Implementation Plan
+# Implementation Plan — COMPLETE
+
+All 9 steps delivered. 241 unit tests + 19 e2e tests (dev, static, ESI).
 
 Build Gazetta as designed. First slice delivers a complete user experience (editor customization).
 Then sequential infrastructure steps. Types ship with their consumers.

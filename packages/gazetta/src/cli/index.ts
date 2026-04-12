@@ -851,12 +851,47 @@ async function runValidate(siteDir: string) {
   }
 
   // 4. List templates
+  let templateNames: string[] = []
   try {
     const entries = await storage.readDir(templatesDir)
-    const templateCount = entries.filter(e => e.isDirectory).length
-    console.log(`  ${c.green('✓')} ${c.dim(`${templateCount} templates`)}`)
+    templateNames = entries.filter(e => e.isDirectory).map(e => e.name)
+    console.log(`  ${c.green('✓')} ${c.dim(`${templateNames.length} templates`)}`)
   } catch {
     console.log(`  ${c.yellow('⚠')} ${c.dim('templates/ directory not found')}`)
+  }
+
+  // 5. Check for orphaned editors (editor exists but template doesn't)
+  const adminDir = join(projectRoot, 'admin')
+  const editorsDir = join(adminDir, 'editors')
+  if (existsSync(editorsDir)) {
+    const editorFiles = (await import('node:fs')).readdirSync(editorsDir).filter(f => f.endsWith('.ts') || f.endsWith('.tsx'))
+    for (const file of editorFiles) {
+      const editorName = file.replace(/\.(ts|tsx)$/, '')
+      if (!templateNames.includes(editorName)) {
+        console.log(`  ${c.yellow('⚠')} orphaned editor: ${c.dim(`admin/editors/${file}`)} ${c.dim('— no matching template')}`)
+      }
+    }
+  }
+
+  // 6. Check for missing custom fields (schema references field but file doesn't exist)
+  const fieldsDir = join(adminDir, 'fields')
+  const fieldFiles = existsSync(fieldsDir) ? (await import('node:fs')).readdirSync(fieldsDir).filter(f => f.endsWith('.ts') || f.endsWith('.tsx')).map(f => f.replace(/\.(ts|tsx)$/, '')) : []
+  const { loadTemplate } = await import('../template-loader.js')
+  const zod = await import('zod')
+  for (const tplName of templateNames) {
+    try {
+      const loaded = await loadTemplate(storage, templatesDir, tplName)
+      const jsonSchema = zod.z.toJSONSchema(loaded.schema as import('zod').ZodType) as Record<string, unknown>
+      const props = jsonSchema.properties as Record<string, Record<string, unknown>> | undefined
+      if (!props) continue
+      for (const [propName, prop] of Object.entries(props)) {
+        const fieldRef = prop.field as string | undefined
+        if (fieldRef && !fieldFiles.includes(fieldRef)) {
+          console.error(`  ${c.red('✗')} template ${tplName}.${propName} references field "${fieldRef}" ${c.dim('— not found in admin/fields/')}`)
+          errors++
+        }
+      }
+    } catch { /* template load errors already caught above */ }
   }
 
   console.log()
