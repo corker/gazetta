@@ -337,18 +337,21 @@ async function addComponent(name: string, template: string) {
 .node-item.selected .node-label { color: #374151; }
 .node-item:hover .node-label, .node-item.hovered .node-label { color: #374151; }
 .node-root .node-label { color: #1f2937; }
-:global(.dark) .node-item:hover, :global(.dark) .node-item.hovered { background: rgba(255, 255, 255, 0.05); }
-:global(.dark) .node-root { border-bottom-color: #27272a; }
-:global(.dark) .node-icon { color: #666; }
-:global(.dark) .node-label { color: #bbb; }
-:global(.dark) .node-item.selected .node-label { color: #e4e4e7; }
-:global(.dark) .node-item:hover .node-label, :global(.dark) .node-item.hovered .node-label { color: #e4e4e7; }
-:global(.dark) .node-root .node-label { color: #e4e4e7; }
 .node-dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: #d97706; flex-shrink: 0; }
-:global(.dark) .node-dirty-dot { background: #f59e0b; }
 .node-revert { opacity: 0; transition: opacity 0.1s; width: 18px; height: 18px; flex-shrink: 0; }
 .node-item:hover .node-revert { opacity: 1; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-actions { opacity: 1; }
 .add-btn { margin-top: 6px; }
+</style>
+
+<style>
+.dark .component-tree .node-item:hover, .dark .component-tree .node-item.hovered { background: rgba(255, 255, 255, 0.05); }
+.dark .component-tree .node-root { border-bottom-color: #27272a; }
+.dark .component-tree .node-icon { color: #666; }
+.dark .component-tree .node-label { color: #bbb; }
+.dark .component-tree .node-item.selected .node-label { color: #e4e4e7; }
+.dark .component-tree .node-item:hover .node-label, .dark .component-tree .node-item.hovered .node-label { color: #e4e4e7; }
+.dark .component-tree .node-root .node-label { color: #e4e4e7; }
+.dark .component-tree .node-dirty-dot { background: #f59e0b; }
 </style>
