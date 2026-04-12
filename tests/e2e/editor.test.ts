@@ -119,6 +119,25 @@ test.describe('Custom field', () => {
   })
 })
 
+test.describe('Rapid selection', () => {
+  test('last click wins when rapidly switching pages', async ({ page }) => {
+    await page.goto('/admin')
+    await expect(page.locator('[data-testid="site-page-home"]')).toBeVisible()
+
+    // Click two pages rapidly without waiting for the first to load
+    page.click('[data-testid="site-page-home"]')
+    await page.click('[data-testid="site-page-about"]')
+
+    // Wait for preview to settle — the about page should win
+    const iframe = page.frameLocator('[data-testid="preview-iframe"]')
+    await iframe.locator('[data-gz]').first().waitFor({ timeout: 10000 })
+
+    // The selected item in the tree should be about, not home
+    await expect(page.locator('[data-testid="site-page-about"].selected')).toBeVisible()
+    await expect(page.locator('[data-testid="site-page-home"].selected')).not.toBeVisible()
+  })
+})
+
 test.describe('Dev playground', () => {
   test('loads and shows sidebar with editors and fields', async ({ page }) => {
     await page.goto('/admin/dev')
