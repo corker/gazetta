@@ -35,3 +35,7 @@ Validated approaches and things to avoid. Each entry: rule, then why.
    ```
    `npm version -w` updates package.json and lockfile but does NOT commit or tag (disabled for workspaces). Must do it manually.
    Why: v0.1.1 shipped with lockfile out of sync because the commit and tag were done without the lockfile.
+
+10. **Dark mode CSS: use non-scoped `<style>` block, not `:global(.dark)` in scoped styles.**
+   Scoped selectors get `[data-v-xxx]` attributes which beat `:global(.dark)` in specificity. Put dark overrides in a separate `<style>` (no `scoped`) using `.dark .component-name` selectors. Follow PreviewPanel's pattern.
+   Why: ComponentTree dark mode was broken — `:global(.dark) .node-root .node-label` lost to `.node-root .node-label[data-v-xxx]`.
