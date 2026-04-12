@@ -157,9 +157,9 @@ test.describe('Unsaved changes dialog', () => {
     const dialog = page.locator('.p-dialog')
     await expect(dialog).toBeVisible({ timeout: 5000 })
     await expect(dialog).toContainText('Unsaved Changes')
-    await expect(dialog.locator('button', { hasText: 'Save' })).toBeVisible()
-    await expect(dialog.locator('button', { hasText: 'Discard' })).toBeVisible()
-    await expect(dialog.locator('button', { hasText: 'Cancel' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: "Don't Save" })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible()
   })
 
   test('Cancel keeps the editor open', async ({ page }) => {
@@ -182,7 +182,7 @@ test.describe('Unsaved changes dialog', () => {
     await expect(page.locator('[data-testid="editor-container"]')).toBeVisible()
   })
 
-  test('Discard exits edit mode', async ({ page }) => {
+  test('Don\'t Save exits edit mode', async ({ page }) => {
     await openEditor(page, 'home')
 
     await page.click('[data-testid="component-hero"]')
@@ -195,7 +195,7 @@ test.describe('Unsaved changes dialog', () => {
     await page.locator('.p-dialog').waitFor({ timeout: 5000 })
 
     // Click Discard
-    await page.locator('.p-dialog button', { hasText: 'Discard' }).click()
+    await page.locator('.p-dialog button', { hasText: "Don't Save" }).click()
 
     // Dialog closes, back to browse mode (SiteTree visible)
     await expect(page.locator('.p-dialog')).not.toBeVisible()
