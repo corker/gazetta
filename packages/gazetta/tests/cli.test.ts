@@ -179,6 +179,56 @@ describe('runBuild', () => {
   })
 })
 
+describe('runValidate', () => {
+  const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+
+  it('passes on valid project', async () => {
+    const { execSync } = await import('node:child_process')
+    const output = execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, { cwd: starterDir, stdio: 'pipe' }).toString()
+    expect(output).toContain('All good')
+    expect(output).toContain('site.yaml')
+    expect(output).toContain('@header')
+    expect(output).toContain('@footer')
+    expect(output).toContain('home')
+  })
+
+  it('detects orphaned editors', async () => {
+    const { execSync } = await import('node:child_process')
+    const { writeFile, rm } = await import('node:fs/promises')
+    const orphanPath = join(starterDir, 'admin/editors/nonexistent.tsx')
+    await writeFile(orphanPath, 'export default {}')
+    try {
+      const output = execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, { cwd: starterDir, stdio: 'pipe' }).toString()
+      expect(output).toContain('orphaned editor')
+      expect(output).toContain('nonexistent.tsx')
+    } finally {
+      await rm(orphanPath, { force: true })
+    }
+  })
+
+  it('detects missing custom fields', async () => {
+    const { execSync } = await import('node:child_process')
+    const { rename } = await import('node:fs/promises')
+    const fieldPath = join(starterDir, 'admin/fields/brand-color.tsx')
+    const backupPath = fieldPath + '.bak'
+    await rename(fieldPath, backupPath)
+    try {
+      execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, { cwd: starterDir, stdio: 'pipe' })
+      // Should not reach here — validate exits with code 1
+      expect.unreachable()
+    } catch (err: unknown) {
+      const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? ''
+      const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? ''
+      const output = stdout + stderr
+      expect(output).toContain('brand-color')
+      expect(output).toContain('not found')
+      expect(output).toContain('1 error')
+    } finally {
+      await rename(backupPath, fieldPath)
+    }
+  })
+})
+
 describe('findCmsDir (dev mode detection)', () => {
   function findCmsDir(): string | null {
     const candidates = [
