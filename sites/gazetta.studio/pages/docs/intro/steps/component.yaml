@@ -2,8 +2,8 @@ template: text
 content:
   body: |
     <p><strong>1. Create a site</strong></p>
-    <p><code>npx gazetta init my-site && cd my-site && npm install</code></p>
-    <p>This scaffolds a site with a home page, a hero template, and a text block template.</p>
+    <p><code>npx gazetta init my-site && cd my-site</code></p>
+    <p>This scaffolds a site with templates, an admin directory, and a home page — and installs dependencies automatically.</p>
     <p><strong>2. Start the dev server</strong></p>
     <p><code>npx gazetta dev</code> — site at <a href="http://localhost:3000">localhost:3000</a>, CMS editor at <a href="http://localhost:3000/admin">localhost:3000/admin</a></p>
     <p><strong>3. Create a template</strong></p>
