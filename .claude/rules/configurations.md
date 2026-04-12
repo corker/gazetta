@@ -179,16 +179,8 @@ A target = storage + optional worker + optional cache + optional publishMode.
 
 Decision logic: determined by `publishMode` field in target config (default: `static` if no worker, `esi` if worker configured).
 
-**Known gaps:**
-
-- **Publish mode is coupled to worker config.** Currently `gazetta serve` targets need
-  `worker: { type: cloudflare }` to get ESI mode. Fix: add `publishMode: esi | static` field
-  to target config (shown in the self-hosted example above). Default: `esi` if worker configured, `static` otherwise.
-
-- **Admin API always publishes ESI mode** (`admin-api/routes/publish.ts`). It calls
-  `publishPageRendered()` / `publishFragmentRendered()` regardless of target config. CLI branches
-  correctly. This means CLI and admin UI produce different output for static targets. Fix: admin API
-  must check `publishMode` and branch like the CLI does.
+Both CLI and admin API use `getPublishMode(target)` from `types.ts` to determine mode.
+`gazetta serve` also reads `publishMode` to decide whether to do ESI assembly or serve static files.
 
 ### Real-world target examples
 
@@ -300,12 +292,10 @@ targets, or CLI commands to avoid re-introducing these issues or building on bro
 
 | # | Gap | Severity | Location | Status |
 |---|-----|----------|----------|--------|
-| 1 | Admin API always publishes ESI, ignores static mode | Critical | `admin-api/routes/publish.ts` | Bug — CLI and admin UI produce different output for static targets |
-| 2 | Publish mode coupled to worker config — needs `publishMode` field | High | `cli/index.ts` | Design — add `publishMode: esi | static` to target config to decouple from worker |
+| ~~1~~ | ~~Admin API always publishes ESI, ignores static mode~~ | ~~Critical~~ | | Fixed — uses `getPublishMode()` |
+| ~~2~~ | ~~Publish mode coupled to worker config~~ | ~~High~~ | | Fixed — `publishMode` field on `TargetConfig` |
 | 3 | Cache purge only implements Cloudflare | Medium | `cli/index.ts`, `admin-api/routes/publish.ts` | Silent no-op for S3/Azure purge configs |
-| 4 | `WorkerConfig.type` is `string`, only `'cloudflare'` works | Low | `types.ts` | Should be literal type |
+| ~~4~~ | ~~`WorkerConfig.type` is `string`~~ | ~~Low~~ | | Fixed — literal type `'cloudflare'` |
 | 5 | `validate` doesn't check targets | Medium | `cli/index.ts` | No storage connectivity, env var, or credential checks |
 | 6 | `fetch` can't recover from static targets | Medium | `admin-api/routes/publish.ts` | Static targets have rendered HTML, not source manifests |
 | 7 | No validation of nonsensical target combos | Low | `targets.ts` | R2+no worker, filesystem+worker silently accepted |
-| 8 | Project structure doesn't match doc | High | `examples/starter/`, `sites/` | Current starter is flat — needs restructuring to `admin/`, `templates/`, `sites/` |
-| 9 | React is direct dep, not peer dep | Medium | `packages/gazetta/package.json` | Should be peerDependency so site controls version |
