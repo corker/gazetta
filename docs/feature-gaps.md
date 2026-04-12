@@ -180,6 +180,31 @@ filtering, no pagination, no bulk operations.
 - Consider: nested route tree (#88), search/filter, pagination, virtual scrolling,
   bulk publish, content type grouping, recently edited, favorites/pinned
 
+### MCP server as admin interface
+
+**What others do:** Sanity has GROQ for programmatic content access. Payload has a full
+REST + GraphQL API. Contentful has Management API + CLI. All allow non-UI content operations
+for automation, scripting, and AI agent workflows.
+
+**Gazetta today:** Issue #49 tracks an MCP server concept. The `tools/mcp-dev/` package
+exists but only provides screenshot/interaction tools for development. No MCP server
+exposes the admin API for content operations.
+
+**Two use cases:**
+- **Deployed admin:** MCP server connects to a remote Gazetta instance (e.g. production
+  admin at `https://admin.mysite.com`). AI agents can read pages, edit content, publish,
+  fetch — same operations as the admin UI but via MCP tools. Enables AI-assisted content
+  authoring, bulk operations, migration scripts.
+- **Local site dev:** MCP server connects to `gazetta dev` running locally. Claude Code
+  can read the site tree, edit content YAML, preview pages, publish to targets — all
+  without the developer switching to the browser. Template developers get AI-assisted
+  content testing.
+
+**Scope:** MCP server that wraps the existing admin API (`/api/pages`, `/api/fragments`,
+`/api/templates`, `/api/publish`, `/api/fetch`). Runs as a sidecar to `gazetta dev` or
+connects to a remote admin URL. Tools: list-pages, read-page, update-page, list-fragments,
+read-fragment, update-fragment, publish, fetch, preview.
+
 ## Expected — noticeable absence
 
 Most platforms offer these. Teams with content workflows need them.
