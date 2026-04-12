@@ -96,13 +96,17 @@ const template: TemplateFunction<Content> = ({ content }) => {
   }
 
   function colorize(text) {
-    return text
-      .replace(/\\x1b\\[([0-9;]+)m/g, '') // strip real ANSI (shouldn't appear, safety)
-      .replace(/\{green\}(.*?)\{\/\}/g, '<span class="t-green">$1</span>')
-      .replace(/\{cyan\}(.*?)\{\/\}/g, '<span class="t-cyan">$1</span>')
-      .replace(/\{dim\}(.*?)\{\/\}/g, '<span class="t-dim">$1</span>')
-      .replace(/\{bold\}(.*?)\{\/\}/g, '<span class="t-bold">$1</span>')
-      .replace(/\{badge\}(.*?)\{\/\}/g, '<span class="t-badge">$1</span>')
+    var end = '{' + '/}';
+    ['green','cyan','dim','bold','badge'].forEach(function(tag) {
+      var cls = 't-' + tag, open = '{' + tag + '}';
+      while (text.includes(open)) {
+        var i = text.indexOf(open), j = text.indexOf(end, i);
+        if (j < 0) break;
+        var inner = text.slice(i + open.length, j);
+        text = text.slice(0, i) + '<span class="' + cls + '">' + inner + '</span>' + text.slice(j + end.length);
+      }
+    });
+    return text;
   }
 
   async function showOutput(lineEl, text) {
