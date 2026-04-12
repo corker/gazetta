@@ -1,3 +1,13 @@
+---
+paths:
+  - "packages/gazetta/src/cli/**"
+  - "packages/gazetta/src/providers/**"
+  - "packages/gazetta/src/targets.ts"
+  - "packages/gazetta/src/publish-rendered.ts"
+  - "packages/gazetta/src/admin-api/routes/publish.ts"
+  - "sites/*/site.yaml"
+---
+
 # Configurations
 
 How Gazetta is developed, configured, and deployed. For CLI details see cli.md, hosting see hosting.md, custom editors see custom-editors.md, operations and edge cases see operations.md.

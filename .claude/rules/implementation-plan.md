@@ -1,3 +1,8 @@
+---
+paths:
+  - "NEVER_MATCH_AUTO_LOAD"
+---
+
 # Implementation Plan — COMPLETE
 
 All 9 steps delivered. 241 unit tests + 19 e2e tests (dev, static, ESI).

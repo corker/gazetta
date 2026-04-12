@@ -1,3 +1,10 @@
+---
+paths:
+  - "packages/gazetta/src/**"
+  - "examples/starter/**"
+  - "sites/*/site.yaml"
+---
+
 # Operations and Edge Cases
 
 Runtime behavior, security, caching, content management, publishing details, platform considerations, and known gaps.

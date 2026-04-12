@@ -1,3 +1,8 @@
+---
+paths:
+  - "packages/gazetta/src/cli/**"
+---
+
 # CLI Reference
 
 Gazetta CLI commands, principles, auto-detection, and related edge cases.

@@ -1,3 +1,10 @@
+---
+paths:
+  - "apps/admin/**"
+  - "packages/gazetta/src/editor/**"
+  - "packages/gazetta/src/admin-api/**"
+---
+
 # Custom Editors and Fields
 
 Custom editing UIs, field widgets, template switching, and the editor development workflow.

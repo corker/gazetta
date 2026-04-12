@@ -1,3 +1,12 @@
+---
+paths:
+  - "packages/gazetta/src/serve.ts"
+  - "packages/gazetta/src/workers/**"
+  - "docs/cloudflare.md"
+  - "docs/self-hosted.md"
+  - ".github/workflows/**"
+---
+
 # Hosting and Deployment
 
 Serve modes, hosting platforms, deployment workflows, and production operations.

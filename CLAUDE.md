@@ -12,6 +12,7 @@ Stateless CMS that structures websites as composable fragments. All state lives 
 - `docs/design.md` — Human-readable design document
 - `docs/cloudflare.md` — Cloudflare deployment guide (R2, Workers, cache, CI)
 - `docs/self-hosted.md` — Self-hosted deployment guide (VPS, Docker, Fly.io)
+- `docs/feature-gaps.md` — CMS feature gap analysis (media, i18n, drafts, SEO, RBAC, etc.) — read when planning new features or discussing roadmap
 
 ## Design docs (auto-loaded by Claude)
 
