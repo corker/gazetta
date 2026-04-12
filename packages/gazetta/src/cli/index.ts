@@ -60,8 +60,9 @@ function printHelp() {
     gazetta init [dir]              Create a new site
     gazetta dev [site]              Start dev server + CMS at /admin
     gazetta build                   Build admin UI for production
+    gazetta admin [site]            Run production CMS admin server
     gazetta publish [target] [site] Pre-render and publish to a target
-    gazetta serve [target] [site]   Serve published site from target storage
+    gazetta serve [target] [site]   Serve published pages from target storage
     gazetta deploy [target] [site]  Deploy worker to hosting (one-time setup)
     gazetta validate [site]         Check site for broken references
     gazetta help                    Show this help message
@@ -651,6 +652,46 @@ async function runBuild(siteDir: string) {
   console.log()
 }
 
+async function runAdmin(siteDir: string, port: number) {
+  const projectRoot = detectProjectRoot(siteDir)
+  const templatesDir = join(projectRoot, 'templates')
+  const adminDir = join(projectRoot, 'admin')
+  const builtAdminDir = join(projectRoot, 'dist', 'admin')
+
+  if (!existsSync(join(builtAdminDir, 'index.html'))) {
+    console.error(`\n  ${c.red('Error:')} admin UI not built`)
+    console.error(`  Run ${c.cyan('gazetta build')} first\n`)
+    process.exit(1)
+  }
+
+  const app = new Hono()
+  app.get('/__reload', (ctx) => ctx.body(null, 204))
+
+  const fsStorage = createFilesystemProvider()
+  await setupProductionMode(app, siteDir, fsStorage, builtAdminDir, templatesDir, adminDir)
+
+  // SPA fallback for non-API admin routes
+  app.get('*', (ctx) => {
+    const indexPath = join(builtAdminDir, 'index.html')
+    if (existsSync(indexPath)) return ctx.html(readFileSync(indexPath, 'utf-8'))
+    return ctx.notFound()
+  })
+
+  const siteYaml = yaml.load(readFileSync(join(siteDir, 'site.yaml'), 'utf-8')) as SiteManifest
+
+  const server = serve({ fetch: app.fetch, port }, () => {
+    console.log()
+    console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green('admin')} ${c.dim(siteYaml.name)}`)
+    console.log()
+    console.log(`  ${c.dim('┃')} Admin    ${c.cyan(`http://localhost:${port}/admin`)}`)
+    console.log()
+  })
+
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => { console.log(`\n  Shutting down...`); server.close(() => process.exit(0)) })
+  }
+}
+
 async function runServe(siteDir: string, port: number, targetName?: string) {
   const siteYamlPath = join(siteDir, 'site.yaml')
   if (!existsSync(siteYamlPath)) {
@@ -673,41 +714,15 @@ async function runServe(siteDir: string, port: number, targetName?: string) {
 
   const { createStorageProvider } = await import('../targets.js')
   const storage = await createStorageProvider(config.storage, siteDir)
-
-  const projectRoot = detectProjectRoot(siteDir)
-  const templatesDir = join(projectRoot, 'templates')
-  const adminDir = join(projectRoot, 'admin')
-
-  const app = new Hono()
-
-  // No-op for dev-only SSE reload endpoint (admin SPA tries to connect)
-  app.get('/__reload', (ctx) => ctx.body(null, 204))
-
-  // Mount admin UI first (before catch-all page routes)
-  const builtAdminDir = join(projectRoot, 'dist', 'admin')
-  const hasBuiltAdmin = existsSync(join(builtAdminDir, 'index.html'))
-  if (hasBuiltAdmin) {
-    const fsStorage = createFilesystemProvider()
-    await setupProductionMode(app, siteDir, fsStorage, builtAdminDir, templatesDir, adminDir)
-  }
-
-  // Mount page serving routes (includes catch-all)
   const { getPublishMode } = await import('../types.js')
-  const serveMode = config ? getPublishMode(config) : 'static'
   const { createServer } = await import('../serve.js')
-  const pageServer = createServer({ storage, mode: serveMode })
-  app.route('/', pageServer)
+  const app = createServer({ storage, mode: getPublishMode(config) })
 
   const server = serve({ fetch: app.fetch, port }, () => {
     console.log()
     console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green('serve')} ${c.dim(siteYaml.name)} ${c.dim(`(${name})`)}`)
     console.log()
     console.log(`  ${c.dim('┃')} Local    ${c.cyan(`http://localhost:${port}/`)}`)
-    if (hasBuiltAdmin) {
-      console.log(`  ${c.dim('┃')} Admin    ${c.cyan(`http://localhost:${port}/admin`)}`)
-    } else {
-      console.log(`  ${c.dim('┃')} Admin    ${c.dim('not built — run gazetta build first')}`)
-    }
     console.log()
   })
 
@@ -1191,7 +1206,7 @@ async function main() {
   // Commands that take [target] [site] positional args
   const targetFirstCommands = new Set(['publish', 'serve', 'deploy'])
   // Commands that take [site] positional arg
-  const siteOnlyCommands = new Set(['dev', 'validate'])
+  const siteOnlyCommands = new Set(['dev', 'validate', 'admin'])
 
   let siteDir: string
   let targetName: string | undefined
@@ -1256,6 +1271,9 @@ async function main() {
       break
     case 'dev':
       await runDev(siteDir, parsed.port ?? 3000)
+      break
+    case 'admin':
+      await runAdmin(siteDir, parsed.port ?? 3000)
       break
   }
 }

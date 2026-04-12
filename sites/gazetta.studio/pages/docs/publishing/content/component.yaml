@@ -13,10 +13,11 @@ content:
     <p><strong>Publish content:</strong></p>
     <p><code>npx gazetta publish</code> — publishes to default target<br>
     <code>npx gazetta publish production</code> — specific target</p>
-    <p><strong>Serve locally:</strong></p>
-    <p><code>npx gazetta serve</code> — serves from first target<br>
-    <code>npx gazetta serve staging -p 8080</code> — specific target and port<br>
-    Admin CMS is available at <code>/admin</code> if <code>gazetta build</code> was run first.</p>
+    <p><strong>Serve pages:</strong></p>
+    <p><code>npx gazetta serve</code> — serves published pages from first target<br>
+    <code>npx gazetta serve staging -p 8080</code> — specific target and port</p>
+    <p><strong>Run admin CMS:</strong></p>
+    <p><code>npx gazetta admin</code> — production CMS for content editors (requires <code>gazetta build</code> first)</p>
     <p><strong>Deploy Cloudflare Worker (one-time):</strong></p>
     <p><code>npx gazetta build && npx gazetta deploy production</code></p>
     <p>Build and deploy once. Publish as often as you want.</p>

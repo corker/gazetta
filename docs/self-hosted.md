@@ -49,13 +49,21 @@ npx gazetta build              # build admin UI + bundle custom editors/fields
 npx gazetta publish             # pre-render pages/fragments → upload to storage
 ```
 
-### 3. Serve
+### 3. Serve pages
 
 ```bash
 npx gazetta serve -p 8080
 ```
 
-The server reads from the target's storage and assembles pages on each request. If `dist/admin/` exists (from `gazetta build`), the admin CMS is available at `/admin`.
+Serves published pages from the target's storage.
+
+### 4. Run admin CMS (optional)
+
+```bash
+npx gazetta admin -p 3001
+```
+
+Runs the production CMS admin for content editors. Requires `gazetta build` first.
 
 ## Options
 
