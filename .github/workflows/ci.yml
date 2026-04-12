@@ -19,6 +19,6 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run build
+      - run: npm run build -w packages/gazetta
 
-      - run: npm test
+      - run: npm test -w packages/gazetta

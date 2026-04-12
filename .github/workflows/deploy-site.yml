@@ -20,11 +20,13 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      - run: npm run build -w packages/gazetta
 
       - name: Publish site to R2
-        run: npx tsx packages/gazetta/src/cli/index.ts publish sites/gazetta.studio
+        run: npx tsx packages/gazetta/src/cli/index.ts publish production sites/gazetta.studio
         env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Deploy worker

@@ -23,9 +23,9 @@ jobs:
 
       - run: npm run build -w packages/gazetta
 
-      - run: npm run build:admin -w gazetta
+      - run: npm run build:admin -w packages/gazetta
 
-      - run: npm test -w gazetta
+      - run: npm test -w packages/gazetta
 
       - run: npm publish -w packages/gazetta --provenance
         env:
