@@ -23,3 +23,15 @@ Validated approaches and things to avoid. Each entry: rule, then why.
 
 8. **Update docs in the same commit as the feature.** When adding or changing user-facing behavior, update getting-started.md and gazetta.studio docs in the same commit. Don't leave docs as a follow-up.
    Why: Docs that lag behind the code mislead users and create extra issues to track.
+
+9. **npm release: bump version, lockfile, commit, tag — all together.**
+   When bumping the gazetta package version:
+   ```
+   npm version <patch|minor|major> -w packages/gazetta
+   git add packages/gazetta/package.json package-lock.json
+   git commit -m "Bump gazetta to v$(node -p "require('./packages/gazetta/package.json').version")"
+   git tag "v$(node -p "require('./packages/gazetta/package.json').version")"
+   git push && git push --tags
+   ```
+   `npm version -w` updates package.json and lockfile but does NOT commit or tag (disabled for workspaces). Must do it manually.
+   Why: v0.1.1 shipped with lockfile out of sync because the commit and tag were done without the lockfile.
