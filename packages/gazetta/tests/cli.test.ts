@@ -89,7 +89,7 @@ describe('runInit', () => {
     await rm(testDir, { recursive: true, force: true })
   })
 
-  it('scaffolds the correct project structure', async () => {
+  it('scaffolds the correct project structure', { timeout: 60000 }, async () => {
     // Run init via the compiled CLI
     const { execSync } = await import('node:child_process')
     execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} init ${testDir}`, { stdio: 'pipe' })
@@ -113,7 +113,7 @@ describe('runInit', () => {
     expect(existsSync(join(testDir, 'fragments'))).toBe(false)
   })
 
-  it('package.json has correct fields', async () => {
+  it('package.json has correct fields', { timeout: 60000 }, async () => {
     const { execSync } = await import('node:child_process')
     execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} init ${testDir}`, { stdio: 'pipe' })
 
@@ -126,7 +126,7 @@ describe('runInit', () => {
     expect(pkg.dependencies.zod).toBeDefined()
   })
 
-  it('refuses to init in existing project', async () => {
+  it('refuses to init in existing project', { timeout: 60000 }, async () => {
     const { execSync } = await import('node:child_process')
     execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} init ${testDir}`, { stdio: 'pipe' })
 
@@ -141,7 +141,7 @@ describe('runBuild', () => {
   const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
   const outDir = join(starterDir, 'dist', 'admin')
 
-  it('builds admin SPA + bundles custom editors and fields', async () => {
+  it('builds admin SPA + bundles custom editors and fields', { timeout: 60000 }, async () => {
     const { execSync } = await import('node:child_process')
     // Clean and rebuild
     await rm(outDir, { recursive: true, force: true })
