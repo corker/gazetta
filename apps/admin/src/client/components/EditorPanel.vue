@@ -86,7 +86,11 @@ const themeVars = computed(() => {
 
 <template>
   <div class="editor-panel" data-testid="editor-panel" :style="themeVars">
-    <div v-if="!editing.path" class="editor-empty" data-testid="editor-empty">
+    <div v-if="editing.loadError" class="editor-error" data-testid="editor-error">
+      <i class="pi pi-exclamation-triangle" />
+      <p>{{ editing.loadError }}</p>
+    </div>
+    <div v-else-if="!editing.path" class="editor-empty" data-testid="editor-empty">
       <i class="pi pi-pencil" style="font-size: 2rem; opacity: 0.3; margin-bottom: 0.5rem;" />
       <p>Select a component to edit</p>
     </div>
@@ -100,6 +104,9 @@ const themeVars = computed(() => {
 
 <style scoped>
 .editor-panel h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--gz-text-label); margin-bottom: 1rem; letter-spacing: 0.05em; }
+.editor-error { color: var(--gz-error); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; gap: 0.5rem; text-align: center; }
+.editor-error .pi { font-size: 2rem; }
+.editor-error p { max-width: 300px; line-height: 1.5; }
 .editor-empty { color: var(--gz-text-hint); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; }
 .editor-container { font-size: 0.875rem; }
 .editor-no-schema { color: var(--gz-text-hint); font-size: 0.875rem; }

@@ -32,8 +32,10 @@ export const useEditingStore = defineStore('editing', () => {
   const saved = ref<Record<string, unknown> | null>(null)
   const saving = ref(false)
   const lastSaveError = ref<string | null>(null)
+  const loadError = ref<string | null>(null)
   const mountVersion = ref(0)
   const customEditorMount = ref<EditorMount | null>(null)
+  let retryTimer: ReturnType<typeof setInterval> | null = null
   const pendingEdits = reactive<Map<string, StashedEdit>>(new Map())
 
   const template = computed(() => target.value?.template ?? null)
@@ -56,6 +58,10 @@ export const useEditingStore = defineStore('editing', () => {
     return pendingEdits.has(componentPath)
   }
 
+  function clearRetry() {
+    if (retryTimer) { clearInterval(retryTimer); retryTimer = null }
+  }
+
   function stashCurrent() {
     if (dirty.value && target.value && content.value) {
       pendingEdits.set(target.value.path, { target: target.value, editedContent: deepClone(content.value) })
@@ -69,6 +75,8 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   async function open(t: EditingTarget, editedContent?: Record<string, unknown>) {
+    clearRetry()
+    loadError.value = null
     target.value = t
     content.value = editedContent ? deepClone(editedContent) : deepClone(t.content)
     saved.value = deepClone(t.content)
@@ -90,6 +98,7 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   async function openComponent(componentPath: string, templateName: string) {
+    clearRetry()
     stashCurrent()
     const stashed = pendingEdits.get(componentPath)
     if (stashed) {
@@ -103,11 +112,14 @@ export const useEditingStore = defineStore('editing', () => {
       const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(templateName)
       await open({ template: templateName, path: componentPath, content: componentContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateComponent(componentPath, { content: c }).then(() => {}) })
     } catch (err) {
-      toast.showError(err, 'Failed to load component')
+      target.value = null
+      loadError.value = `Failed to load "${templateName}": ${(err as Error).message}`
+      retryTimer = setInterval(() => openComponent(componentPath, templateName), 3000)
     }
   }
 
   async function openPageRoot() {
+    clearRetry()
     stashCurrent()
     const sel = useSelectionStore()
     const d = sel.detail
@@ -128,11 +140,14 @@ export const useEditingStore = defineStore('editing', () => {
         : (c: Record<string, unknown>) => api.updateFragment(selection.name, { content: c }).then(() => {})
       await open({ template: d.template, path: pagePath, content: pageContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: saveFn })
     } catch (err) {
-      toast.showError(err, 'Failed to load content')
+      target.value = null
+      loadError.value = `Failed to load "${d.template}": ${(err as Error).message}`
+      retryTimer = setInterval(() => openPageRoot(), 3000)
     }
   }
 
   async function openFragment(fragName: string) {
+    clearRetry()
     stashCurrent()
     const stashed = pendingEdits.get(fragName)
     try {
@@ -148,11 +163,15 @@ export const useEditingStore = defineStore('editing', () => {
       const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(frag.template)
       await open({ template: frag.template, path: fragPath, content: fragContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateFragment(fragName, { content: c }).then(() => {}) })
     } catch (err) {
-      toast.showError(err, `Failed to load fragment "${fragName}"`)
+      target.value = null
+      loadError.value = `Failed to load fragment "${fragName}": ${(err as Error).message}`
+      retryTimer = setInterval(() => openFragment(fragName), 3000)
     }
   }
 
   function clear() {
+    clearRetry()
+    loadError.value = null
     target.value = null
     content.value = null
     saved.value = null
@@ -186,12 +205,14 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   async function save() {
-    if (!target.value || !content.value) return
+    if (!target.value && pendingEdits.size === 0) return
     saving.value = true
     lastSaveError.value = null
     try {
-      await target.value.save(content.value)
-      saved.value = deepClone(content.value)
+      if (target.value && content.value) {
+        await target.value.save(content.value)
+        saved.value = deepClone(content.value)
+      }
       for (const [p, entry] of pendingEdits) {
         await entry.target.save(entry.editedContent)
       }
@@ -208,7 +229,7 @@ export const useEditingStore = defineStore('editing', () => {
 
   return {
     target, content, saved, saving, lastSaveError, template, path, schema,
-    dirty, mountVersion, customEditorMount, pendingEdits, pendingCount,
+    dirty, loadError, mountVersion, customEditorMount, pendingEdits, pendingCount,
     hasPendingEdits, allOverrides,
     open, openComponent, openPageRoot, openFragment,
     clear, markDirty, discard, revertStashed, save, hasPendingEdit,

@@ -29,6 +29,7 @@ interface NodeData {
   fragName?: string
   index?: number
   isTopLevel?: boolean
+  error?: string
 }
 
 interface ComponentNode {
@@ -75,14 +76,15 @@ async function buildComponentNode(name: string, parentDir: string, index: number
         data: { isFragment: true, fragName, treePath, path: frag.dir, template: frag.template, index, isTopLevel: true },
         children,
       }
-    } catch {
-      return { key: `frag:${fragName}:${index}`, label: name, data: { isFragment: true, treePath, index, isTopLevel: true }, children: [] }
+    } catch (err) {
+      return { key: `frag:${fragName}:${index}`, label: name, data: { isFragment: true, fragName, treePath, index, isTopLevel: true, error: (err as Error).message }, children: [] }
     }
   }
 
   const path = `${parentDir}/${name}`
   let template = ''
   let children: ComponentNode[] = []
+  let error: string | undefined
   try {
     const comp = await api.getComponent(path)
     template = (comp.template as string) ?? ''
@@ -91,14 +93,14 @@ async function buildComponentNode(name: string, parentDir: string, index: number
         (comp.components as string[]).map((c: string, i: number) => buildComponentNode(c, path, i, treePath, map))
       )
     }
-  } catch { /* component may not have manifest */ }
+  } catch (err) { error = (err as Error).message }
 
   map.set(gzId, { path, template })
 
   return {
     key: `comp:${path}:${index}`,
     label: name,
-    data: { path, template, treePath, isFragment: false, index, isTopLevel: true },
+    data: { path, template, treePath, isFragment: false, index, isTopLevel: true, error },
     children: children.map(c => ({ ...c, data: { ...c.data, isTopLevel: false } })),
   }
 }
@@ -209,8 +211,8 @@ async function onSelect(node: ComponentNode) {
     editing.openPageRoot()
     return
   }
-  if (!node.data.path || !node.data.template) return
-  editing.openComponent(node.data.path!, node.data.template!)
+  if (!node.data.path) return
+  editing.openComponent(node.data.path!, node.data.template ?? '')
 }
 
 // Find a node by walking the tree
@@ -293,7 +295,8 @@ async function addComponent(name: string, template: string) {
         @click="onSelect(node)"
         @mouseenter="onHover(node)"
         @mouseleave="onHoverEnd()">
-        <i :class="nodeIcon(node, depth)" class="node-icon" />
+        <i v-if="node.data?.error" class="pi pi-exclamation-triangle node-icon node-error-icon" />
+        <i v-else :class="nodeIcon(node, depth)" class="node-icon" />
         <span v-if="node.data?.path && (editing.hasPendingEdit(node.data.path) || (editing.dirty && editing.path === node.data.path))" class="node-dirty-dot" />
         <span class="node-label">{{ node.label }}</span>
         <Button v-if="node.data?.path && (editing.hasPendingEdit(node.data.path) || (editing.dirty && editing.path === node.data.path))"
@@ -337,6 +340,7 @@ async function addComponent(name: string, template: string) {
 .node-item.selected .node-label { color: #374151; }
 .node-item:hover .node-label, .node-item.hovered .node-label { color: #374151; }
 .node-root .node-label { color: #1f2937; }
+.node-error-icon { color: #dc2626; }
 .node-dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: #d97706; flex-shrink: 0; }
 .node-revert { opacity: 0; transition: opacity 0.1s; width: 18px; height: 18px; flex-shrink: 0; }
 .node-item:hover .node-revert { opacity: 1; }
@@ -353,5 +357,6 @@ async function addComponent(name: string, template: string) {
 .dark .component-tree .node-item.selected .node-label { color: #e4e4e7; }
 .dark .component-tree .node-item:hover .node-label, .dark .component-tree .node-item.hovered .node-label { color: #e4e4e7; }
 .dark .component-tree .node-root .node-label { color: #e4e4e7; }
+.dark .component-tree .node-error-icon { color: #f87171; }
 .dark .component-tree .node-dirty-dot { background: #f59e0b; }
 </style>
