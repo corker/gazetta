@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
-import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { api } from '../api/client.js'
 import CreatePageDialog from './CreatePageDialog.vue'
 import CreateFragmentDialog from './CreateFragmentDialog.vue'
@@ -18,10 +18,10 @@ interface SiteNode {
   icon: string
 }
 
+const router = useRouter()
 const site = useSiteStore()
 const selection = useSelectionStore()
 const editing = useEditingStore()
-const unsavedGuard = useUnsavedGuardStore()
 const toast = useToastStore()
 const selectedKey = ref<string | null>(null)
 const showCreatePage = ref(false)
@@ -31,7 +31,7 @@ const showCreateFragment = ref(false)
 watch(() => selection.selection, (sel) => {
   if (sel) selectedKey.value = `${sel.type}:${sel.name}`
   else selectedKey.value = null
-})
+}, { immediate: true })
 
 const systemPageNames = computed(() => new Set(site.manifest?.systemPages ?? []))
 
@@ -55,16 +55,9 @@ const fragments = computed<SiteNode[]>(() =>
     .sort((a, b) => a.label.localeCompare(b.label))
 )
 
-async function onSelect(node: SiteNode) {
-  if (editing.hasPendingEdits) {
-    const result = await unsavedGuard.guard()
-    if (result === 'cancel') return
-    if (result === 'save') await editing.save()
-  }
-  editing.clear()
-  selectedKey.value = node.key
-  if (node.type === 'page') selection.selectPage(node.name)
-  else selection.selectFragment(node.name)
+function onSelect(node: SiteNode) {
+  const prefix = node.type === 'page' ? '/pages' : '/fragments'
+  router.push(`${prefix}/${node.name}`)
 }
 
 async function handleDelete(node: SiteNode, e: Event) {

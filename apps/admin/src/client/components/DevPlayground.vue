@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { onKeyStroke } from '@vueuse/core'
 import { useThemeStore } from '../stores/theme.js'
 import { api } from '../api/client.js'
@@ -8,6 +8,7 @@ import type { EditorMount, FieldMount } from 'gazetta/types'
 
 const theme = useThemeStore()
 const router = useRouter()
+const route = useRoute()
 
 // ESC exits playground — matches edit mode + fullscreen pattern
 onKeyStroke('Escape', () => {
@@ -16,7 +17,7 @@ onKeyStroke('Escape', () => {
     active.blur()
     return
   }
-  router.push('/')
+  router.back()
 })
 
 // --- Data ---
@@ -67,7 +68,12 @@ async function loadSidebar() {
   }
 }
 
-loadSidebar()
+loadSidebar().then(() => {
+  const editorParam = route.params.editor as string | undefined
+  const fieldParam = route.params.field as string | undefined
+  if (editorParam && templates.value.some(t => t.name === editorParam)) selectEditor(editorParam)
+  else if (fieldParam && fields.value.some(f => f.name === fieldParam)) selectField(fieldParam)
+})
 
 // --- Computed ---
 const customEditors = computed(() => templates.value.filter(t => t.hasEditor))
@@ -120,6 +126,7 @@ async function selectEditor(name: string) {
     const realContent = await findRealContent(name)
 
     selected.value = { type: 'editor', name, hasEditor: !!hasEditor, editorUrl, fieldsBaseUrl, schema, realContent }
+    router.replace(`/dev/editor/${name}`)
   } catch (err) {
     mountError.value = `Failed to load schema for "${name}": ${(err as Error).message}`
     selected.value = null
@@ -139,6 +146,7 @@ async function selectField(name: string) {
   }
   if (!fieldsBaseUrl) { mountError.value = 'No fieldsBaseUrl available'; return }
   selected.value = { type: 'field', name, fieldsBaseUrl }
+  router.replace(`/dev/field/${name}`)
 }
 
 // --- Find real content from any component that uses this template ---

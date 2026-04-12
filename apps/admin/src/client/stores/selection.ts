@@ -9,13 +9,6 @@ export type Selection =
   | { type: 'page'; name: string; detail: PageDetail }
   | { type: 'fragment'; name: string; detail: FragmentDetail }
 
-const STORAGE_KEY = 'gazetta_selection'
-
-function saveSession(data: { type: string; name: string; hostPage?: string } | null) {
-  if (data) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  else sessionStorage.removeItem(STORAGE_KEY)
-}
-
 export const useSelectionStore = defineStore('selection', () => {
   const toast = useToastStore()
 
@@ -49,9 +42,6 @@ export const useSelectionStore = defineStore('selection', () => {
     const page = staticPages.value.find(p => p.name === pageName)
     if (page) {
       fragmentHostPage.value = page
-      if (selection.value?.type === 'fragment') {
-        saveSession({ type: 'fragment', name: selection.value.name, hostPage: pageName })
-      }
       usePreviewStore().invalidate()
     }
   }
@@ -64,7 +54,6 @@ export const useSelectionStore = defineStore('selection', () => {
       const detail = await api.getPage(pageName, { signal })
       selection.value = { type: 'page', name: pageName, detail }
       fragmentHostPage.value = null
-      saveSession({ type: 'page', name: pageName })
       usePreviewStore().invalidate()
     } catch (err) {
       if ((err as Error).name === 'AbortError') return
@@ -80,7 +69,6 @@ export const useSelectionStore = defineStore('selection', () => {
       const detail = await api.getFragment(fragName, { signal })
       selection.value = { type: 'fragment', name: fragName, detail }
       if (!fragmentHostPage.value) resolveDefaultHostPage()
-      saveSession({ type: 'fragment', name: fragName, hostPage: fragmentHostPage.value?.name })
       usePreviewStore().invalidate()
     } catch (err) {
       if ((err as Error).name === 'AbortError') return
@@ -120,36 +108,5 @@ export const useSelectionStore = defineStore('selection', () => {
     }
   }
 
-  /** Restore selection from sessionStorage (call after site data is loaded) */
-  async function restore() {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return
-    try {
-      const saved = JSON.parse(raw) as { type: string; name: string; hostPage?: string }
-      if (saved.type === 'page') {
-        const detail = await api.getPage(saved.name)
-        if (selection.value) return // User already clicked something
-        selection.value = { type: 'page', name: saved.name, detail }
-        fragmentHostPage.value = null
-        usePreviewStore().invalidate()
-      } else if (saved.type === 'fragment') {
-        const detail = await api.getFragment(saved.name)
-        if (selection.value) return // User already clicked something
-        selection.value = { type: 'fragment', name: saved.name, detail }
-        // Restore host page if saved, otherwise default
-        if (saved.hostPage) {
-          const page = staticPages.value.find(p => p.name === saved.hostPage)
-          if (page) fragmentHostPage.value = page
-          else resolveDefaultHostPage()
-        } else {
-          resolveDefaultHostPage()
-        }
-        usePreviewStore().invalidate()
-      }
-    } catch {
-      sessionStorage.removeItem(STORAGE_KEY)
-    }
-  }
-
-  return { selection, type, name, detail, previewRoute, fragmentHostPage, staticPages, selectPage, selectFragment, setFragmentHostPage, reload, updateComponents, restore }
+  return { selection, type, name, detail, previewRoute, fragmentHostPage, staticPages, selectPage, selectFragment, setFragmentHostPage, reload, updateComponents }
 })

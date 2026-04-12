@@ -8,20 +8,18 @@ import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
-import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
-const isDevPage = computed(() => route.path === '/dev')
+const isDevPage = computed(() => route.name === 'dev')
 
 const site = useSiteStore()
 const selection = useSelectionStore()
 const editing = useEditingStore()
 const theme = useThemeStore()
 const uiMode = useUiModeStore()
-const unsavedGuard = useUnsavedGuardStore()
 const showPublish = ref(false)
 const showFetch = ref(false)
 
@@ -29,13 +27,9 @@ const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fr
 const publishItemName = computed(() => selection.name ?? '')
 const canPublish = computed(() => selection.name && !editing.hasPendingEdits)
 
-async function handleBack() {
-  if (editing.hasPendingEdits) {
-    const result = await unsavedGuard.guard()
-    if (result === 'cancel') return
-    if (result === 'save') await editing.save()
-  }
-  uiMode.enterBrowse()
+function handleBack() {
+  const prefix = selection.type === 'page' ? '/pages' : '/fragments'
+  router.push(`${prefix}/${selection.name}`)
 }
 </script>
 
@@ -45,7 +39,7 @@ async function handleBack() {
       <Button v-if="uiMode.mode === 'edit' && !isDevPage" icon="pi pi-arrow-left" text rounded
         data-testid="back-to-browse" @click="handleBack" size="small" class="cms-btn" />
       <Button v-if="isDevPage" icon="pi pi-arrow-left" text rounded
-        data-testid="back-to-editor" @click="router.push('/')" size="small" class="cms-btn" />
+        data-testid="back-to-editor" @click="router.back()" size="small" class="cms-btn" />
       <span class="cms-logo">
         <i class="pi pi-objects-column" />
         Gazetta

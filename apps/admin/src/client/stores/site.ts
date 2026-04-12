@@ -9,7 +9,21 @@ export const useSiteStore = defineStore('site', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  let loadPromise: Promise<void> | null = null
+
+  async function ensureLoaded() {
+    if (manifest.value && !error.value) return
+    if (loadPromise) return loadPromise
+    return load()
+  }
+
   async function load(retries = 5) {
+    if (loadPromise) return loadPromise
+    loadPromise = doLoad(retries)
+    return loadPromise
+  }
+
+  async function doLoad(retries = 5) {
     loading.value = true
     error.value = null
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -34,7 +48,8 @@ export const useSiteStore = defineStore('site', () => {
       }
     }
     loading.value = false
+    loadPromise = null
   }
 
-  return { manifest, pages, fragments, loading, error, load }
+  return { manifest, pages, fragments, loading, error, load, ensureLoaded }
 })

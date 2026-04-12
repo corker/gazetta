@@ -2,19 +2,22 @@
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import { onKeyStroke } from '@vueuse/core'
+import { useRouter } from 'vue-router'
 import SiteTree from './SiteTree.vue'
 import ComponentTree from './ComponentTree.vue'
 import EditorPanel from './EditorPanel.vue'
 import PreviewPanel from './PreviewPanel.vue'
 import { useUiModeStore } from '../stores/uiMode.js'
-import { useEditingStore } from '../stores/editing.js'
+import { useSelectionStore } from '../stores/selection.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 
+const router = useRouter()
 const uiMode = useUiModeStore()
-const editing = useEditingStore()
+const selection = useSelectionStore()
 const unsavedGuard = useUnsavedGuardStore()
 
-onKeyStroke('Escape', async () => {
+onKeyStroke('Escape', () => {
+  if (unsavedGuard.visible) return
   if (uiMode.mode === 'fullscreen') { uiMode.toggleFullscreen(); return }
   if (uiMode.mode !== 'edit') return
   const active = document.activeElement as HTMLElement | null
@@ -22,12 +25,9 @@ onKeyStroke('Escape', async () => {
     active.blur()
     return
   }
-  if (editing.hasPendingEdits) {
-    const result = await unsavedGuard.guard()
-    if (result === 'cancel') return
-    if (result === 'save') await editing.save()
-  }
-  uiMode.enterBrowse()
+  if (!selection.name) return
+  const prefix = selection.type === 'page' ? '/pages' : '/fragments'
+  router.push(`${prefix}/${selection.name}`)
 })
 </script>
 

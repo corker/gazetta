@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useSiteStore } from './stores/site.js'
-import { useSelectionStore } from './stores/selection.js'
 import { useThemeStore } from './stores/theme.js'
 import { useToastStore } from './stores/toast.js'
 import Toolbar from './components/CmsToolbar.vue'
 import UnsavedDialog from './components/UnsavedDialog.vue'
 
 const site = useSiteStore()
-const selection = useSelectionStore()
 const theme = useThemeStore()
 const toast = useToastStore()
-onMounted(async () => {
-  await site.load()
+onMounted(() => {
   theme.init()
-  selection.restore()
 })
 </script>
 

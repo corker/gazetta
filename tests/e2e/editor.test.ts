@@ -271,6 +271,99 @@ test.describe('Component stashing', () => {
   })
 })
 
+test.describe('Deep linking', () => {
+  test('direct URL to page selects it in browse mode', async ({ page }) => {
+    await page.goto('/admin/pages/about')
+    await expect(page.locator('[data-testid="site-page-about"].selected')).toBeVisible({ timeout: 10000 })
+    // Preview should show about page
+    const iframe = page.frameLocator('[data-testid="preview-iframe"]')
+    await iframe.locator('[data-gz]').first().waitFor({ timeout: 10000 })
+  })
+
+  test('direct URL to page/edit enters edit mode', async ({ page }) => {
+    await page.goto('/admin/pages/home/edit')
+    // Should be in edit mode with component tree visible
+    await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
+  })
+
+  test('direct URL to fragment selects it', async ({ page }) => {
+    await page.goto('/admin/fragments/header')
+    await expect(page.locator('[data-testid="site-fragment-header"].selected')).toBeVisible({ timeout: 10000 })
+  })
+
+  test('back button navigates from edit to browse', async ({ page }) => {
+    await page.goto('/admin/pages/home')
+    await page.locator('[data-testid="site-page-home"].selected').waitFor({ timeout: 10000 })
+
+    // Enter edit mode via preview click
+    const iframe = page.frameLocator('[data-testid="preview-iframe"]')
+    await iframe.locator('[data-gz]').first().waitFor({ timeout: 10000 })
+    await iframe.locator('[data-gz]').first().click()
+    await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
+
+    // URL should reflect edit mode
+    await expect(page).toHaveURL(/\/pages\/home\/edit/)
+
+    // Browser back should return to browse mode
+    await page.goBack()
+    await expect(page).toHaveURL(/\/pages\/home$/)
+    await expect(page.locator('[data-testid="site-page-home"]')).toBeVisible()
+  })
+
+  test('URL updates when switching pages', async ({ page }) => {
+    await page.goto('/admin/pages/home')
+    await page.locator('[data-testid="site-page-home"].selected').waitFor({ timeout: 10000 })
+
+    await page.click('[data-testid="site-page-about"]')
+    await expect(page).toHaveURL(/\/pages\/about/)
+    await expect(page.locator('[data-testid="site-page-about"].selected')).toBeVisible()
+  })
+})
+
+test.describe('Deep linking - dev playground', () => {
+  test('direct URL to editor pre-selects it', async ({ page }) => {
+    await page.goto('/admin/dev/editor/hero')
+    await page.waitForSelector('[data-testid="playground-mount"]', { timeout: 10000 })
+    const inspector = page.locator('[data-testid="playground-inspector"]')
+    await expect(inspector).toContainText('Welcome to Gazetta', { timeout: 10000 })
+  })
+
+  test('selecting editor updates URL', async ({ page }) => {
+    await page.goto('/admin/dev')
+    await page.waitForSelector('[data-testid="dev-playground"]')
+    await page.click('[data-testid="playground-editor-hero"]')
+    await expect(page).toHaveURL(/\/dev\/editor\/hero/, { timeout: 5000 })
+  })
+
+  test('selecting field updates URL', async ({ page }) => {
+    await page.goto('/admin/dev')
+    await page.waitForSelector('[data-testid="dev-playground"]')
+    await page.click('[data-testid="playground-field-brand-color"]')
+    await expect(page).toHaveURL(/\/dev\/field\/brand-color/, { timeout: 5000 })
+  })
+})
+
+test.describe('Escape key behavior', () => {
+  test('Escape from unsaved dialog does not reopen it', async ({ page }) => {
+    await openEditor(page, 'home')
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+    await page.locator('[data-testid="editor-container"] input').first().fill('escape test')
+
+    await page.click('[data-testid="back-to-browse"]')
+    const dialog = page.locator('.p-dialog')
+    await dialog.waitFor({ timeout: 5000 })
+
+    // Press Escape to close dialog
+    await page.keyboard.press('Escape')
+    await expect(dialog).not.toBeVisible({ timeout: 2000 })
+
+    // Wait a moment — dialog should NOT reappear
+    await page.waitForTimeout(500)
+    await expect(dialog).not.toBeVisible()
+  })
+})
+
 test.describe('Dev playground', () => {
   test('loads and shows sidebar with editors and fields', async ({ page }) => {
     await page.goto('/admin/dev')

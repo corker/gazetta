@@ -8,7 +8,7 @@ import { usePreviewStore } from '../stores/preview.js'
 import { useToastStore } from '../stores/toast.js'
 import { useSiteStore } from '../stores/site.js'
 import { useUiModeStore } from '../stores/uiMode.js'
-import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
+import { useRouter } from 'vue-router'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
@@ -27,7 +27,7 @@ const preview = usePreviewStore()
 const toast = useToastStore()
 const site = useSiteStore()
 const uiMode = useUiModeStore()
-const unsavedGuard = useUnsavedGuardStore()
+const router = useRouter()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let currentHtml = ''
@@ -344,24 +344,18 @@ async function handleMessage(e: MessageEvent) {
     if (uiMode.mode === 'fullscreen') uiMode.toggleFullscreen()
   }
   if (e.data?.type === 'gazetta:select' && e.data.gzId) {
-    // Instant visual feedback — show selection overlay before async processing
     iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:showSelect', gzId: e.data.gzId }, '*')
-    // In browse mode, entering edit first — setPending buffers for ComponentTree
-    if (uiMode.mode === 'browse') uiMode.enterEdit()
     focus.setPending(e.data.gzId)
-    // Move focus from iframe to parent so keyboard shortcuts (Escape) work
+    if (selection.name) {
+      const prefix = selection.type === 'page' ? '/pages' : '/fragments'
+      router.push(`${prefix}/${selection.name}/edit`)
+    }
     iframeRef.value?.blur()
   }
   if (e.data?.type === 'gazetta:navigate' && e.data.route) {
     const page = site.pages.find(p => p.route === e.data.route)
     if (page) {
-      if (editing.dirty) {
-        const result = await unsavedGuard.guard()
-        if (result === 'cancel') return
-        if (result === 'save') await editing.save()
-      }
-      editing.clear()
-      selection.selectPage(page.name)
+      router.push(`/pages/${page.name}`)
     } else {
       toast.show(`No page found for route ${e.data.route}`, { type: 'error' })
     }
