@@ -21,6 +21,7 @@ export const useSelectionStore = defineStore('selection', () => {
 
   const selection = ref<Selection | null>(null)
   const fragmentHostPage = ref<PageSummary | null>(null)
+  let selectController: AbortController | null = null
 
   // Convenience accessors
   const type = computed(() => selection.value?.type ?? null)
@@ -56,25 +57,33 @@ export const useSelectionStore = defineStore('selection', () => {
   }
 
   async function selectPage(pageName: string) {
+    selectController?.abort()
+    selectController = new AbortController()
+    const { signal } = selectController
     try {
-      const detail = await api.getPage(pageName)
+      const detail = await api.getPage(pageName, { signal })
       selection.value = { type: 'page', name: pageName, detail }
       fragmentHostPage.value = null
       saveSession({ type: 'page', name: pageName })
       usePreviewStore().invalidate()
     } catch (err) {
+      if ((err as Error).name === 'AbortError') return
       toast.showError(err, `Failed to load page "${pageName}"`)
     }
   }
 
   async function selectFragment(fragName: string) {
+    selectController?.abort()
+    selectController = new AbortController()
+    const { signal } = selectController
     try {
-      const detail = await api.getFragment(fragName)
+      const detail = await api.getFragment(fragName, { signal })
       selection.value = { type: 'fragment', name: fragName, detail }
       if (!fragmentHostPage.value) resolveDefaultHostPage()
       saveSession({ type: 'fragment', name: fragName, hostPage: fragmentHostPage.value?.name })
       usePreviewStore().invalidate()
     } catch (err) {
+      if ((err as Error).name === 'AbortError') return
       toast.showError(err, `Failed to load fragment "${fragName}"`)
     }
   }

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { resolve, join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import yaml from 'js-yaml'

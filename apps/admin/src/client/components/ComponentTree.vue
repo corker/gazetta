@@ -19,10 +19,21 @@ function hashPath(path: string): string {
   return hash.toString(16).padStart(8, '0')
 }
 
+interface NodeData {
+  treePath?: string
+  path?: string
+  template?: string
+  isFragment?: boolean
+  isPage?: boolean
+  fragName?: string
+  index?: number
+  isTopLevel?: boolean
+}
+
 interface ComponentNode {
   key: string
   label: string
-  data: Record<string, unknown>
+  data: NodeData
   children: ComponentNode[]
 }
 
@@ -129,7 +140,7 @@ watch(() => focus.pendingGzId, () => consumePending())
 // Highlight tree node when component is hovered in preview
 watch(() => focus.previewHoverGzId, (gzId) => {
   if (!gzId) { hoveredNodeKey.value = null; return }
-  const found = findNodeByKey(componentNodes.value, d => d.treePath && hashPath(d.treePath as string) === gzId)
+  const found = findNodeByKey(componentNodes.value, d => d.treePath ? hashPath(d.treePath) === gzId : false)
   hoveredNodeKey.value = found?.key ?? null
 })
 
@@ -211,7 +222,7 @@ async function openFragmentEditor(fragName: string) {
 
 function onHover(node: ComponentNode) {
   if (!node.data.treePath) return
-  focus.highlight(hashPath(node.data.treePath as string))
+  focus.highlight(hashPath(node.data.treePath!))
 }
 
 function onHoverEnd() {
@@ -224,10 +235,10 @@ function onSelect(node: ComponentNode) {
   if (!node.data) return
   if (editing.dirty && !confirm('You have unsaved changes. Discard?')) return
   selectedNodeKey.value = node.key
-  const treePath = node.data.treePath as string
+  const treePath = node.data.treePath
   focus.select(treePath ? hashPath(treePath) : null)
   if (node.data.isFragment && node.data.fragName) {
-    openFragmentEditor(node.data.fragName as string)
+    openFragmentEditor(node.data.fragName!)
     return
   }
   if (node.data.isPage) {
@@ -235,11 +246,11 @@ function onSelect(node: ComponentNode) {
     return
   }
   if (!node.data.path || !node.data.template) return
-  openComponentEditor(node.data.path as string, node.data.template as string)
+  openComponentEditor(node.data.path!, node.data.template!)
 }
 
 // Find a node by walking the tree
-function findNodeByKey(nodes: ComponentNode[], predicate: (data: Record<string, unknown>) => boolean): ComponentNode | null {
+function findNodeByKey(nodes: ComponentNode[], predicate: (data: NodeData) => boolean): ComponentNode | null {
   for (const node of nodes) {
     if (node.data && predicate(node.data)) return node
     if (node.children.length) {
