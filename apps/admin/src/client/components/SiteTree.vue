@@ -73,7 +73,8 @@ async function handleDelete(node: SiteNode, e: Event) {
   try {
     if (node.type === 'page') await api.deletePage(node.name)
     else await api.deleteFragment(node.name)
-    editing.clear()
+    const isSelected = selection.type === node.type && selection.name === node.name
+    if (isSelected) editing.clear()
     await site.load()
   } catch (err) {
     toast.showError(err, `Failed to delete "${node.name}"`)
