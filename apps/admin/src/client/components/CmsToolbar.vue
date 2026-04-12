@@ -38,6 +38,8 @@ function handleBack() {
     <template #start>
       <Button v-if="uiMode.mode === 'edit'" icon="pi pi-arrow-left" text rounded
         data-testid="back-to-browse" @click="handleBack" size="small" class="cms-btn" />
+      <Button v-if="isDevPage" icon="pi pi-arrow-left" text rounded
+        data-testid="back-to-editor" @click="router.push('/')" size="small" class="cms-btn" />
       <span class="cms-logo">
         <i class="pi pi-objects-column" />
         Gazetta
@@ -55,9 +57,7 @@ function handleBack() {
       </Transition>
     </template>
     <template #end>
-      <Button v-if="isDevPage" icon="pi pi-arrow-left" label="Editor" text
-        data-testid="back-to-editor" @click="router.push('/')" size="small" class="cms-btn" />
-      <Button v-else icon="pi pi-code" text rounded title="Dev Playground"
+      <Button v-if="!isDevPage" icon="pi pi-code" text rounded title="Dev Playground"
         data-testid="dev-playground-link" @click="router.push('/dev')" size="small" class="cms-btn" />
       <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />

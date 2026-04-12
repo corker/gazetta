@@ -1,10 +1,23 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
+import { onKeyStroke } from '@vueuse/core'
 import { useThemeStore } from '../stores/theme.js'
 import { api } from '../api/client.js'
 import type { EditorMount, FieldMount } from 'gazetta/types'
 
 const theme = useThemeStore()
+const router = useRouter()
+
+// ESC exits playground — matches edit mode + fullscreen pattern
+onKeyStroke('Escape', () => {
+  const active = document.activeElement as HTMLElement | null
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
+    active.blur()
+    return
+  }
+  router.push('/')
+})
 
 // --- Data ---
 interface TemplateItem { name: string; hasEditor: boolean }
@@ -60,10 +73,40 @@ loadSidebar()
 const customEditors = computed(() => templates.value.filter(t => t.hasEditor))
 const defaultEditors = computed(() => templates.value.filter(t => !t.hasEditor))
 const themeMode = computed<'dark' | 'light'>(() => theme.dark ? 'dark' : 'light')
-const valueJson = computed(() => {
-  try { return JSON.stringify(currentValue.value, null, 2) }
-  catch { return String(currentValue.value) }
+const valueHtml = computed(() => {
+  try { return syntaxHighlight(currentValue.value) }
+  catch { return escapeHtml(String(currentValue.value)) }
 })
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function syntaxHighlight(obj: unknown, indent = 0): string {
+  const pad = '  '.repeat(indent)
+  if (obj === null) return `<span class="jv-null">null</span>`
+  if (typeof obj === 'boolean') return `<span class="jv-bool">${obj}</span>`
+  if (typeof obj === 'number') return `<span class="jv-num">${obj}</span>`
+  if (typeof obj === 'string') {
+    if (obj.includes('\n')) {
+      const lines = obj.split('\n').map(l => escapeHtml(l))
+      return `<span class="jv-str">"${lines.join(`<br>${pad}  `)}"</span>`
+    }
+    return `<span class="jv-str">"${escapeHtml(obj)}"</span>`
+  }
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return '[]'
+    const items = obj.map(v => `${pad}  ${syntaxHighlight(v, indent + 1)}`).join(',\n')
+    return `[\n${items}\n${pad}]`
+  }
+  if (typeof obj === 'object') {
+    const entries = Object.entries(obj as Record<string, unknown>)
+    if (entries.length === 0) return '{}'
+    const props = entries.map(([k, v]) => `${pad}  <span class="jv-key">"${escapeHtml(k)}"</span>: ${syntaxHighlight(v, indent + 1)}`).join(',\n')
+    return `{\n${props}\n${pad}}`
+  }
+  return escapeHtml(String(obj))
+}
 
 // --- Select an editor (lazy schema load) ---
 async function selectEditor(name: string) {
@@ -339,7 +382,7 @@ const themeVars = computed(() => {
           <!-- Value inspector — side panel -->
           <div v-if="showInspector" class="value-inspector" data-testid="playground-inspector">
             <div class="inspector-header">Value</div>
-            <pre class="inspector-value">{{ valueJson }}</pre>
+            <pre class="inspector-value" v-html="valueHtml" />
           </div>
         </div>
       </template>
@@ -379,16 +422,23 @@ const themeVars = computed(() => {
 .toolbar-btn { display: flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border: 1px solid #e5e7eb; border-radius: 6px; background: transparent; color: #6b7280; font-size: 0.75rem; cursor: pointer; white-space: nowrap; }
 .toolbar-btn:hover { background: rgba(128, 128, 128, 0.08); color: #374151; }
 
-/* Body — side by side */
+/* Body — side by side, equal width */
 .main-body { flex: 1; display: flex; overflow: hidden; }
 .main-content { flex: 1; overflow-y: auto; padding: 1.5rem; min-width: 0; }
 .mount-container { max-width: 600px; }
 .mount-error { color: #dc2626; font-size: 0.8125rem; margin-bottom: 1rem; padding: 0.75rem; background: rgba(220, 38, 38, 0.08); border-radius: 6px; }
 
-/* Value inspector — side panel */
-.value-inspector { width: 300px; flex-shrink: 0; border-left: 1px solid #e5e7eb; overflow-y: auto; display: flex; flex-direction: column; }
+/* Value inspector — equal width side panel */
+.value-inspector { flex: 1; min-width: 0; border-left: 1px solid #e5e7eb; overflow-y: auto; display: flex; flex-direction: column; }
 .inspector-header { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; padding: 0.5rem 0.75rem; font-weight: 600; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
-.inspector-value { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.6875rem; line-height: 1.5; padding: 0.75rem; color: #374151; margin: 0; white-space: pre-wrap; word-break: break-all; flex: 1; }
+.inspector-value { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.7; padding: 0.75rem; color: #374151; margin: 0; white-space: pre-wrap; word-break: break-word; flex: 1; }
+
+/* JSON syntax colors */
+.inspector-value .jv-key { color: #6b7280; }
+.inspector-value .jv-str { color: #16a34a; }
+.inspector-value .jv-num { color: #d97706; }
+.inspector-value .jv-bool { color: #7c3aed; }
+.inspector-value .jv-null { color: #9ca3af; }
 
 </style>
 
@@ -411,4 +461,9 @@ const themeVars = computed(() => {
 .dark .value-inspector { border-left-color: #27272a; background: #0c0c14; }
 .dark .inspector-header { color: #666; border-bottom-color: #27272a; }
 .dark .inspector-value { color: #e4e4e7; }
+.dark .inspector-value .jv-key { color: #8888a0; }
+.dark .inspector-value .jv-str { color: #4ade80; }
+.dark .inspector-value .jv-num { color: #fbbf24; }
+.dark .inspector-value .jv-bool { color: #a78bfa; }
+.dark .inspector-value .jv-null { color: #52525b; }
 </style>
