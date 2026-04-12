@@ -107,6 +107,13 @@ describe('runInit', () => {
     expect(existsSync(join(testDir, 'sites/main/fragments/header/fragment.yaml'))).toBe(true)
     expect(existsSync(join(testDir, 'sites/main/pages/404/page.yaml'))).toBe(true)
 
+    // site.yaml has a default local target
+    const siteYaml = await import('node:fs').then(fs => fs.readFileSync(join(testDir, 'sites/main/site.yaml'), 'utf-8'))
+    expect(siteYaml).toContain('targets:')
+    expect(siteYaml).toContain('local:')
+    expect(siteYaml).toContain('type: filesystem')
+    expect(siteYaml).toContain('systemPages:')
+
     // No old flat structure
     expect(existsSync(join(testDir, 'site.yaml'))).toBe(false)
     expect(existsSync(join(testDir, 'pages'))).toBe(false)

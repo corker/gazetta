@@ -200,7 +200,7 @@ async function runInit(dir: string) {
   const name = target.split('/').pop() ?? 'my-site'
 
   const files: Record<string, string> = {
-    'sites/main/site.yaml': `name: ${name}\nversion: 1.0.0\n`,
+    'sites/main/site.yaml': `name: ${name}\nversion: 1.0.0\nsystemPages:\n  - "404"\ntargets:\n  local:\n    storage:\n      type: filesystem\n      path: ./dist/local\n`,
 
     'templates/page-layout/index.ts': `import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
@@ -358,7 +358,7 @@ content:
     `  ${c.dim('pages/home/')}       ${c.dim('home page with hero + intro')}\n` +
     `  ${c.dim('pages/404/')}        ${c.dim('error page')}\n` +
     `  ${c.dim('fragments/header/')} ${c.dim('shared header nav')}\n` +
-    `  ${c.dim('site.yaml')}         ${c.dim('site config')}\n` +
+    `  ${c.dim('site.yaml')}         ${c.dim('site config + local target')}\n` +
     `${c.bold('package.json')}`,
     `Created ${c.green(name)}/`
   )

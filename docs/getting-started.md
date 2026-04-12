@@ -16,6 +16,7 @@ This scaffolds:
 - A home page with a hero and text block
 - A shared header fragment (nav bar)
 - Templates: page-layout, hero, nav, text-block
+- A `local` filesystem target — publish works immediately
 
 ## Start the dev server
 
