@@ -42,7 +42,7 @@ async function handleBack() {
 <template>
   <Toolbar class="cms-toolbar">
     <template #start>
-      <Button v-if="uiMode.mode === 'edit'" icon="pi pi-arrow-left" text rounded
+      <Button v-if="uiMode.mode === 'edit' && !isDevPage" icon="pi pi-arrow-left" text rounded
         data-testid="back-to-browse" @click="handleBack" size="small" class="cms-btn" />
       <Button v-if="isDevPage" icon="pi pi-arrow-left" text rounded
         data-testid="back-to-editor" @click="router.push('/')" size="small" class="cms-btn" />
