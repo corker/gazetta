@@ -136,7 +136,9 @@ const BRIDGE_SCRIPT = `
 
   function isInteractive(el) {
     var tag = el.tagName;
-    return tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'LABEL' || el.isContentEditable;
+    if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'LABEL' || tag === 'A' || el.isContentEditable) return true;
+    var role = el.getAttribute && el.getAttribute('role');
+    return role === 'button' || role === 'link' || role === 'menuitem' || role === 'tab' || role === 'switch' || role === 'checkbox' || role === 'radio' || role === 'textbox' || role === 'combobox';
   }
 
   function positionOverlay(ovl, el) {
