@@ -947,6 +947,7 @@ export function DefaultEditorForm({ schema: jsonSchema, content, onChange, field
           liveValidate={false}
           omitExtraData
           noHtml5Validate
+          autoComplete="off"
         />
       </div>
     </>
