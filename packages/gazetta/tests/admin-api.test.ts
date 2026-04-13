@@ -54,8 +54,10 @@ describe('GET /api/pages/:name', () => {
     expect(status).toBe(200)
     expect(body.route).toBe('/')
     expect(body.components).toContain('@header')
-    expect(body.components).toContain('hero')
     expect(body.components).toContain('@footer')
+    const hero = body.components.find((c: any) => typeof c === 'object' && c.name === 'hero')
+    expect(hero).toBeDefined()
+    expect(hero.template).toBe('hero')
   })
 
   it('returns nested page', async () => {
@@ -86,8 +88,10 @@ describe('GET /api/fragments/:name', () => {
     const { status, body } = await get('/api/fragments/header')
     expect(status).toBe(200)
     expect(body.template).toBe('header-layout')
-    expect(body.components).toContain('logo')
-    expect(body.components).toContain('nav')
+    const logo = body.components.find((c: any) => typeof c === 'object' && c.name === 'logo')
+    const nav = body.components.find((c: any) => typeof c === 'object' && c.name === 'nav')
+    expect(logo).toBeDefined()
+    expect(nav).toBeDefined()
   })
 
   it('returns 404 for missing fragment', async () => {
@@ -122,23 +126,12 @@ describe('GET /api/templates/:name/schema', () => {
   })
 })
 
-describe('GET /api/components', () => {
-  it('returns component manifest', async () => {
-    const path = resolve(siteDir, 'pages/home/hero')
-    const { status, body } = await get(`/api/components?path=${encodeURIComponent(path)}`)
+describe('component data via page API', () => {
+  it('page detail includes inline component content', async () => {
+    const { status, body } = await get('/api/pages/home')
     expect(status).toBe(200)
-    expect(body.template).toBe('hero')
-    expect(body.content.title).toBe('Welcome to Gazetta')
-  })
-
-  it('returns 400 without path param', async () => {
-    const { status } = await get('/api/components')
-    expect(status).toBe(400)
-  })
-
-  it('returns 404 for missing component', async () => {
-    const { status } = await get('/api/components?path=/nonexistent/path')
-    expect(status).toBe(404)
+    const hero = body.components.find((c: any) => typeof c === 'object' && c.name === 'hero')
+    expect(hero.content.title).toBe('Welcome to Gazetta')
   })
 })
 
@@ -199,12 +192,11 @@ describe('POST /preview/@fragment', () => {
 
 describe('POST /preview/*', () => {
   it('renders with content overrides', async () => {
-    const heroPath = resolve(siteDir, 'pages/home/hero')
     const res = await app.request('/preview/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        overrides: { [heroPath]: { title: 'Draft Title', subtitle: 'Draft Subtitle' } },
+        overrides: { 'hero': { title: 'Draft Title', subtitle: 'Draft Subtitle' } },
       }),
     })
     expect(res.status).toBe(200)
@@ -300,35 +292,42 @@ describe('PUT /api/pages/:name', () => {
   })
 })
 
-describe('PUT /api/components', () => {
-  it('updates component content', async () => {
-    const path = resolve(siteDir, 'pages/home/hero')
-    const res = await app.request(`/api/components?path=${encodeURIComponent(path)}`, {
+describe('PUT /api/pages/:name (update component content)', () => {
+  it('updates page with modified component content', async () => {
+    // Read current page
+    const { body: page } = await get('/api/pages/home')
+    const components = page.components.map((c: any) => {
+      if (typeof c === 'object' && c.name === 'hero') {
+        return { ...c, content: { title: 'Updated Hero', subtitle: 'New subtitle' } }
+      }
+      return c
+    })
+
+    // Update page
+    const res = await app.request('/api/pages/home', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: { title: 'Updated Hero', subtitle: 'New subtitle' } }),
+      body: JSON.stringify({ components }),
     })
     expect(res.status).toBe(200)
 
-    // Verify and restore
-    const { body } = await get(`/api/components?path=${encodeURIComponent(path)}`)
-    expect(body.content.title).toBe('Updated Hero')
+    // Verify
+    const { body: updated } = await get('/api/pages/home')
+    const hero = updated.components.find((c: any) => typeof c === 'object' && c.name === 'hero')
+    expect(hero.content.title).toBe('Updated Hero')
 
     // Restore original
-    await app.request(`/api/components?path=${encodeURIComponent(path)}`, {
+    const restored = updated.components.map((c: any) => {
+      if (typeof c === 'object' && c.name === 'hero') {
+        return { ...c, content: { title: 'Welcome to Gazetta', subtitle: 'A stateless CMS that composes pages from reusable components' } }
+      }
+      return c
+    })
+    await app.request('/api/pages/home', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: { title: 'Welcome to Gazetta', subtitle: 'A stateless CMS that composes pages from reusable components' } }),
+      body: JSON.stringify({ components: restored }),
     })
-  })
-
-  it('returns 400 without path', async () => {
-    const res = await app.request('/api/components', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: {} }),
-    })
-    expect(res.status).toBe(400)
   })
 })
 
@@ -397,30 +396,4 @@ describe('DELETE /api/fragments/:name', () => {
   })
 })
 
-describe('POST /api/components (create)', () => {
-  afterAll(async () => {
-    await rm(resolve(siteDir, 'pages/home/test-comp'), { recursive: true, force: true })
-  })
-
-  it('creates a new component', async () => {
-    const parentDir = resolve(siteDir, 'pages/home')
-    const res = await app.request('/api/components', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parentDir, name: 'test-comp', template: 'hero' }),
-    })
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.ok).toBe(true)
-    expect(body.path).toContain('test-comp')
-  })
-
-  it('rejects missing fields', async () => {
-    const res = await app.request('/api/components', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'x' }),
-    })
-    expect(res.status).toBe(400)
-  })
-})
+// Component create/delete is now done via PUT /api/pages/:name (update components array)

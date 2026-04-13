@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
-import yaml from 'js-yaml'
 import type { StorageProvider } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
 
@@ -23,7 +22,7 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider) {
     }
 
     const fragDir = join(join(siteDir, 'fragments'), body.name)
-    const manifestPath = join(fragDir, 'fragment.yaml')
+    const manifestPath = join(fragDir, 'fragment.json')
 
     if (await storage.exists(manifestPath)) {
       return c.json({ error: `Fragment "${body.name}" already exists` }, 409)
@@ -31,7 +30,7 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider) {
 
     await storage.mkdir(fragDir)
     const manifest = { template: body.template, components: [] }
-    await storage.writeFile(manifestPath, yaml.dump(manifest, { quotingType: '"', forceQuotes: false }))
+    await storage.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
     return c.json({ ok: true, name: body.name })
   })
 
@@ -62,8 +61,7 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider) {
       components: body.components ?? fragment.components,
     }
 
-    const yamlContent = yaml.dump(manifest, { quotingType: '"', forceQuotes: false })
-    await storage.writeFile(join(fragment.dir, 'fragment.yaml'), yamlContent)
+    await storage.writeFile(join(fragment.dir, 'fragment.json'), JSON.stringify(manifest, null, 2) + '\n')
     return c.json({ ok: true })
   })
 

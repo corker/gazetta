@@ -69,8 +69,10 @@ async function renderPreview(
 }
 
 function applyOverrides(node: ResolvedComponent, overrides: Record<string, Record<string, unknown>>) {
-  if (node.path && overrides[node.path]) {
-    node.content = overrides[node.path]
+  // Match on treePath (name path) for merged JSON format, fallback to filesystem path for compatibility
+  const key = node.treePath ?? node.path
+  if (key && overrides[key]) {
+    node.content = overrides[key]
   }
   for (const child of node.children) {
     applyOverrides(child, overrides)

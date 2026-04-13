@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
-import yaml from 'js-yaml'
 import type { StorageProvider } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
 
@@ -24,7 +23,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
     }
 
     const pageDir = join(join(siteDir, 'pages'), body.name)
-    const manifestPath = join(pageDir, 'page.yaml')
+    const manifestPath = join(pageDir, 'page.json')
 
     if (await storage.exists(manifestPath)) {
       return c.json({ error: `Page "${body.name}" already exists` }, 409)
@@ -36,8 +35,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
       content: body.content ?? { title: body.name },
       components: [],
     }
-    const yamlContent = yaml.dump(manifest, { quotingType: '"', forceQuotes: false })
-    await storage.writeFile(manifestPath, yamlContent)
+    await storage.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
     return c.json({ ok: true, name: body.name })
   })
 
@@ -69,8 +67,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
       components: body.components ?? page.components,
     }
 
-    const yamlContent = yaml.dump(manifest, { quotingType: '"', forceQuotes: false })
-    await storage.writeFile(join(page.dir, 'page.yaml'), yamlContent)
+    await storage.writeFile(join(page.dir, 'page.json'), JSON.stringify(manifest, null, 2) + '\n')
     return c.json({ ok: true })
   })
 
