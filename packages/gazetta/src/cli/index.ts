@@ -1047,26 +1047,26 @@ async function runDev(siteDir: string, port: number) {
       try {
         const { createServer: createViteServer } = await import('vite')
         const { searchForWorkspaceRoot } = await import('vite')
-        // Discover custom editor/field entries up front so Vite can pre-scan
-        // them during dep optimization. Without this, Vite finds the JSX
-        // runtime imports only when hero.tsx (etc.) is loaded at runtime,
-        // triggers "optimized dependencies changed. reloading", and full-reloads
-        // the admin mid-session — wiping editor state (#122).
-        const editorEntries: string[] = []
+        // Discover entries Vite should pre-scan during dep optimization at startup.
+        // Without this, Vite finds deps lazily (e.g. react/jsx-dev-runtime when
+        // hero.tsx is first loaded) and triggers "optimized dependencies changed.
+        // reloading" — a full page reload that wipes editor state (#122).
+        //
+        // Entries must include: admin SPA root (index.html), custom editors, and
+        // custom fields. Vite resolves the full transitive dep graph from these.
+        const optimizeEntries: string[] = [join(cmsWebDir, 'index.html')]
         if (existsSync(adminDir)) {
-          const editorsSubdir = join(adminDir, 'editors')
-          const fieldsSubdir = join(adminDir, 'fields')
           const { readdir } = await import('node:fs/promises')
-          for (const dir of [editorsSubdir, fieldsSubdir]) {
+          for (const dir of [join(adminDir, 'editors'), join(adminDir, 'fields')]) {
             if (!existsSync(dir)) continue
             try {
               const entries = await readdir(dir, { withFileTypes: true })
               for (const e of entries) {
                 if (e.isFile() && /\.(tsx?|jsx?)$/.test(e.name)) {
-                  editorEntries.push(join(dir, e.name))
+                  optimizeEntries.push(join(dir, e.name))
                 }
               }
-            } catch { /* ignore — dir may not exist */ }
+            } catch { /* ignore */ }
           }
         }
 
@@ -1080,7 +1080,7 @@ async function runDev(siteDir: string, port: number) {
               '@fields': join(adminDir, 'fields'),
             },
           },
-          optimizeDeps: editorEntries.length ? { entries: editorEntries } : undefined,
+          optimizeDeps: { entries: optimizeEntries },
           server: {
             middlewareMode: true,
             hmr: { server: nodeServer as unknown as import('node:http').Server },
