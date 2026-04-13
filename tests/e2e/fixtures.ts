@@ -104,18 +104,6 @@ async function waitForServer(port: number, server: ChildProcess): Promise<void> 
     throw new Error(`gazetta dev on port ${port} did not become ready within ${timeoutMs}ms\n${stderr}`)
   }
 
-  // Warmup: hit the APIs and template schema endpoint that the editor depends on.
-  // Cold-start Vite transforms + jiti imports can race the first editor mount
-  // otherwise, causing a flaky "Select a component" flicker on the very first test.
-  await Promise.all([
-    fetch(`http://localhost:${port}/admin/api/site`),
-    fetch(`http://localhost:${port}/admin/api/pages`),
-    fetch(`http://localhost:${port}/admin/api/fragments`),
-    fetch(`http://localhost:${port}/admin/api/templates`),
-    fetch(`http://localhost:${port}/admin/api/templates/hero/schema`),
-    fetch(`http://localhost:${port}/admin/api/pages/home`),
-    fetch(`http://localhost:${port}/admin/preview/`),
-  ]).catch(() => { /* warmup failures aren't fatal */ })
 }
 
 export { expect } from '@playwright/test'
