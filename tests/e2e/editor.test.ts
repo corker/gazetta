@@ -5,19 +5,12 @@ function restoreStarterSite() {
   execSync('git checkout examples/starter/sites/main/', { stdio: 'pipe' })
 }
 
-// Helper: navigate to admin, select a page, enter edit mode by clicking a component in the preview iframe
+// Helper: navigate to admin in edit mode for a page — uses the direct URL to avoid
+// race conditions from clicking data-gz elements in the preview iframe.
 async function openEditor(page: import('@playwright/test').Page, pageName: string) {
-  await page.goto('/admin')
-  await page.click(`[data-testid="site-page-${pageName}"]`)
+  await page.goto(`/admin/pages/${pageName}/edit`)
 
-  // Wait for preview iframe to load content
-  const iframe = page.frameLocator('[data-testid="preview-iframe"]')
-  await iframe.locator('[data-gz]').first().waitFor({ timeout: 10000 })
-
-  // Click a data-gz element inside the iframe to trigger edit mode
-  await iframe.locator('[data-gz]').first().click()
-
-  // Wait for component tree to appear (edit mode)
+  // Wait for component tree to appear
   await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
 }
 
