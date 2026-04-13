@@ -1,9 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
 
-// Restore starter site files before each test so tests don't depend on each other's side effects
-test.beforeEach(() => {
+// Restore starter site files before each test so tests don't depend on each other's side effects.
+// The git checkout may trigger the file watcher → SSE reload in the dev server.
+// We restore synchronously before the browser navigates, so the reload settles before the test starts.
+test.beforeEach(async ({ page }) => {
   execSync('git checkout examples/starter/sites/main/', { stdio: 'pipe' })
+  // Navigate away to ensure any pending SSE reload doesn't interfere with test setup
+  await page.goto('about:blank')
 })
 
 // Helper: navigate to admin, select a page, enter edit mode by clicking a component in the preview iframe
