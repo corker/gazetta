@@ -41,7 +41,7 @@ jobs:
 
       - name: Upload test-results on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-test-results
           path: test-results/
@@ -66,7 +66,7 @@ jobs:
         run: |
           tarball=$(npm pack --silent | tail -1)
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gazetta-tarball
           path: packages/gazetta/${{ steps.pack.outputs.tarball }}
