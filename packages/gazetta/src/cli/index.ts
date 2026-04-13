@@ -403,6 +403,17 @@ async function runPublish(siteDir: string, targetName?: string) {
   )
 
   const { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } = await import('../publish-rendered.js')
+  const { scanTemplates, templateHashesFrom, reportTemplateErrors } = await import('../templates-scan.js')
+  const { hashManifest } = await import('../hash.js')
+
+  // Validate + hash templates once for this publish run
+  const templateInfos = await scanTemplates(templatesDir, projectRoot)
+  const invalid = reportTemplateErrors(templateInfos)
+  if (invalid > 0) {
+    console.error(`\n  ${c.red('✗')} Refusing to publish with invalid templates.`)
+    process.exit(1)
+  }
+  const templateHashes = templateHashesFrom(templateInfos)
 
   console.log()
   console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green('publish')} ${c.dim(site.manifest.name)}`)
@@ -429,21 +440,24 @@ async function runPublish(siteDir: string, targetName?: string) {
 
     if (isStatic) {
       // Static mode — fully assembled HTML, no fragments needed separately
-      for (const pageName of site.pages.keys()) {
-        const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir)
+      for (const [pageName, page] of site.pages) {
+        const manifestHash = hashManifest(page, { templateHashes })
+        const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir, manifestHash)
         totalFiles += files
         console.log(`    ${c.green('✓')} ${pageName}`)
       }
     } else {
       // ESI mode — fragments separate, pages with placeholders
-      for (const fragName of site.fragments.keys()) {
-        const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage, templatesDir)
+      for (const [fragName, frag] of site.fragments) {
+        const manifestHash = hashManifest(frag, { templateHashes })
+        const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage, templatesDir, manifestHash)
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} @${fragName}`)
       }
-      for (const pageName of site.pages.keys()) {
-        const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache, templatesDir)
+      for (const [pageName, page] of site.pages) {
+        const manifestHash = hashManifest(page, { templateHashes })
+        const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache, templatesDir, manifestHash)
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} ${pageName}`)

@@ -1,0 +1,127 @@
+import { describe, it, expect, beforeEach, afterAll } from 'vitest'
+import { mkdir, writeFile, rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { compareTargets } from '../src/compare.js'
+import { createFilesystemProvider } from '../src/providers/filesystem.js'
+import { sidecarNameFor } from '../src/hash.js'
+
+const root = join(tmpdir(), 'gazetta-compare-test-' + Date.now())
+const siteDir = join(root, 'sites/main')
+const targetDir = join(root, 'dist/staging')
+const templatesDir = join(root, 'templates')
+
+const source = createFilesystemProvider()
+let target = createFilesystemProvider(targetDir)
+
+const TEMPLATE = `
+export const schema = { type: 'object' }
+export default ({ content }) => ({ html: '<p>' + (content?.title ?? '') + '</p>', css: '', js: '' })
+`
+
+async function reset() {
+  await rm(root, { recursive: true, force: true })
+  await mkdir(siteDir, { recursive: true })
+  await mkdir(join(templatesDir, 'page'), { recursive: true })
+  await writeFile(join(templatesDir, 'page/index.js'), TEMPLATE)
+  await writeFile(join(siteDir, 'site.yaml'), 'name: Test')
+  await mkdir(join(siteDir, 'pages/home'), { recursive: true })
+  await writeFile(join(siteDir, 'pages/home/page.json'), JSON.stringify({
+    template: 'page',
+    content: { title: 'Hello' },
+  }))
+  await mkdir(join(siteDir, 'fragments/header'), { recursive: true })
+  await writeFile(join(siteDir, 'fragments/header/fragment.json'), JSON.stringify({
+    template: 'page',
+    content: { title: 'Header' },
+  }))
+  await mkdir(targetDir, { recursive: true })
+  // Recreate target provider rooted at the (now-existing) targetDir
+  target = createFilesystemProvider(targetDir)
+}
+
+beforeEach(reset)
+afterAll(async () => { await rm(root, { recursive: true, force: true }) })
+
+async function writeSidecar(dir: string, hash: string) {
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, sidecarNameFor(hash)), '')
+}
+
+describe('compareTargets', () => {
+  it('returns firstPublish:true when target has no sidecars', async () => {
+    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    expect(r.firstPublish).toBe(true)
+    // Both pages and fragments are "added" since target is empty
+    expect(r.added.sort()).toEqual(['fragments/header', 'pages/home'])
+    expect(r.modified).toEqual([])
+    expect(r.deleted).toEqual([])
+  })
+
+  it('returns unchanged when sidecars match', async () => {
+    // First call to get the local hashes
+    const r1 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    // Re-derive: we need the actual hashes — easiest is to publish "by hand" using r1.added
+    // But we only have item names, not hashes. Easier: import hashManifest directly.
+    const { hashManifest } = await import('../src/hash.js')
+    const { scanTemplates, templateHashesFrom } = await import('../src/templates-scan.js')
+    const { loadSite } = await import('../src/site-loader.js')
+    const tpls = await scanTemplates(templatesDir, root)
+    const tHashes = templateHashesFrom(tpls)
+    const site = await loadSite({ siteDir, storage: source, templatesDir })
+    for (const [name, page] of site.pages) {
+      await writeSidecar(join(targetDir, 'pages', name), hashManifest(page, { templateHashes: tHashes }))
+    }
+    for (const [name, frag] of site.fragments) {
+      await writeSidecar(join(targetDir, 'fragments', name), hashManifest(frag, { templateHashes: tHashes }))
+    }
+
+    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    expect(r2.firstPublish).toBe(false)
+    expect(r2.unchanged.sort()).toEqual(['fragments/header', 'pages/home'])
+    expect(r2.added).toEqual([])
+    expect(r2.modified).toEqual([])
+    expect(r1).toBeDefined()
+  })
+
+  it('detects modified when content changes locally', async () => {
+    // Write a stale sidecar with wrong hash
+    await writeSidecar(join(targetDir, 'pages/home'), '00000000')
+    await writeSidecar(join(targetDir, 'fragments/header'), '00000000')
+
+    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    expect(r.firstPublish).toBe(false)
+    expect(r.modified.sort()).toEqual(['fragments/header', 'pages/home'])
+  })
+
+  it('detects deleted when target has items not present locally', async () => {
+    await writeSidecar(join(targetDir, 'pages/home'), '00000000')
+    await writeSidecar(join(targetDir, 'pages/old-page'), '11111111')
+
+    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    expect(r.deleted).toContain('pages/old-page')
+  })
+
+  it('detects added when local has items not on target', async () => {
+    // Add a new local page
+    await mkdir(join(siteDir, 'pages/about'), { recursive: true })
+    await writeFile(join(siteDir, 'pages/about/page.json'), JSON.stringify({
+      template: 'page', content: { title: 'About' },
+    }))
+    // Old sidecar for home so target isn't empty
+    await writeSidecar(join(targetDir, 'pages/home'), '00000000')
+
+    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    expect(r.added).toContain('pages/about')
+  })
+
+  it('reports invalid templates without failing the compare', async () => {
+    // Break the template
+    await writeFile(join(templatesDir, 'page/index.js'), 'this is not js!!!')
+    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    expect(r.invalidTemplates.length).toBeGreaterThan(0)
+    expect(r.invalidTemplates[0].name).toBe('page')
+    // Compare still completes and lists items
+    expect(r.added.length + r.modified.length + r.unchanged.length).toBeGreaterThan(0)
+  })
+})

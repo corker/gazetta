@@ -6,6 +6,8 @@ import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
 import { resolveEnvVars } from '../../targets.js'
+import { scanTemplates, templateHashesFrom } from '../../templates-scan.js'
+import { hashManifest } from '../../hash.js'
 
 export function publishRoutes(
   siteDir: string,
@@ -64,6 +66,20 @@ export function publishRoutes(
     console.log(`    Items: ${body.items.join(', ')} (+ ${allItems.length - body.items.length} dependencies)`)
     console.log(`    Targets: ${body.targets.join(', ')}`)
 
+    // Validate + hash templates once for this publish run
+    const tdir = templatesDir ?? `${siteDir}/templates`
+    const projectRoot = siteDir.replace(/\/sites\/[^/]+$/, '')
+    const templateInfos = await scanTemplates(tdir, projectRoot)
+    const invalidTpls = templateInfos.filter(t => !t.valid)
+    if (invalidTpls.length) {
+      return c.json({
+        error: 'Cannot publish: invalid templates',
+        invalidTemplates: invalidTpls.map(t => ({ name: t.name, errors: t.errors })),
+      }, 400)
+    }
+    const templateHashes = templateHashesFrom(templateInfos)
+    const site = await loadSite({ siteDir, storage: sourceStorage, templatesDir: tdir })
+
     const results: PublishResult[] = []
     for (const targetName of body.targets) {
       const targetStorage = t.get(targetName)!
@@ -80,17 +96,21 @@ export function publishRoutes(
         for (const item of allItems) {
           if (item.startsWith('pages/')) {
             const pageName = item.replace('pages/', '')
+            const page = site.pages.get(pageName)
+            const manifestHash = page ? hashManifest(page, { templateHashes }) : undefined
             if (isStatic) {
-              const { files } = await publishPageStatic(pageName, sourceStorage, siteDir, targetStorage)
+              const { files } = await publishPageStatic(pageName, sourceStorage, siteDir, targetStorage, undefined, manifestHash)
               totalFiles += files
             } else {
-              const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache)
+              const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache, undefined, manifestHash)
               totalFiles += files
             }
           } else if (item.startsWith('fragments/')) {
             if (!isStatic) {
               const fragName = item.replace('fragments/', '')
-              const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage)
+              const frag = site.fragments.get(fragName)
+              const manifestHash = frag ? hashManifest(frag, { templateHashes }) : undefined
+              const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage, undefined, manifestHash)
               totalFiles += files
             }
           }

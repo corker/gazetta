@@ -9,6 +9,7 @@ import { fragmentRoutes } from './routes/fragments.js'
 import { templateRoutes } from './routes/templates.js'
 import { previewRoutes } from './routes/preview.js'
 import { publishRoutes } from './routes/publish.js'
+import { compareRoutes } from './routes/compare.js'
 import { fieldRoutes } from './routes/fields.js'
 
 export interface AdminAppOptions {
@@ -51,6 +52,7 @@ export function createAdminApp(
   app.route('/', templateRoutes(opts.siteDir, opts.storage, templatesDir, adminDir, opts.production))
   app.route('/', previewRoutes(opts.siteDir, opts.storage, templatesDir))
   app.route('/', publishRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir))
+  app.route('/', compareRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir))
   app.route('/', fieldRoutes(opts.siteDir, opts.storage, adminDir))
 
   return app

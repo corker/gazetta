@@ -4,9 +4,28 @@ import type { StorageProvider, PurgeStrategy, CacheConfig } from './types.js'
 import { loadSite } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent, renderPage } from './renderer.js'
+import { parseSidecarName, sidecarNameFor } from './hash.js'
 
 function contentHash(content: string): string {
   return createHash('md5').update(content).digest('hex').slice(0, 8)
+}
+
+/**
+ * Write a content-hash sidecar (zero-byte file) and remove any older sidecar(s)
+ * in the same directory. Used by compare-targets to detect changes via readDir.
+ */
+async function writeSidecar(storage: StorageProvider, dir: string, hash: string): Promise<void> {
+  // Remove stale sidecars first — there should only ever be one per dir
+  try {
+    const entries = await storage.readDir(dir)
+    for (const e of entries) {
+      const existing = parseSidecarName(e.name)
+      if (existing && existing !== hash) {
+        try { await storage.rm(`${dir}/${e.name}`) } catch { /* already gone */ }
+      }
+    }
+  } catch { /* dir doesn't exist yet */ }
+  await storage.writeFile(`${dir}/${sidecarNameFor(hash)}`, '')
 }
 
 /** List existing hashed files (styles.*.css, script.*.js) in a directory */
@@ -45,6 +64,7 @@ export async function publishPageRendered(
   targetStorage: StorageProvider,
   targetCache?: CacheConfig,
   templatesDir?: string,
+  manifestHash?: string,
 ): Promise<{ files: number; removed: number }> {
   const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const page = site.pages.get(pageName)
@@ -148,6 +168,9 @@ ${bodyContent}
   await targetStorage.writeFile(`${pageDir}/index.html`, html)
   fileCount++
 
+  // Write content-hash sidecar for compare-targets
+  if (manifestHash) await writeSidecar(targetStorage, pageDir, manifestHash)
+
   // Clean up old hashed files
   const removed = await cleanupOldFiles(targetStorage, oldFiles, newFiles)
 
@@ -165,6 +188,7 @@ export async function publishPageStatic(
   sourceDir: string,
   targetStorage: StorageProvider,
   templatesDir?: string,
+  manifestHash?: string,
 ): Promise<{ files: number }> {
   const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const page = site.pages.get(pageName)
@@ -181,6 +205,7 @@ export async function publishPageStatic(
 
   await targetStorage.mkdir(outputDir)
   await targetStorage.writeFile(outputPath, html)
+  if (manifestHash) await writeSidecar(targetStorage, outputDir, manifestHash)
 
   return { files: 1 }
 }
@@ -195,6 +220,7 @@ export async function publishFragmentRendered(
   sourceDir: string,
   targetStorage: StorageProvider,
   templatesDir?: string,
+  manifestHash?: string,
 ): Promise<{ files: number; removed: number }> {
   const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const fragment = site.fragments.get(fragmentName)
@@ -245,6 +271,9 @@ export async function publishFragmentRendered(
   await targetStorage.mkdir(fragDir)
   await targetStorage.writeFile(`${fragDir}/index.html`, fragmentHtml)
   fileCount++
+
+  // Write content-hash sidecar for compare-targets
+  if (manifestHash) await writeSidecar(targetStorage, fragDir, manifestHash)
 
   // Clean up old hashed files
   const removed = await cleanupOldFiles(targetStorage, oldFiles, newFiles)
