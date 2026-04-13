@@ -24,11 +24,14 @@ async function findTemplateFile(storage: StorageProvider, templatesDir: string, 
 
 async function importTemplate(templatePath: string): Promise<Record<string, unknown>> {
   if (!importedPaths.has(templatePath)) {
-    // First load — use native import() (fast, resolves deps from project node_modules)
     importedPaths.add(templatePath)
-    return await import(pathToFileURL(templatePath).href)
+    try {
+      return await import(pathToFileURL(templatePath).href)
+    } catch {
+      const jiti = createJiti(pathToFileURL(templatePath).href, { jsx: true })
+      return await jiti.import(templatePath) as Record<string, unknown>
+    }
   }
-  // Reload — use jiti with moduleCache disabled (bypasses Node/tsx module cache)
   const freshJiti = createJiti(pathToFileURL(templatePath).href, { jsx: true, moduleCache: false })
   return await freshJiti.import(templatePath) as Record<string, unknown>
 }
