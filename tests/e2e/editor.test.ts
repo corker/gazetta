@@ -3,9 +3,7 @@ import { execSync } from 'node:child_process'
 
 // Restore starter site files before each test so tests don't depend on each other's side effects
 test.beforeEach(() => {
-  try {
-    execSync('git checkout examples/starter/sites/main/', { stdio: 'ignore' })
-  } catch { /* not a git repo or file not tracked */ }
+  execSync('git checkout examples/starter/sites/main/', { stdio: 'pipe' })
 })
 
 // Helper: navigate to admin, select a page, enter edit mode by clicking a component in the preview iframe
