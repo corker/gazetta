@@ -27,6 +27,9 @@ jobs:
 
       - run: npm test -w packages/gazetta
 
+      - name: Smoke test (pack → init → dev → curl)
+        run: npm run smoke
+
       - run: npm publish -w packages/gazetta --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

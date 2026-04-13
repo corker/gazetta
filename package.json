@@ -18,7 +18,8 @@
     "dev:site": "npm run build && npm run dev -w @gazetta/website",
     "deploy:site": "npm run build && cd sites/gazetta.studio/worker && npm run seed && npm run deploy",
     "dev:admin": "npm run build && npm run dev:api -w @gazetta/admin & npm run dev:ui -w @gazetta/admin",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "smoke": "bash scripts/smoke-publish.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
