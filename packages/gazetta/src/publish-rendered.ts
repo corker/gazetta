@@ -23,7 +23,8 @@ async function writeSidecar(storage: StorageProvider, dir: string, hash: string)
         try { await storage.rm(`${dir}/${e.name}`) } catch { /* already gone */ }
       }
     }
-  } catch { /* dir doesn't exist yet */ }
+  } catch { /* dir doesn't exist yet — mkdir below */ }
+  await storage.mkdir(dir)
   await storage.writeFile(`${dir}/${sidecarNameFor(hash)}`, '')
 }
 
