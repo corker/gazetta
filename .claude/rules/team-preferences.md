@@ -36,9 +36,9 @@ Validated approaches and things to avoid. Each entry: rule, then why.
    `npm version -w` updates package.json and lockfile but does NOT commit or tag (disabled for workspaces). Must do it manually.
    Why: v0.1.1 shipped with lockfile out of sync because the commit and tag were done without the lockfile.
 
-10. **E2e test isolation: scope git checkout to mutating tests only, not global beforeEach.**
-   Only tests that write to disk (add/remove/move component) need `beforeEach` with `git checkout`. Read-only tests must not have it — the file change triggers SSE reload which clears editor state mid-test.
-   Why: Global beforeEach caused 5 CI failures. The SSE reload from git checkout arrived late in CI and clobbered component selections in unrelated tests.
+10. **E2e test isolation: per-worker temp sites, not in-place mutation.**
+   Each Playwright worker gets its own `cp -r` of `examples/starter` into `{repo}/.tmp/e2e-{workerIdx}/project/` with its own dev server on port 3100+workerIdx. Mutation tests write to the copy, never to the repo. See `tests/e2e/fixtures.ts` for the worker-scoped `testSite` fixture.
+   Why: Earlier approach (git checkout in beforeEach) leaked state between tests via SSE reload timing. Temp sites eliminate the class of problem.
 
 11. **When adding CI steps, verify assumptions locally first.**
    Before pushing CI changes, check: default parallelism settings, async import behavior, file watcher side effects, and timing differences between local and CI. One fact-check round saves multiple CI push-fix cycles.
@@ -47,3 +47,11 @@ Validated approaches and things to avoid. Each entry: rule, then why.
 12. **Dark mode CSS: use non-scoped `<style>` block, not `:global(.dark)` in scoped styles.**
    Scoped selectors get `[data-v-xxx]` attributes which beat `:global(.dark)` in specificity. Put dark overrides in a separate `<style>` (no `scoped`) using `.dark .component-name` selectors. Follow PreviewPanel's pattern.
    Why: ComponentTree dark mode was broken — `:global(.dark) .node-root .node-label` lost to `.node-root .node-label[data-v-xxx]`.
+
+13. **Vite dev: pre-scan custom editors in `optimizeDeps.entries` + include JSX auto-runtime explicitly.**
+   When Vite finds a new dep at runtime (after initial optimization), it fires `optimized dependencies changed. reloading` — a full page reload that wipes editor state mid-session. Custom editors under `admin/editors/*.tsx` must be listed in `optimizeDeps.entries`, and `'react/jsx-dev-runtime'` / `'react/jsx-runtime'` must be in `optimizeDeps.include` (the scanner can't see them — they're injected by esbuild at transform time).
+   Why: The #122 flake took 3 diagnosis iterations to find. Symptom ("Select a component to edit") looked like a store clear bug; actual cause was Vite's lazy dep optimizer. Always investigate with CI browser console capture before speculating.
+
+14. **Editor mount composables: capture (mount, el) as a pair — don't rely on the ref's current value at unmount time.**
+   When `editorMount` ref changes (e.g. default form → custom editor), calling `editorMount.value.unmount(el)` uses the NEW instance's unmount on a container mounted by the OLD one — it's a no-op, leaving the React root behind. Next `createRoot(el)` triggers "container already has root" warning. Fix: store `current = { mount, el }` at mount time, use `current.mount.unmount(current.el)` at unmount time.
+   Why: Discovered while diagnosing #122. The React warning on its own didn't break things, but it compounded with the Vite reload bug.
