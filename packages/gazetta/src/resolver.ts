@@ -1,6 +1,4 @@
-import { join } from 'node:path'
-import type { ResolvedComponent, ComponentManifest } from './types.js'
-import { parseComponentManifest } from './manifest.js'
+import type { ResolvedComponent, ComponentEntry, InlineComponent } from './types.js'
 import { loadTemplate } from './template-loader.js'
 import { processContent } from './content.js'
 import type { Site } from './site-loader.js'
@@ -13,68 +11,85 @@ interface ResolveContext {
 }
 
 export async function resolveComponent(
-  name: string,
-  parentDir: string,
+  entry: ComponentEntry,
   ctx: ResolveContext
 ): Promise<ResolvedComponent> {
-  const isFragment = name.startsWith('@')
-  const key = isFragment ? name : `${parentDir}/${name}`
+  if (typeof entry === 'string') {
+    if (!entry.startsWith('@')) {
+      throw new Error(
+        `Invalid component entry "${entry}" — string entries must be fragment references starting with @.\n` +
+        `  Referenced in: ${ctx.path.join(' → ') || 'page root'}`
+      )
+    }
+    const fragmentName = entry.slice(1)
+    return resolveFragmentRef(fragmentName, ctx)
+  }
 
+  return resolveInlineComponent(entry, ctx)
+}
+
+async function resolveFragmentRef(fragmentName: string, ctx: ResolveContext): Promise<ResolvedComponent> {
+  const key = `@${fragmentName}`
   if (ctx.visited.has(key)) {
     throw new Error(
       `Circular reference detected: ${key}\n` +
-      `  Resolution path: ${ctx.path.join(' → ')} → ${name}`
+      `  Resolution path: ${ctx.path.join(' → ')} → ${key}`
     )
   }
   ctx.visited.add(key)
-  ctx.path.push(name)
+  ctx.path.push(key)
 
-  let manifest: ComponentManifest
-  let componentDir: string
-  const { storage } = ctx.site
-
-  if (isFragment) {
-    const fragmentName = name.slice(1)
-    const fragment = ctx.site.fragments.get(fragmentName)
-    if (!fragment) {
-      const available = [...ctx.site.fragments.keys()]
-      throw new Error(
-        `Fragment "@${fragmentName}" not found.\n` +
-        `  Referenced in: ${ctx.path.slice(0, -1).join(' → ') || 'page root'}\n` +
-        `  Available fragments: ${available.length > 0 ? available.join(', ') : '(none)'}`
-      )
-    }
-    manifest = fragment
-    componentDir = fragment.dir
-  } else {
-    componentDir = join(parentDir, name)
-    const manifestPath = join(componentDir, 'component.yaml')
-    if (!await storage.exists(manifestPath)) {
-      throw new Error(
-        `Component "${name}" not found. Expected manifest at ${manifestPath}\n` +
-        `  Referenced in: ${ctx.path.slice(0, -1).join(' → ') || 'page root'}\n` +
-        `  Parent directory: ${parentDir}`
-      )
-    }
-    manifest = await parseComponentManifest(storage, manifestPath)
+  const fragment = ctx.site.fragments.get(fragmentName)
+  if (!fragment) {
+    const available = [...ctx.site.fragments.keys()]
+    ctx.path.pop()
+    ctx.visited.delete(key)
+    throw new Error(
+      `Fragment "@${fragmentName}" not found.\n` +
+      `  Referenced in: ${ctx.path.join(' → ') || 'page root'}\n` +
+      `  Available fragments: ${available.length > 0 ? available.join(', ') : '(none)'}`
+    )
   }
 
-  const loaded = await loadTemplate(storage, ctx.templatesDir, manifest.template)
-
+  const loaded = await loadTemplate(ctx.site.storage, ctx.templatesDir, fragment.template)
   const children: ResolvedComponent[] = []
-  if (manifest.components) {
-    for (const childName of manifest.components) {
-      children.push(await resolveComponent(childName, componentDir, ctx))
+  if (fragment.components) {
+    for (const child of fragment.components) {
+      children.push(await resolveComponent(child, ctx))
     }
   }
 
-  // Tree path is the component's position relative to the page (excluding the page name)
   const treePath = ctx.path.slice(1).join('/')
-
   ctx.path.pop()
   ctx.visited.delete(key)
 
-  return { template: loaded.render, content: processContent(manifest.content, loaded.schema), children, path: componentDir, treePath }
+  return { template: loaded.render, content: processContent(fragment.content, loaded.schema), children, path: fragment.dir, treePath }
+}
+
+async function resolveInlineComponent(comp: InlineComponent, ctx: ResolveContext): Promise<ResolvedComponent> {
+  const key = comp.name
+  if (ctx.visited.has(key)) {
+    throw new Error(
+      `Circular reference detected: ${key}\n` +
+      `  Resolution path: ${ctx.path.join(' → ')} → ${key}`
+    )
+  }
+  ctx.visited.add(key)
+  ctx.path.push(comp.name)
+
+  const loaded = await loadTemplate(ctx.site.storage, ctx.templatesDir, comp.template)
+  const children: ResolvedComponent[] = []
+  if (comp.components) {
+    for (const child of comp.components) {
+      children.push(await resolveComponent(child, ctx))
+    }
+  }
+
+  const treePath = ctx.path.slice(1).join('/')
+  ctx.path.pop()
+  ctx.visited.delete(key)
+
+  return { template: loaded.render, content: processContent(comp.content, loaded.schema), children, treePath }
 }
 
 export async function resolveFragment(fragmentName: string, site: Site): Promise<ResolvedComponent> {
@@ -91,11 +106,10 @@ export async function resolveFragment(fragmentName: string, site: Site): Promise
   const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: ['', `@${fragmentName}`] }
 
   const loaded = await loadTemplate(site.storage, templatesDir, fragment.template)
-
   const children: ResolvedComponent[] = []
   if (fragment.components) {
-    for (const childName of fragment.components) {
-      children.push(await resolveComponent(childName, fragment.dir, ctx))
+    for (const child of fragment.components) {
+      children.push(await resolveComponent(child, ctx))
     }
   }
 
@@ -116,11 +130,10 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
   const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: [pageName] }
 
   const loaded = await loadTemplate(site.storage, templatesDir, page.template)
-
   const children: ResolvedComponent[] = []
   if (page.components) {
-    for (const childName of page.components) {
-      children.push(await resolveComponent(childName, page.dir, ctx))
+    for (const child of page.components) {
+      children.push(await resolveComponent(child, ctx))
     }
   }
 

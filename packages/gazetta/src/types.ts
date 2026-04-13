@@ -43,11 +43,22 @@ export interface TemplateModule {
   schema: unknown // ZodType — kept as unknown to avoid zod dependency in shared
 }
 
+/** Inline component — nested within a page or fragment manifest */
+export interface InlineComponent {
+  name: string
+  template: string
+  content?: Record<string, unknown>
+  components?: ComponentEntry[]
+}
+
+/** A component entry is either a fragment reference string ("@header") or an inline component object */
+export type ComponentEntry = string | InlineComponent
+
 /** Component manifest (base) */
 export interface ComponentManifest {
   template: string
   content?: Record<string, unknown>
-  components?: string[]
+  components?: ComponentEntry[]
 }
 
 /** Fragment manifest (shared component) */

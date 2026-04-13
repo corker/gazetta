@@ -61,11 +61,11 @@ export async function publishPageRendered(
   const esiHeadTags: string[] = []
 
   for (let i = 0; i < resolved.children.length; i++) {
-    const childName = page.components![i]
-    const isFragment = childName.startsWith('@')
+    const childEntry = page.components![i]
+    const isFragment = typeof childEntry === 'string' && childEntry.startsWith('@')
 
     if (isFragment) {
-      const fragName = childName.slice(1)
+      const fragName = childEntry.slice(1)
       const fragPath = `fragments/${fragName}/index.html`
       esiHeadTags.push(`<!--esi-head:/${fragPath}-->`)
       bodyParts.push(`<!--esi:/${fragPath}-->`)
@@ -201,7 +201,7 @@ export async function publishFragmentRendered(
   if (!fragment) throw new Error(`Fragment "${fragmentName}" not found`)
 
   const ctx = { site, templatesDir: site.templatesDir, visited: new Set<string>(), path: [`@${fragmentName}`] }
-  const resolved = await resolveComponent(`@${fragmentName}`, '', ctx)
+  const resolved = await resolveComponent(`@${fragmentName}`, ctx)
 
   // Scope IDs are now deterministic (hash-based), no reset needed
   const rendered = await renderComponent(resolved)
@@ -279,10 +279,10 @@ export async function publishFragmentIndex(
 
   for (const [_pageName, page] of site.pages) {
     if (!page.components) continue
-    for (const comp of page.components) {
-      if (comp.startsWith('@')) {
-        if (!index[comp]) index[comp] = []
-        index[comp].push(page.route)
+    for (const entry of page.components) {
+      if (typeof entry === 'string' && entry.startsWith('@')) {
+        if (!index[entry]) index[entry] = []
+        index[entry].push(page.route)
       }
     }
   }

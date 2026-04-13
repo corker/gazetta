@@ -841,7 +841,7 @@ async function runValidate(siteDir: string) {
     try {
       const { resolveComponent } = await import('../resolver.js')
       const ctx = { site, templatesDir: site.templatesDir, visited: new Set<string>(), path: [`@${fragName}`] }
-      await resolveComponent(`@${fragName}`, '', ctx)
+      await resolveComponent(`@${fragName}`, ctx)
 
       const childCount = frag.components?.length ?? 0
       console.log(`  ${c.green('✓')} @${fragName} ${c.dim(`(${childCount} components)`)}`)
@@ -857,7 +857,7 @@ async function runValidate(siteDir: string) {
       await resolvePage(pageName, site)
 
       const componentCount = page.components?.length ?? 0
-      const fragmentCount = page.components?.filter(cc => cc.startsWith('@')).length ?? 0
+      const fragmentCount = page.components?.filter(cc => typeof cc === 'string' && cc.startsWith('@')).length ?? 0
       console.log(`  ${c.green('✓')} ${pageName} ${c.dim(`(${componentCount} components, ${fragmentCount} fragments)`)}`)
     } catch (err) {
       console.error(`  ${c.red('✗')} ${pageName} ${c.dim(`— ${(err as Error).message}`)}`)

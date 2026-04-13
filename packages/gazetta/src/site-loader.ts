@@ -34,7 +34,7 @@ async function discoverPages(
     if (!entry.isDirectory) continue
     const dir = join(pagesDir, entry.name)
     const name = prefix ? `${prefix}/${entry.name}` : entry.name
-    const manifestPath = join(dir, 'page.yaml')
+    const manifestPath = join(dir, 'page.json')
 
     if (await storage.exists(manifestPath)) {
       try {
@@ -66,7 +66,7 @@ async function discoverFragments(
   for (const entry of entries) {
     if (!entry.isDirectory) continue
     const fragDir = join(fragmentsDir, entry.name)
-    const manifestPath = join(fragDir, 'fragment.yaml')
+    const manifestPath = join(fragDir, 'fragment.json')
 
     if (!await storage.exists(manifestPath)) continue
 
