@@ -294,40 +294,25 @@ const template: TemplateFunction = ({ content = {} }) => {
 export default template
 `,
 
-    'sites/main/fragments/header/fragment.yaml': `template: nav
-content:
-  brand: ${name}
-  links:
-    - label: Home
-      href: /
-`,
+    'sites/main/fragments/header/fragment.json': JSON.stringify({
+      template: 'nav',
+      content: { brand: name, links: [{ label: 'Home', href: '/' }] },
+    }, null, 2) + '\n',
 
-    'sites/main/pages/home/page.yaml': `template: page-layout
-content:
-  title: ${name}
-  description: A site built with Gazetta
-components:
-  - "@header"
-  - hero
-  - intro
-`,
+    'sites/main/pages/home/page.json': JSON.stringify({
+      template: 'page-layout',
+      content: { title: name, description: 'A site built with Gazetta' },
+      components: [
+        '@header',
+        { name: 'hero', template: 'hero', content: { title: `Welcome to ${name}`, subtitle: 'A site built with Gazetta' } },
+        { name: 'intro', template: 'text-block', content: { body: '<p>Edit this content in the CMS at <a href="/admin">/admin</a>.</p>' } },
+      ],
+    }, null, 2) + '\n',
 
-    'sites/main/pages/home/hero/component.yaml': `template: hero
-content:
-  title: Welcome to ${name}
-  subtitle: A site built with Gazetta
-`,
-
-    'sites/main/pages/home/intro/component.yaml': `template: text-block
-content:
-  body: "<p>Edit this content in the CMS at <a href='/admin'>/admin</a>.</p>"
-`,
-
-    'sites/main/pages/404/page.yaml': `template: page-layout
-content:
-  title: "Page Not Found"
-  description: "The page you're looking for doesn't exist."
-`,
+    'sites/main/pages/404/page.json': JSON.stringify({
+      template: 'page-layout',
+      content: { title: 'Page Not Found', description: "The page you're looking for doesn't exist." },
+    }, null, 2) + '\n',
 
     'admin/.gitkeep': '',
     '.gitignore': `node_modules/\ndist/\n.env.local\n`,
@@ -1094,10 +1079,10 @@ async function runDev(siteDir: string, port: number) {
   })
 
   // ---- File watching ----
-  // Watch site dir for content changes (yaml manifests)
+  // Watch site dir for content changes (JSON manifests + site.yaml config)
   watch(siteDir, { recursive: true }, (_event, filename) => {
     if (!filename) return
-    if (filename.endsWith('.yaml')) {
+    if (filename.endsWith('.json') || filename.endsWith('.yaml')) {
       console.log(`  Manifest changed: ${filename}`)
       invalidateAllTemplates()
       notifyReload()

@@ -102,10 +102,12 @@ describe('runInit', () => {
     expect(existsSync(join(testDir, 'templates/text-block/index.ts'))).toBe(true)
     expect(existsSync(join(testDir, 'admin/.gitkeep'))).toBe(true)
     expect(existsSync(join(testDir, 'sites/main/site.yaml'))).toBe(true)
-    expect(existsSync(join(testDir, 'sites/main/pages/home/page.yaml'))).toBe(true)
-    expect(existsSync(join(testDir, 'sites/main/pages/home/hero/component.yaml'))).toBe(true)
-    expect(existsSync(join(testDir, 'sites/main/fragments/header/fragment.yaml'))).toBe(true)
-    expect(existsSync(join(testDir, 'sites/main/pages/404/page.yaml'))).toBe(true)
+    expect(existsSync(join(testDir, 'sites/main/pages/home/page.json'))).toBe(true)
+    expect(existsSync(join(testDir, 'sites/main/fragments/header/fragment.json'))).toBe(true)
+    expect(existsSync(join(testDir, 'sites/main/pages/404/page.json'))).toBe(true)
+
+    // No component subdirectories (components are inline in page.json)
+    expect(existsSync(join(testDir, 'sites/main/pages/home/hero'))).toBe(false)
 
     // site.yaml has a default local target
     const siteYaml = await import('node:fs').then(fs => fs.readFileSync(join(testDir, 'sites/main/site.yaml'), 'utf-8'))
