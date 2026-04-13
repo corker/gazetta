@@ -77,11 +77,15 @@ function spawnDev(cwd: string, port: number): ChildProcess {
   // Use the project's node_modules (which includes tsx + jiti via gazetta package)
   const tsxBin = resolve(repoRoot, 'node_modules/.bin/tsx')
   if (!existsSync(tsxBin)) throw new Error(`tsx not found at ${tsxBin}; run 'npm install' at repo root`)
-  return spawn(tsxBin, [cli, 'dev', 'sites/main', '--port', String(port)], {
+  const server = spawn(tsxBin, [cli, 'dev', 'sites/main', '--port', String(port)], {
     cwd,
     env: { ...process.env, CI: 'true', NO_COLOR: '1' }, // CI=true avoids the interactive publish confirm
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  // Surface all server output to stderr so CI shows "Manifest changed", "Template changed", etc.
+  server.stdout?.on('data', d => process.stderr.write(`[dev:${port}] ${d}`))
+  server.stderr?.on('data', d => process.stderr.write(`[dev:${port}:err] ${d}`))
+  return server
 }
 
 /**
@@ -92,12 +96,10 @@ function spawnDev(cwd: string, port: number): ChildProcess {
 async function waitForServer(port: number, server: ChildProcess): Promise<void> {
   const timeoutMs = 30000
   const started = Date.now()
-  let stderr = ''
-  server.stderr?.on('data', (d) => { stderr += d.toString() })
 
   const exitPromise = new Promise<never>((_, reject) => {
     server.once('exit', (code) => {
-      reject(new Error(`gazetta dev exited prematurely (code ${code}) before serving /admin\n${stderr}`))
+      reject(new Error(`gazetta dev on port ${port} exited prematurely (code ${code}) before serving /admin`))
     })
   })
 
@@ -114,9 +116,8 @@ async function waitForServer(port: number, server: ChildProcess): Promise<void> 
     await new Promise(r => setTimeout(r, 100))
   }
   if (Date.now() - started >= timeoutMs) {
-    throw new Error(`gazetta dev on port ${port} did not become ready within ${timeoutMs}ms\n${stderr}`)
+    throw new Error(`gazetta dev on port ${port} did not become ready within ${timeoutMs}ms`)
   }
-
 }
 
 export { expect } from '@playwright/test'
