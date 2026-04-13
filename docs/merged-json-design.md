@@ -193,23 +193,20 @@ interface InlineComponent {
 - New: `parsePageManifest` returns the full nested structure
 - Component manifests are nested objects, not separate files
 
-### Admin API
+### Admin API — simplified
 
-#### Pages/Fragments (`routes/pages.ts`, `routes/fragments.ts`)
+Remove separate component endpoints. Pages and fragments contain all component data.
 
-- `GET /api/pages/:name` returns the full nested manifest (including all components)
-- `PUT /api/pages/:name` writes the full manifest back
-- No change to list endpoints
+Current API (6 component endpoints):
+- `GET/PUT/POST/DELETE /api/components` — per-component CRUD via filesystem path
 
-#### Components (`routes/components.ts`)
+New API (page endpoints do everything):
+- `GET /api/pages/:name` — full page with all nested components
+- `PUT /api/pages/:name` — write full page JSON (atomic)
+- `GET /api/fragments/:name` — full fragment with all nested components
+- `PUT /api/fragments/:name` — write full fragment JSON (atomic)
 
-- Currently: `GET /api/components?path=...` reads `component.json` from filesystem path
-- New: `GET /api/components?page=home&path=hero` reads from the page's YAML, returns the component at that name path
-- `PUT /api/components?page=home&path=hero` updates the component content within the page JSON
-- `POST /api/components` adds a new component to a page's components list
-- `DELETE /api/components?page=home&path=hero` removes a component
-
-The `path` parameter changes from filesystem path to name path.
+No separate component API. Adding/removing/reordering components = update the page JSON.
 
 ### Publish (`publish-rendered.ts`, `publish.ts`)
 
@@ -217,29 +214,59 @@ The `path` parameter changes from filesystem path to name path.
 - `publishPageRendered`/`publishPageStatic` reads one file, resolves recursively
 - Fewer filesystem reads = faster publish
 
-### Editor store (`stores/editing.ts`)
+### Editor store (`stores/editing.ts`) — major simplification
 
-- `openComponent(path, template)` — `path` becomes name path (e.g., `"hero"`, `"features/fast"`)
-- Stash keys use name paths
-- `save()` writes back to the page JSON via `PUT /api/components`
+Current: `openComponent(path, template)` → API call per component, separate save closure per component. `save()` calls N save closures.
 
-### ComponentTree (`ComponentTree.vue`)
+New:
+- `openComponent(namePath)` → reads from `selection.detail.components` (no API call)
+- Stash keys use name paths (`"hero"`, `"features/fast"`)
+- `save()` → builds updated page JSON with all edits applied, one `PUT /api/pages/:name`
+- No per-component save functions — one atomic page write
 
-- Currently: builds tree from API calls per component (`api.getComponent(path)`)
-- New: builds tree directly from `selection.detail.components` (already loaded)
-- No API calls to build the tree — instant
-- `onSelect` uses name path to identify components
+`EditingTarget` simplifies — remove the `save` closure:
+
+```ts
+interface EditingTarget {
+  template: string
+  namePath: string      // "hero", "features/fast"
+  content: Record<string, unknown>
+  schema: Record<string, unknown>
+  hasEditor?: boolean
+  editorUrl?: string
+  fieldsBaseUrl?: string
+  // No save function — editing store handles page-level save
+}
+```
+
+### ComponentTree (`ComponentTree.vue`) — major simplification
+
+Current: imports `api`, makes N API calls per tree build.
+
+New: zero API imports. Builds tree from `selection.detail.components` (in-memory). Opens editor by reading component data from the detail.
 
 ### Preview overrides
 
 - Currently: `overrides` map keyed by filesystem path
-- New: keyed by name path (e.g., `{ "hero": { title: "..." } }`)
-- Preview API `applyOverrides` walks the nested manifest instead of filesystem
+- New: keyed by name path (e.g., `{ "hero": { "title": "..." } }`)
+- Preview API `applyOverrides` matches on `treePath` instead of `path`
 
 ### CLI init scaffold
 
-- Creates page.json with inline components (no component directories)
+- Creates `page.json` with inline components (no component directories)
 - Simpler output — fewer files and directories
+
+## Architecture improvements
+
+| Area | Current | After |
+|------|---------|-------|
+| ComponentTree API calls | N calls per tree build | Zero — reads from selection detail |
+| Editing store API calls | 1 per component open + N per save | 0 per open + 1 per save (atomic) |
+| Component API endpoints | 4 separate endpoints | Removed — page API covers everything |
+| EditingTarget.save | Per-component closure | Not needed — store handles page-level save |
+| Tree build latency | Depends on N network requests | Instant (in-memory) |
+| Save atomicity | N sequential writes | 1 atomic write |
+| Component addressing | Filesystem paths | Name paths (stable across reorder) |
 
 ## Migration
 
