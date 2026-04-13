@@ -1,4 +1,12 @@
 import { test, expect } from '@playwright/test'
+import { execSync } from 'node:child_process'
+
+// Restore starter site files before each test so tests don't depend on each other's side effects
+test.beforeEach(() => {
+  try {
+    execSync('git checkout examples/starter/sites/main/', { stdio: 'ignore' })
+  } catch { /* not a git repo or file not tracked */ }
+})
 
 // Helper: navigate to admin, select a page, enter edit mode by clicking a component in the preview iframe
 async function openEditor(page: import('@playwright/test').Page, pageName: string) {
@@ -441,18 +449,23 @@ test.describe('Component operations', () => {
     expect(afterCount).toBe(beforeCount + 1)
   })
 
-  test('remove the added component', async ({ page }) => {
+  test('remove component', async ({ page }) => {
     await openEditor(page, 'home')
 
-    // Verify test-widget exists from previous test
-    const widget = page.locator('[data-testid="component-test-widget"]')
+    // Add a component first so we have something to remove
+    await page.click('[data-testid="add-component"]')
+    await page.locator('[data-testid="add-component-name"]').waitFor({ timeout: 5000 })
+    await page.locator('[data-testid="add-component-name"]').fill('to-remove')
+    await page.locator('.p-listbox-option', { hasText: 'text-block' }).click()
+    await page.click('[data-testid="add-component-submit"]')
+    const widget = page.locator('[data-testid="component-to-remove"]')
     await expect(widget).toBeVisible({ timeout: 10000 })
 
     const beforeCount = await page.locator('[data-testid^="component-"]').count()
 
     // Hover to reveal actions, click remove
     await widget.hover()
-    await page.click('[data-testid="remove-test-widget"]')
+    await page.click('[data-testid="remove-to-remove"]')
 
     // Component should be gone
     await expect(widget).not.toBeVisible({ timeout: 10000 })
@@ -478,9 +491,6 @@ test.describe('Component operations', () => {
       const featuresAfter = await page.locator('[data-testid="component-features"]').boundingBox()
       expect(featuresAfter!.y).toBeLessThan(heroAfter!.y)
     }).toPass({ timeout: 10000 })
-
-    // Move features back down to restore original order
-    await page.locator('[data-testid="component-features"]').hover()
-    await page.click('[data-testid="move-down-features"]')
+    // No manual cleanup — beforeEach restores page.json via git checkout
   })
 })
