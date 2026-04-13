@@ -1080,7 +1080,14 @@ async function runDev(siteDir: string, port: number) {
               '@fields': join(adminDir, 'fields'),
             },
           },
-          optimizeDeps: { entries: optimizeEntries },
+          optimizeDeps: {
+            entries: optimizeEntries,
+            // JSX automatic runtime is injected by Vite's esbuild transform, not
+            // written into the source, so the scanner misses it. Include it
+            // explicitly to avoid a mid-session page reload when a TSX editor
+            // is first loaded (#122).
+            include: ['react/jsx-dev-runtime', 'react/jsx-runtime'],
+          },
           server: {
             middlewareMode: true,
             hmr: { server: nodeServer as unknown as import('node:http').Server },
