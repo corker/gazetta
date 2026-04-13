@@ -59,14 +59,13 @@ test.describe('Custom editor', () => {
   test('loads custom editor for hero template', async ({ page }) => {
     await openEditor(page, 'home')
 
-    // Click hero component (has custom editor).
-    // In CI, the editor may briefly load then get cleared by a pending gzId resolution.
-    // Re-click hero if needed until the custom editor stabilizes.
+    // Click hero component (has custom editor)
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Wait for custom editor to load and render content
     const editorPanel = page.locator('[data-testid="editor-panel"]')
-    await expect(async () => {
-      await page.click('[data-testid="component-hero"]')
-      await expect(editorPanel).toContainText('Welcome to Gazetta', { timeout: 5000 })
-    }).toPass({ timeout: 20000 })
+    await expect(editorPanel).toContainText('Welcome to Gazetta', { timeout: 20000 })
   })
 
   test('falls back to default form when switching to template without editor', async ({ page }) => {

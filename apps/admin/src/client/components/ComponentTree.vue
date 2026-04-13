@@ -193,6 +193,7 @@ function onHoverEnd() {
 async function onSelect(node: ComponentNode) {
   if (!node.data) return
   selectedNodeKey.value = node.key
+  focus.clearPending()
   const treePath = node.data.treePath
   focus.select(treePath ? hashPath(treePath) : null)
   if (node.data.isFragment && node.data.fragName) {
