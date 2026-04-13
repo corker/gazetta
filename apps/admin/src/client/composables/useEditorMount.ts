@@ -11,25 +11,32 @@ export function useEditorMount(
   mountVersion?: Ref<number>,
   fieldsBaseUrl?: Ref<string | undefined>
 ) {
-  let mounted = false
+  // Track the mount instance AND container that's currently live. Critical:
+  // when `editorMount` changes (default form → custom editor) the OLD instance
+  // still owns the React root on the container. We must call ITS unmount, not
+  // the new one's. Otherwise createRoot gets called twice on the same container
+  // and React 18 errors → Vite may trigger a page reload → editing state resets.
+  let current: { mount: EditorMount; el: HTMLElement } | null = null
 
-  function mount() {
+  function mountNew() {
     if (!containerRef.value || !editorMount.value || !content.value || !schema.value) return
-    if (mounted) unmount()
-    editorMount.value.mount(containerRef.value, {
+    if (current) unmountCurrent()
+    const m = editorMount.value
+    const el = containerRef.value
+    m.mount(el, {
       content: content.value,
       schema: schema.value,
       theme: theme.value,
       onChange,
       fieldsBaseUrl: fieldsBaseUrl?.value,
     })
-    mounted = true
+    current = { mount: m, el }
   }
 
-  function unmount() {
-    if (!mounted || !containerRef.value || !editorMount.value) return
-    editorMount.value.unmount(containerRef.value)
-    mounted = false
+  function unmountCurrent() {
+    if (!current) return
+    try { current.mount.unmount(current.el) } catch { /* already unmounted */ }
+    current = null
   }
 
   // Re-mount when container, editor instance, or mountVersion changes.
@@ -40,9 +47,9 @@ export function useEditorMount(
     : [containerRef, editorMount] as const
 
   watch(deps, () => {
-    if (containerRef.value && editorMount.value && content.value) mount()
-    else unmount()
+    if (containerRef.value && editorMount.value && content.value) mountNew()
+    else unmountCurrent()
   }, { immediate: true })
 
-  onBeforeUnmount(unmount)
+  onBeforeUnmount(unmountCurrent)
 }

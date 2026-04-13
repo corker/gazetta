@@ -218,12 +218,6 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   function clear() {
-    // TEMPORARY: logging to diagnose #122 — the flaky "Custom editor loads" test
-    // in CI clears target unexpectedly. Remove once root cause is found.
-    if (target.value) {
-      const caller = new Error().stack?.split('\n').slice(2, 5).map(l => l.trim()).join(' <- ')
-      console.warn('[editing.clear] target was set:', target.value.path, 'caller:', caller)
-    }
     clearRetry()
     loadError.value = null
     target.value = null

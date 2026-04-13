@@ -23,17 +23,16 @@ interface TestSite {
  * server automatically.
  */
 export const test = base.extend<{ page: Page }, { testSite: TestSite; baseURL: string }>({
-  // Capture browser console + page errors. Logged to stderr on failure so it
-  // shows up in CI logs directly (also attached as artifact). Helps diagnose #122.
+  // Capture browser console + page errors on failure (artifact + stderr).
+  // Useful for diagnosing flakes that only repro in CI.
   page: async ({ page }, use, testInfo) => {
     const logs: string[] = []
     page.on('console', msg => logs.push(`[${msg.type()}] ${msg.text()}`))
     page.on('pageerror', err => logs.push(`[pageerror] ${err.message}`))
     await use(page)
-    if (testInfo.status !== testInfo.expectedStatus) {
-      const body = logs.length ? logs.join('\n') : '(no browser logs captured)'
-      process.stderr.write(`\n===== BROWSER CONSOLE for ${testInfo.title} =====\n${body}\n===== END =====\n`)
-      await testInfo.attach('browser-console.log', { body, contentType: 'text/plain' })
+    if (testInfo.status !== testInfo.expectedStatus && logs.length) {
+      process.stderr.write(`\n===== BROWSER CONSOLE for ${testInfo.title} =====\n${logs.join('\n')}\n===== END =====\n`)
+      await testInfo.attach('browser-console.log', { body: logs.join('\n'), contentType: 'text/plain' })
     }
   },
 
