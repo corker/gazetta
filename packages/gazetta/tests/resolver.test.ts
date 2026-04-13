@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { writeFile, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import type { TemplateFunction } from '../src/types.js'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { resolveFragment, resolvePage } from '../src/resolver.js'
 import { loadSite } from '../src/site-loader.js'
@@ -43,11 +42,15 @@ describe('resolvePage', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
-  it('resolves a simple page with local components', async () => {
+  it('resolves a simple page with inline components', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'pages/home/page.yaml': 'route: /\ntemplate: echo\ncomponents:\n  - hero',
-      'pages/home/hero/component.yaml': 'template: echo\ncontent:\n  text: "Hello"',
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: [
+          { name: 'hero', template: 'echo', content: { text: 'Hello' } },
+        ],
+      }),
     })
     await writeTemplate('echo')
 
@@ -61,8 +64,11 @@ describe('resolvePage', () => {
   it('resolves a page with fragment references', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'fragments/header/fragment.yaml': 'template: echo\ncontent:\n  text: "Header"',
-      'pages/home/page.yaml': 'route: /\ntemplate: echo\ncomponents:\n  - "@header"',
+      'fragments/header/fragment.json': JSON.stringify({ template: 'echo', content: { text: 'Header' } }),
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['@header'],
+      }),
     })
     await writeTemplate('echo')
 
@@ -76,9 +82,16 @@ describe('resolvePage', () => {
   it('resolves nested fragment with children', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'fragments/header/fragment.yaml': 'template: echo\ncomponents:\n  - logo',
-      'fragments/header/logo/component.yaml': 'template: echo\ncontent:\n  text: "Logo"',
-      'pages/home/page.yaml': 'route: /\ntemplate: echo\ncomponents:\n  - "@header"',
+      'fragments/header/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: [
+          { name: 'logo', template: 'echo', content: { text: 'Logo' } },
+        ],
+      }),
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['@header'],
+      }),
     })
     await writeTemplate('echo')
 
@@ -91,6 +104,34 @@ describe('resolvePage', () => {
     expect(header.children[0].content?.text).toBe('Logo')
   })
 
+  it('resolves deeply nested components', async () => {
+    await writeSite({
+      'site.yaml': 'name: "Test"',
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: [
+          {
+            name: 'features',
+            template: 'echo',
+            components: [
+              { name: 'fast', template: 'echo', content: { text: 'Fast' } },
+              { name: 'composable', template: 'echo', content: { text: 'Composable' } },
+            ],
+          },
+        ],
+      }),
+    })
+    await writeTemplate('echo')
+
+    const site = await loadSite(testDir, storage)
+    const resolved = await resolvePage('home', site)
+
+    const features = resolved.children[0]
+    expect(features.children).toHaveLength(2)
+    expect(features.children[0].content?.text).toBe('Fast')
+    expect(features.children[1].content?.text).toBe('Composable')
+  })
+
   it('throws on missing page', async () => {
     await writeSite({ 'site.yaml': 'name: "Test"' })
     const site = await loadSite(testDir, storage)
@@ -100,7 +141,10 @@ describe('resolvePage', () => {
   it('throws on missing fragment', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'pages/home/page.yaml': 'route: /\ntemplate: echo\ncomponents:\n  - "@missing"',
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['@missing'],
+      }),
     })
     await writeTemplate('echo')
 
@@ -108,21 +152,24 @@ describe('resolvePage', () => {
     await expect(resolvePage('home', site)).rejects.toThrow('Fragment "@missing" not found')
   })
 
-  it('throws on missing local component', async () => {
+  it('throws on string entry that is not a fragment reference', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'pages/home/page.yaml': 'route: /\ntemplate: echo\ncomponents:\n  - nope',
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['not-a-fragment'],
+      }),
     })
     await writeTemplate('echo')
 
     const site = await loadSite(testDir, storage)
-    await expect(resolvePage('home', site)).rejects.toThrow('Component "nope" not found')
+    await expect(resolvePage('home', site)).rejects.toThrow('string entries must be fragment references')
   })
 
   it('throws on missing template', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'pages/home/page.yaml': 'route: /\ntemplate: nonexistent',
+      'pages/home/page.json': JSON.stringify({ template: 'nonexistent' }),
     })
 
     const site = await loadSite(testDir, storage)
@@ -132,9 +179,12 @@ describe('resolvePage', () => {
   it('lists available fragments on missing fragment error', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'fragments/header/fragment.yaml': 'template: echo',
-      'fragments/footer/fragment.yaml': 'template: echo',
-      'pages/home/page.yaml': 'route: /\ntemplate: echo\ncomponents:\n  - "@missing"',
+      'fragments/header/fragment.json': JSON.stringify({ template: 'echo' }),
+      'fragments/footer/fragment.json': JSON.stringify({ template: 'echo' }),
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['@missing'],
+      }),
     })
     await writeTemplate('echo')
 
@@ -149,22 +199,30 @@ describe('resolvePage', () => {
     }
   })
 
-  it('includes resolution path in error messages', async () => {
+  it('sets treePath on resolved components', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'fragments/header/fragment.yaml': 'template: echo\ncomponents:\n  - missing-child',
-      'pages/home/page.yaml': 'route: /\ntemplate: echo\ncomponents:\n  - "@header"',
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: [
+          {
+            name: 'features',
+            template: 'echo',
+            components: [
+              { name: 'fast', template: 'echo', content: { text: 'Fast' } },
+            ],
+          },
+        ],
+      }),
     })
     await writeTemplate('echo')
 
     const site = await loadSite(testDir, storage)
-    try {
-      await resolvePage('home', site)
-      expect.fail('should have thrown')
-    } catch (err) {
-      const message = (err as Error).message
-      expect(message).toContain('@header')
-    }
+    const resolved = await resolvePage('home', site)
+
+    expect(resolved.treePath).toBe('')
+    expect(resolved.children[0].treePath).toBe('features')
+    expect(resolved.children[0].children[0].treePath).toBe('features/fast')
   })
 })
 
@@ -176,7 +234,7 @@ describe('resolveFragment', () => {
   it('resolves a simple fragment', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'fragments/header/fragment.yaml': 'template: echo\ncontent:\n  text: "Header"',
+      'fragments/header/fragment.json': JSON.stringify({ template: 'echo', content: { text: 'Header' } }),
     })
     await writeTemplate('echo')
 
@@ -187,11 +245,15 @@ describe('resolveFragment', () => {
     expect(resolved.treePath).toBe('')
   })
 
-  it('resolves a fragment with children', async () => {
+  it('resolves a fragment with inline children', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'fragments/header/fragment.yaml': 'template: echo\ncomponents:\n  - logo',
-      'fragments/header/logo/component.yaml': 'template: echo\ncontent:\n  text: "Logo"',
+      'fragments/header/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: [
+          { name: 'logo', template: 'echo', content: { text: 'Logo' } },
+        ],
+      }),
     })
     await writeTemplate('echo')
 
@@ -212,8 +274,8 @@ describe('resolveFragment', () => {
   it('lists available fragments on missing fragment error', async () => {
     await writeSite({
       'site.yaml': 'name: "Test"',
-      'fragments/header/fragment.yaml': 'template: echo',
-      'fragments/footer/fragment.yaml': 'template: echo',
+      'fragments/header/fragment.json': JSON.stringify({ template: 'echo' }),
+      'fragments/footer/fragment.json': JSON.stringify({ template: 'echo' }),
     })
     await writeTemplate('echo')
 
