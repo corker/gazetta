@@ -1,14 +1,36 @@
-import { describe, it, expect, afterAll } from 'vitest'
-import { rm } from 'node:fs/promises'
+import { describe, it, expect, afterAll, beforeAll } from 'vitest'
+import { rm, cp } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Hono } from 'hono'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { createAdminApp } from '../src/admin-api/index.js'
+import { tempDir } from './_helpers/temp.js'
 
-const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
+// Copy the starter into .tmp/ so admin API tests can mutate pages/fragments
+// without dirtying the real repo. See #123.
+const realStarter = resolve(import.meta.dirname, '../../../examples/starter')
+const projectRoot = tempDir('admin-api-test-' + Date.now())
 const siteDir = resolve(projectRoot, 'sites/main')
 const storage = createFilesystemProvider()
-const app: Hono = createAdminApp({ siteDir, storage, templatesDir: resolve(projectRoot, 'templates'), adminDir: resolve(projectRoot, 'admin') })
+let app: Hono
+
+beforeAll(async () => {
+  await rm(projectRoot, { recursive: true, force: true })
+  await cp(realStarter, projectRoot, {
+    recursive: true,
+    filter: (src) => !src.includes('/dist') && !src.includes('/node_modules') && !src.includes('/.tmp'),
+  })
+  app = createAdminApp({
+    siteDir,
+    storage,
+    templatesDir: resolve(projectRoot, 'templates'),
+    adminDir: resolve(projectRoot, 'admin'),
+  })
+})
+
+afterAll(async () => {
+  await rm(projectRoot, { recursive: true, force: true })
+})
 
 async function get(path: string) {
   const res = await app.request(path)
