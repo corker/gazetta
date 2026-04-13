@@ -36,6 +36,14 @@ Validated approaches and things to avoid. Each entry: rule, then why.
    `npm version -w` updates package.json and lockfile but does NOT commit or tag (disabled for workspaces). Must do it manually.
    Why: v0.1.1 shipped with lockfile out of sync because the commit and tag were done without the lockfile.
 
-10. **Dark mode CSS: use non-scoped `<style>` block, not `:global(.dark)` in scoped styles.**
+10. **E2e test isolation: scope git checkout to mutating tests only, not global beforeEach.**
+   Only tests that write to disk (add/remove/move component) need `beforeEach` with `git checkout`. Read-only tests must not have it — the file change triggers SSE reload which clears editor state mid-test.
+   Why: Global beforeEach caused 5 CI failures. The SSE reload from git checkout arrived late in CI and clobbered component selections in unrelated tests.
+
+11. **When adding CI steps, verify assumptions locally first.**
+   Before pushing CI changes, check: default parallelism settings, async import behavior, file watcher side effects, and timing differences between local and CI. One fact-check round saves multiple CI push-fix cycles.
+   Why: The e2e CI setup took 5 pushes because we assumed Playwright defaults, SSE timing, and Vite import behavior without verifying.
+
+12. **Dark mode CSS: use non-scoped `<style>` block, not `:global(.dark)` in scoped styles.**
    Scoped selectors get `[data-v-xxx]` attributes which beat `:global(.dark)` in specificity. Put dark overrides in a separate `<style>` (no `scoped`) using `.dark .component-name` selectors. Follow PreviewPanel's pattern.
    Why: ComponentTree dark mode was broken — `:global(.dark) .node-root .node-label` lost to `.node-root .node-label[data-v-xxx]`.
