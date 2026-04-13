@@ -20,15 +20,23 @@ export interface TemplateSummary { name: string }
 export interface FieldSummary { name: string; path: string }
 export interface SiteManifest { name: string; version?: string; systemPages?: string[] }
 
+export interface InlineComponent {
+  name: string
+  template: string
+  content?: Record<string, unknown>
+  components?: ComponentEntry[]
+}
+export type ComponentEntry = string | InlineComponent
+
 export interface PageDetail extends PageSummary {
   content?: Record<string, unknown>
-  components?: string[]
+  components?: ComponentEntry[]
   dir: string
 }
 
 export interface FragmentDetail extends FragmentSummary {
   content?: Record<string, unknown>
-  components?: string[]
+  components?: ComponentEntry[]
   dir: string
 }
 

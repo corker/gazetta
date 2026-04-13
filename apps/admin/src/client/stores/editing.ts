@@ -97,24 +97,73 @@ export const useEditingStore = defineStore('editing', () => {
     usePreviewStore().invalidateDraft()
   }
 
-  async function openComponent(componentPath: string, templateName: string) {
+  /** Build a save function that updates a component's content within the page/fragment JSON */
+  function buildSaveFn(namePath: string): (content: Record<string, unknown>) => Promise<void> {
+    return async (newContent: Record<string, unknown>) => {
+      const sel = useSelectionStore()
+      const detail = sel.detail
+      if (!detail || !sel.selection) return
+
+      // Deep clone the components array and update the target component's content
+      const updatedComponents = deepClone(detail.components ?? [])
+      const parts = namePath.split('/')
+      let components = updatedComponents as Array<string | { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }>
+
+      for (let i = 0; i < parts.length; i++) {
+        const idx = components.findIndex(c => typeof c === 'object' && c.name === parts[i])
+        if (idx === -1) return
+        const comp = components[idx] as { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }
+        if (i === parts.length - 1) {
+          comp.content = newContent
+        } else {
+          components = (comp.components ?? []) as typeof components
+        }
+      }
+
+      if (sel.selection.type === 'page') {
+        await api.updatePage(sel.selection.name, { components: updatedComponents })
+      } else {
+        await api.updateFragment(sel.selection.name, { components: updatedComponents })
+      }
+    }
+  }
+
+  /** Find an inline component by name path (e.g., "hero", "features/fast") in the selection detail */
+  function findComponentByNamePath(namePath: string): { template: string; content: Record<string, unknown> } | null {
+    const sel = useSelectionStore()
+    const detail = sel.detail
+    if (!detail?.components) return null
+
+    const parts = namePath.split('/')
+    let components = detail.components as Array<string | { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }>
+
+    for (let i = 0; i < parts.length; i++) {
+      const comp = components.find(c => typeof c === 'object' && c.name === parts[i])
+      if (!comp || typeof comp === 'string') return null
+      if (i === parts.length - 1) return { template: comp.template, content: (comp.content as Record<string, unknown>) ?? {} }
+      components = (comp.components ?? []) as typeof components
+    }
+    return null
+  }
+
+  async function openComponent(namePath: string, templateName: string) {
     clearRetry()
     stashCurrent()
-    const stashed = pendingEdits.get(componentPath)
+    const stashed = pendingEdits.get(namePath)
     if (stashed) {
-      pendingEdits.delete(componentPath)
+      pendingEdits.delete(namePath)
       await open(stashed.target, stashed.editedContent)
       return
     }
     try {
-      const comp = await api.getComponent(componentPath)
-      const componentContent = (comp.content as Record<string, unknown>) ?? {}
+      const comp = findComponentByNamePath(namePath)
+      if (!comp) throw new Error(`Component "${namePath}" not found in page manifest`)
       const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(templateName)
-      await open({ template: templateName, path: componentPath, content: componentContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateComponent(componentPath, { content: c }).then(() => {}) })
+      await open({ template: templateName, path: namePath, content: comp.content, schema, hasEditor, editorUrl, fieldsBaseUrl, save: buildSaveFn(namePath) })
     } catch (err) {
       target.value = null
       loadError.value = `Failed to load "${templateName}": ${(err as Error).message}`
-      retryTimer = setInterval(() => openComponent(componentPath, templateName), 3000)
+      retryTimer = setInterval(() => openComponent(namePath, templateName), 3000)
     }
   }
 
@@ -125,10 +174,10 @@ export const useEditingStore = defineStore('editing', () => {
     const d = sel.detail
     const selection = sel.selection
     if (!d || !selection) return
-    const pagePath = d.dir
-    const stashed = pendingEdits.get(pagePath)
+    const rootPath = '_root'
+    const stashed = pendingEdits.get(rootPath)
     if (stashed) {
-      pendingEdits.delete(pagePath)
+      pendingEdits.delete(rootPath)
       await open(stashed.target, stashed.editedContent)
       return
     }
@@ -138,7 +187,7 @@ export const useEditingStore = defineStore('editing', () => {
       const saveFn = selection.type === 'page'
         ? (c: Record<string, unknown>) => api.updatePage(selection.name, { content: c }).then(() => {})
         : (c: Record<string, unknown>) => api.updateFragment(selection.name, { content: c }).then(() => {})
-      await open({ template: d.template, path: pagePath, content: pageContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: saveFn })
+      await open({ template: d.template, path: rootPath, content: pageContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: saveFn })
     } catch (err) {
       target.value = null
       loadError.value = `Failed to load "${d.template}": ${(err as Error).message}`
@@ -149,19 +198,18 @@ export const useEditingStore = defineStore('editing', () => {
   async function openFragment(fragName: string) {
     clearRetry()
     stashCurrent()
-    const stashed = pendingEdits.get(fragName)
+    const stashKey = `@${fragName}`
+    const stashed = pendingEdits.get(stashKey)
+    if (stashed) {
+      pendingEdits.delete(stashKey)
+      await open(stashed.target, stashed.editedContent)
+      return
+    }
     try {
       const frag = await api.getFragment(fragName)
-      const fragPath = frag.dir
-      const existingStash = stashed ?? pendingEdits.get(fragPath)
-      if (existingStash) {
-        pendingEdits.delete(existingStash === stashed ? fragName : fragPath)
-        await open(existingStash.target, existingStash.editedContent)
-        return
-      }
       const fragContent = (frag.content as Record<string, unknown>) ?? {}
       const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(frag.template)
-      await open({ template: frag.template, path: fragPath, content: fragContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateFragment(fragName, { content: c }).then(() => {}) })
+      await open({ template: frag.template, path: stashKey, content: fragContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateFragment(fragName, { content: c }).then(() => {}) })
     } catch (err) {
       target.value = null
       loadError.value = `Failed to load fragment "${fragName}": ${(err as Error).message}`

@@ -168,44 +168,32 @@ async function findRealContent(templateName: string): Promise<Record<string, unk
       }
     }
 
-    // Search nested components within pages and fragments
+    // Search inline components within pages and fragments
+    function findInlineContent(components: import('../api/client.js').ComponentEntry[], template: string): Record<string, unknown> | undefined {
+      for (const entry of components) {
+        if (typeof entry === 'string') continue
+        if (entry.template === template && entry.content) return entry.content as Record<string, unknown>
+        if (entry.components) {
+          const found = findInlineContent(entry.components, template)
+          if (found) return found
+        }
+      }
+      return undefined
+    }
+
     for (const p of pages) {
       const detail = await api.getPage(p.name)
       if (!detail.components) continue
-      for (const compName of detail.components) {
-        if (compName.startsWith('@')) continue // skip fragment refs
-        const found = await searchComponent(detail.dir, compName, templateName)
-        if (found) return found
-      }
+      const found = findInlineContent(detail.components, templateName)
+      if (found) return found
     }
     for (const f of frags) {
       const detail = await api.getFragment(f.name)
       if (!detail.components) continue
-      for (const compName of detail.components) {
-        if (compName.startsWith('@')) continue
-        const found = await searchComponent(detail.dir, compName, templateName)
-        if (found) return found
-      }
+      const found = findInlineContent(detail.components, templateName)
+      if (found) return found
     }
   } catch { /* ignore — fallback to generated mock */ }
-  return undefined
-}
-
-async function searchComponent(parentDir: string, name: string, targetTemplate: string): Promise<Record<string, unknown> | undefined> {
-  try {
-    const comp = await api.getComponent(`${parentDir}/${name}`)
-    if ((comp.template as string) === targetTemplate && comp.content && Object.keys(comp.content as object).length > 0) {
-      return comp.content as Record<string, unknown>
-    }
-    // Recurse into children
-    if (comp.components) {
-      for (const child of comp.components as string[]) {
-        if (child.startsWith('@')) continue
-        const found = await searchComponent(`${parentDir}/${name}`, child, targetTemplate)
-        if (found) return found
-      }
-    }
-  } catch { /* component may not have manifest */ }
   return undefined
 }
 

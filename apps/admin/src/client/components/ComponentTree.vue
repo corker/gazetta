@@ -57,50 +57,42 @@ const componentCount = computed(() => detail.value?.components?.length ?? 0)
 type GzEntry = { path: string; template: string } | { isFragment: true; fragName: string }
 const gzMap = ref(new Map<string, GzEntry>())
 
-async function buildComponentNode(name: string, parentDir: string, index: number, parentTreePath: string, map: Map<string, GzEntry>): Promise<ComponentNode> {
-  const treePath = parentTreePath ? `${parentTreePath}/${name}` : name
-  const gzId = hashPath(treePath)
-  const isFragment = name.startsWith('@')
-
-  if (isFragment) {
-    const fragName = name.slice(1)
+async function buildComponentNode(entry: import('../api/client.js').ComponentEntry, index: number, parentTreePath: string, map: Map<string, GzEntry>): Promise<ComponentNode> {
+  // Fragment reference
+  if (typeof entry === 'string') {
+    const fragName = entry.slice(1)
+    const treePath = parentTreePath ? `${parentTreePath}/${entry}` : entry
+    const gzId = hashPath(treePath)
     map.set(gzId, { isFragment: true, fragName })
     try {
       const frag = await api.getFragment(fragName)
       const children = frag.components
-        ? await Promise.all(frag.components.map((c: string, i: number) => buildComponentNode(c, frag.dir, i, treePath, map)))
+        ? await Promise.all(frag.components.map((c, i) => buildComponentNode(c, i, treePath, map)))
         : []
       return {
         key: `frag:${fragName}:${index}`,
-        label: name,
-        data: { isFragment: true, fragName, treePath, path: frag.dir, template: frag.template, index, isTopLevel: true },
+        label: entry,
+        data: { isFragment: true, fragName, treePath, path: treePath, template: frag.template, index, isTopLevel: true },
         children,
       }
     } catch (err) {
-      return { key: `frag:${fragName}:${index}`, label: name, data: { isFragment: true, fragName, treePath, index, isTopLevel: true, error: (err as Error).message }, children: [] }
+      return { key: `frag:${fragName}:${index}`, label: entry, data: { isFragment: true, fragName, treePath, index, isTopLevel: true, error: (err as Error).message }, children: [] }
     }
   }
 
-  const path = `${parentDir}/${name}`
-  let template = ''
-  let children: ComponentNode[] = []
-  let error: string | undefined
-  try {
-    const comp = await api.getComponent(path)
-    template = (comp.template as string) ?? ''
-    if (comp.components) {
-      children = await Promise.all(
-        (comp.components as string[]).map((c: string, i: number) => buildComponentNode(c, path, i, treePath, map))
-      )
-    }
-  } catch (err) { error = (err as Error).message }
+  // Inline component
+  const treePath = parentTreePath ? `${parentTreePath}/${entry.name}` : entry.name
+  const gzId = hashPath(treePath)
+  const children: ComponentNode[] = entry.components
+    ? await Promise.all(entry.components.map((c, i) => buildComponentNode(c, i, treePath, map)))
+    : []
 
-  map.set(gzId, { path, template })
+  map.set(gzId, { path: treePath, template: entry.template })
 
   return {
-    key: `comp:${path}:${index}`,
-    label: name,
-    data: { path, template, treePath, isFragment: false, index, isTopLevel: true, error },
+    key: `comp:${treePath}:${index}`,
+    label: entry.name,
+    data: { path: treePath, template: entry.template, treePath, isFragment: false, index, isTopLevel: true },
     children: children.map(c => ({ ...c, data: { ...c.data, isTopLevel: false } })),
   }
 }
@@ -111,7 +103,7 @@ watch(detail, async (d) => {
   const map = new Map<string, GzEntry>()
   const rootPath = selection.type === 'fragment' ? `@${selection.name}` : ''
   const children = d.components
-    ? await Promise.all(d.components.map((name: string, i: number) => buildComponentNode(name, d.dir, i, rootPath, map)))
+    ? await Promise.all(d.components.map((entry, i) => buildComponentNode(entry, i, rootPath, map)))
     : []
 
   const rootNode: ComponentNode = {

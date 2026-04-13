@@ -93,7 +93,7 @@ export const useSelectionStore = defineStore('selection', () => {
   }
 
   /** Update the component list (after move/add/remove) and refresh */
-  async function updateComponents(components: string[]) {
+  async function updateComponents(components: import('../api/client.js').ComponentEntry[]) {
     if (!selection.value) return
     try {
       if (selection.value.type === 'page') {
