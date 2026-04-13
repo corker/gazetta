@@ -1,14 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
 
-// Restore starter site files before each test so tests don't depend on each other's side effects.
-// The git checkout may trigger the file watcher → SSE reload in the dev server.
-// We restore synchronously before the browser navigates, so the reload settles before the test starts.
-test.beforeEach(async ({ page }) => {
+function restoreStarterSite() {
   execSync('git checkout examples/starter/sites/main/', { stdio: 'pipe' })
-  // Navigate away to ensure any pending SSE reload doesn't interfere with test setup
-  await page.goto('about:blank')
-})
+}
 
 // Helper: navigate to admin, select a page, enter edit mode by clicking a component in the preview iframe
 async function openEditor(page: import('@playwright/test').Page, pageName: string) {
@@ -75,11 +70,9 @@ test.describe('Custom editor', () => {
     await page.click('[data-testid="component-hero"]')
     await page.waitForSelector('[data-testid="editor-container"]')
 
-    // Wait for editor to load — custom editor renders "Welcome to Gazetta" locally,
-    // but in CI the Vite async import may be slower. Verify the editor panel has content
-    // (title/subtitle fields appear in both custom and default editor).
+    // Wait for custom editor to load and render content
     const editorPanel = page.locator('[data-testid="editor-panel"]')
-    await expect(editorPanel).toContainText('title', { timeout: 20000 })
+    await expect(editorPanel).toContainText('Welcome to Gazetta', { timeout: 20000 })
   })
 
   test('falls back to default form when switching to template without editor', async ({ page }) => {
@@ -422,6 +415,14 @@ test.describe('Dev playground', () => {
 })
 
 test.describe('Component operations', () => {
+  // These tests mutate page.json on disk via the API.
+  // Restore starter files before each test and after the suite.
+  test.beforeEach(async ({ page }) => {
+    restoreStarterSite()
+    await page.goto('about:blank')
+  })
+  test.afterAll(() => restoreStarterSite())
+
   test('add inline component via dialog', async ({ page }) => {
     await openEditor(page, 'home')
 
@@ -491,6 +492,6 @@ test.describe('Component operations', () => {
       const featuresAfter = await page.locator('[data-testid="component-features"]').boundingBox()
       expect(featuresAfter!.y).toBeLessThan(heroAfter!.y)
     }).toPass({ timeout: 10000 })
-    // No manual cleanup — beforeEach restores page.json via git checkout
+    // No manual cleanup — beforeEach/afterAll restores page.json via git checkout
   })
 })
