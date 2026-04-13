@@ -258,17 +258,18 @@ async function removeComponent(index: number) {
   }
   const components = [...d.components]
   const removed = components.splice(index, 1)[0]
+  const removedName = typeof removed === 'string' ? removed : removed.name
   editing.clear()
   await selection.updateComponents(components)
-  toast.show(`Removed "${removed}"`)
+  toast.show(`Removed "${removedName}"`)
 }
 
 async function addComponent(name: string, template: string) {
   const d = detail.value
   if (!d) return
   try {
-    await api.createComponent(d.dir, name, template)
-    const components = [...(d.components ?? []), name]
+    const entry: import('../api/client.js').InlineComponent = { name, template, content: {} }
+    const components = [...(d.components ?? []), entry]
     await selection.updateComponents(components)
     toast.show(`Added "${name}"`)
   } catch (err) {
