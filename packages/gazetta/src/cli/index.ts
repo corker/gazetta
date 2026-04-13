@@ -1047,6 +1047,29 @@ async function runDev(siteDir: string, port: number) {
       try {
         const { createServer: createViteServer } = await import('vite')
         const { searchForWorkspaceRoot } = await import('vite')
+        // Discover custom editor/field entries up front so Vite can pre-scan
+        // them during dep optimization. Without this, Vite finds the JSX
+        // runtime imports only when hero.tsx (etc.) is loaded at runtime,
+        // triggers "optimized dependencies changed. reloading", and full-reloads
+        // the admin mid-session — wiping editor state (#122).
+        const editorEntries: string[] = []
+        if (existsSync(adminDir)) {
+          const editorsSubdir = join(adminDir, 'editors')
+          const fieldsSubdir = join(adminDir, 'fields')
+          const { readdir } = await import('node:fs/promises')
+          for (const dir of [editorsSubdir, fieldsSubdir]) {
+            if (!existsSync(dir)) continue
+            try {
+              const entries = await readdir(dir, { withFileTypes: true })
+              for (const e of entries) {
+                if (e.isFile() && /\.(tsx?|jsx?)$/.test(e.name)) {
+                  editorEntries.push(join(dir, e.name))
+                }
+              }
+            } catch { /* ignore — dir may not exist */ }
+          }
+        }
+
         const vite = await createViteServer({
           configFile: join(cmsWebDir, 'vite.config.ts'),
           root: cmsWebDir,
@@ -1057,6 +1080,7 @@ async function runDev(siteDir: string, port: number) {
               '@fields': join(adminDir, 'fields'),
             },
           },
+          optimizeDeps: editorEntries.length ? { entries: editorEntries } : undefined,
           server: {
             middlewareMode: true,
             hmr: { server: nodeServer as unknown as import('node:http').Server },
