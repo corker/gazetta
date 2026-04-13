@@ -1,9 +1,4 @@
-import { test, expect } from '@playwright/test'
-import { execSync } from 'node:child_process'
-
-function restoreStarterSite() {
-  execSync('git checkout examples/starter/sites/main/', { stdio: 'pipe' })
-}
+import { test, expect } from './fixtures'
 
 // Helper: navigate to admin in edit mode for a page — uses the direct URL to avoid
 // race conditions from clicking data-gz elements in the preview iframe.
@@ -408,60 +403,46 @@ test.describe('Dev playground', () => {
 })
 
 test.describe('Component operations', () => {
-  // These tests mutate page.json on disk via the API.
-  // Restore starter files before each test and after the suite.
-  test.beforeEach(async ({ page }) => {
-    restoreStarterSite()
-    await page.goto('about:blank')
-  })
-  test.afterAll(() => restoreStarterSite())
+  // These tests mutate page.json on disk via the API. Isolation comes from the
+  // worker-scoped testSite fixture — each Playwright worker has its own copy
+  // of the starter site. Tests within the file share state; each one uses a
+  // unique component name so they don't collide.
 
-  test('add inline component via dialog', async ({ page }) => {
+  test('add inline component via dialog', async ({ page }, testInfo) => {
     await openEditor(page, 'home')
+    const name = `test-add-${testInfo.testId}`
 
-    // Count components before adding
     const beforeCount = await page.locator('[data-testid^="component-"]').count()
 
-    // Open add dialog
     await page.click('[data-testid="add-component"]')
     await page.locator('[data-testid="add-component-name"]').waitFor({ timeout: 5000 })
-
-    // Fill name
-    await page.locator('[data-testid="add-component-name"]').fill('test-widget')
-
-    // Select a template from the listbox
+    await page.locator('[data-testid="add-component-name"]').fill(name)
     await page.locator('.p-listbox-option', { hasText: 'text-block' }).click()
-
-    // Click Add
     await page.click('[data-testid="add-component-submit"]')
 
-    // Component should appear in tree
-    await expect(page.locator('[data-testid="component-test-widget"]')).toBeVisible({ timeout: 10000 })
-
-    // Count should increase
+    await expect(page.locator(`[data-testid="component-${name}"]`)).toBeVisible({ timeout: 10000 })
     const afterCount = await page.locator('[data-testid^="component-"]').count()
     expect(afterCount).toBe(beforeCount + 1)
   })
 
-  test('remove component', async ({ page }) => {
+  test('remove component', async ({ page }, testInfo) => {
     await openEditor(page, 'home')
+    const name = `test-remove-${testInfo.testId}`
 
     // Add a component first so we have something to remove
     await page.click('[data-testid="add-component"]')
     await page.locator('[data-testid="add-component-name"]').waitFor({ timeout: 5000 })
-    await page.locator('[data-testid="add-component-name"]').fill('to-remove')
+    await page.locator('[data-testid="add-component-name"]').fill(name)
     await page.locator('.p-listbox-option', { hasText: 'text-block' }).click()
     await page.click('[data-testid="add-component-submit"]')
-    const widget = page.locator('[data-testid="component-to-remove"]')
+    const widget = page.locator(`[data-testid="component-${name}"]`)
     await expect(widget).toBeVisible({ timeout: 10000 })
 
     const beforeCount = await page.locator('[data-testid^="component-"]').count()
 
-    // Hover to reveal actions, click remove
     await widget.hover()
-    await page.click('[data-testid="remove-to-remove"]')
+    await page.click(`[data-testid="remove-${name}"]`)
 
-    // Component should be gone
     await expect(widget).not.toBeVisible({ timeout: 10000 })
     const afterCount = await page.locator('[data-testid^="component-"]').count()
     expect(afterCount).toBe(beforeCount - 1)
@@ -479,12 +460,19 @@ test.describe('Component operations', () => {
     await page.locator('[data-testid="component-features"]').hover()
     await page.click('[data-testid="move-up-features"]')
 
-    // Wait for tree to re-render with new order (features above hero)
     await expect(async () => {
       const heroAfter = await page.locator('[data-testid="component-hero"]').boundingBox()
       const featuresAfter = await page.locator('[data-testid="component-features"]').boundingBox()
       expect(featuresAfter!.y).toBeLessThan(heroAfter!.y)
     }).toPass({ timeout: 10000 })
-    // No manual cleanup — beforeEach/afterAll restores page.json via git checkout
+
+    // Restore order so subsequent tests see hero above features
+    await page.locator('[data-testid="component-features"]').hover()
+    await page.click('[data-testid="move-down-features"]')
+    await expect(async () => {
+      const heroAfter = await page.locator('[data-testid="component-hero"]').boundingBox()
+      const featuresAfter = await page.locator('[data-testid="component-features"]').boundingBox()
+      expect(heroAfter!.y).toBeLessThan(featuresAfter!.y)
+    }).toPass({ timeout: 10000 })
   })
 })
