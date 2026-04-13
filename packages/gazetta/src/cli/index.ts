@@ -524,17 +524,22 @@ async function runBuild(siteDir: string) {
         outDir,
         emptyOutDir: true,
         chunkSizeWarningLimit: 2000,
-        rollupOptions: {
+        // Vite 8: rollupOptions renamed to rolldownOptions, and manualChunks only
+        // accepts the function form (Rolldown doesn't support the object record form).
+        rolldownOptions: {
           output: {
-            manualChunks: {
-              'vendor-react': ['react', 'react-dom', 'react-dom/client'],
-              'vendor-editor': ['@rjsf/core', '@rjsf/utils', '@rjsf/validator-ajv8', '@hello-pangea/dnd'],
-              'vendor-tiptap': ['@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-link', '@tiptap/extension-placeholder'],
+            manualChunks(id: string) {
+              if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'vendor-react'
+              if (id.includes('node_modules/@rjsf/') || id.includes('node_modules/@hello-pangea/dnd')) return 'vendor-editor'
+              if (id.includes('node_modules/@tiptap/')) return 'vendor-tiptap'
+              return undefined
             },
           },
           onwarn(warning, defaultHandler) {
-            if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return
-            if (warning.code === 'PLUGIN_WARNING' && warning.message?.includes('dynamically imported')) return
+            const code = (warning as { code?: string }).code
+            const message = (warning as { message?: string }).message
+            if (code === 'MODULE_LEVEL_DIRECTIVE') return
+            if (code === 'PLUGIN_WARNING' && message?.includes('dynamically imported')) return
             defaultHandler(warning)
           },
         },
