@@ -38,3 +38,11 @@ jobs:
       - run: npm run build -w packages/gazetta
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --project=dev
+
+      - name: Upload test-results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 7
