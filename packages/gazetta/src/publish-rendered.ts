@@ -205,7 +205,10 @@ export async function publishPageStatic(
 
   await targetStorage.mkdir(outputDir)
   await targetStorage.writeFile(outputPath, html)
-  if (manifestHash) await writeSidecar(targetStorage, outputDir, manifestHash)
+  // Sidecar goes under pages/{name}/ regardless of static route layout, so compare
+  // can find it the same way it does for ESI targets. pages/ doesn't clash with
+  // static serving (routes are / and /{route}, not /pages/*).
+  if (manifestHash) await writeSidecar(targetStorage, `pages/${pageName}`, manifestHash)
 
   return { files: 1 }
 }

@@ -1,17 +1,29 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
-import { api } from '../api/client.js'
+import ProgressSpinner from 'primevue/progressspinner'
+import { api, type CompareResult } from '../api/client.js'
 
 const props = defineProps<{ visible: boolean; itemType: string; itemName: string }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
+
+const currentItem = computed(() => `${props.itemType}/${props.itemName}`)
 
 const targets = ref<string[]>([])
 const selectedTargets = ref<string[]>([])
 const publishing = ref(false)
 const results = ref<Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> | null>(null)
+
+// Per-target compare state
+const compareByTarget = ref(new Map<string, CompareResult>())
+const compareErrorsByTarget = ref(new Map<string, string>())
+const compareLoadingTargets = ref(new Set<string>())
+const compareAborts = new Map<string, AbortController>()
+
+// Checked items for publish (defaults to currentItem)
+const selectedItems = ref(new Set<string>([currentItem.value]))
 
 onMounted(async () => {
   try {
@@ -21,13 +33,123 @@ onMounted(async () => {
   }
 })
 
+onUnmounted(() => abortAllCompares())
+
+function abortAllCompares() {
+  for (const ac of compareAborts.values()) ac.abort()
+  compareAborts.clear()
+}
+
+// Start compare for a newly selected target; abort when deselected
+watch(selectedTargets, (now, prev) => {
+  const added = now.filter(t => !prev?.includes(t))
+  const removed = (prev ?? []).filter(t => !now.includes(t))
+
+  for (const t of removed) {
+    compareAborts.get(t)?.abort()
+    compareAborts.delete(t)
+    compareLoadingTargets.value.delete(t)
+    compareByTarget.value.delete(t)
+    compareErrorsByTarget.value.delete(t)
+  }
+
+  for (const t of added) {
+    const ac = new AbortController()
+    compareAborts.set(t, ac)
+    compareLoadingTargets.value.add(t)
+    compareErrorsByTarget.value.delete(t)
+    api.compare(t, { signal: ac.signal })
+      .then(r => {
+        if (ac.signal.aborted) return
+        compareByTarget.value.set(t, r)
+        compareLoadingTargets.value.delete(t)
+        // Trigger reactivity on Set/Map updates
+        compareByTarget.value = new Map(compareByTarget.value)
+        compareLoadingTargets.value = new Set(compareLoadingTargets.value)
+      })
+      .catch(err => {
+        if (ac.signal.aborted || (err as Error).name === 'AbortError') return
+        compareErrorsByTarget.value.set(t, (err as Error).message)
+        compareLoadingTargets.value.delete(t)
+        compareErrorsByTarget.value = new Map(compareErrorsByTarget.value)
+        compareLoadingTargets.value = new Set(compareLoadingTargets.value)
+      })
+  }
+})
+
+// Union of added+modified across selected targets
+interface ChangedItem { path: string; change: 'added' | 'modified' }
+const changedItems = computed<ChangedItem[]>(() => {
+  const map = new Map<string, ChangedItem>()
+  for (const target of selectedTargets.value) {
+    const r = compareByTarget.value.get(target)
+    if (!r) continue
+    for (const p of r.added) map.set(p, { path: p, change: 'added' })
+    for (const p of r.modified) {
+      // added takes precedence over modified for display — if any target considers it added, show it as added
+      if (!map.has(p)) map.set(p, { path: p, change: 'modified' })
+    }
+  }
+  return [...map.values()].sort((a, b) => a.path.localeCompare(b.path))
+})
+
+const anyLoading = computed(() => compareLoadingTargets.value.size > 0)
+const anyCompareDone = computed(() => compareByTarget.value.size > 0)
+const anyFirstPublish = computed(() => {
+  for (const t of selectedTargets.value) {
+    if (compareByTarget.value.get(t)?.firstPublish) return true
+  }
+  return false
+})
+const compareError = computed(() => {
+  // Report first error (targets usually share config; showing one is enough)
+  for (const t of selectedTargets.value) {
+    const e = compareErrorsByTarget.value.get(t)
+    if (e) return e
+  }
+  return null
+})
+
+// Keep currentItem pre-checked whenever it appears in the changed list
+watch(changedItems, (items) => {
+  const paths = new Set(items.map(i => i.path))
+  // Drop anything from selectedItems that's no longer in changedItems (except currentItem which is always sticky)
+  const kept = new Set<string>()
+  for (const p of selectedItems.value) {
+    if (paths.has(p) || p === currentItem.value) kept.add(p)
+  }
+  kept.add(currentItem.value)
+  selectedItems.value = kept
+})
+
+function toggleItem(path: string) {
+  const s = new Set(selectedItems.value)
+  if (s.has(path)) s.delete(path)
+  else s.add(path)
+  selectedItems.value = s
+}
+
 async function handlePublish() {
   if (selectedTargets.value.length === 0) return
+  abortAllCompares()
   publishing.value = true
   results.value = null
   try {
-    const item = `${props.itemType}/${props.itemName}`
-    const response = await api.publish([item], selectedTargets.value)
+    // If firstPublish for any target: publish ALL local items
+    let items: string[]
+    if (anyFirstPublish.value) {
+      // Use added list from the first-publish target (they'll all be the same since target is empty)
+      const firstPubTarget = selectedTargets.value.find(t => compareByTarget.value.get(t)?.firstPublish)
+      const r = firstPubTarget ? compareByTarget.value.get(firstPubTarget) : null
+      items = r ? r.added : [currentItem.value]
+    } else if (!anyCompareDone.value || compareError.value) {
+      // No compare data — fall back to current item only (pre-#108 safe behavior)
+      items = [currentItem.value]
+    } else {
+      items = [...selectedItems.value]
+      if (items.length === 0) items = [currentItem.value]
+    }
+    const response = await api.publish(items, selectedTargets.value)
     results.value = response.results
   } catch (err) {
     results.value = [{ target: '(all)', success: false, error: (err as Error).message, copiedFiles: 0 }]
@@ -35,27 +157,80 @@ async function handlePublish() {
     publishing.value = false
   }
 }
+
+function iconFor(item: string): string {
+  return item.startsWith('pages/') ? 'pi pi-file' : 'pi pi-share-alt'
+}
+
+function labelFor(item: string): string {
+  if (item.startsWith('pages/')) return item.slice('pages/'.length)
+  if (item.startsWith('fragments/')) return `@${item.slice('fragments/'.length)}`
+  return item
+}
+
+function changeSymbol(change: 'added' | 'modified'): string {
+  return change === 'added' ? '+' : '●'
+}
+
+function onClose() {
+  abortAllCompares()
+  emit('close')
+}
 </script>
 
 <template>
-  <Dialog :visible="props.visible" @update:visible="emit('close')" modal header="Publish" :style="{ width: '28rem' }">
+  <Dialog :visible="props.visible" @update:visible="onClose" modal header="Publish" :style="{ width: '32rem' }">
     <div class="publish-content">
-      <p class="publish-item">
-        <i :class="itemType === 'pages' ? 'pi pi-file' : 'pi pi-share-alt'" />
-        {{ itemName }}
+      <p class="publish-item" data-testid="publish-current-item">
+        <i :class="iconFor(currentItem)" />
+        {{ labelFor(currentItem) }}
       </p>
 
       <div v-if="targets.length === 0" class="publish-empty">
         No targets configured in site.yaml
       </div>
 
-      <div v-else-if="!results" class="publish-targets">
-        <p class="publish-label">Select targets:</p>
-        <div v-for="target in targets" :key="target" class="publish-target">
-          <Checkbox v-model="selectedTargets" :inputId="target" :value="target" />
-          <label :for="target">{{ target }}</label>
+      <template v-else-if="!results">
+        <div class="publish-targets">
+          <p class="publish-label">Select targets</p>
+          <div v-for="target in targets" :key="target" class="publish-target">
+            <Checkbox v-model="selectedTargets" :inputId="target" :value="target" :data-testid="`publish-target-${target}`" />
+            <label :for="target">{{ target }}</label>
+            <ProgressSpinner v-if="compareLoadingTargets.has(target)" style="width:14px;height:14px" strokeWidth="6" />
+          </div>
         </div>
-      </div>
+
+        <div v-if="compareError" class="publish-warning" data-testid="publish-compare-error">
+          <i class="pi pi-exclamation-triangle" />
+          <span>Couldn't load changes: {{ compareError }}</span>
+        </div>
+
+        <div v-else-if="anyFirstPublish" class="publish-firstpublish" data-testid="publish-first-publish">
+          <i class="pi pi-info-circle" />
+          <span>First publish — everything will be published.</span>
+        </div>
+
+        <div v-else-if="selectedTargets.length > 0" class="publish-changes">
+          <p class="publish-label">
+            Your changes
+            <span v-if="anyLoading" class="publish-label-hint">loading…</span>
+            <span v-else-if="changedItems.length" class="publish-label-hint">{{ changedItems.length }}</span>
+          </p>
+          <div v-if="!anyLoading && changedItems.length === 0" class="publish-nochanges">
+            No changes to publish.
+          </div>
+          <div v-else class="publish-changes-list">
+            <label v-for="item in changedItems" :key="item.path" class="publish-change-row"
+              :data-testid="`publish-change-${item.path}`">
+              <Checkbox :modelValue="selectedItems.has(item.path)" :binary="true"
+                @update:modelValue="toggleItem(item.path)" />
+              <span class="publish-change-mark" :class="item.change">{{ changeSymbol(item.change) }}</span>
+              <i :class="iconFor(item.path)" class="publish-change-icon" />
+              <span class="publish-change-label">{{ labelFor(item.path) }}</span>
+            </label>
+          </div>
+        </div>
+      </template>
 
       <div v-else class="publish-results">
         <div v-for="result in results" :key="result.target" class="publish-result"
@@ -69,10 +244,11 @@ async function handlePublish() {
     </div>
 
     <template #footer>
-      <Button v-if="results" label="Done" @click="emit('close')" />
+      <Button v-if="results" label="Done" data-testid="publish-done" @click="onClose" />
       <template v-else>
-        <Button label="Cancel" severity="secondary" text @click="emit('close')" />
+        <Button label="Cancel" severity="secondary" text @click="onClose" />
         <Button label="Publish" icon="pi pi-cloud-upload" :loading="publishing"
+          data-testid="publish-submit"
           :disabled="selectedTargets.length === 0" @click="handlePublish" />
       </template>
     </template>
@@ -83,14 +259,38 @@ async function handlePublish() {
 .publish-content { display: flex; flex-direction: column; gap: 1rem; }
 .publish-item { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 1rem; }
 .publish-empty { color: #888; font-size: 0.875rem; }
-.publish-label { font-size: 0.75rem; text-transform: uppercase; color: #888; letter-spacing: 0.03em; }
+.publish-label { font-size: 0.75rem; text-transform: uppercase; color: #888; letter-spacing: 0.03em; display: flex; align-items: center; gap: 0.5rem; }
+.publish-label-hint { text-transform: none; letter-spacing: 0; font-size: 0.75rem; color: #6b7280; font-weight: normal; }
 .publish-targets { display: flex; flex-direction: column; gap: 0.5rem; }
 .publish-target { display: flex; align-items: center; gap: 0.5rem; }
 .publish-target label { cursor: pointer; }
+.publish-warning { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #450a0a; color: #f87171; font-size: 0.875rem; }
+.publish-firstpublish { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #1e3a5f; color: #93c5fd; font-size: 0.875rem; }
+.publish-changes { display: flex; flex-direction: column; gap: 0.5rem; }
+.publish-nochanges { color: #888; font-size: 0.875rem; }
+.publish-changes-list { display: flex; flex-direction: column; gap: 0.25rem; max-height: 240px; overflow-y: auto; }
+.publish-change-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; border-radius: 4px; cursor: pointer; }
+.publish-change-row:hover { background: rgba(128, 128, 128, 0.1); }
+.publish-change-mark { font-family: monospace; width: 10px; text-align: center; font-weight: bold; }
+.publish-change-mark.added { color: #4ade80; }
+.publish-change-mark.modified { color: #fbbf24; }
+.publish-change-icon { color: #888; font-size: 0.8rem; }
+.publish-change-label { font-size: 0.875rem; }
 .publish-results { display: flex; flex-direction: column; gap: 0.5rem; }
 .publish-result { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border-radius: 6px; }
 .publish-result.success { background: #052e16; color: #4ade80; }
 .publish-result.error { background: #450a0a; color: #f87171; }
 .result-target { font-weight: 600; }
 .result-detail { margin-left: auto; font-size: 0.875rem; opacity: 0.8; }
+</style>
+
+<style>
+/* Light mode overrides (scoped :global doesn't beat Vue's data-v- hashes; see team preferences #12) */
+.light .publish-changes-list .publish-change-row:hover { background: rgba(0, 0, 0, 0.04); }
+.light .publish-warning { background: #fef2f2; color: #991b1b; }
+.light .publish-firstpublish { background: #eff6ff; color: #1e40af; }
+.light .publish-change-mark.added { color: #15803d; }
+.light .publish-change-mark.modified { color: #a16207; }
+.light .publish-result.success { background: #dcfce7; color: #15803d; }
+.light .publish-result.error { background: #fef2f2; color: #991b1b; }
 </style>

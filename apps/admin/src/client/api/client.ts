@@ -40,6 +40,15 @@ export interface FragmentDetail extends FragmentSummary {
   dir: string
 }
 
+export interface CompareResult {
+  added: string[]
+  modified: string[]
+  deleted: string[]
+  unchanged: string[]
+  firstPublish: boolean
+  invalidTemplates: { name: string; errors: string[] }[]
+}
+
 export const api = {
   getSite: () => request<SiteManifest>('/site'),
   getPages: () => request<PageSummary[]>('/pages'),
@@ -57,5 +66,6 @@ export const api = {
   getFields: () => request<FieldSummary[]>('/fields'),
   getTargets: () => request<string[]>('/targets'),
   publish: (items: string[], targets: string[]) => request<{ results: Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
+  compare: (target: string, options?: RequestInit) => request<CompareResult>(`/compare?target=${encodeURIComponent(target)}`, options),
   fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),
 }
