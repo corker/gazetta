@@ -8,5 +8,6 @@ admin-dist/
 .env
 .env.*
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 CLAUDE.local.md
 test-results/
