@@ -107,7 +107,7 @@ No draft state between them — saving is effectively "publishing to source."
 SERP preview in admin, structured data / JSON-LD, Open Graph social previews, canonical URLs.
 Payload has an official SEO plugin. Storyblok has an SEO App with AI-powered meta generation.
 
-**Gazetta today:** `metadata` field exists in page.yaml (title, description, og:image).
+**Gazetta today:** `metadata` field exists in page.json (title, description, og:image).
 No admin UI for editing it, no OG preview, no sitemap generation (issue #59 open),
 no structured data helpers.
 

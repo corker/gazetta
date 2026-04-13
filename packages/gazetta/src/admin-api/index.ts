@@ -6,7 +6,6 @@ import { authMiddleware } from './middleware/auth.js'
 import { siteRoutes } from './routes/site.js'
 import { pageRoutes } from './routes/pages.js'
 import { fragmentRoutes } from './routes/fragments.js'
-import { componentRoutes } from './routes/components.js'
 import { templateRoutes } from './routes/templates.js'
 import { previewRoutes } from './routes/preview.js'
 import { publishRoutes } from './routes/publish.js'
@@ -49,7 +48,6 @@ export function createAdminApp(
   app.route('/', siteRoutes(opts.siteDir, opts.storage))
   app.route('/', pageRoutes(opts.siteDir, opts.storage))
   app.route('/', fragmentRoutes(opts.siteDir, opts.storage))
-  app.route('/', componentRoutes(opts.siteDir, opts.storage))
   app.route('/', templateRoutes(opts.siteDir, opts.storage, templatesDir, adminDir, opts.production))
   app.route('/', previewRoutes(opts.siteDir, opts.storage, templatesDir))
   app.route('/', publishRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir))

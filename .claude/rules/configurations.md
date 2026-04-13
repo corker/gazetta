@@ -104,17 +104,14 @@ my-project/
       site.yaml                # Site manifest — name, targets
       fragments/               # Shared components (reusable across pages)
         header/
-          fragment.yaml
-          logo/
-          nav/
+          fragment.json        # all components inline
         footer/
+          fragment.json
       pages/                   # Routable components
         home/
-          page.yaml
-          hero/
-          features/
+          page.json            # all components inline
         about/
-          page.yaml
+          page.json
     another-site/              # Another site — same templates, different content
       site.yaml
       fragments/
@@ -131,7 +128,7 @@ my-project/
 | Fragment (content) | Site | Server (rendered) | Templates | `sites/x/fragments/` |
 | Page (content) | Site | Server (rendered) | Templates | `sites/x/pages/` |
 
-Templates are flat by default. Subfolders are opt-in for grouping (e.g. `buttons/primary`, `cards/product`). A template doesn't inherently know its usage — the same template can serve as a page, fragment, or component template. The type is decided by the content (page.yaml, fragment.yaml), not by the template.
+Templates are flat by default. Subfolders are opt-in for grouping (e.g. `buttons/primary`, `cards/product`). A template doesn't inherently know its usage — the same template can serve as a page, fragment, or component template. The type is decided by the content (page.json, fragment.json), not by the template.
 
 Templates, editors, and fields are shared across all sites in the project. Fragments and pages are per-site.
 

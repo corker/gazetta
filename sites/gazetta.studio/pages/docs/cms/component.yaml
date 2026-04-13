@@ -1,6 +1,0 @@
-template: section
-content:
-  heading: "CMS Editor"
-  subheading: "Edit content visually at /admin."
-components:
-  - content

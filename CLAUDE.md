@@ -30,7 +30,7 @@ npm run dev        # start dev server (examples/starter on localhost:3000)
 npm test           # run all tests
 ```
 
-**Note:** `@` in YAML component references must be quoted (`"@header"`) since `@` is reserved in YAML.
+**Note:** Page and fragment manifests use JSON (`page.json`, `fragment.json`). Site config stays YAML (`site.yaml`). Components are inline in the page manifest — no separate component files.
 
 ## Conventions
 

@@ -1,6 +1,0 @@
-template: section
-content:
-  heading: "Getting Started"
-  subheading: "Everything you need to build your first Gazetta site."
-components:
-  - steps

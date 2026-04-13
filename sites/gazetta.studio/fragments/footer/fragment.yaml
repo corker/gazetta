@@ -1,4 +1,0 @@
-template: site-footer
-components:
-  - links-product
-  - links-resources

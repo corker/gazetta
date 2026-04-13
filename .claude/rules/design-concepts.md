@@ -207,7 +207,7 @@ Fragments live in `fragments/` and are referenced with `@` in page manifests.
 They are reusable across any page. The `@` tells the runtime to resolve from `fragments/`.
 
 ```yaml
-# fragments/header/fragment.yaml
+# fragments/header/fragment.json
 template: header-layout
 components:
   - logo
@@ -217,11 +217,11 @@ components:
 
 ## Page = Component + Route + Metadata
 
-A page is a component with route and metadata. `page.yaml` extends the component manifest.
+A page is a component with route and metadata. `page.json` extends the component manifest.
 More page fields will be added as the design evolves.
 
 ```yaml
-# pages/home/page.yaml
+# pages/home/page.json
 route: /home
 metadata:
   title: "Home"
@@ -236,7 +236,7 @@ components:
 ```
 
 ```yaml
-# pages/blog/[slug]/page.yaml — dynamic route
+# pages/blog/[slug]/page.json — dynamic route
 route: /blog/:slug
 metadata:
   title: "Blog Post"
@@ -266,21 +266,21 @@ my-project/
       site.yaml
       fragments/      # shared components (reusable across pages)
         header/
-          fragment.yaml
+          fragment.json
           logo/
           nav/
         footer/
       pages/          # routable components
         home/
-          page.yaml
+          page.json
           hero/
           featured/
         about/
-          page.yaml
+          page.json
           bio/
         blog/
           [slug]/
-            page.yaml
+            page.json
             article/
 ```
 

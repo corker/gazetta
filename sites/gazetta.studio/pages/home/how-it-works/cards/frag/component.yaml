@@ -1,5 +1,0 @@
-template: feature-card
-content:
-  icon: "\U0001F517"
-  title: "Fragments"
-  description: "Shared components reusable across pages. Update a header fragment once — every page reflects it instantly. No rebuild needed."

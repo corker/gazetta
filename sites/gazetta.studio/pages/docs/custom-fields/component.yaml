@@ -1,6 +1,0 @@
-template: section
-content:
-  heading: "Custom Fields"
-  subheading: "Create reusable widgets for individual form fields."
-components:
-  - content

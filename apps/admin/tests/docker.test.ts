@@ -124,17 +124,17 @@ describe('Azure Blob publish (Azurite)', () => {
     const allItems = await resolveDependencies(source, starterDir, ['pages/home'])
     const { copiedFiles } = await publishItems(source, starterDir, blobProvider, '', allItems)
     expect(copiedFiles).toBeGreaterThan(10)
-    expect(await blobProvider.exists('pages/home/page.yaml')).toBe(true)
+    expect(await blobProvider.exists('pages/home/page.json')).toBe(true)
   })
 
   it('reads back published content', async () => {
-    const content = await blobProvider.readFile('pages/home/page.yaml')
+    const content = await blobProvider.readFile('pages/home/page.json')
     expect(content).toContain('template:')
   })
 
   it('lists published files', async () => {
     const entries = await blobProvider.readDir('pages/home')
-    expect(entries.map(e => e.name)).toContain('page.yaml')
+    expect(entries.map(e => e.name)).toContain('page.json')
   })
 })
 
@@ -329,7 +329,7 @@ describe('Filesystem publish', () => {
 
     const { copiedFiles } = await publishItems(source, starterDir, target, '', allItems)
     expect(copiedFiles).toBeGreaterThan(10)
-    expect(await target.exists('pages/home/page.yaml')).toBe(true)
+    expect(await target.exists('pages/home/page.json')).toBe(true)
   })
 
   it('publishes a fragment', async () => {

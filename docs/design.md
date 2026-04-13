@@ -57,7 +57,7 @@ A fragment is a component reusable across pages. Lives in `fragments/`.
 Referenced with `@` prefix in page manifests.
 
 ```yaml
-# fragments/header/fragment.yaml
+# fragments/header/fragment.json
 template: header-layout
 components:
   - logo
@@ -136,7 +136,7 @@ A page is a component extended with route and metadata. More page fields will be
 as the design evolves.
 
 ```yaml
-# pages/home/page.yaml
+# pages/home/page.json
 route: /home
 metadata:
   title: "Home"
@@ -206,21 +206,21 @@ my-project/
       site.yaml
       fragments/        # shared components (reusable across pages)
         header/
-          fragment.yaml
+          fragment.json
           logo/
           nav/
         footer/
       pages/            # routable components
         home/
-          page.yaml
+          page.json
           hero/
           featured/
         about/
-          page.yaml
+          page.json
           bio/
         blog/
           [slug]/
-            page.yaml
+            page.json
             article/
 ```
 

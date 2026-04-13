@@ -105,7 +105,7 @@ Creates:
         site.yaml          # name + filesystem staging target
         fragments/
         pages/
-          home/page.yaml
+          home/page.json
 ```
 
 ### `gazetta dev`
@@ -373,8 +373,8 @@ regardless of name. For multi-site, names are chosen by the developer.
 ```
 sites/main/
   pages/
-    404/page.yaml    # template: page-default, route: /404
-    home/page.yaml
+    404/page.json    # template: page-default, route: /404
+    home/page.json
 ```
 
 The runtime serves the 404 page for unmatched routes. If no 404 page exists, the runtime

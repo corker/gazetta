@@ -1,8 +1,0 @@
-template: section
-content:
-  heading: "Templates"
-  subheading: "Use any framework. The contract is the boundary."
-components:
-  - plain-ts
-  - react-example
-  - vue-example

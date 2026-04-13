@@ -1,6 +1,0 @@
-template: section
-content:
-  heading: "Publishing & Cache"
-  subheading: "Pre-render, deploy, and control caching."
-components:
-  - content

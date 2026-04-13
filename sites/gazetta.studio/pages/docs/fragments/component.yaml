@@ -1,6 +1,0 @@
-template: section
-content:
-  heading: "Fragments"
-  subheading: "Shared components that update everywhere at once."
-components:
-  - content

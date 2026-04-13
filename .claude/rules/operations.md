@@ -222,9 +222,9 @@ parameterized content. During `gazetta dev`, the slug is extracted from the URL.
 `blog/another-post/`). During `gazetta publish`, each instance directory is rendered
 separately — producing one HTML file per slug in storage.
 
-**Component list in page.yaml:** The `components` list is the source of truth for component
+**Component list in page.json:** The `components` list is the source of truth for component
 ordering. The admin UI's component tree shows this list. Content authors can reorder via
-drag-and-drop, add components via dialog, and remove components — all update `page.yaml`.
+drag-and-drop, add components via dialog, and remove components — all update `page.json`.
 
 **Fragment nesting:** Fragments can reference other fragments: `@header` can include `@logo`
 as a child component. The renderer resolves `@` references recursively. Circular references
@@ -244,9 +244,9 @@ re-renders ALL pages by default. Future: dependency graph for incremental static
 ```
 sites/my-site/
   pages/
-    home/page.yaml           # English (default)
-    fr/home/page.yaml        # French
-    de/home/page.yaml        # German
+    home/page.json           # English (default)
+    fr/home/page.json        # French
+    de/home/page.json        # German
 ```
 
 Each locale is a separate page with its own content and route. Templates are shared.
@@ -434,7 +434,7 @@ need targets. The admin UI's Publish button is disabled if no targets are config
 
 **No pages in site:** If all pages are deleted, `/` → 404, `/admin` → admin UI works (empty
 site tree, "New page" button available). Pages can be created from admin UI or by adding
-`page.yaml` files.
+`page.json` files.
 
 **Browser auto-open:** `gazetta dev` does NOT auto-open the browser. Future: `--open` flag.
 Root `package.json` scripts can add `--open`: `"dev": "gazetta dev --open"`.
@@ -547,7 +547,7 @@ its package. The consuming project installs the package and references templates
 package path:
 
 ```
-# In consuming project's page.yaml:
+# In consuming project's page.json:
 template: "@company/templates/hero"
 ```
 
@@ -570,7 +570,7 @@ my-site/
   templates/package.json          # gazetta, zod
   templates/page/index.ts         # one template
   sites/main/site.yaml            # name + one target
-  sites/main/pages/home/page.yaml # one page
+  sites/main/pages/home/page.json # one page
 ```
 
 No fragments, no custom editors, no custom fields. One template, one page.

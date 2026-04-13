@@ -54,20 +54,17 @@ site/
     header-layout/index.ts
   fragments/             # shared components
     header/
-      fragment.yaml      # template + children
-      logo/component.yaml
-      nav/component.yaml
+      fragment.json      # template + inline components
     footer/
-      fragment.yaml
+      fragment.json
   pages/                 # routable components
     home/
-      page.yaml          # route + template + children
-      hero/component.yaml
+      page.json          # route + template + inline components
     about/
-      page.yaml
+      page.json
     blog/
       [slug]/            # dynamic routes
-        page.yaml
+        page.json
 ```
 
 ### Templates
@@ -97,18 +94,19 @@ includes both plain TS templates and a React template (feature-card using `rende
 
 ### Manifests
 
-Pages and fragments use YAML manifests to define their template, content, and children:
+Pages and fragments use JSON manifests with inline components:
 
-```yaml
-# pages/home/page.yaml
-route: /
-template: page-default
-metadata:
-  title: "Home"
-components:
-  - "@header"       # shared fragment
-  - hero            # local component
-  - "@footer"       # shared fragment
+```json
+// pages/home/page.json
+{
+  "template": "page-default",
+  "metadata": { "title": "Home" },
+  "components": [
+    "@header",
+    { "name": "hero", "template": "hero", "content": { "title": "Welcome" } },
+    "@footer"
+  ]
+}
 ```
 
 ### Rendering

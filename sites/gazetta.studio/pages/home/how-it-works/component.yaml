@@ -1,7 +1,0 @@
-template: section
-content:
-  heading: "How it works"
-  subheading: "Three concepts. That's it."
-components:
-  - cards
-  - example

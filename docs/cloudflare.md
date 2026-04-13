@@ -169,7 +169,7 @@ Set `edge: 0` to disable edge caching entirely (no purge needed). Pages are stil
 Override target-level cache in a page manifest:
 
 ```yaml
-# pages/dashboard/page.yaml
+# pages/dashboard/page.json
 cache:
   browser: 0
   edge: 0

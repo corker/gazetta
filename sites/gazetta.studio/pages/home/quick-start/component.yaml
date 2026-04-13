@@ -1,6 +1,0 @@
-template: section
-content:
-  heading: "Quick start"
-  subheading: "From zero to a running site in 30 seconds."
-components:
-  - install-code

@@ -38,7 +38,7 @@ Storyblok/Contentful support nested components but only in a database, not as fi
 
 ## 4. Manifests for ordering (not convention)
 
-**Decision:** `page.yaml` and `fragment.yaml` define component order explicitly.
+**Decision:** `page.json` and `fragment.json` define component order explicitly.
 
 **Why:** Convention-based ordering (alphabetical, numbered prefixes) is fragile and hard to
 reorder without renaming files. A manifest is a single source of truth that a UI can edit.

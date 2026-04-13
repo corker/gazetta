@@ -91,7 +91,7 @@ cache:
 Per-page cache overrides work:
 
 ```yaml
-# pages/dashboard/page.yaml
+# pages/dashboard/page.json
 cache:
   browser: 0
   edge: 0       # never cache this page

@@ -118,28 +118,30 @@ ${children.map(c => c.css).join('\n')}`,
 
 ## Pages
 
-A page is a folder with a `page.yaml` manifest. The route is derived from the folder path — `pages/about/` becomes `/about`:
+A page is a folder with a `page.json` manifest. The route is derived from the folder path — `pages/about/` becomes `/about`:
 
-```yaml
-# pages/about/page.yaml
-template: page-layout
-content:
-  title: About
-  description: About our company
-components:
-  - "@header"       # shared fragment
-  - about-text      # local component
-  - "@footer"       # shared fragment
+```json
+{
+  "template": "page-layout",
+  "content": {
+    "title": "About",
+    "description": "About our company"
+  },
+  "components": [
+    "@header",
+    {
+      "name": "about-text",
+      "template": "text-block",
+      "content": {
+        "body": "<p>We build composable websites.</p>"
+      }
+    },
+    "@footer"
+  ]
+}
 ```
 
-Local components live in subfolders:
-
-```yaml
-# pages/about/about-text/component.yaml
-template: text-block
-content:
-  body: "<p>We build composable websites.</p>"
-```
+All components are inline in the page manifest — no separate files.
 
 Or create pages in the CMS — click **New page** in the admin UI.
 
@@ -148,7 +150,7 @@ Or create pages in the CMS — click **New page** in the admin UI.
 Use `[param]` in the folder name — it becomes `:param` in the route:
 
 ```yaml
-# pages/blog/[slug]/page.yaml → /blog/:slug
+# pages/blog/[slug]/page.json → /blog/:slug
 template: blog-post
 components:
   - article
@@ -167,16 +169,17 @@ const template: TemplateFunction<Content> = ({ content, params }) => ({
 
 Fragments are shared components reusable across pages. They live in `fragments/` and are referenced with `@`:
 
-```yaml
-# fragments/header/fragment.yaml
-template: nav
-content:
-  brand: My Site
-  links:
-    - label: Home
-      href: /
-    - label: About
-      href: /about
+```json
+{
+  "template": "nav",
+  "content": {
+    "brand": "My Site",
+    "links": [
+      { "label": "Home", "href": "/" },
+      { "label": "About", "href": "/about" }
+    ]
+  }
+}
 ```
 
 Reference in any page with `"@header"`. Update the fragment once — every page reflects it.
@@ -445,7 +448,7 @@ The publish mode is automatic based on the target config:
 Create a `pages/404/` page like any other page. It's automatically served with a 404 status when a route doesn't match. The URL stays as-is — no redirect.
 
 ```yaml
-# pages/404/page.yaml
+# pages/404/page.json
 template: page-default
 content:
   title: "Page Not Found"
@@ -471,7 +474,7 @@ cache:
 
 Per page (overrides target):
 ```yaml
-# pages/dashboard/page.yaml
+# pages/dashboard/page.json
 cache:
   browser: 0      # always fresh
 ```
@@ -500,15 +503,14 @@ my-project/
     main/                    # site content
       site.yaml              # site manifest + targets
       fragments/             # shared components
-        header/fragment.yaml
+        header/fragment.json
       pages/                 # routable pages
         home/
-          page.yaml
-          hero/component.yaml
+          page.json          # all components inline
         about/
-          page.yaml
+          page.json
         blog/
-          [slug]/page.yaml   # dynamic route
+          [slug]/page.json   # dynamic route
 ```
 
 Templates and admin customizations are at the project root, shared across all sites.
