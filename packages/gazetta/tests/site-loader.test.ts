@@ -116,7 +116,7 @@ describe('loadSite', () => {
     spy.mockRestore()
   })
 
-  it.todo('loads the real starter site — needs starter migration to JSON', async () => {
+  it('loads the real starter site', async () => {
     const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
     const site = await loadSite({ siteDir: resolve(projectRoot, 'sites/main'), storage, templatesDir: resolve(projectRoot, 'templates') })
     expect(site.manifest.name).toBe('Gazetta Starter')

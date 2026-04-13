@@ -1,9 +1,0 @@
-template: page-default
-content:
-  title: About
-  description: About Gazetta
-components:
-  - "@header"
-  - about-text
-  - testimonial
-  - "@footer"

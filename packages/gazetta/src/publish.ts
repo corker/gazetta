@@ -120,39 +120,47 @@ async function collectDependencies(
   if (visited.has(item)) return
   visited.add(item)
 
-  const manifestNames = ['page.yaml', 'fragment.yaml', 'component.yaml']
-  let manifestContent: string | null = null
+  const manifestNames = ['page.json', 'fragment.json']
+  let manifest: Record<string, unknown> | null = null
   const itemPath = join(siteBase, item)
 
   for (const name of manifestNames) {
     try {
-      manifestContent = await storage.readFile(join(itemPath, name))
+      manifest = JSON.parse(await storage.readFile(join(itemPath, name)))
       break
     } catch { continue }
   }
 
-  if (!manifestContent) return
+  if (!manifest) return
 
-  // Parse template reference
-  const templateMatch = manifestContent.match(/template:\s*(.+)/)
-  if (templateMatch) {
-    const templateName = templateMatch[1].trim()
-    allItems.add(`templates/${templateName}`)
+  if (typeof manifest.template === 'string') {
+    allItems.add(`templates/${manifest.template}`)
   }
 
-  // Parse component references
-  const componentsMatch = manifestContent.match(/components:\n((?:\s+-\s+.+\n?)+)/)
-  if (componentsMatch) {
-    const lines = componentsMatch[1].split('\n').map(l => l.trim()).filter(l => l.startsWith('-'))
-    for (const line of lines) {
-      const name = line.replace(/^-\s+/, '').replace(/^["']|["']$/g, '')
-      if (name.startsWith('@')) {
-        const fragName = name.slice(1)
-        allItems.add(`fragments/${fragName}`)
-        await collectDependencies(storage, siteBase, `fragments/${fragName}`, allItems, visited)
-      } else {
-        const childPath = `${item}/${name}`
-        await collectDependencies(storage, siteBase, childPath, allItems, visited)
+  if (Array.isArray(manifest.components)) {
+    await collectComponentDeps(manifest.components, storage, siteBase, allItems, visited)
+  }
+}
+
+async function collectComponentDeps(
+  components: unknown[],
+  storage: StorageProvider,
+  siteBase: string,
+  allItems: Set<string>,
+  visited: Set<string>
+): Promise<void> {
+  for (const entry of components) {
+    if (typeof entry === 'string' && entry.startsWith('@')) {
+      const fragName = entry.slice(1)
+      allItems.add(`fragments/${fragName}`)
+      await collectDependencies(storage, siteBase, `fragments/${fragName}`, allItems, visited)
+    } else if (typeof entry === 'object' && entry !== null) {
+      const comp = entry as Record<string, unknown>
+      if (typeof comp.template === 'string') {
+        allItems.add(`templates/${comp.template}`)
+      }
+      if (Array.isArray(comp.components)) {
+        await collectComponentDeps(comp.components, storage, siteBase, allItems, visited)
       }
     }
   }

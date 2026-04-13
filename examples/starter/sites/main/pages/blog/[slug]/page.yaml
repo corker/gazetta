@@ -1,7 +1,0 @@
-template: page-default
-content:
-  title: Blog Post
-components:
-  - "@header"
-  - article
-  - "@footer"

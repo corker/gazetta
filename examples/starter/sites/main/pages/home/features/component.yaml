@@ -1,7 +1,0 @@
-template: features-grid
-content:
-  heading: "Why Gazetta?"
-components:
-  - fast
-  - composable
-  - open-source

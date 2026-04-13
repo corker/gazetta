@@ -27,23 +27,21 @@ afterEach(async () => {
 
 describe('publishItems', () => {
   it('copies a single page directory', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', 'route: /\ntemplate: default')
-    await writeTestFile(sourceDir, 'pages/home/hero/component.yaml', 'template: hero')
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'default' }))
     await writeTestFile(sourceDir, 'site.yaml', 'name: Test')
 
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
     const { copiedFiles } = await publishItems(source, '', target, '', ['pages/home'])
-    expect(copiedFiles).toBeGreaterThanOrEqual(3) // page.yaml + component.yaml + site.yaml
-    expect(await target.exists('pages/home/page.yaml')).toBe(true)
-    expect(await target.exists('pages/home/hero/component.yaml')).toBe(true)
+    expect(copiedFiles).toBeGreaterThanOrEqual(2) // page.json + site.yaml
+    expect(await target.exists('pages/home/page.json')).toBe(true)
     expect(await target.exists('site.yaml')).toBe(true)
   })
 
   it('copies multiple items', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', 'route: /')
-    await writeTestFile(sourceDir, 'fragments/header/fragment.yaml', 'template: header')
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'default' }))
+    await writeTestFile(sourceDir, 'fragments/header/fragment.json', JSON.stringify({ template: 'header' }))
     await writeTestFile(sourceDir, 'site.yaml', 'name: Test')
 
     const source = createFilesystemProvider(sourceDir)
@@ -51,45 +49,43 @@ describe('publishItems', () => {
 
     const { copiedFiles } = await publishItems(source, '', target, '', ['pages/home', 'fragments/header'])
     expect(copiedFiles).toBeGreaterThanOrEqual(3)
-    expect(await target.exists('pages/home/page.yaml')).toBe(true)
-    expect(await target.exists('fragments/header/fragment.yaml')).toBe(true)
+    expect(await target.exists('pages/home/page.json')).toBe(true)
+    expect(await target.exists('fragments/header/fragment.json')).toBe(true)
   })
 
   it('copies nested directory structure', async () => {
-    await writeTestFile(sourceDir, 'pages/blog/[slug]/page.yaml', 'route: /blog/:slug')
-    await writeTestFile(sourceDir, 'pages/blog/[slug]/article/component.yaml', 'template: article')
+    await writeTestFile(sourceDir, 'pages/blog/[slug]/page.json', JSON.stringify({ template: 'article' }))
     await writeTestFile(sourceDir, 'site.yaml', 'name: Test')
 
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
     const { copiedFiles } = await publishItems(source, '', target, '', ['pages/blog/[slug]'])
-    expect(copiedFiles).toBeGreaterThanOrEqual(3)
-    expect(await target.exists('pages/blog/[slug]/page.yaml')).toBe(true)
-    expect(await target.exists('pages/blog/[slug]/article/component.yaml')).toBe(true)
+    expect(copiedFiles).toBeGreaterThanOrEqual(2)
+    expect(await target.exists('pages/blog/[slug]/page.json')).toBe(true)
   })
 
   it('preserves file content', async () => {
-    const content = 'route: /\ntemplate: page-default\nmetadata:\n  title: Home'
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', content)
+    const content = JSON.stringify({ template: 'page-default', content: { title: 'Home' } })
+    await writeTestFile(sourceDir, 'pages/home/page.json', content)
     await writeTestFile(sourceDir, 'site.yaml', 'name: Test')
 
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
     await publishItems(source, '', target, '', ['pages/home'])
-    const copied = await target.readFile('pages/home/page.yaml')
+    const copied = await target.readFile('pages/home/page.json')
     expect(copied).toBe(content)
   })
 
   it('handles missing site.yaml gracefully', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', 'route: /')
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'default' }))
 
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
     const { copiedFiles } = await publishItems(source, '', target, '', ['pages/home'])
-    expect(copiedFiles).toBe(1) // only page.yaml, no site.yaml
+    expect(copiedFiles).toBe(1) // only page.json, no site.yaml
   })
 
   it('returns 0 for nonexistent items', async () => {
@@ -105,7 +101,7 @@ describe('publishItems', () => {
 
 describe('resolveDependencies', () => {
   it('includes the item itself', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', 'route: /\ntemplate: default')
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'default' }))
 
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(storage, '', ['pages/home'])
@@ -113,7 +109,7 @@ describe('resolveDependencies', () => {
   })
 
   it('resolves template dependency', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', 'route: /\ntemplate: page-default')
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'page-default' }))
 
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(storage, '', ['pages/home'])
@@ -121,18 +117,29 @@ describe('resolveDependencies', () => {
   })
 
   it('resolves fragment dependencies', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', 'route: /\ntemplate: default\ncomponents:\n  - "@header"\n  - hero')
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({
+      template: 'default',
+      components: ['@header', { name: 'hero', template: 'hero' }],
+    }))
 
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(storage, '', ['pages/home'])
     expect(deps).toContain('fragments/header')
+    expect(deps).toContain('templates/hero')
   })
 
   it('resolves nested fragment dependencies', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', 'route: /\ntemplate: default\ncomponents:\n  - "@header"')
-    await writeTestFile(sourceDir, 'fragments/header/fragment.yaml', 'template: header-layout\ncomponents:\n  - logo\n  - nav')
-    await writeTestFile(sourceDir, 'fragments/header/logo/component.yaml', 'template: logo')
-    await writeTestFile(sourceDir, 'fragments/header/nav/component.yaml', 'template: nav')
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({
+      template: 'default',
+      components: ['@header'],
+    }))
+    await writeTestFile(sourceDir, 'fragments/header/fragment.json', JSON.stringify({
+      template: 'header-layout',
+      components: [
+        { name: 'logo', template: 'logo' },
+        { name: 'nav', template: 'nav' },
+      ],
+    }))
 
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(storage, '', ['pages/home'])
@@ -143,8 +150,8 @@ describe('resolveDependencies', () => {
   })
 
   it('deduplicates dependencies', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.yaml', 'route: /\ntemplate: default\ncomponents:\n  - "@header"\n  - "@footer"')
-    await writeTestFile(sourceDir, 'pages/about/page.yaml', 'route: /about\ntemplate: default\ncomponents:\n  - "@header"\n  - "@footer"')
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'default', components: ['@header', '@footer'] }))
+    await writeTestFile(sourceDir, 'pages/about/page.json', JSON.stringify({ template: 'default', components: ['@header', '@footer'] }))
 
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(storage, '', ['pages/home', 'pages/about'])

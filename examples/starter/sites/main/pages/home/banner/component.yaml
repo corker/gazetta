@@ -1,7 +1,0 @@
-template: banner
-content:
-  heading: Get Started Today
-  text: Build beautiful sites with composable fragments
-  buttonText: Learn More
-  buttonUrl: /about
-  background: "#667eea"

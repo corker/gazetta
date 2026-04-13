@@ -1,9 +1,0 @@
-template: nav
-content:
-  links:
-    - label: "Home"
-      href: "/"
-    - label: "About"
-      href: "/about"
-    - label: "Blog"
-      href: "/blog/hello-world"

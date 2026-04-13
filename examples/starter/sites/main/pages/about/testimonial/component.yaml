@@ -1,5 +1,0 @@
-template: quote-card
-content:
-  quote: Gazetta lets us update shared components once and every page reflects it instantly. No more rebuilding the entire site.
-  author: Site Developer
-  role: Vue SSR template example

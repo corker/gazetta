@@ -1,4 +1,0 @@
-template: header-layout
-components:
-  - logo
-  - nav

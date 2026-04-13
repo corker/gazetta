@@ -1,0 +1,33 @@
+{
+  "template": "header-layout",
+  "components": [
+    {
+      "name": "logo",
+      "template": "logo",
+      "content": {
+        "text": "Gazetta",
+        "href": "/"
+      }
+    },
+    {
+      "name": "nav",
+      "template": "nav",
+      "content": {
+        "links": [
+          {
+            "label": "Home",
+            "href": "/"
+          },
+          {
+            "label": "About",
+            "href": "/about"
+          },
+          {
+            "label": "Blog",
+            "href": "/blog/hello-world"
+          }
+        ]
+      }
+    }
+  ]
+}

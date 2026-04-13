@@ -1,0 +1,82 @@
+{
+  "template": "page-default",
+  "content": {
+    "title": "Home",
+    "description": "Welcome to Gazetta"
+  },
+  "components": [
+    "@header",
+    {
+      "name": "hero",
+      "template": "hero",
+      "content": {
+        "title": "Welcome to Gazetta",
+        "subtitle": "A stateless CMS that composes pages from reusable components"
+      }
+    },
+    {
+      "name": "features",
+      "template": "features-grid",
+      "content": {
+        "heading": "Why Gazetta?"
+      },
+      "components": [
+        {
+          "name": "fast",
+          "template": "feature-card",
+          "content": {
+            "icon": "⚡",
+            "title": "Fast",
+            "description": "Edge composition at request time. No full rebuilds."
+          }
+        },
+        {
+          "name": "composable",
+          "template": "feature-card",
+          "content": {
+            "icon": "🧩",
+            "title": "Composable",
+            "description": "Build pages from reusable fragments. Recursive composition."
+          }
+        },
+        {
+          "name": "open-source",
+          "template": "feature-card",
+          "content": {
+            "icon": "🔓",
+            "title": "Open Source",
+            "description": "No vendor lock-in. Use any framework for templates."
+          }
+        }
+      ]
+    },
+    {
+      "name": "demo",
+      "template": "counter",
+      "content": {
+        "label": "Clicks",
+        "start": 0
+      }
+    },
+    {
+      "name": "vue-demo",
+      "template": "vue-test",
+      "content": {
+        "heading": "Vue SSR Works",
+        "body": "This component is rendered with Vue 3 SSR"
+      }
+    },
+    {
+      "name": "banner",
+      "template": "banner",
+      "content": {
+        "heading": "Get Started Today",
+        "text": "Build beautiful sites with composable fragments",
+        "buttonText": "Learn More",
+        "buttonUrl": "/about",
+        "background": "#667eea"
+      }
+    },
+    "@footer"
+  ]
+}
