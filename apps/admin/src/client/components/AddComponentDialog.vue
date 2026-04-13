@@ -39,7 +39,7 @@ async function handleCreate() {
     <div class="add-content">
       <div class="add-field">
         <label>Name</label>
-        <InputText v-model="componentName" placeholder="e.g. hero, sidebar, cta" class="add-input" />
+        <InputText v-model="componentName" placeholder="e.g. hero, sidebar, cta" class="add-input" data-testid="add-component-name" />
       </div>
 
       <div class="add-field">
@@ -52,9 +52,9 @@ async function handleCreate() {
     </div>
 
     <template #footer>
-      <Button label="Cancel" severity="secondary" text @click="emit('close')" />
+      <Button label="Cancel" severity="secondary" text @click="emit('close')" data-testid="add-component-cancel" />
       <Button label="Add" icon="pi pi-plus" :loading="creating"
-        :disabled="!selectedTemplate || !componentName.trim()" @click="handleCreate" />
+        :disabled="!selectedTemplate || !componentName.trim()" @click="handleCreate" data-testid="add-component-submit" />
     </template>
   </Dialog>
 </template>

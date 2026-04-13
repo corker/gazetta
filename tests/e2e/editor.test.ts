@@ -412,3 +412,75 @@ test.describe('Dev playground', () => {
     await expect(page.locator('[data-testid="back-to-editor"]')).toBeVisible()
   })
 })
+
+test.describe('Component operations', () => {
+  test('add inline component via dialog', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Count components before adding
+    const beforeCount = await page.locator('[data-testid^="component-"]').count()
+
+    // Open add dialog
+    await page.click('[data-testid="add-component"]')
+    await page.locator('[data-testid="add-component-name"]').waitFor({ timeout: 5000 })
+
+    // Fill name
+    await page.locator('[data-testid="add-component-name"]').fill('test-widget')
+
+    // Select a template from the listbox
+    await page.locator('.p-listbox-option', { hasText: 'text-block' }).click()
+
+    // Click Add
+    await page.click('[data-testid="add-component-submit"]')
+
+    // Component should appear in tree
+    await expect(page.locator('[data-testid="component-test-widget"]')).toBeVisible({ timeout: 10000 })
+
+    // Count should increase
+    const afterCount = await page.locator('[data-testid^="component-"]').count()
+    expect(afterCount).toBe(beforeCount + 1)
+  })
+
+  test('remove the added component', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Verify test-widget exists from previous test
+    const widget = page.locator('[data-testid="component-test-widget"]')
+    await expect(widget).toBeVisible({ timeout: 10000 })
+
+    const beforeCount = await page.locator('[data-testid^="component-"]').count()
+
+    // Hover to reveal actions, click remove
+    await widget.hover()
+    await page.click('[data-testid="remove-test-widget"]')
+
+    // Component should be gone
+    await expect(widget).not.toBeVisible({ timeout: 10000 })
+    const afterCount = await page.locator('[data-testid^="component-"]').count()
+    expect(afterCount).toBe(beforeCount - 1)
+  })
+
+  test('move component changes order', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // hero should be above features in the tree
+    const heroBefore = await page.locator('[data-testid="component-hero"]').boundingBox()
+    const featuresBefore = await page.locator('[data-testid="component-features"]').boundingBox()
+    expect(heroBefore!.y).toBeLessThan(featuresBefore!.y)
+
+    // Move features up — it should swap with hero
+    await page.locator('[data-testid="component-features"]').hover()
+    await page.click('[data-testid="move-up-features"]')
+
+    // Wait for tree to re-render with new order (features above hero)
+    await expect(async () => {
+      const heroAfter = await page.locator('[data-testid="component-hero"]').boundingBox()
+      const featuresAfter = await page.locator('[data-testid="component-features"]').boundingBox()
+      expect(featuresAfter!.y).toBeLessThan(heroAfter!.y)
+    }).toPass({ timeout: 10000 })
+
+    // Move features back down to restore original order
+    await page.locator('[data-testid="component-features"]').hover()
+    await page.click('[data-testid="move-down-features"]')
+  })
+})
