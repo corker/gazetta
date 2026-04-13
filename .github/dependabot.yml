@@ -5,12 +5,17 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # Bundle safe updates (patch + minor) into one PR per group. Majors get
+      # their own PR each so they can be reviewed/upgraded individually —
+      # bundling 5+ major bumps (#118) produced an unmergeable mess.
       production:
         patterns: ["*"]
         exclude-patterns: ["@types/*"]
+        update-types: ["patch", "minor"]
       types:
         patterns: ["@types/*"]
-    open-pull-requests-limit: 5
+        update-types: ["patch", "minor"]
+    open-pull-requests-limit: 10
 
   - package-ecosystem: github-actions
     directory: /
