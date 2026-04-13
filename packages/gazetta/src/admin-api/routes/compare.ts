@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import type { StorageProvider, TargetConfig } from '../../types.js'
+import { getPublishMode } from '../../types.js'
 import { compareTargets } from '../../compare.js'
 
 export function compareRoutes(
@@ -43,6 +44,9 @@ export function compareRoutes(
     // Walk up from siteDir to find the project root (parent of "sites/")
     const projectRoot = siteDir.replace(/[\\/]sites[\\/][^\\/]+$/, '')
 
+    const targetConfig = targetConfigs?.[targetName]
+    const publishMode = targetConfig ? getPublishMode(targetConfig) : 'esi'
+
     try {
       const result = await compareTargets({
         source: sourceStorage,
@@ -50,6 +54,7 @@ export function compareRoutes(
         siteDir,
         templatesDir: tdir,
         projectRoot,
+        publishMode,
       })
       return c.json(result)
     } catch (err) {

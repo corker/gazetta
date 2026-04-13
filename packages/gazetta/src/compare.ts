@@ -24,6 +24,13 @@ export interface CompareOptions {
   siteDir: string
   templatesDir: string
   projectRoot: string
+  /**
+   * Target's publish mode. In static mode fragments are baked into pages, so
+   * they're not published as separate items — omit them from compare to avoid
+   * listing @header / @footer as "added" when they can't actually be published.
+   * Defaults to 'esi' (include fragments).
+   */
+  publishMode?: 'static' | 'esi'
 }
 
 /**
@@ -49,14 +56,21 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   for (const [name, page] of site.pages) {
     local.set(`pages/${name}`, hashManifest(page, { templateHashes }))
   }
-  for (const [name, frag] of site.fragments) {
-    local.set(`fragments/${name}`, hashManifest(frag, { templateHashes }))
+  // Static-mode targets bake fragments into pages — no fragment sidecars exist
+  // on the target, and publishing @header/@footer is a no-op server-side. Omit
+  // them from local so they don't appear as perpetually "added".
+  if (opts.publishMode !== 'static') {
+    for (const [name, frag] of site.fragments) {
+      local.set(`fragments/${name}`, hashManifest(frag, { templateHashes }))
+    }
   }
 
   // 3. List target sidecars
   const target = new Map<string, string>()
   await collectSidecars(opts.target, 'pages', target)
-  await collectSidecars(opts.target, 'fragments', target)
+  if (opts.publishMode !== 'static') {
+    await collectSidecars(opts.target, 'fragments', target)
+  }
 
   // 4. Diff
   const result: CompareResult = {

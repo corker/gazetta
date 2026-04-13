@@ -124,4 +124,18 @@ describe('compareTargets', () => {
     // Compare still completes and lists items
     expect(r.added.length + r.modified.length + r.unchanged.length).toBeGreaterThan(0)
   })
+
+  it('omits fragments when target is static (#119)', async () => {
+    // Default (esi): fragments included
+    const r1 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    expect(r1.added.some(x => x.startsWith('fragments/'))).toBe(true)
+
+    // Static mode: fragments excluded from local + target walks
+    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, publishMode: 'static' })
+    expect(r2.added.some(x => x.startsWith('fragments/'))).toBe(false)
+    expect(r2.modified.some(x => x.startsWith('fragments/'))).toBe(false)
+    expect(r2.unchanged.some(x => x.startsWith('fragments/'))).toBe(false)
+    // Pages still compared normally
+    expect(r2.added).toContain('pages/home')
+  })
 })
