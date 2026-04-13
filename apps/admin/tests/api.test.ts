@@ -5,19 +5,20 @@ import type { Hono } from 'hono'
 import { createFilesystemProvider } from 'gazetta'
 import { createAdminApp } from '../src/server/index.js'
 
-const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+const starterDir = resolve(import.meta.dirname, '../../../examples/starter/sites/main')
+const templatesDir = resolve(import.meta.dirname, '../../../examples/starter/templates')
 const storage = createFilesystemProvider()
 let app: Hono
 
 beforeAll(() => {
-  app = createAdminApp(starterDir, storage)
+  app = createAdminApp({ siteDir: starterDir, storage, templatesDir })
 })
 
 afterAll(async () => {
   const dirs = [
     'pages/.test-put-page', 'pages/.test-put-comp', 'pages/.test-page',
-    'pages/.test-nested', 'pages/.test-comp-parent',
-    'fragments/.test-put-frag', 'fragments/.test-frag',
+    'pages/.test-nested', 'pages/.test-comp-parent', 'pages/.test-to-delete',
+    'fragments/.test-put-frag', 'fragments/.test-frag', 'fragments/.test-to-delete',
   ]
   await Promise.all(dirs.map(d => rm(resolve(starterDir, d), { recursive: true, force: true })))
 })
@@ -65,9 +66,11 @@ describe('GET /api/pages/:name', () => {
     const { status, body } = await get('/api/pages/home')
     expect(status).toBe(200)
     expect(body.route).toBe('/')
-    expect(body.components).toContain('@header')
-    expect(body.components).toContain('hero')
-    expect(body.components).toContain('@footer')
+    // Merged JSON format — components are a mix of strings (fragment refs) and inline component objects
+    expect(body.components).toContainEqual('@header')
+    expect(body.components).toContainEqual('@footer')
+    const names = body.components.filter((c: unknown) => typeof c === 'object').map((c: { name: string }) => c.name)
+    expect(names).toContain('hero')
   })
 
   it('returns nested page', async () => {
@@ -98,8 +101,9 @@ describe('GET /api/fragments/:name', () => {
     const { status, body } = await get('/api/fragments/header')
     expect(status).toBe(200)
     expect(body.template).toBe('header-layout')
-    expect(body.components).toContain('logo')
-    expect(body.components).toContain('nav')
+    const names = body.components.filter((c: unknown) => typeof c === 'object').map((c: { name: string }) => c.name)
+    expect(names).toContain('logo')
+    expect(names).toContain('nav')
   })
 
   it('returns 404 for missing fragment', async () => {
@@ -134,26 +138,6 @@ describe('GET /api/templates/:name/schema', () => {
   })
 })
 
-describe('GET /api/components', () => {
-  it('returns component manifest', async () => {
-    const path = resolve(starterDir, 'pages/home/hero')
-    const { status, body } = await get(`/api/components?path=${encodeURIComponent(path)}`)
-    expect(status).toBe(200)
-    expect(body.template).toBe('hero')
-    expect(body.content.title).toBe('Welcome to Gazetta')
-  })
-
-  it('returns 400 without path param', async () => {
-    const { status } = await get('/api/components')
-    expect(status).toBe(400)
-  })
-
-  it('returns 404 for missing component', async () => {
-    const { status } = await get('/api/components?path=/nonexistent/path')
-    expect(status).toBe(404)
-  })
-})
-
 describe('GET /preview/*', () => {
   it('renders home page', async () => {
     const { status, body } = await getText('/preview/')
@@ -183,12 +167,12 @@ describe('GET /preview/*', () => {
 
 describe('POST /preview/*', () => {
   it('renders with content overrides', async () => {
-    const heroPath = resolve(starterDir, 'pages/home/hero')
+    // After #112 merged-JSON migration, overrides use name paths, not filesystem paths
     const res = await app.request('/preview/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        overrides: { [heroPath]: { title: 'Draft Title', subtitle: 'Draft Subtitle' } },
+        overrides: { 'hero': { title: 'Draft Title', subtitle: 'Draft Subtitle' } },
       }),
     })
     expect(res.status).toBe(200)
@@ -263,43 +247,6 @@ describe('PUT /api/fragments/:name', () => {
 
   it('returns 404 for missing fragment', async () => {
     const res = await app.request('/api/fragments/nonexistent', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: {} }),
-    })
-    expect(res.status).toBe(404)
-  })
-})
-
-describe('PUT /api/components', () => {
-  beforeAll(async () => {
-    await app.request('/api/pages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '.test-put-comp', route: '/.test-put-comp', template: 'page-default' }),
-    })
-    await app.request('/api/components', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parentDir: resolve(starterDir, 'pages/.test-put-comp'), name: 'my-comp', template: 'hero' }),
-    })
-  })
-
-  it('updates component content', async () => {
-    const path = resolve(starterDir, 'pages/.test-put-comp/my-comp')
-    const res = await app.request(`/api/components?path=${encodeURIComponent(path)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: { title: 'Updated Hero' } }),
-    })
-    expect(res.status).toBe(200)
-
-    const { body } = await get(`/api/components?path=${encodeURIComponent(path)}`)
-    expect(body.content.title).toBe('Updated Hero')
-  })
-
-  it('returns 404 for missing component', async () => {
-    const res = await app.request(`/api/components?path=${encodeURIComponent('/nonexistent')}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: {} }),
@@ -430,48 +377,5 @@ describe('DELETE /api/fragments/:name', () => {
   })
 })
 
-describe('POST /api/components (create)', () => {
-  const parentDir = resolve(starterDir, 'pages/.test-comp-parent')
-
-  beforeAll(async () => {
-    await app.request('/api/pages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '.test-comp-parent', route: '/.test-comp-parent', template: 'page-default' }),
-    })
-  })
-
-  it('creates a new component', async () => {
-    const res = await app.request('/api/components', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parentDir, name: 'test-comp', template: 'hero' }),
-    })
-    expect(res.status).toBe(200)
-    const body = await res.json() as { ok: boolean; path: string }
-    expect(body.ok).toBe(true)
-
-    // Verify it exists
-    const comp = await get(`/api/components?path=${encodeURIComponent(body.path)}`)
-    expect(comp.status).toBe(200)
-    expect(comp.body.template).toBe('hero')
-  })
-
-  it('rejects duplicate component', async () => {
-    const res = await app.request('/api/components', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parentDir, name: 'test-comp', template: 'hero' }),
-    })
-    expect(res.status).toBe(409)
-  })
-
-  it('rejects missing fields', async () => {
-    const res = await app.request('/api/components', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'x' }),
-    })
-    expect(res.status).toBe(400)
-  })
-})
+// /api/components routes were removed in #112 (merged JSON format).
+// Component create/update now happens via PUT /api/pages/:name with updated components array.
