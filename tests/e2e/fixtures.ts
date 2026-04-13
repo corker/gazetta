@@ -1,4 +1,4 @@
-import { test as base } from '@playwright/test'
+import { test as base, type Page } from '@playwright/test'
 import { cp, mkdir, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
@@ -22,7 +22,19 @@ interface TestSite {
  * Override playwright's `baseURL` so `page.goto('/admin')` hits the worker's
  * server automatically.
  */
-export const test = base.extend<object, { testSite: TestSite; baseURL: string }>({
+export const test = base.extend<{ page: Page }, { testSite: TestSite; baseURL: string }>({
+  // Attach browser console + page errors to the test's annotations on failure.
+  // Helps diagnose flakes like #122 that only repro in CI.
+  page: async ({ page }, use, testInfo) => {
+    const logs: string[] = []
+    page.on('console', msg => logs.push(`[${msg.type()}] ${msg.text()}`))
+    page.on('pageerror', err => logs.push(`[pageerror] ${err.message}`))
+    await use(page)
+    if (testInfo.status !== testInfo.expectedStatus && logs.length) {
+      await testInfo.attach('browser-console.log', { body: logs.join('\n'), contentType: 'text/plain' })
+    }
+  },
+
   testSite: [async ({}, use, workerInfo) => {
     const workerDir = resolve(repoRoot, '.tmp', `e2e-${workerInfo.workerIndex}`)
     const projectDir = resolve(workerDir, 'project')
