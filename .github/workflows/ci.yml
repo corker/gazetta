@@ -47,7 +47,35 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  # Pack once on linux — tarball is platform-independent.
+  pack:
+    runs-on: ubuntu-latest
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w packages/gazetta
+      - run: npm run build:admin -w packages/gazetta
+      - id: pack
+        working-directory: packages/gazetta
+        run: |
+          tarball=$(npm pack --silent | tail -1)
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gazetta-tarball
+          path: packages/gazetta/${{ steps.pack.outputs.tarball }}
+          retention-days: 1
+
+  # Consume the packed tarball on each OS. The pack/install/dev path is what
+  # end users experience — this is where platform-specific issues surface.
   smoke:
+    needs: pack
     strategy:
       fail-fast: false
       matrix:
@@ -60,6 +88,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Smoke test (pack → init → dev → curl)
-        run: npm run smoke
+      - uses: actions/download-artifact@v4
+        with:
+          name: gazetta-tarball
+          path: packages/gazetta/
+      - name: Smoke test (init → dev → curl)
         shell: bash
+        run: |
+          # Find the downloaded tarball
+          TARBALL="$(ls packages/gazetta/gazetta-*.tgz | head -1)"
+          GAZETTA_TARBALL="$(pwd)/$TARBALL" npm run smoke
