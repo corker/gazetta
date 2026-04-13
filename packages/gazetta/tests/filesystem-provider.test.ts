@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { rm, mkdir } from 'node:fs/promises'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
+import { tempDir } from './_helpers/temp.js'
 
-const testDir = join(tmpdir(), 'gazetta-fs-test-' + Date.now())
+const testDir = tempDir('fs-test-' + Date.now())
 
 afterEach(async () => {
   await rm(testDir, { recursive: true, force: true })

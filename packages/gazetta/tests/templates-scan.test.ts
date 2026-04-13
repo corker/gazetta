@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { scanTemplate, scanTemplates, templateHashesFrom } from '../src/templates-scan.js'
+import { tempDir } from './_helpers/temp.js'
 
-const root = join(tmpdir(), 'gazetta-scan-test-' + Date.now())
+const root = tempDir('scan-test-' + Date.now())
 const templatesDir = join(root, 'templates')
 
 // Tests use a fake "schema" object instead of importing zod, so they can run
@@ -15,11 +15,12 @@ export const schema = { type: 'object', properties: { title: { type: 'string' } 
 export default ({ content }) => ({ html: '<h1>' + content.title + '</h1>', css: '', js: '' })
 `
 
-const SHARED = `export function shout(s) { return s.toUpperCase() }`
+const SHARED = `export function shout(s: string) { return s.toUpperCase() }`
+// Import without extension so jiti/TS resolver works against .ts file
 const USES_SHARED = `
-import { shout } from '../_shared/util.js'
+import { shout } from '../_shared/util'
 export const schema = { type: 'object' }
-export default ({ content }) => ({ html: shout(content.title), css: '', js: '' })
+export default ({ content }: { content: { title: string } }) => ({ html: shout(content.title), css: '', js: '' })
 `
 
 const NO_DEFAULT = `
@@ -33,22 +34,25 @@ export default () => ({ html: '', css: '', js: '' })
 const SYNTAX_ERROR = `this is not valid js!!!`
 
 beforeAll(async () => {
+  // Use .ts files so jiti always transforms them and populates its import cache.
+  // (Plain .js files get resolved by Node's native ESM loader when the test root
+  // is inside the repo, bypassing jiti's transformer entirely.)
   await mkdir(join(templatesDir, 'good'), { recursive: true })
-  await writeFile(join(templatesDir, 'good/index.js'), VALID)
+  await writeFile(join(templatesDir, 'good/index.ts'), VALID)
 
   await mkdir(join(templatesDir, '_shared'), { recursive: true })
-  await writeFile(join(templatesDir, '_shared/util.js'), SHARED)
+  await writeFile(join(templatesDir, '_shared/util.ts'), SHARED)
   await mkdir(join(templatesDir, 'uses-shared'), { recursive: true })
-  await writeFile(join(templatesDir, 'uses-shared/index.js'), USES_SHARED)
+  await writeFile(join(templatesDir, 'uses-shared/index.ts'), USES_SHARED)
 
   await mkdir(join(templatesDir, 'no-default'), { recursive: true })
-  await writeFile(join(templatesDir, 'no-default/index.js'), NO_DEFAULT)
+  await writeFile(join(templatesDir, 'no-default/index.ts'), NO_DEFAULT)
 
   await mkdir(join(templatesDir, 'no-schema'), { recursive: true })
-  await writeFile(join(templatesDir, 'no-schema/index.js'), NO_SCHEMA)
+  await writeFile(join(templatesDir, 'no-schema/index.ts'), NO_SCHEMA)
 
   await mkdir(join(templatesDir, 'broken'), { recursive: true })
-  await writeFile(join(templatesDir, 'broken/index.js'), SYNTAX_ERROR)
+  await writeFile(join(templatesDir, 'broken/index.ts'), SYNTAX_ERROR)
 })
 
 afterAll(async () => {
@@ -115,10 +119,10 @@ describe('scanTemplate (single)', () => {
     const r1 = await scanTemplate(templatesDir, root, 'uses-shared')
     expect(r1.valid).toBe(true)
     expect(r1.files.length).toBeGreaterThanOrEqual(2)
-    expect(r1.files.some(f => f.includes('_shared/util.js'))).toBe(true)
+    expect(r1.files.some(f => f.includes('_shared/util'))).toBe(true)
 
-    // Modify _shared/util.js → hash should change
-    await writeFile(join(templatesDir, '_shared/util.js'), 'export function shout(s) { return s + "!" }')
+    // Modify _shared/util.ts → hash should change
+    await writeFile(join(templatesDir, '_shared/util.ts'), 'export function shout(s: string) { return s + "!" }')
     const r2 = await scanTemplate(templatesDir, root, 'uses-shared')
     expect(r2.hash).not.toBe(r1.hash)
   })

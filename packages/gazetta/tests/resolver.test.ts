@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { writeFile, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { resolveFragment, resolvePage } from '../src/resolver.js'
 import { loadSite } from '../src/site-loader.js'
+import { tempDir } from './_helpers/temp.js'
 
-const testDir = join(tmpdir(), 'gazetta-resolver-test')
+const testDir = tempDir('resolver-test')
 const storage = createFilesystemProvider()
 
 async function writeSite(files: Record<string, string>) {

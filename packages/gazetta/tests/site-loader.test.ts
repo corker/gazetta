@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { writeFile, mkdir, rm } from 'node:fs/promises'
-import { resolve } from 'node:path'
 import { deriveRoute } from '../src/site-loader.js'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { loadSite } from '../src/site-loader.js'
+import { tempDir } from './_helpers/temp.js'
 
-const testDir = join(tmpdir(), 'gazetta-siteloader-test-' + Date.now())
+const testDir = tempDir('siteloader-test-' + Date.now())
 const storage = createFilesystemProvider()
 
 async function writeTestFile(path: string, content: string) {

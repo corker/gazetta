@@ -1,15 +1,15 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { writeFile, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import {
   parseSiteManifest,
   parsePageManifest,
   parseFragmentManifest,
 } from '../src/manifest.js'
+import { tempDir } from './_helpers/temp.js'
 
-const testDir = join(tmpdir(), 'gazetta-manifest-test')
+const testDir = tempDir('manifest-test')
 const storage = createFilesystemProvider()
 
 async function writeTestFile(filename: string, content: string): Promise<string> {

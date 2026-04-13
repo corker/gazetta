@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { format } from '../src/formats.js'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
+import { tempDir } from './_helpers/temp.js'
 
 describe('format.field()', () => {
   it('returns meta object with field name', () => {
@@ -34,7 +34,7 @@ describe('format.field()', () => {
 })
 
 describe('fields API', () => {
-  const testDir = join(tmpdir(), 'gazetta-fields-api-' + Date.now())
+  const testDir = tempDir('fields-api-' + Date.now())
 
   beforeEach(async () => {
     await mkdir(join(testDir, 'admin', 'fields'), { recursive: true })

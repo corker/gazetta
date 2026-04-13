@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { compareTargets } from '../src/compare.js'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { sidecarNameFor } from '../src/hash.js'
+import { tempDir } from './_helpers/temp.js'
 
-const root = join(tmpdir(), 'gazetta-compare-test-' + Date.now())
+const root = tempDir('compare-test-' + Date.now())
 const siteDir = join(root, 'sites/main')
 const targetDir = join(root, 'dist/staging')
 const templatesDir = join(root, 'templates')

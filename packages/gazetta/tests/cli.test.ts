@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { resolve, join, dirname } from 'node:path'
 import { existsSync } from 'node:fs'
 import { mkdir, rm, writeFile, readdir } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { tempDir } from './_helpers/temp.js'
 
 // Test the helper functions from the CLI by extracting the logic
 // Since the CLI is a script with side effects, we test the pure functions
@@ -76,14 +76,14 @@ describe('detectProjectRoot', () => {
   })
 
   it('falls back to siteDir when no templates/ found', () => {
-    const tmpDir = join(tmpdir(), 'gazetta-no-templates-' + Date.now())
+    const tmpDir = tempDir('no-templates-' + Date.now())
     // Doesn't exist, so no templates/ anywhere
     expect(detectProjectRoot(tmpDir)).toBe(tmpDir)
   })
 })
 
 describe('runInit', () => {
-  const testDir = join(tmpdir(), 'gazetta-init-test-' + Date.now())
+  const testDir = tempDir('init-test-' + Date.now())
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true })

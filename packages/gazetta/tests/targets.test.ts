@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { mkdir, rm } from 'node:fs/promises'
 import { createStorageProvider, createTargetRegistry } from '../src/targets.js'
 import type { TargetConfig, StorageConfig } from '../src/types.js'
+import { tempDir } from './_helpers/temp.js'
 
-const testDir = join(tmpdir(), 'gazetta-targets-test-' + Date.now())
+const testDir = tempDir('targets-test-' + Date.now())
 
 afterEach(async () => {
   await rm(testDir, { recursive: true, force: true })

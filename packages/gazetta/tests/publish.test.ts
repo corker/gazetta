@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join, resolve } from 'node:path'
-import { tmpdir } from 'node:os'
 import { writeFile, mkdir, rm, readdir } from 'node:fs/promises'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { publishItems, resolveDependencies } from '../src/publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered } from '../src/publish-rendered.js'
+import { tempDir } from './_helpers/temp.js'
 
-const testDir = join(tmpdir(), 'gazetta-publish-test-' + Date.now())
+const testDir = tempDir('publish-test-' + Date.now())
 const sourceDir = join(testDir, 'source')
 const targetDir = join(testDir, 'target')
 
@@ -174,7 +174,7 @@ describe('publishRendered', () => {
   const starterDir = resolve(projectRoot, 'sites/main')
   const templatesDir = resolve(projectRoot, 'templates')
   const storage = createFilesystemProvider()
-  const renderTargetDir = join(tmpdir(), 'gazetta-render-test-' + Date.now())
+  const renderTargetDir = tempDir('render-test-' + Date.now())
 
   afterEach(async () => {
     await rm(renderTargetDir, { recursive: true, force: true })
@@ -286,7 +286,7 @@ describe('publishPageStatic', () => {
   const starterDir = resolve(projectRoot2, 'sites/main')
   const templatesDir = resolve(projectRoot2, 'templates')
   const storage = createFilesystemProvider()
-  const staticTargetDir = join(tmpdir(), 'gazetta-static-test-' + Date.now())
+  const staticTargetDir = tempDir('static-test-' + Date.now())
 
   afterEach(async () => {
     await rm(staticTargetDir, { recursive: true, force: true })
