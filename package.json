@@ -26,5 +26,8 @@
     "playwright": "^1.59.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
+  },
+  "overrides": {
+    "glob": "^13.0.6"
   }
 }

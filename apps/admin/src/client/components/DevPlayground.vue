@@ -5,6 +5,7 @@ import { onKeyStroke } from '@vueuse/core'
 import { useThemeStore } from '../stores/theme.js'
 import { api } from '../api/client.js'
 import type { EditorMount, FieldMount } from 'gazetta/types'
+import { createEditorMount } from 'gazetta/editor'
 
 const theme = useThemeStore()
 const router = useRouter()
@@ -223,7 +224,6 @@ async function mountSelected() {
         mount.mount(el, { content, schema: item.schema, theme: themeMode.value, onChange: (c) => { currentValue.value = c }, fieldsBaseUrl: item.fieldsBaseUrl })
         currentMount = mount
       } else {
-        const { createEditorMount } = await import('gazetta/editor')
         const mount = createEditorMount(item.schema)
         mount.mount(el, { content, schema: item.schema, theme: themeMode.value, onChange: (c) => { currentValue.value = c }, fieldsBaseUrl: item.fieldsBaseUrl })
         currentMount = mount

@@ -78,7 +78,9 @@ function spawnDev(cwd: string, port: number): ChildProcess {
   if (!existsSync(tsxBin)) throw new Error(`tsx not found at ${tsxBin}; run 'npm install' at repo root`)
   const server = spawn(tsxBin, [cli, 'dev', 'sites/main', '--port', String(port)], {
     cwd,
-    env: { ...process.env, CI: 'true', NO_COLOR: '1' }, // CI=true avoids the interactive publish confirm
+    // CI=true avoids the interactive publish confirm. Leave color control to
+    // Playwright's FORCE_COLOR — overriding here triggers a Node warning.
+    env: { ...process.env, CI: 'true' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   // Surface Vite optimizer events and warnings — helpful for diagnosing flakes.
