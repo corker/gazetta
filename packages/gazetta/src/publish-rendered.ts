@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { join } from 'node:path'
 import type { StorageProvider, PurgeStrategy, CacheConfig } from './types.js'
 import { loadSite } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'

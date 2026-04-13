@@ -261,7 +261,7 @@ export const useEditingStore = defineStore('editing', () => {
         await target.value.save(content.value)
         saved.value = deepClone(content.value)
       }
-      for (const [p, entry] of pendingEdits) {
+      for (const entry of pendingEdits.values()) {
         await entry.target.save(entry.editedContent)
       }
       pendingEdits.clear()

@@ -4,7 +4,6 @@ import Button from 'primevue/button'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
-import { usePreviewStore } from '../stores/preview.js'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { api } from '../api/client.js'
@@ -42,7 +41,6 @@ interface ComponentNode {
 const selection = useSelectionStore()
 const editing = useEditingStore()
 const toast = useToastStore()
-const preview = usePreviewStore()
 const focus = useComponentFocusStore()
 const unsavedGuard = useUnsavedGuardStore()
 const selectedNodeKey = ref<string | null>(null)

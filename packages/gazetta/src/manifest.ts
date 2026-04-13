@@ -1,5 +1,5 @@
 import yaml from 'js-yaml'
-import type { ComponentEntry, ComponentManifest, FragmentManifest, PageManifest, SiteManifest, StorageProvider } from './types.js'
+import type { ComponentEntry, FragmentManifest, PageManifest, SiteManifest, StorageProvider } from './types.js'
 
 function parseYaml(content: string, filePath: string): Record<string, unknown> {
   try {

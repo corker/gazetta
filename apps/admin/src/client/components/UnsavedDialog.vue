@@ -2,11 +2,9 @@
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
-import { useEditingStore } from '../stores/editing.js'
 import { useSelectionStore } from '../stores/selection.js'
 
 const guard = useUnsavedGuardStore()
-const editing = useEditingStore()
 const selection = useSelectionStore()
 
 function onKeydown(e: KeyboardEvent) {

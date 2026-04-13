@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createJiti } from 'jiti'
-import type { TemplateFunction, TemplateModule, StorageProvider } from './types.js'
+import type { TemplateFunction, StorageProvider } from './types.js'
 
 interface LoadedTemplate {
   render: TemplateFunction
@@ -81,19 +81,14 @@ export async function loadTemplate(storage: StorageProvider, templatesDir: strin
   return loaded
 }
 
-const EDITOR_FILES = ['editor.ts', 'editor.tsx']
-
 /** Check if a custom editor file exists for a template */
 export async function hasEditorFile(storage: StorageProvider, editorsDir: string, templateName: string): Promise<boolean> {
-  for (const file of EDITOR_FILES) {
-    // Try flat: admin/editors/hero.ts
-    if (await storage.exists(join(editorsDir, `${templateName}.ts`))) return true
-    if (await storage.exists(join(editorsDir, `${templateName}.tsx`))) return true
-  }
-  // Try directory: admin/editors/hero/index.ts
-  for (const file of ['index.ts', 'index.tsx']) {
-    if (await storage.exists(join(editorsDir, templateName, file))) return true
-  }
+  // Flat: admin/editors/hero.ts(x)
+  if (await storage.exists(join(editorsDir, `${templateName}.ts`))) return true
+  if (await storage.exists(join(editorsDir, `${templateName}.tsx`))) return true
+  // Directory: admin/editors/hero/index.ts(x)
+  if (await storage.exists(join(editorsDir, templateName, 'index.ts'))) return true
+  if (await storage.exists(join(editorsDir, templateName, 'index.tsx'))) return true
   return false
 }
 
