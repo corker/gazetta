@@ -22,3 +22,19 @@ jobs:
       - run: npm run build -w packages/gazetta
 
       - run: npm test -w packages/gazetta
+
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w packages/gazetta
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=dev
