@@ -83,11 +83,6 @@ export async function createStorageProvider(config: StorageConfig, siteDir: stri
   }
 }
 
-/** @deprecated Use createStorageProvider */
-export async function createTargetProvider(config: TargetConfig, siteDir: string): Promise<StorageProvider> {
-  return createStorageProvider(config.storage, siteDir)
-}
-
 export async function createTargetRegistry(targets: Record<string, TargetConfig>, siteDir: string): Promise<Map<string, StorageProvider>> {
   const registry = new Map<string, StorageProvider>()
   for (const [name, config] of Object.entries(targets)) {

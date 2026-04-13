@@ -26,7 +26,7 @@ export { resolveComponent, resolveFragment, resolvePage } from './resolver.js'
 export { loadSite } from './site-loader.js'
 export type { Site, LoadSiteOptions } from './site-loader.js'
 export { loadTemplate, invalidateTemplate, invalidateAllTemplates } from './template-loader.js'
-export { scopeHtml, scopeCss, hashPath, generateScopeId, resetScopeCounter } from './scope.js'
+export { scopeHtml, scopeCss, hashPath } from './scope.js'
 
 // Storage providers
 export { createFilesystemProvider } from './providers/filesystem.js'
@@ -38,7 +38,7 @@ export { createR2RestProvider } from './providers/r2.js'
 export type { R2RestProviderOptions } from './providers/r2.js'
 
 // Targets
-export { createStorageProvider, createTargetProvider, createTargetRegistry } from './targets.js'
+export { createStorageProvider, createTargetRegistry } from './targets.js'
 
 // Server
 export { createServer } from './serve.js'
@@ -46,7 +46,7 @@ export type { ServeOptions } from './serve.js'
 
 // Publish
 export { publishItems, resolveDependencies } from './publish.js'
-export { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, publishFragmentWithPurge, publishPageWithPurge, createWorkerPurge } from './publish-rendered.js'
+export { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, publishFragmentWithPurge, publishPageWithPurge } from './publish-rendered.js'
 
 // Format helpers
 export { format } from './formats.js'

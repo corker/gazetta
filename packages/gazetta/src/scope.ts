@@ -38,8 +38,3 @@ export function scopeCss(css: string, scopeId: string): string {
   return result
 }
 
-// Legacy exports for backwards compatibility
-/** @deprecated Use hashPath instead */
-export function generateScopeId(): string { return hashPath(String(Date.now())) }
-/** @deprecated No longer needed — scope IDs are deterministic */
-export function resetScopeCounter(): void {}

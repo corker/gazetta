@@ -351,9 +351,6 @@ export async function lookupCloudflareZoneId(siteUrl: string, apiToken: string):
   return data.result?.[0]?.id ?? null
 }
 
-/** @deprecated Use createCloudflarePurge instead */
-export const createWorkerPurge = createCloudflarePurge
-
 /**
  * Publish a fragment and purge affected pages.
  */
