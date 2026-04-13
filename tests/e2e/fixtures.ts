@@ -74,7 +74,6 @@ export const test = base.extend<{ page: Page }, { testSite: TestSite; baseURL: s
 
 function spawnDev(cwd: string, port: number): ChildProcess {
   const cli = resolve(repoRoot, 'packages/gazetta/src/cli/index.ts')
-  // Use the project's node_modules (which includes tsx + jiti via gazetta package)
   const tsxBin = resolve(repoRoot, 'node_modules/.bin/tsx')
   if (!existsSync(tsxBin)) throw new Error(`tsx not found at ${tsxBin}; run 'npm install' at repo root`)
   const server = spawn(tsxBin, [cli, 'dev', 'sites/main', '--port', String(port)], {
@@ -82,8 +81,16 @@ function spawnDev(cwd: string, port: number): ChildProcess {
     env: { ...process.env, CI: 'true', NO_COLOR: '1' }, // CI=true avoids the interactive publish confirm
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  // Surface all server output to stderr so CI shows "Manifest changed", "Template changed", etc.
-  server.stdout?.on('data', d => process.stderr.write(`[dev:${port}] ${d}`))
+  // Surface Vite optimizer events and warnings — helpful for diagnosing flakes.
+  // Request logs are filtered out to keep CI output manageable.
+  server.stdout?.on('data', (d) => {
+    const text = d.toString()
+    // Skip verbose request logs (lines starting with request arrows)
+    const important = text.split('\n')
+      .filter((line: string) => line.trim() && !/^\s*(<--|-->)\s/.test(line))
+      .join('\n')
+    if (important.trim()) process.stderr.write(`[dev:${port}] ${important}${important.endsWith('\n') ? '' : '\n'}`)
+  })
   server.stderr?.on('data', d => process.stderr.write(`[dev:${port}:err] ${d}`))
   return server
 }
