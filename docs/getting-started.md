@@ -496,6 +496,14 @@ The CLI loads `.env` automatically. In CI, env vars are set directly — `.env` 
 
 Values in site.yaml can reference env vars with `${VAR_NAME}` syntax — they're resolved at runtime.
 
+### Unpublished change indicators
+
+The site tree shows a small orange dot next to any page or fragment that has unpublished changes against the most relevant target.
+
+The admin picks the target automatically: it prefers `production` if available, then `staging`, then `local`, but skips any target that has never been published to (so a brand-new production target doesn't make every item look dirty). Hover the dot to see which target the comparison is against.
+
+The dot disappears when the item matches the target. It refreshes after every save and publish.
+
 ### Publish and deploy
 
 ```bash
