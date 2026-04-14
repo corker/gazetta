@@ -48,17 +48,19 @@ const LOADER_HTML = `<!doctype html>
   body { font-family: system-ui, -apple-system, sans-serif; background: #262626; color: #a3a3a3; display: flex; align-items: center; justify-content: center; transition: opacity 200ms ease; }
   body.light { background: #f5f5f5; color: #525252; }
   body.leaving { opacity: 0; }
-  .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; opacity: 0; transition: opacity 300ms ease; }
+  .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; opacity: 0; transition: opacity 300ms ease; }
   .panel.shown { opacity: 1; }
-  .spinner { width: 24px; height: 24px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .brand { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; color: currentColor; opacity: 0.9; }
+  .spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; opacity: 0.6; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .label { font-size: 0.875rem; }
+  .label { font-size: 0.8125rem; opacity: 0.75; }
 </style>
 </head>
 <body>
   <div class="panel" role="status" aria-live="polite">
+    <div class="brand">Gazetta</div>
     <div class="spinner" aria-hidden="true"></div>
-    <div class="label">Starting Gazetta admin…</div>
+    <div class="label">Starting admin…</div>
   </div>
   <script>
     // Match the user's saved admin theme if present; fall back to dark default
