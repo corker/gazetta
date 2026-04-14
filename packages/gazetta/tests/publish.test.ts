@@ -410,4 +410,15 @@ describe('findDependentsFromSidecars', () => {
     expect(r.pages).toEqual([])
     expect(r.fragments).toEqual([])
   })
+
+  it('accepts baseDir for source-storage queries (unrooted provider)', async () => {
+    const { findDependentsFromSidecars } = await import('../src/publish.js')
+    const sourceDir = join(targetDir, '../source-root/sites/main')
+    await writeTestFile(sourceDir, 'pages/home/.11111111.hash', '')
+    await writeTestFile(sourceDir, 'pages/home/.uses-header', '')
+    const source = createFilesystemProvider()
+
+    const r = await findDependentsFromSidecars(source, { fragment: 'header' }, { baseDir: sourceDir })
+    expect(r.pages).toEqual(['home'])
+  })
 })

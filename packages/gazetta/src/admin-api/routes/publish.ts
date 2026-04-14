@@ -3,6 +3,7 @@ import { streamSSE } from 'hono/streaming'
 import { getPublishMode, getEnvironment } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
+import { listSidecars } from '../../sidecars.js'
 import { mapLimitStream } from '../../concurrency.js'
 import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
@@ -103,6 +104,19 @@ export function publishRoutes(
         const targetStorage = t.get(targetName)
         if (!targetStorage) return c.json({ error: `Unknown target: ${targetName}` }, 400)
         const result = await findDependentsFromSidecars(targetStorage, { fragment: fragmentName })
+        return c.json(result)
+      }
+      // Source-side: prefer sidecars (listings only) when present. If the
+      // project has any source sidecars, trust them — empty means "no
+      // dependents," not "stale." Fall back to a full manifest scan only
+      // when sidecars don't exist (e.g. project was never opened in the
+      // admin UI).
+      const [pagesList, fragmentsList] = await Promise.all([
+        listSidecars(sourceStorage, `${siteDir}/pages`),
+        listSidecars(sourceStorage, `${siteDir}/fragments`),
+      ])
+      if (pagesList.size || fragmentsList.size) {
+        const result = await findDependentsFromSidecars(sourceStorage, { fragment: fragmentName }, { baseDir: siteDir })
         return c.json(result)
       }
       const result = await findFragmentDependents(sourceStorage, siteDir, fragmentName)

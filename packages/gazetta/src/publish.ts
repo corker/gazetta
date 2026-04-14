@@ -255,17 +255,20 @@ export async function findFragmentDependents(
  * by @outer which is referenced by pages/home, querying "@inner" returns
  * home and @outer.
  *
- * Intended for queries against target storage (where the sidecars live).
- * Queries against source/local content should use findFragmentDependents.
+ * Works against target storage (rooted at target base) or source storage
+ * (pass `baseDir: siteDir` so the walker descends into `siteDir/pages`).
  */
 export async function findDependentsFromSidecars(
-  targetStorage: StorageProvider,
+  storage: StorageProvider,
   query: { fragment: string } | { template: string },
+  opts: { baseDir?: string } = {},
 ): Promise<{ pages: string[]; fragments: string[] }> {
+  const pagesRoot = opts.baseDir ? `${opts.baseDir}/pages` : 'pages'
+  const fragmentsRoot = opts.baseDir ? `${opts.baseDir}/fragments` : 'fragments'
   // Single listing pass per root, then all reasoning is in-memory.
   const [pagesList, fragmentsList] = await Promise.all([
-    listSidecars(targetStorage, 'pages'),
-    listSidecars(targetStorage, 'fragments'),
+    listSidecars(storage, pagesRoot),
+    listSidecars(storage, fragmentsRoot),
   ])
   const pagesIndex = new Map<string, { uses: Set<string>; template: string | null }>()
   for (const [name, state] of pagesList) {
