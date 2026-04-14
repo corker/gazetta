@@ -77,20 +77,56 @@ watch(selectedTargets, (now, prev) => {
   }
 })
 
-// Union of added+modified across selected targets
-interface ChangedItem { path: string; change: 'added' | 'modified' }
+// Union of added+modified+deleted across selected targets.
+// Precedence on display when the same item appears with different changes
+// across targets: added > modified > deleted. Deleted items are informational
+// only (no checkbox, no action — they're gone locally, user deletes on target
+// by other means).
+type ChangeKind = 'added' | 'modified' | 'deleted'
+interface ChangedItem { path: string; change: ChangeKind }
+const PRECEDENCE: Record<ChangeKind, number> = { added: 0, modified: 1, deleted: 2 }
+
 const changedItems = computed<ChangedItem[]>(() => {
   const map = new Map<string, ChangedItem>()
+  const bump = (path: string, change: ChangeKind) => {
+    const existing = map.get(path)
+    if (!existing || PRECEDENCE[change] < PRECEDENCE[existing.change]) {
+      map.set(path, { path, change })
+    }
+  }
   for (const target of selectedTargets.value) {
     const r = compareByTarget.value.get(target)
     if (!r) continue
-    for (const p of r.added) map.set(p, { path: p, change: 'added' })
-    for (const p of r.modified) {
-      // added takes precedence over modified for display — if any target considers it added, show it as added
-      if (!map.has(p)) map.set(p, { path: p, change: 'modified' })
-    }
+    for (const p of r.added) bump(p, 'added')
+    for (const p of r.modified) bump(p, 'modified')
+    for (const p of r.deleted) bump(p, 'deleted')
   }
   return [...map.values()].sort((a, b) => a.path.localeCompare(b.path))
+})
+
+// Grouping by kind (pages vs fragments) and summary counts
+interface GroupedItems {
+  pages: ChangedItem[]
+  fragments: ChangedItem[]
+}
+const grouped = computed<GroupedItems>(() => {
+  const pages: ChangedItem[] = []
+  const fragments: ChangedItem[] = []
+  for (const item of changedItems.value) {
+    if (item.path.startsWith('fragments/')) fragments.push(item)
+    else pages.push(item)
+  }
+  return { pages, fragments }
+})
+
+const summary = computed(() => {
+  let added = 0, modified = 0, deleted = 0
+  for (const item of changedItems.value) {
+    if (item.change === 'added') added++
+    else if (item.change === 'modified') modified++
+    else deleted++
+  }
+  return { added, modified, deleted }
 })
 
 const anyLoading = computed(() => compareLoadingTargets.value.size > 0)
@@ -110,19 +146,26 @@ const compareError = computed(() => {
   return null
 })
 
-// Keep currentItem pre-checked whenever it appears in the changed list
+// Keep currentItem pre-checked whenever it appears in the changed list.
+// Deleted items are informational (never selectable) — they're already gone
+// locally, publish would be a no-op.
+const deletedPaths = computed(() => new Set(
+  changedItems.value.filter(i => i.change === 'deleted').map(i => i.path)
+))
+
 watch(changedItems, (items) => {
   const paths = new Set(items.map(i => i.path))
-  // Drop anything from selectedItems that's no longer in changedItems (except currentItem which is always sticky)
   const kept = new Set<string>()
   for (const p of selectedItems.value) {
+    if (deletedPaths.value.has(p)) continue
     if (paths.has(p) || p === currentItem.value) kept.add(p)
   }
-  kept.add(currentItem.value)
+  if (!deletedPaths.value.has(currentItem.value)) kept.add(currentItem.value)
   selectedItems.value = kept
 })
 
 function toggleItem(path: string) {
+  if (deletedPaths.value.has(path)) return // deleted items are informational
   const s = new Set(selectedItems.value)
   if (s.has(path)) s.delete(path)
   else s.add(path)
@@ -168,8 +211,10 @@ function labelFor(item: string): string {
   return item
 }
 
-function changeSymbol(change: 'added' | 'modified'): string {
-  return change === 'added' ? '+' : '●'
+function changeSymbol(change: ChangeKind): string {
+  if (change === 'added') return '+'
+  if (change === 'deleted') return '−'
+  return '●'
 }
 
 function onClose() {
@@ -212,23 +257,55 @@ function onClose() {
 
         <div v-else-if="selectedTargets.length > 0" class="publish-changes">
           <p class="publish-label">
-            Your changes
+            Changes
             <span v-if="anyLoading" class="publish-label-hint">loading…</span>
-            <span v-else-if="changedItems.length" class="publish-label-hint">{{ changedItems.length }}</span>
+            <span v-else-if="changedItems.length" class="publish-label-hint" data-testid="publish-summary">
+              <span v-if="summary.modified">{{ summary.modified }} modified</span>
+              <span v-if="summary.added">{{ summary.modified ? ' · ' : '' }}{{ summary.added }} added</span>
+              <span v-if="summary.deleted">{{ summary.modified || summary.added ? ' · ' : '' }}{{ summary.deleted }} only on target</span>
+            </span>
           </p>
           <div v-if="!anyLoading && changedItems.length === 0" class="publish-nochanges">
             No changes to publish.
           </div>
-          <div v-else class="publish-changes-list">
-            <label v-for="item in changedItems" :key="item.path" class="publish-change-row"
-              :data-testid="`publish-change-${item.path}`">
-              <Checkbox :modelValue="selectedItems.has(item.path)" :binary="true"
-                @update:modelValue="toggleItem(item.path)" />
-              <span class="publish-change-mark" :class="item.change">{{ changeSymbol(item.change) }}</span>
-              <i :class="iconFor(item.path)" class="publish-change-icon" />
-              <span class="publish-change-label">{{ labelFor(item.path) }}</span>
-            </label>
-          </div>
+          <template v-else>
+            <div v-if="grouped.pages.length" class="publish-changes-group" data-testid="publish-group-pages">
+              <p class="publish-group-label">Pages</p>
+              <div class="publish-changes-list">
+                <component :is="item.change === 'deleted' ? 'div' : 'label'"
+                  v-for="item in grouped.pages" :key="item.path"
+                  class="publish-change-row"
+                  :class="{ 'publish-change-row-deleted': item.change === 'deleted' }"
+                  :data-testid="`publish-change-${item.path}`">
+                  <Checkbox v-if="item.change !== 'deleted'"
+                    :modelValue="selectedItems.has(item.path)" :binary="true"
+                    @update:modelValue="toggleItem(item.path)" />
+                  <span v-else class="publish-change-nocheckbox" />
+                  <span class="publish-change-mark" :class="item.change">{{ changeSymbol(item.change) }}</span>
+                  <i :class="iconFor(item.path)" class="publish-change-icon" />
+                  <span class="publish-change-label">{{ labelFor(item.path) }}</span>
+                </component>
+              </div>
+            </div>
+            <div v-if="grouped.fragments.length" class="publish-changes-group" data-testid="publish-group-fragments">
+              <p class="publish-group-label">Fragments</p>
+              <div class="publish-changes-list">
+                <component :is="item.change === 'deleted' ? 'div' : 'label'"
+                  v-for="item in grouped.fragments" :key="item.path"
+                  class="publish-change-row"
+                  :class="{ 'publish-change-row-deleted': item.change === 'deleted' }"
+                  :data-testid="`publish-change-${item.path}`">
+                  <Checkbox v-if="item.change !== 'deleted'"
+                    :modelValue="selectedItems.has(item.path)" :binary="true"
+                    @update:modelValue="toggleItem(item.path)" />
+                  <span v-else class="publish-change-nocheckbox" />
+                  <span class="publish-change-mark" :class="item.change">{{ changeSymbol(item.change) }}</span>
+                  <i :class="iconFor(item.path)" class="publish-change-icon" />
+                  <span class="publish-change-label">{{ labelFor(item.path) }}</span>
+                </component>
+              </div>
+            </div>
+          </template>
         </div>
       </template>
 
@@ -268,12 +345,19 @@ function onClose() {
 .publish-firstpublish { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #1e3a5f; color: #93c5fd; font-size: 0.875rem; }
 .publish-changes { display: flex; flex-direction: column; gap: 0.5rem; }
 .publish-nochanges { color: #888; font-size: 0.875rem; }
-.publish-changes-list { display: flex; flex-direction: column; gap: 0.25rem; max-height: 240px; overflow-y: auto; }
+.publish-changes-group { display: flex; flex-direction: column; gap: 0.25rem; }
+.publish-changes-group + .publish-changes-group { margin-top: 0.5rem; }
+.publish-group-label { font-size: 0.6875rem; text-transform: uppercase; color: #6b7280; letter-spacing: 0.05em; font-weight: 600; margin: 0 0 0.125rem 0.25rem; }
+.publish-changes-list { display: flex; flex-direction: column; gap: 0.125rem; max-height: 240px; overflow-y: auto; }
 .publish-change-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; border-radius: 4px; cursor: pointer; }
 .publish-change-row:hover { background: rgba(128, 128, 128, 0.1); }
+.publish-change-row-deleted { cursor: default; opacity: 0.55; }
+.publish-change-row-deleted:hover { background: transparent; }
+.publish-change-nocheckbox { display: inline-block; width: 20px; flex-shrink: 0; }
 .publish-change-mark { font-family: monospace; width: 10px; text-align: center; font-weight: bold; }
 .publish-change-mark.added { color: #4ade80; }
 .publish-change-mark.modified { color: #fbbf24; }
+.publish-change-mark.deleted { color: #9ca3af; }
 .publish-change-icon { color: #888; font-size: 0.8rem; }
 .publish-change-label { font-size: 0.875rem; }
 .publish-results { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -291,6 +375,8 @@ function onClose() {
 .light .publish-firstpublish { background: #eff6ff; color: #1e40af; }
 .light .publish-change-mark.added { color: #15803d; }
 .light .publish-change-mark.modified { color: #a16207; }
+.light .publish-change-mark.deleted { color: #6b7280; }
+.light .publish-group-label { color: #4b5563; }
 .light .publish-result.success { background: #dcfce7; color: #15803d; }
 .light .publish-result.error { background: #fef2f2; color: #991b1b; }
 </style>
