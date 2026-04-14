@@ -35,6 +35,66 @@ test.describe('Toolbar tooltips', () => {
   })
 })
 
+test.describe('User theme', () => {
+  test('admin/theme.css overrides Gazetta tokens and exposes custom tokens', async ({ page, testSite }) => {
+    // Seed a theme.css that overrides --p-primary-color, --color-env-prod-bg
+    // (a Gazetta token), and adds a user-namespaced custom token. The dev
+    // server's user-theme route picks this up without restart.
+    await writeFile(join(testSite.projectDir, 'admin/theme.css'), `
+      :root {
+        --p-primary-color: rgb(124, 58, 237);
+        --color-env-prod-bg: rgb(255, 245, 230);
+        --myapp-test-color: rgb(255, 0, 255);
+      }
+      .dark {
+        --p-primary-color: rgb(167, 139, 250);
+        --color-env-prod-bg: rgb(42, 26, 5);
+        --myapp-test-color: rgb(0, 255, 255);
+      }
+    `)
+    // Force a fresh cold load so the runtime <link> injection runs from main.ts
+    await page.goto('/admin')
+    // Wait for the theme.css link to actually load (main.ts appends it after PrimeVue)
+    await page.waitForFunction(() => {
+      return getComputedStyle(document.documentElement).getPropertyValue('--myapp-test-color').trim() !== ''
+    }, { timeout: 5000 })
+
+    const dark = await page.evaluate(() => {
+      const cs = getComputedStyle(document.documentElement)
+      return {
+        primary: cs.getPropertyValue('--p-primary-color').trim(),
+        envProdBg: cs.getPropertyValue('--color-env-prod-bg').trim(),
+        myapp: cs.getPropertyValue('--myapp-test-color').trim(),
+      }
+    })
+    expect(dark.primary).toBe('rgb(167, 139, 250)')
+    expect(dark.envProdBg).toBe('rgb(42, 26, 5)')
+    expect(dark.myapp).toBe('rgb(0, 255, 255)')
+
+    await page.locator('[data-testid="theme-toggle"]').click()
+    await page.waitForTimeout(200)
+    const light = await page.evaluate(() => {
+      const cs = getComputedStyle(document.documentElement)
+      return {
+        primary: cs.getPropertyValue('--p-primary-color').trim(),
+        envProdBg: cs.getPropertyValue('--color-env-prod-bg').trim(),
+        myapp: cs.getPropertyValue('--myapp-test-color').trim(),
+      }
+    })
+    expect(light.primary).toBe('rgb(124, 58, 237)')
+    expect(light.envProdBg).toBe('rgb(255, 245, 230)')
+    expect(light.myapp).toBe('rgb(255, 0, 255)')
+  })
+
+  test('/admin/theme.css 404s when no user file exists', async ({ page, testSite }) => {
+    // Make sure no theme file is present — the worker copies the starter which
+    // does not include one, but be explicit in case prior tests added it.
+    await rm(join(testSite.projectDir, 'admin/theme.css'), { force: true })
+    const res = await page.request.get('/admin/theme.css')
+    expect(res.status()).toBe(404)
+  })
+})
+
 test.describe('Toast', () => {
   test('error toasts persist and have a dismiss button', async ({ page }) => {
     // Force every page-load to fail — opening home triggers selection.selectPage,
