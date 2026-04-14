@@ -1,4 +1,6 @@
 import { test, expect } from './fixtures'
+import { mkdir, writeFile, rm } from 'node:fs/promises'
+import { join } from 'node:path'
 
 // Helper: navigate to admin in edit mode for a page — uses the direct URL to avoid
 // race conditions from clicking data-gz elements in the preview iframe.
@@ -474,5 +476,150 @@ test.describe('Component operations', () => {
       const featuresAfter = await page.locator('[data-testid="component-features"]').boundingBox()
       expect(heroAfter!.y).toBeLessThan(featuresAfter!.y)
     }).toPass({ timeout: 10000 })
+  })
+})
+
+test.describe('Publish dialog', () => {
+  // Staging target's storage path is ./dist/staging relative to sites/main
+  function stagingDir(projectDir: string) {
+    return join(projectDir, 'sites/main/dist/staging')
+  }
+  async function seedSidecar(dir: string, hash: string) {
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, `.${hash}.hash`), '')
+  }
+  async function wipe(projectDir: string) {
+    await rm(stagingDir(projectDir), { recursive: true, force: true })
+  }
+
+  async function openPublish(page: import('@playwright/test').Page) {
+    // Selecting a page enables the publish button
+    await page.goto('/admin/pages/home')
+    await page.locator('[data-testid="publish-btn"]').click()
+    await expect(page.locator('[data-testid="publish-current-item"]')).toBeVisible()
+  }
+  async function selectStaging(page: import('@playwright/test').Page) {
+    await page.locator('[data-testid="publish-target-staging"]').click()
+  }
+
+  test('first publish shows info banner', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    await openPublish(page)
+    await selectStaging(page)
+    await expect(page.locator('[data-testid="publish-first-publish"]')).toBeVisible()
+  })
+
+  test('modified item shows filled-circle mark', async ({ page, testSite }) => {
+    // Seed a stale sidecar for pages/home so compare reports 'modified'
+    await wipe(testSite.projectDir)
+    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/home'), '00000000')
+
+    await openPublish(page)
+    await selectStaging(page)
+    const row = page.locator('[data-testid="publish-change-pages/home"]')
+    await expect(row).toBeVisible()
+    await expect(row.locator('.publish-change-mark.modified')).toHaveText('●')
+  })
+
+  test('deleted item renders informational (no checkbox, dimmed)', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    // Seed a sidecar for a page that doesn't exist locally
+    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/old-contact'), '11111111')
+    // And a real-page sidecar so firstPublish is false
+    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/home'), '00000000')
+
+    await openPublish(page)
+    await selectStaging(page)
+    const deletedRow = page.locator('[data-testid="publish-change-pages/old-contact"]')
+    await expect(deletedRow).toBeVisible()
+    await expect(deletedRow).toHaveClass(/publish-change-row-deleted/)
+    await expect(deletedRow.locator('.p-checkbox')).toHaveCount(0)
+    await expect(deletedRow.locator('.publish-change-mark.deleted')).toHaveText('−')
+  })
+
+  test('summary line shows category counts', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/home'), '00000000')
+    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/old-contact'), '11111111')
+    // about + blog + showcase + 404 will be 'added' (no sidecar, local exists)
+
+    await openPublish(page)
+    await selectStaging(page)
+    const summary = page.locator('[data-testid="publish-summary"]')
+    await expect(summary).toBeVisible()
+    await expect(summary).toContainText('modified')
+    await expect(summary).toContainText('added')
+    await expect(summary).toContainText('only on target')
+  })
+
+  test('pages and fragments render in separate groups', async ({ page, testSite }) => {
+    // Staging is static-mode so fragments are excluded. Use firstPublish path
+    // with esi-test which includes fragments. Seed one fake sidecar to avoid
+    // the firstPublish banner short-circuit, so the grouped list renders.
+    const esiDir = join(testSite.projectDir, 'sites/main/dist/esi-test')
+    await rm(esiDir, { recursive: true, force: true })
+    await seedSidecar(join(esiDir, 'pages/home'), '00000000')
+
+    await page.goto('/admin/pages/home')
+    await page.locator('[data-testid="publish-btn"]').click()
+    await page.locator('[data-testid="publish-target-esi-test"]').click()
+    await expect(page.locator('[data-testid="publish-group-pages"]')).toBeVisible()
+    await expect(page.locator('[data-testid="publish-group-fragments"]')).toBeVisible()
+  })
+
+  test('compare failure surfaces an error message', async ({ page, testSite: _ }) => {
+    // Intercept the compare call and force a 500
+    await page.route('**/admin/api/compare*', route => route.fulfill({
+      status: 500, contentType: 'application/json',
+      body: JSON.stringify({ error: 'Storage unreachable' }),
+    }))
+    await openPublish(page)
+    await selectStaging(page)
+    const err = page.locator('[data-testid="publish-compare-error"]')
+    await expect(err).toBeVisible()
+    await expect(err).toContainText('Storage unreachable')
+  })
+
+  test('deselecting a target aborts its in-flight compare', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    const requests: { url: string; aborted: boolean }[] = []
+    // Slow the compare call so we have time to deselect before it completes
+    await page.route('**/admin/api/compare*', async (route) => {
+      requests.push({ url: route.request().url(), aborted: false })
+      await new Promise(r => setTimeout(r, 1500))
+      try { await route.continue() } catch { /* aborted */ }
+    })
+    page.on('requestfailed', req => {
+      if (req.url().includes('/admin/api/compare')) {
+        const entry = requests.find(r => r.url === req.url())
+        if (entry) entry.aborted = true
+      }
+    })
+
+    await openPublish(page)
+    await selectStaging(page)
+    // Deselect before the slowed compare completes
+    await page.waitForTimeout(200)
+    await page.locator('[data-testid="publish-target-staging"]').click()
+    // The compare error/first-publish/summary should NOT appear, since the
+    // response was discarded. Wait long enough for the fulfillment to finish.
+    await page.waitForTimeout(2000)
+    await expect(page.locator('[data-testid="publish-first-publish"]')).toHaveCount(0)
+    await expect(page.locator('[data-testid="publish-compare-error"]')).toHaveCount(0)
+  })
+
+  test('works in light mode', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    await page.goto('/admin')
+    // Toggle to light mode
+    const html = page.locator('html')
+    if ((await html.getAttribute('class'))?.includes('dark')) {
+      await page.locator('[data-testid="theme-toggle"]').click()
+    }
+    await openPublish(page)
+    await selectStaging(page)
+    await expect(page.locator('[data-testid="publish-first-publish"]')).toBeVisible()
+    // Sanity: html has light class, not dark
+    await expect(html).not.toHaveClass(/dark/)
   })
 })
