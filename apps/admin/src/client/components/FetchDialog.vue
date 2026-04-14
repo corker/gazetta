@@ -80,11 +80,11 @@ async function handleFetch() {
 
 <style scoped>
 .fetch-content { display: flex; flex-direction: column; gap: 1rem; }
-.fetch-empty { color: #888; font-size: 0.875rem; }
-.fetch-label { font-size: 0.875rem; color: #aaa; margin-bottom: 0.5rem; }
+.fetch-empty { color: var(--color-muted); font-size: 0.875rem; }
+.fetch-label { font-size: 0.875rem; color: var(--color-muted); margin-bottom: 0.5rem; }
 .fetch-list { width: 100%; }
-.fetch-result { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; border-radius: 6px; }
-.fetch-result.success { background: #052e16; color: #4ade80; }
-.fetch-result.error { background: #450a0a; color: #f87171; }
+.fetch-result { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; border-radius: var(--p-border-radius-md); }
+.fetch-result.success { background: var(--color-success-bg); color: var(--color-success-fg); }
+.fetch-result.error { background: var(--color-danger-bg); color: var(--color-danger-fg); }
 .fetch-items { font-size: 0.75rem; opacity: 0.7; margin-top: 0.25rem; }
 </style>

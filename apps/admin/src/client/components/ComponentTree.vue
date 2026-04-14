@@ -322,34 +322,23 @@ async function addComponent(name: string, template: string) {
 
 <style scoped>
 .component-tree { font-size: 13px; line-height: 22px; }
-.empty { color: #aaa; }
+.empty { color: var(--color-muted); }
 .node-item { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; margin: 0 2px; cursor: pointer; border-radius: 3px; }
-.node-item:hover, .node-item.hovered { background: rgba(128, 128, 128, 0.08); }
-.node-item.selected { background: rgba(167, 139, 250, 0.15); box-shadow: inset 2px 0 0 #a78bfa; }
-.node-root { font-weight: 600; padding: 0 6px; height: 26px; line-height: 26px; border-radius: 0; margin: 0 0 2px 0; border-bottom: 1px solid rgba(128, 128, 128, 0.15); }
-.node-root.selected { background: rgba(167, 139, 250, 0.1); box-shadow: none; border-bottom-color: #a78bfa; }
-.node-icon { width: 16px; text-align: center; font-size: 10px; color: #999; flex-shrink: 0; }
-.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6b7280; }
-.node-item.selected .node-label { color: #374151; }
-.node-item:hover .node-label, .node-item.hovered .node-label { color: #374151; }
-.node-root .node-label { color: #1f2937; }
-.node-error-icon { color: #dc2626; }
-.node-dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: #d97706; flex-shrink: 0; }
+.node-item:hover, .node-item.hovered { background: var(--color-hover-bg); }
+.node-item.selected { background: rgba(167, 139, 250, 0.15); box-shadow: inset 2px 0 0 var(--p-violet-400); }
+.node-root { font-weight: 600; padding: 0 6px; height: 26px; line-height: 26px; border-radius: 0; margin: 0 0 2px 0; border-bottom: 1px solid var(--color-border); }
+.node-root.selected { background: rgba(167, 139, 250, 0.1); box-shadow: none; border-bottom-color: var(--p-violet-400); }
+.node-icon { width: 16px; text-align: center; font-size: 10px; color: var(--color-muted); flex-shrink: 0; }
+.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-muted); }
+.node-item.selected .node-label,
+.node-item:hover .node-label,
+.node-item.hovered .node-label,
+.node-root .node-label { color: var(--color-fg); }
+.node-error-icon { color: var(--color-danger-fg); }
+.node-dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning-fg); flex-shrink: 0; }
 .node-revert { opacity: 0; transition: opacity 0.1s; width: 18px; height: 18px; flex-shrink: 0; }
 .node-item:hover .node-revert { opacity: 1; }
 .node-actions { display: flex; gap: 0; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-actions { opacity: 1; }
 .add-btn { margin-top: 6px; }
-</style>
-
-<style>
-.dark .component-tree .node-item:hover, .dark .component-tree .node-item.hovered { background: rgba(255, 255, 255, 0.05); }
-.dark .component-tree .node-root { border-bottom-color: #27272a; }
-.dark .component-tree .node-icon { color: #666; }
-.dark .component-tree .node-label { color: #bbb; }
-.dark .component-tree .node-item.selected .node-label { color: #e4e4e7; }
-.dark .component-tree .node-item:hover .node-label, .dark .component-tree .node-item.hovered .node-label { color: #e4e4e7; }
-.dark .component-tree .node-root .node-label { color: #e4e4e7; }
-.dark .component-tree .node-error-icon { color: #f87171; }
-.dark .component-tree .node-dirty-dot { background: #f59e0b; }
 </style>

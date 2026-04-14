@@ -41,16 +41,12 @@ onMounted(() => {
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #app, .cms-app { height: 100%; }
-body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; background: #fff; }
-.dark body { color: #e4e4e7; background: #09090b; }
-.cms-error { padding: 2rem; color: #c00; }
-.cms-loading { padding: 2rem; color: #666; }
-.global-toast { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 1001; background: #fff; color: #1a1a1a; border: 1px solid #e4e4e7; border-top: none; border-radius: 0 0 8px 8px; padding: 8px 20px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 400px; }
-.dark .global-toast { background: #1a1a1e; color: #e8e8e8; border-color: rgba(255,255,255,0.08); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
-.toast-success { color: #16a34a; }
-.dark .toast-success { color: hsl(150, 86%, 65%); }
-.toast-error { color: #dc2626; }
-.dark .toast-error { color: hsl(358, 100%, 81%); }
+body { font-family: system-ui, -apple-system, sans-serif; color: var(--color-fg); background: var(--color-bg); }
+.cms-error { padding: 2rem; color: var(--color-danger-fg); }
+.cms-loading { padding: 2rem; color: var(--color-muted); }
+.global-toast { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 1001; background: var(--color-bg); color: var(--color-fg); border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 8px 8px; padding: 8px 20px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; }
+.toast-success { color: var(--color-success-fg); }
+.toast-error { color: var(--color-danger-fg); }
 .toast-link { color: inherit; text-decoration: underline; }
 .toast-dismiss { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 2px 4px; margin-left: 4px; opacity: 0.7; display: flex; align-items: center; }
 .toast-dismiss:hover { opacity: 1; }
