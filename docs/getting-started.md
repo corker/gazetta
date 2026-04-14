@@ -400,6 +400,74 @@ The optional `environment` field declares a target's intent — `local`, `stagin
 
 Defaults: `filesystem` storage → `local`, everything else → `production`. Override in site.yaml when those defaults don't match your setup (e.g. a shared filesystem mount used as production, or a cloud target reserved for staging).
 
+## Customize admin appearance
+
+If your project has a file at `admin/theme.css`, Gazetta loads it after the
+admin's own styles so your declarations win the cascade.
+
+Use it to:
+
+**Override Gazetta's tokens** — change brand color, status colors, etc.
+
+```css
+/* admin/theme.css */
+:root {
+  --p-primary-color: #7c3aed;
+  --color-danger-bg: #fef2f2;
+  --color-env-prod-bg: #fff5e6;
+}
+.dark {
+  --p-primary-color: #a78bfa;
+  --color-danger-bg: #2a0a0a;
+}
+```
+
+**Define custom tokens for custom editors and fields** — pick a prefix you own:
+
+```css
+/* admin/theme.css */
+:root {
+  --myapp-json-key: #6366f1;
+  --myapp-json-string: #10b981;
+}
+.dark {
+  --myapp-json-key: #a5b4fc;
+  --myapp-json-string: #4ade80;
+}
+```
+
+Your custom editor consumes via `var(--myapp-json-key)`. Tokens are globally
+available before any editor mounts.
+
+### Reserved prefixes
+
+| Prefix | Owner | What you can do |
+|---|---|---|
+| `--p-*` | PrimeVue (595 tokens) | Override existing — don't add new |
+| `--color-*` | Gazetta semantic layer | Override existing — don't add new |
+| Anything else | You | Pick a prefix you own (`--myapp-*`, `--mycorp-*`) |
+
+The most useful Gazetta tokens to override:
+
+| Token | Purpose |
+|---|---|
+| `--p-primary-color` | Brand accent — buttons, focus rings, active states |
+| `--color-danger-bg` / `--color-danger-fg` | Error banners |
+| `--color-success-bg` / `--color-success-fg` | Success banners |
+| `--color-warning-bg` / `--color-warning-fg` | Warning banners |
+| `--color-info-bg` / `--color-info-fg` | Info banners |
+| `--color-env-prod-bg` / `--color-env-prod-fg` | Production target badge |
+| `--color-env-staging-bg` / `--color-env-staging-fg` | Staging target badge |
+
+### Known limitation: brand color cascade
+
+Overriding `--p-primary-color` cascades to some downstream tokens
+(button background, focus rings) but not to derived shades
+(`--p-primary-hover-color`, `--p-primary-active-color`,
+`--p-primary-contrast-color`). For a full brand palette swap, declare
+each shade. A future JS preset API will solve this — until then, CSS
+overrides handle the common cases.
+
 ### Authentication
 
 **Local dev:** Run `npx wrangler login` once. The CLI uses your wrangler session to access R2 — no API keys needed.

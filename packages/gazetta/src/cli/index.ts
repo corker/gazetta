@@ -1225,7 +1225,7 @@ async function runDev(siteDir: string, port: number) {
             res.end(JSON.stringify({ ready: true }))
             return
           }
-          if (url.startsWith('/admin/api') || url.startsWith('/admin/preview')) {
+          if (url.startsWith('/admin/api') || url.startsWith('/admin/preview') || url === '/admin/theme.css' || url.startsWith('/admin/theme.css?')) {
             honoHandler(req, res)
           } else if (url.startsWith('/admin') || url.startsWith('/@')) {
             vite.middlewares(req, res, () => honoHandler(req, res))
@@ -1270,6 +1270,23 @@ async function runDev(siteDir: string, port: number) {
 }
 
 // ---- Mount CMS API on the main Hono app (shared process = shared template cache) ----
+/**
+ * Mount a Hono route serving the user's admin/theme.css. 404 if not present.
+ * Cache-Control no-cache so devs see edits immediately.
+ *
+ * The link tag is added at runtime by main.ts (after PrimeVue + tokens.css)
+ * so user declarations win the cascade. See #134 and css-theming.md.
+ */
+function mountUserThemeRoute(cmsApp: Hono, adminDir: string) {
+  cmsApp.get('/theme.css', (c) => {
+    const themePath = join(adminDir, 'theme.css')
+    if (!existsSync(themePath)) return c.text('', 404)
+    c.header('Content-Type', 'text/css; charset=utf-8')
+    c.header('Cache-Control', 'no-cache')
+    return c.body(readFileSync(themePath, 'utf-8'))
+  })
+}
+
 async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string) {
   const siteYamlPath = join(siteDir, 'site.yaml')
   let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
@@ -1278,6 +1295,7 @@ async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeo
     targetConfigs = siteYaml.targets
   }
   const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, targetConfigs })
+  mountUserThemeRoute(cmsApp, adminDir)
   app.route('/admin', cmsApp)
 }
 
@@ -1293,6 +1311,7 @@ async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnTy
 
   // Mount CMS API inline at /admin (production mode — bundled editors/fields)
   const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, production: true, targetConfigs })
+  mountUserThemeRoute(cmsApp, adminDir)
   app.route('/admin', cmsApp)
 
   // Serve pre-built CMS static files (includes bundled editors/fields)
@@ -1301,21 +1320,16 @@ async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnTy
     rewriteRequestPath: (path) => path.replace(/^\/admin/, ''),
   }))
 
-  // SPA fallback: serve index.html for unmatched /admin routes
-  app.get('/admin/*', (c) => {
+  // SPA fallback: serve index.html for /admin and unmatched /admin/* routes
+  const serveIndex = (c: import('hono').Context) => {
     const indexPath = join(cmsStaticDir, 'index.html')
     if (existsSync(indexPath)) {
       return c.html(readFileSync(indexPath, 'utf-8'))
     }
     return c.text('CMS admin UI not found', 404)
-  })
-  app.get('/admin', (c) => {
-    const indexPath = join(cmsStaticDir, 'index.html')
-    if (existsSync(indexPath)) {
-      return c.html(readFileSync(indexPath, 'utf-8'))
-    }
-    return c.text('CMS admin UI not found', 404)
-  })
+  }
+  app.get('/admin/*', serveIndex)
+  app.get('/admin', serveIndex)
 }
 
 /** Find apps/admin source dir (monorepo dev mode) */
