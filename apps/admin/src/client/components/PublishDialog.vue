@@ -184,6 +184,25 @@ const compareError = computed(() => {
   return null
 })
 
+// Items the user can actually toggle — everything except deleted (which are
+// informational) and the currentItem (which is always pinned). Used by the
+// select-all/none toggle.
+const selectableItems = computed(() => changedItems.value.filter(
+  i => i.change !== 'deleted' && i.path !== currentItem.value,
+))
+const allSelected = computed(() => selectableItems.value.length > 0
+  && selectableItems.value.every(i => selectedItems.value.has(i.path)),
+)
+function toggleSelectAll() {
+  const s = new Set(selectedItems.value)
+  if (allSelected.value) {
+    for (const i of selectableItems.value) s.delete(i.path)
+  } else {
+    for (const i of selectableItems.value) s.add(i.path)
+  }
+  selectedItems.value = s
+}
+
 // Keep currentItem pre-checked whenever it appears in the changed list.
 // Deleted items are informational (never selectable) — they're already gone
 // locally, publish would be a no-op.
@@ -338,6 +357,12 @@ function onClose() {
               <span v-if="summary.added">{{ summary.modified ? ' · ' : '' }}{{ summary.added }} added</span>
               <span v-if="summary.deleted">{{ summary.modified || summary.added ? ' · ' : '' }}{{ summary.deleted }} only on target</span>
             </span>
+            <button v-if="!anyLoading && selectableItems.length > 0"
+              type="button" class="publish-select-all"
+              data-testid="publish-select-all"
+              @click="toggleSelectAll">
+              {{ allSelected ? 'Select none' : 'Select all' }}
+            </button>
           </p>
           <div v-if="!anyLoading && changedItems.length === 0" class="publish-nochanges">
             No changes to publish.
@@ -420,6 +445,8 @@ function onClose() {
 .publish-empty { color: var(--color-muted); font-size: 0.875rem; }
 .publish-label { font-size: 0.75rem; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.03em; display: flex; align-items: center; gap: 0.5rem; }
 .publish-label-hint { text-transform: none; letter-spacing: 0; font-size: 0.75rem; color: var(--color-muted); font-weight: normal; }
+.publish-select-all { margin-left: auto; background: transparent; border: 0; color: var(--color-primary); font-size: 0.75rem; cursor: pointer; padding: 0.125rem 0.25rem; border-radius: var(--p-border-radius-sm); text-transform: none; letter-spacing: 0; font-weight: normal; }
+.publish-select-all:hover { background: var(--color-hover-bg); }
 .publish-targets { display: flex; flex-direction: column; gap: 0.5rem; }
 .publish-target { display: flex; align-items: center; gap: 0.5rem; }
 .publish-target label { cursor: pointer; }

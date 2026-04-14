@@ -755,6 +755,32 @@ test.describe('Publish dialog', () => {
     await expect(html).not.toHaveClass(/dark/)
   })
 
+  test('select-all toggles all changed items at once', async ({ page, testSite }) => {
+    // Seed two stale sidecars + the worker's two fresh pages = 4 selectable
+    // changes (home is currentItem, always pinned). about/showcase/blog/404
+    // start un-checked.
+    await wipe(testSite.projectDir)
+    await openPublish(page)
+    await selectStaging(page)
+    const toggle = page.locator('[data-testid="publish-select-all"]')
+    // First-publish path skips the per-item list entirely — seed a sidecar so
+    // the changes panel renders.
+    await wipe(testSite.projectDir)
+    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/home'), '00000000')
+    await page.locator('[data-testid="publish-target-staging"]').click()
+    await page.locator('[data-testid="publish-target-staging"]').click()
+    await expect(toggle).toBeVisible()
+    await expect(toggle).toHaveText('Select all')
+    await toggle.click()
+    await expect(toggle).toHaveText('Select none')
+    // Every non-deleted, non-current row's checkbox is now checked
+    const aboutRow = page.locator('[data-testid="publish-change-pages/about"]')
+    await expect(aboutRow.locator('.p-checkbox-checked')).toHaveCount(1)
+    await toggle.click()
+    await expect(toggle).toHaveText('Select all')
+    await expect(aboutRow.locator('.p-checkbox-checked')).toHaveCount(0)
+  })
+
   test('invalid templates are surfaced and block publish', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     // Break the 'hero' template — not parseable js. Compare should still
