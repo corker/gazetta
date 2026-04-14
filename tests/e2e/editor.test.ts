@@ -694,4 +694,22 @@ test.describe('Publish dialog', () => {
     // Sanity: html has light class, not dark
     await expect(html).not.toHaveClass(/dark/)
   })
+
+  test('invalid templates are surfaced and block publish', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    // Break the 'hero' template — not parseable js. Compare should still
+    // complete but report invalidTemplates.
+    const tpl = join(testSite.projectDir, 'templates/hero/index.ts')
+    await writeFile(tpl, 'this is not valid ts!!!')
+
+    await openPublish(page)
+    await selectStaging(page)
+    const banner = page.locator('[data-testid="publish-invalid-templates"]')
+    await expect(banner).toBeVisible()
+    await expect(banner).toContainText('hero')
+    // Publish button is disabled with the explanatory title
+    const submit = page.locator('[data-testid="publish-submit"]')
+    await expect(submit).toBeDisabled()
+    await expect(submit).toHaveAttribute('title', 'Fix invalid templates before publishing')
+  })
 })

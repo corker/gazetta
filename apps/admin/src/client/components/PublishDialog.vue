@@ -145,12 +145,27 @@ const needsConfirm = computed(() => productionTargetsSelected.value.length > 0)
 // Publish is blocked while compare is still running — otherwise a hasty click
 // falls back to publishing only the currently-edited item, which users rarely
 // intend when the changes panel is still about to populate.
+// Invalid templates surface across all selected targets — templates are
+// scanned once per compare, but any target can report errors. Dedupe by name.
+const invalidTemplates = computed(() => {
+  const seen = new Map<string, string[]>()
+  for (const t of selectedTargets.value) {
+    const r = compareByTarget.value.get(t)
+    if (!r) continue
+    for (const tpl of r.invalidTemplates) {
+      if (!seen.has(tpl.name)) seen.set(tpl.name, tpl.errors)
+    }
+  }
+  return [...seen.entries()].map(([name, errors]) => ({ name, errors }))
+})
+const hasInvalidTemplates = computed(() => invalidTemplates.value.length > 0)
 const publishBlocked = computed(() =>
-  selectedTargets.value.length === 0 || anyLoading.value || publishing.value
+  selectedTargets.value.length === 0 || anyLoading.value || publishing.value || hasInvalidTemplates.value
 )
 const publishDisabledReason = computed(() => {
   if (selectedTargets.value.length === 0) return 'Select at least one target'
   if (anyLoading.value) return 'Loading changes…'
+  if (hasInvalidTemplates.value) return 'Fix invalid templates before publishing'
   return ''
 })
 const anyCompareDone = computed(() => compareByTarget.value.size > 0)
@@ -282,6 +297,19 @@ function onClose() {
           </div>
         </div>
 
+        <div v-if="hasInvalidTemplates" class="publish-warning" data-testid="publish-invalid-templates">
+          <i class="pi pi-exclamation-triangle" />
+          <div class="publish-invalid-body">
+            <p><strong>{{ invalidTemplates.length }} template{{ invalidTemplates.length === 1 ? '' : 's' }} can't be rendered.</strong> Publish is blocked until fixed.</p>
+            <ul class="publish-invalid-list">
+              <li v-for="tpl in invalidTemplates" :key="tpl.name">
+                <span class="publish-invalid-name">{{ tpl.name }}</span>
+                <span class="publish-invalid-error">{{ tpl.errors[0] }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
         <div v-if="confirming" class="publish-confirm-banner" data-testid="publish-confirm-banner">
           <i class="pi pi-exclamation-triangle" />
           <span>
@@ -398,6 +426,12 @@ function onClose() {
 .publish-warning { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #450a0a; color: #f87171; font-size: 0.875rem; }
 .publish-firstpublish { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #1e3a5f; color: #93c5fd; font-size: 0.875rem; }
 .publish-confirm-banner { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #450a0a; color: #fca5a5; font-size: 0.875rem; }
+.publish-invalid-body { display: flex; flex-direction: column; gap: 0.375rem; flex: 1; }
+.publish-invalid-body p { margin: 0; }
+.publish-invalid-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.publish-invalid-list li { display: flex; flex-direction: column; gap: 0.125rem; font-size: 0.8125rem; }
+.publish-invalid-name { font-family: monospace; font-weight: 600; }
+.publish-invalid-error { opacity: 0.85; font-size: 0.75rem; }
 .publish-target-label { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
 .publish-env-badge { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.125rem 0.375rem; border-radius: 4px; font-weight: 600; }
 .publish-env-prod { background: #450a0a; color: #fca5a5; }
