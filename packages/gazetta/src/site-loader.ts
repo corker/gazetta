@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import type { PageManifest, FragmentManifest, SiteManifest, StorageProvider } from './types.js'
 import { parseSiteManifest, parsePageManifest, parseFragmentManifest } from './manifest.js'
+import { mapLimit } from './concurrency.js'
 
 /** Derive route from page folder name: home → /, about → /about, blog/[slug] → /blog/:slug */
 export function deriveRoute(pageName: string): string {
@@ -30,8 +31,11 @@ async function discoverPages(
   }
 
   const entries = await storage.readDir(pagesDir)
-  for (const entry of entries) {
-    if (!entry.isDirectory) continue
+  const subdirs = entries.filter(e => e.isDirectory)
+
+  // Parallelize manifest reads — sequential is untenable at 10k pages.
+  // Bounded concurrency protects the fd table and cloud rate limits.
+  await mapLimit(subdirs, async (entry) => {
     const dir = join(pagesDir, entry.name)
     const name = prefix ? `${prefix}/${entry.name}` : entry.name
     const manifestPath = join(dir, 'page.json')
@@ -46,9 +50,11 @@ async function discoverPages(
       }
     }
 
-    // Recurse into subdirectories to find nested pages (e.g., blog/[slug])
+    // Recurse into subdirectories to find nested pages (e.g., blog/[slug]).
+    // Recursive call inherits the same bounded mapLimit — workers at each
+    // level compete for the same concurrency budget.
     await discoverPages(storage, dir, pages, name)
-  }
+  })
   return pages
 }
 
@@ -63,20 +69,19 @@ async function discoverFragments(
   }
 
   const entries = await storage.readDir(fragmentsDir)
-  for (const entry of entries) {
-    if (!entry.isDirectory) continue
+  const subdirs = entries.filter(e => e.isDirectory)
+
+  await mapLimit(subdirs, async (entry) => {
     const fragDir = join(fragmentsDir, entry.name)
     const manifestPath = join(fragDir, 'fragment.json')
-
-    if (!await storage.exists(manifestPath)) continue
-
+    if (!await storage.exists(manifestPath)) return
     try {
       const manifest = await parseFragmentManifest(storage, manifestPath)
       fragments.set(entry.name, { ...manifest, dir: fragDir })
     } catch (err) {
       console.warn(`  Warning: skipping fragment "${entry.name}": ${(err as Error).message}`)
     }
-  }
+  })
   return fragments
 }
 

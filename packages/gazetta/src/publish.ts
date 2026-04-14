@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import type { StorageProvider } from './types.js'
 import { parseUsesSidecarName, parseTemplateSidecarName } from './hash.js'
+import { mapLimit } from './concurrency.js'
 
 export interface PublishRequest {
   source: string
@@ -27,13 +28,15 @@ export async function publishItems(
   targetBase: string,
   items: string[]
 ): Promise<{ copiedFiles: number }> {
-  let copiedFiles = 0
-
-  for (const item of items) {
+  // Copy items in parallel (bounded). copyRecursive does its own bounded
+  // fan-out per item, so the outer limit here keeps total concurrency in
+  // check regardless of how deep any one item goes.
+  const counts = await mapLimit(items, async (item) => {
     const sourcePath = join(sourceBase, item)
     const targetPath = join(targetBase, item)
-    copiedFiles += await copyRecursive(sourceStorage, sourcePath, targetStorage, targetPath)
-  }
+    return copyRecursive(sourceStorage, sourcePath, targetStorage, targetPath)
+  })
+  let copiedFiles = counts.reduce((a, b) => a + b, 0)
 
   // Also copy site.yaml
   try {
@@ -53,8 +56,6 @@ async function copyRecursive(
   target: StorageProvider,
   targetPath: string
 ): Promise<number> {
-  let count = 0
-
   // Check if sourcePath is a file
   try {
     const content = await source.readFile(sourcePath)
@@ -71,19 +72,20 @@ async function copyRecursive(
   const entries = await source.readDir(sourcePath)
   await target.mkdir(targetPath)
 
-  for (const entry of entries) {
+  // Bounded-parallel copy of children. Sequential would be O(n) wall time;
+  // at 10k files on cloud storage that's minutes of serial I/O latency.
+  const counts = await mapLimit(entries, async (entry) => {
     const childSource = join(sourcePath, entry.name)
     const childTarget = join(targetPath, entry.name)
     if (entry.isDirectory) {
-      count += await copyRecursive(source, childSource, target, childTarget)
-    } else {
-      const content = await source.readFile(childSource)
-      await target.writeFile(childTarget, content)
-      count++
+      return copyRecursive(source, childSource, target, childTarget)
     }
-  }
+    const content = await source.readFile(childSource)
+    await target.writeFile(childTarget, content)
+    return 1
+  })
 
-  return count
+  return counts.reduce((a, b) => a + b, 0)
 }
 
 function dirname(path: string): string {
@@ -195,22 +197,6 @@ export async function findFragmentDependents(
     } catch { /* missing dir */ }
   }
 
-  const directRefs = new Map<string, string[]>() // itemKey -> list of referenced fragment names
-
-  async function loadDirectRefs(kind: 'page' | 'fragment', name: string): Promise<string[]> {
-    const key = `${kind}:${name}`
-    if (directRefs.has(key)) return directRefs.get(key)!
-    const refs: string[] = []
-    const manifestName = kind === 'page' ? 'page.json' : 'fragment.json'
-    try {
-      const raw = await storage.readFile(join(siteBase, kind === 'page' ? 'pages' : 'fragments', name, manifestName))
-      const manifest = JSON.parse(raw) as { components?: unknown[] }
-      walkComponents(manifest.components, refs)
-    } catch { /* skip unreadable manifests */ }
-    directRefs.set(key, refs)
-    return refs
-  }
-
   function walkComponents(components: unknown[] | undefined, out: string[]) {
     if (!Array.isArray(components)) return
     for (const entry of components) {
@@ -221,16 +207,31 @@ export async function findFragmentDependents(
     }
   }
 
-  // BFS: find everything that transitively references `fragmentName`
-  const target = fragmentName
-  const queue = [target]
-  const seen = new Set<string>([target])
+  // Read every manifest in parallel (bounded) and index refs in memory.
+  // Past this point the BFS is a map lookup, not storage I/O — so it stays
+  // fast even at 10k items.
+  const directRefs = new Map<string, string[]>()
+  await mapLimit(manifestsToScan, async (item) => {
+    const refs: string[] = []
+    const manifestName = item.kind === 'page' ? 'page.json' : 'fragment.json'
+    const dir = item.kind === 'page' ? 'pages' : 'fragments'
+    try {
+      const raw = await storage.readFile(join(siteBase, dir, item.name, manifestName))
+      const manifest = JSON.parse(raw) as { components?: unknown[] }
+      walkComponents(manifest.components, refs)
+    } catch { /* skip unreadable */ }
+    directRefs.set(`${item.kind}:${item.name}`, refs)
+  })
+
+  // BFS: find everything that transitively references `fragmentName`.
+  const queue = [fragmentName]
+  const seen = new Set<string>([fragmentName])
   while (queue.length) {
     const current = queue.shift()!
     for (const item of manifestsToScan) {
       const key = `${item.kind}:${item.name}`
       if (seen.has(key)) continue
-      const refs = await loadDirectRefs(item.kind, item.name)
+      const refs = directRefs.get(key) ?? []
       if (refs.includes(current)) {
         seen.add(key)
         if (item.kind === 'page') pages.add(item.name)
@@ -286,21 +287,24 @@ export async function findDependentsFromSidecars(
   async function indexKind(kind: 'pages' | 'fragments', index: Map<string, ItemInfo>): Promise<void> {
     let entries
     try { entries = await targetStorage.readDir(kind) } catch { return }
-    await Promise.all(entries.filter(e => e.isDirectory).map(async (e) => {
-      // Nested pages/fragments (e.g. blog/[slug]) — check children too
+    const topLevel = entries.filter(e => e.isDirectory)
+    // Bounded concurrency — 10k-page sites must not spawn 10k concurrent
+    // listings. Default limit (20) matches cloud storage sweet spot.
+    await mapLimit(topLevel, async (e) => {
       const itemDir = `${kind}/${e.name}`
       const info = await readItemSidecars(itemDir)
       if (info && (info.uses.size || info.template)) index.set(e.name, info)
-      try {
-        const children = await targetStorage.readDir(itemDir)
-        await Promise.all(children.filter(c => c.isDirectory).map(async (c) => {
-          const nestedInfo = await readItemSidecars(`${itemDir}/${c.name}`)
-          if (nestedInfo && (nestedInfo.uses.size || nestedInfo.template)) {
-            index.set(`${e.name}/${c.name}`, nestedInfo)
-          }
-        }))
-      } catch { /* no nested */ }
-    }))
+      // Nested pages/fragments (e.g. blog/[slug]) — check children too
+      let children
+      try { children = await targetStorage.readDir(itemDir) } catch { return }
+      const nested = children.filter(c => c.isDirectory)
+      await mapLimit(nested, async (c) => {
+        const nestedInfo = await readItemSidecars(`${itemDir}/${c.name}`)
+        if (nestedInfo && (nestedInfo.uses.size || nestedInfo.template)) {
+          index.set(`${e.name}/${c.name}`, nestedInfo)
+        }
+      })
+    })
   }
 
   await Promise.all([

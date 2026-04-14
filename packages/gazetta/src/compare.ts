@@ -1,6 +1,7 @@
 import { loadSite } from './site-loader.js'
 import { hashManifest, parseSidecarName } from './hash.js'
 import { scanTemplates, templateHashesFrom } from './templates-scan.js'
+import { mapLimit } from './concurrency.js'
 import type { StorageProvider } from './types.js'
 
 export interface CompareResult {
@@ -98,6 +99,9 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
 /**
  * Walk `pages/` or `fragments/` looking for `.{8hex}.hash` sidecar files.
  * Records `pages/home` → `abc12345` for each found.
+ *
+ * Bounded-parallel recursion — flat Promise.all over 10k dirs would blow
+ * the fd limit or provider rate limit.
  */
 async function collectSidecars(
   storage: StorageProvider,
@@ -121,9 +125,8 @@ async function collectSidecars(
   if (foundSidecar) {
     out.set(prefix, foundSidecar)
   }
-  for (const e of entries) {
-    if (e.isDirectory) {
-      await collectSidecars(storage, `${rootDir}/${e.name}`, out, `${prefix}/${e.name}`)
-    }
-  }
+  const subdirs = entries.filter(e => e.isDirectory)
+  await mapLimit(subdirs, async (e) => {
+    await collectSidecars(storage, `${rootDir}/${e.name}`, out, `${prefix}/${e.name}`)
+  })
 }
