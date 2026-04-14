@@ -235,6 +235,71 @@ function toggleItem(path: string) {
   selectedItems.value = s
 }
 
+// Per-fragment reverse-dependency cache. Publishing a fragment affects the
+// pages that reference it: instantly on ESI targets (edge re-assembles), but
+// on static targets those pages need republishing too. Show the list so the
+// author knows the blast radius. See #110.
+const dependentsCache = ref(new Map<string, { pages: string[]; fragments: string[] }>())
+const dependentsLoading = ref(new Set<string>())
+
+// Selected fragments that we currently have dependent info for.
+const selectedFragments = computed(() =>
+  [...selectedItems.value].filter(p => p.startsWith('fragments/')),
+)
+
+// Fetch dependents for any newly-selected fragment. Cached so reopening the
+// dialog / toggling selection doesn't re-query every time.
+watch(selectedFragments, async (frags) => {
+  for (const frag of frags) {
+    if (dependentsCache.value.has(frag) || dependentsLoading.value.has(frag)) continue
+    const loading = new Set(dependentsLoading.value)
+    loading.add(frag)
+    dependentsLoading.value = loading
+    try {
+      const r = await api.getDependents(frag)
+      const cache = new Map(dependentsCache.value)
+      cache.set(frag, r)
+      dependentsCache.value = cache
+    } catch {
+      // Silent — if the endpoint fails, just skip the notice
+    } finally {
+      const done = new Set(dependentsLoading.value)
+      done.delete(frag)
+      dependentsLoading.value = done
+    }
+  }
+})
+
+// Union of pages affected by any selected fragment. Excludes pages that are
+// already in selectedItems (they'd show twice).
+const impactedPages = computed(() => {
+  const set = new Set<string>()
+  for (const frag of selectedFragments.value) {
+    const deps = dependentsCache.value.get(frag)
+    if (!deps) continue
+    for (const p of deps.pages) {
+      if (!selectedItems.value.has(`pages/${p}`)) set.add(p)
+    }
+  }
+  return [...set].sort()
+})
+
+// Show the impact block only when it's actionable: at least one fragment
+// selected AND at least one page impacted that isn't already in the selection.
+const showImpact = computed(() =>
+  selectedFragments.value.length > 0 && impactedPages.value.length > 0,
+)
+
+// Are any selected targets static? That's when the impact is operationally
+// meaningful: those pages won't see the fragment change until republished.
+const anyStaticTargetSelected = computed(() => {
+  for (const t of selectedTargets.value) {
+    const cfg = targets.value.find(x => x.name === t)
+    if (cfg?.publishMode === 'static') return true
+  }
+  return false
+})
+
 async function onPublishClick() {
   if (publishBlocked.value) return
   if (needsConfirm.value && !confirming.value) {
@@ -352,6 +417,19 @@ function onClose() {
                 <span class="publish-invalid-error">{{ tpl.errors[0] }}</span>
               </li>
             </ul>
+          </div>
+        </div>
+
+        <div v-if="showImpact" class="publish-impact" data-testid="publish-impact">
+          <i class="pi pi-info-circle" />
+          <div class="publish-impact-body">
+            <p>
+              <strong>Also affects:</strong>
+              {{ impactedPages.slice(0, 6).join(', ') }}<span v-if="impactedPages.length > 6">, +{{ impactedPages.length - 6 }} more</span>
+            </p>
+            <p v-if="anyStaticTargetSelected" class="publish-impact-note">
+              Static targets bake fragments into pages — republish the pages above to see the change on static targets. ESI targets update instantly.
+            </p>
           </div>
         </div>
 
@@ -490,6 +568,10 @@ function onClose() {
 .publish-warning { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: var(--p-border-radius-md); background: var(--color-danger-bg); color: var(--color-danger-fg); font-size: 0.875rem; }
 .publish-firstpublish { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: var(--p-border-radius-md); background: var(--color-info-bg); color: var(--color-info-fg); font-size: 0.875rem; }
 .publish-confirm-banner { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: var(--p-border-radius-md); background: var(--color-danger-bg); color: var(--color-danger-fg); font-size: 0.875rem; }
+.publish-impact { display: flex; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: var(--p-border-radius-md); background: var(--color-info-bg); color: var(--color-info-fg); font-size: 0.875rem; }
+.publish-impact-body { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
+.publish-impact-body p { margin: 0; }
+.publish-impact-note { font-size: 0.75rem; opacity: 0.85; }
 .publish-invalid-body { display: flex; flex-direction: column; gap: 0.375rem; flex: 1; }
 .publish-invalid-body p { margin: 0; }
 .publish-invalid-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }

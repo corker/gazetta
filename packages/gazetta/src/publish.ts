@@ -165,3 +165,78 @@ async function collectComponentDeps(
     }
   }
 }
+
+/**
+ * Reverse-dependency lookup: given a fragment name, return the pages and
+ * fragments that reference it (transitively). Used by the admin UI to show
+ * "publishing @header affects: home, about, blog".
+ *
+ * On static targets, those pages need to be republished too — fragments are
+ * baked into pages at publish time. On ESI targets, republishing the fragment
+ * alone suffices because the edge composer resolves @fragments per request.
+ */
+export async function findFragmentDependents(
+  storage: StorageProvider,
+  siteBase: string,
+  fragmentName: string,
+): Promise<{ pages: string[]; fragments: string[] }> {
+  const pages = new Set<string>()
+  const fragments = new Set<string>()
+
+  // Build an index of every manifest → direct @ references
+  const manifestsToScan: { kind: 'page' | 'fragment'; name: string }[] = []
+  for (const kind of ['pages', 'fragments'] as const) {
+    try {
+      const entries = await storage.readDir(join(siteBase, kind))
+      for (const e of entries) {
+        if (e.isDirectory) manifestsToScan.push({ kind: kind === 'pages' ? 'page' : 'fragment', name: e.name })
+      }
+    } catch { /* missing dir */ }
+  }
+
+  const directRefs = new Map<string, string[]>() // itemKey -> list of referenced fragment names
+
+  async function loadDirectRefs(kind: 'page' | 'fragment', name: string): Promise<string[]> {
+    const key = `${kind}:${name}`
+    if (directRefs.has(key)) return directRefs.get(key)!
+    const refs: string[] = []
+    const manifestName = kind === 'page' ? 'page.json' : 'fragment.json'
+    try {
+      const raw = await storage.readFile(join(siteBase, kind === 'page' ? 'pages' : 'fragments', name, manifestName))
+      const manifest = JSON.parse(raw) as { components?: unknown[] }
+      walkComponents(manifest.components, refs)
+    } catch { /* skip unreadable manifests */ }
+    directRefs.set(key, refs)
+    return refs
+  }
+
+  function walkComponents(components: unknown[] | undefined, out: string[]) {
+    if (!Array.isArray(components)) return
+    for (const entry of components) {
+      if (typeof entry === 'string' && entry.startsWith('@')) out.push(entry.slice(1))
+      else if (typeof entry === 'object' && entry !== null) {
+        walkComponents((entry as { components?: unknown[] }).components, out)
+      }
+    }
+  }
+
+  // BFS: find everything that transitively references `fragmentName`
+  const target = fragmentName
+  const queue = [target]
+  const seen = new Set<string>([target])
+  while (queue.length) {
+    const current = queue.shift()!
+    for (const item of manifestsToScan) {
+      const key = `${item.kind}:${item.name}`
+      if (seen.has(key)) continue
+      const refs = await loadDirectRefs(item.kind, item.name)
+      if (refs.includes(current)) {
+        seen.add(key)
+        if (item.kind === 'page') pages.add(item.name)
+        else { fragments.add(item.name); queue.push(item.name) }
+      }
+    }
+  }
+
+  return { pages: [...pages].sort(), fragments: [...fragments].sort() }
+}

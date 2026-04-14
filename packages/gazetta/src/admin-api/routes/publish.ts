@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { getPublishMode, getEnvironment } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
-import { publishItems, resolveDependencies } from '../../publish.js'
+import { publishItems, resolveDependencies, findFragmentDependents } from '../../publish.js'
 import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
@@ -61,8 +61,35 @@ export function publishRoutes(
     const t = await getTargets()
     return c.json([...t.keys()].map(name => {
       const cfg = getTargetConfig(name)
-      return { name, environment: cfg ? getEnvironment(cfg) : 'local' }
+      return {
+        name,
+        environment: cfg ? getEnvironment(cfg) : 'local',
+        publishMode: cfg ? getPublishMode(cfg) : 'static',
+      }
     }))
+  })
+
+  /**
+   * Reverse-dependency lookup for publish UI impact preview.
+   * GET /api/dependents?item=fragments/header
+   *   → { pages: string[], fragments: string[] }
+   *
+   * Returned lists are the pages and nested fragments that transitively
+   * reference the queried fragment. The admin UI shows this as
+   * "Publishing @header affects: home, about, blog".
+   */
+  app.get('/api/dependents', async (c) => {
+    const item = c.req.query('item')
+    if (!item || !item.startsWith('fragments/')) {
+      return c.json({ error: 'Missing or invalid "item" query (must be fragments/<name>)' }, 400)
+    }
+    const fragmentName = item.slice('fragments/'.length)
+    try {
+      const result = await findFragmentDependents(sourceStorage, siteDir, fragmentName)
+      return c.json(result)
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500)
+    }
   })
 
   /**

@@ -752,6 +752,21 @@ test.describe('Publish dialog', () => {
     await expect(page.locator('[data-testid="publish-compare-error"]')).toHaveCount(0)
   })
 
+  test('publishing a fragment shows impacted pages', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    // Open publish for @header — every starter page includes @header so the
+    // impact block should list them.
+    await page.goto('/admin/fragments/header')
+    await page.locator('[data-testid="publish-btn"]').click()
+    await page.locator('[data-testid="publish-target-esi-test"]').click()
+    const impact = page.locator('[data-testid="publish-impact"]')
+    await expect(impact).toBeVisible()
+    await expect(impact).toContainText('Also affects')
+    // home + about + showcase + 404 all reference @header via their page.json
+    await expect(impact).toContainText('home')
+    await expect(impact).toContainText('about')
+  })
+
   test('production target requires confirmation before publishing', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     // The fixture swaps the azure-blob production target for a filesystem

@@ -101,7 +101,8 @@ export interface FragmentDetail extends FragmentSummary {
 }
 
 export type TargetEnvironment = 'local' | 'staging' | 'production'
-export interface TargetInfo { name: string; environment: TargetEnvironment }
+export type PublishMode = 'esi' | 'static'
+export interface TargetInfo { name: string; environment: TargetEnvironment; publishMode: PublishMode }
 
 export interface PublishResult { target: string; success: boolean; error?: string; copiedFiles: number }
 export type PublishProgress =
@@ -140,5 +141,6 @@ export const api = {
   publish: (items: string[], targets: string[]) => request<{ results: PublishResult[] }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
   publishStream,
   compare: (target: string, options?: RequestInit) => request<CompareResult>(`/compare?target=${encodeURIComponent(target)}`, options),
+  getDependents: (item: string, options?: RequestInit) => request<{ pages: string[]; fragments: string[] }>(`/dependents?item=${encodeURIComponent(item)}`, options),
   fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),
 }
