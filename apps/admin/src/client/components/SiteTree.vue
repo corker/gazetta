@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
+import { usePublishStatusStore } from '../stores/publishStatus.js'
 import { api } from '../api/client.js'
 import CreatePageDialog from './CreatePageDialog.vue'
 import CreateFragmentDialog from './CreateFragmentDialog.vue'
@@ -23,9 +24,27 @@ const site = useSiteStore()
 const selection = useSelectionStore()
 const editing = useEditingStore()
 const toast = useToastStore()
+const publishStatus = usePublishStatusStore()
 const selectedKey = ref<string | null>(null)
 const showCreatePage = ref(false)
 const showCreateFragment = ref(false)
+
+// Compare against the most-important target so each node can show whether
+// it has unpublished changes. Refreshes on mount and on site reload.
+onMounted(() => publishStatus.refresh())
+watch(() => site.pages.length + site.fragments.length, () => publishStatus.refresh())
+
+function isDirty(node: SiteNode): boolean {
+  if (publishStatus.isFirstPublish) return true
+  return node.type === 'page'
+    ? publishStatus.isPageDirty(node.name)
+    : publishStatus.isFragmentDirty(node.name)
+}
+function dirtyTitle(): string {
+  if (!publishStatus.target) return ''
+  if (publishStatus.isFirstPublish) return `Not yet published to ${publishStatus.target}`
+  return `Has unpublished changes (${publishStatus.target})`
+}
 
 // Sync selection when changed externally (e.g. preview link click)
 watch(() => selection.selection, (sel) => {
@@ -85,6 +104,8 @@ async function handleDelete(node: SiteNode, e: Event) {
       @click="onSelect(node)">
       <i :class="node.icon" class="node-icon" />
       <span class="node-label">{{ node.label }}</span>
+      <span v-if="isDirty(node)" class="node-dirty-dot" :title="dirtyTitle()"
+        :data-testid="`dirty-${node.type}-${node.name}`" />
       <Button icon="pi pi-trash" text rounded size="small" severity="danger"
         class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
         @click="handleDelete(node, $event)" />
@@ -99,6 +120,8 @@ async function handleDelete(node: SiteNode, e: Event) {
         @click="onSelect(node)">
         <i :class="node.icon" class="node-icon" />
         <span class="node-label">{{ node.label }}</span>
+        <span v-if="isDirty(node)" class="node-dirty-dot" :title="dirtyTitle()"
+          :data-testid="`dirty-${node.type}-${node.name}`" />
         <Button icon="pi pi-trash" text rounded size="small" severity="danger"
           class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
           @click="handleDelete(node, $event)" />
@@ -113,6 +136,8 @@ async function handleDelete(node: SiteNode, e: Event) {
       @click="onSelect(node)">
       <i :class="node.icon" class="node-icon" />
       <span class="node-label">{{ node.label }}</span>
+      <span v-if="isDirty(node)" class="node-dirty-dot" :title="dirtyTitle()"
+        :data-testid="`dirty-${node.type}-${node.name}`" />
       <Button icon="pi pi-trash" text rounded size="small" severity="danger"
         class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
         @click="handleDelete(node, $event)" />
@@ -149,6 +174,7 @@ async function handleDelete(node: SiteNode, e: Event) {
 :global(.dark) .node-label { color: #bbb; }
 :global(.dark) .node-item.selected .node-label { color: #e4e4e7; }
 :global(.dark) .node-item:hover .node-label { color: #e4e4e7; }
+.node-dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning-fg); flex-shrink: 0; margin-right: 2px; }
 .node-delete { opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-delete { opacity: 1; }
 .new-btns { display: flex; gap: 0.5rem; margin-top: 8px; padding: 0 6px; }

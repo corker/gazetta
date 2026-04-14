@@ -266,6 +266,10 @@ export const useEditingStore = defineStore('editing', () => {
       }
       pendingEdits.clear()
       usePreviewStore().invalidate()
+      // Re-check publish state — saving may have flipped this page from
+      // unchanged to dirty (or vice-versa if content matches the target).
+      const { usePublishStatusStore } = await import('./publishStatus.js')
+      usePublishStatusStore().refresh()
       toast.show('Saved')
     } catch (err) {
       lastSaveError.value = (err as Error).message

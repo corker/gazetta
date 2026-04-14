@@ -5,11 +5,13 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
 import { api, type CompareResult, type TargetInfo } from '../api/client.js'
+import { usePublishStatusStore } from '../stores/publishStatus.js'
 
 const props = defineProps<{ visible: boolean; itemType: string; itemName: string }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const currentItem = computed(() => `${props.itemType}/${props.itemName}`)
+const publishStatus = usePublishStatusStore()
 
 const targets = ref<TargetInfo[]>([])
 const selectedTargets = ref<string[]>([])
@@ -261,6 +263,8 @@ async function handlePublish() {
     }
     const response = await api.publish(items, selectedTargets.value)
     results.value = response.results
+    // Refresh the SiteTree dirty indicators against the new target state.
+    publishStatus.refresh()
   } catch (err) {
     results.value = [{ target: '(all)', success: false, error: (err as Error).message, copiedFiles: 0 }]
   } finally {
