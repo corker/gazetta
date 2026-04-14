@@ -376,9 +376,9 @@ describe('findDependentsFromSidecars', () => {
   it('walks transitive fragment→fragment references', async () => {
     const { findDependentsFromSidecars } = await import('../src/publish.js')
     const target = createFilesystemProvider(targetDir)
-    await writeTestFile(targetDir, 'fragments/header/.123.hash', '')
+    await writeTestFile(targetDir, 'fragments/header/.12345678.hash', '')
     await writeTestFile(targetDir, 'fragments/header/.uses-inner-logo', '')
-    await writeTestFile(targetDir, 'pages/home/.456.hash', '')
+    await writeTestFile(targetDir, 'pages/home/.87654321.hash', '')
     await writeTestFile(targetDir, 'pages/home/.uses-header', '')
 
     const r = await findDependentsFromSidecars(target, { fragment: 'inner-logo' })
@@ -389,9 +389,13 @@ describe('findDependentsFromSidecars', () => {
   it('returns items that use a given template', async () => {
     const { findDependentsFromSidecars } = await import('../src/publish.js')
     const target = createFilesystemProvider(targetDir)
+    // Real published state always has .hash alongside .uses-* / .tpl-*
+    await writeTestFile(targetDir, 'pages/home/.11111111.hash', '')
     await writeTestFile(targetDir, 'pages/home/.uses-header', '')
     await writeTestFile(targetDir, 'pages/home/.tpl-page-default', '')
+    await writeTestFile(targetDir, 'pages/blog/.22222222.hash', '')
     await writeTestFile(targetDir, 'pages/blog/.tpl-page-blog', '')
+    await writeTestFile(targetDir, 'fragments/header/.33333333.hash', '')
     await writeTestFile(targetDir, 'fragments/header/.tpl-header-layout', '')
 
     const r = await findDependentsFromSidecars(target, { template: 'page-default' })

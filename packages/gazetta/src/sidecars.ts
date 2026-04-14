@@ -88,55 +88,25 @@ export async function writeSidecars(
 }
 
 /**
- * Loose sidecar read — returns whatever kinds are present, doesn't require
- * a hash. Used by dependents queries that care about .uses-* / .tpl-* even
- * when no .hash has been written yet (e.g. test fixtures, partial state).
- */
-export async function readSidecarsLoose(storage: StorageProvider, dir: string): Promise<SidecarState> {
-  let entries
-  try { entries = await storage.readDir(dir) } catch { return { hash: '', uses: [], template: null } }
-  let hash = ''
-  const uses: string[] = []
-  let template: string | null = null
-  for (const e of entries) {
-    if (e.isDirectory) continue
-    const h = parseSidecarName(e.name)
-    if (h) { hash = h; continue }
-    const u = parseUsesSidecarName(e.name)
-    if (u) { uses.push(u); continue }
-    const t = parseTemplateSidecarName(e.name)
-    if (t) template = t
-  }
-  return { hash, uses, template }
-}
-
-/**
  * Walk `pages/` or `fragments/` collecting every directory's sidecar state.
  * Bounded-parallel recursion — flat Promise.all over 10k dirs would blow
  * the fd limit or provider rate limit.
  *
- * When `requireHash` is true (default), items without a .hash sidecar are
- * skipped — useful for compare where the hash is the identity. When false,
- * any directory with any known sidecar kind is returned — useful for
- * dependents queries that read .uses-* / .tpl-* standalone.
+ * Items without a .hash sidecar are skipped. `writeSidecars` always writes
+ * all three kinds together, so partial state (uses/template without hash)
+ * doesn't occur in real operation.
  */
 export async function listSidecars(
   storage: StorageProvider,
   rootDir: 'pages' | 'fragments',
-  opts: { requireHash?: boolean } = {},
 ): Promise<Map<string, SidecarState>> {
-  const requireHash = opts.requireHash ?? true
   const out = new Map<string, SidecarState>()
   async function walk(dir: string, prefix: string): Promise<void> {
     let entries
     try { entries = await storage.readDir(dir) } catch { return }
     if (prefix !== rootDir) {
-      const state = requireHash
-        ? await readSidecars(storage, dir).catch(() => null)
-        : await readSidecarsLoose(storage, dir).catch(() => null)
-      if (state && (requireHash || state.hash || state.uses.length || state.template)) {
-        out.set(prefix, state)
-      }
+      const state = await readSidecars(storage, dir).catch(() => null)
+      if (state) out.set(prefix, state)
     }
     const subdirs = entries.filter(e => e.isDirectory)
     await mapLimit(subdirs, (e) => walk(`${dir}/${e.name}`, `${prefix}/${e.name}`))

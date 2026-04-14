@@ -262,12 +262,10 @@ export async function findDependentsFromSidecars(
   targetStorage: StorageProvider,
   query: { fragment: string } | { template: string },
 ): Promise<{ pages: string[]; fragments: string[] }> {
-  // Single listing pass per root, then all reasoning is in-memory. Don't
-  // require a .hash — dependents queries care about .uses-* / .tpl-*, and
-  // an item with only those (partial state) is still relevant.
+  // Single listing pass per root, then all reasoning is in-memory.
   const [pagesList, fragmentsList] = await Promise.all([
-    listSidecars(targetStorage, 'pages', { requireHash: false }),
-    listSidecars(targetStorage, 'fragments', { requireHash: false }),
+    listSidecars(targetStorage, 'pages'),
+    listSidecars(targetStorage, 'fragments'),
   ])
   // Strip the 'pages/' or 'fragments/' prefix to match the name-only API.
   const pagesIndex = new Map<string, { uses: Set<string>; template: string | null }>()
