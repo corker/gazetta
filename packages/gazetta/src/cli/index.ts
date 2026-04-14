@@ -1280,9 +1280,13 @@ async function runDev(siteDir: string, port: number) {
 function mountUserThemeRoute(cmsApp: Hono, adminDir: string) {
   cmsApp.get('/theme.css', (c) => {
     const themePath = join(adminDir, 'theme.css')
-    if (!existsSync(themePath)) return c.text('', 404)
     c.header('Content-Type', 'text/css; charset=utf-8')
     c.header('Cache-Control', 'no-cache')
+    // When the user hasn't authored a theme.css, return an empty 200 rather
+    // than a 404. The link tag in main.ts always references this URL; a 404
+    // would log a browser console error on every cold load, polluting error
+    // reports and failing strict console-error checks.
+    if (!existsSync(themePath)) return c.body('')
     return c.body(readFileSync(themePath, 'utf-8'))
   })
 }

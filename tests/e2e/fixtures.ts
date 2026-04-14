@@ -23,16 +23,45 @@ interface TestSite {
  * server automatically.
  */
 export const test = base.extend<{ page: Page }, { testSite: TestSite; baseURL: string }>({
-  // Capture browser console + page errors on failure (artifact + stderr).
-  // Useful for diagnosing flakes that only repro in CI.
+  // Capture browser console + page errors.
+  // - Console errors and uncaught exceptions fail the test (silent bugs fly
+  //   under text-assertion radar; this catches Vue runtime errors, unhandled
+  //   rejections, PrimeVue warnings that shouldn't ship).
+  // - All captured logs are attached to the report on any failure (including
+  //   ones we trigger ourselves), for diagnosis.
+  //
+  // Tests that intentionally exercise an error path can opt out with
+  //   test.info().annotations.push({ type: 'allow-console-errors' })
+  // before the assertion that triggers the error.
   page: async ({ page }, use, testInfo) => {
     const logs: string[] = []
-    page.on('console', msg => logs.push(`[${msg.type()}] ${msg.text()}`))
-    page.on('pageerror', err => logs.push(`[pageerror] ${err.message}`))
+    const errors: string[] = []
+    page.on('console', msg => {
+      const entry = `[${msg.type()}] ${msg.text()}`
+      logs.push(entry)
+      if (msg.type() === 'error') errors.push(entry)
+    })
+    page.on('pageerror', err => {
+      const entry = `[pageerror] ${err.message}`
+      logs.push(entry)
+      errors.push(entry)
+    })
     await use(page)
-    if (testInfo.status !== testInfo.expectedStatus && logs.length) {
-      process.stderr.write(`\n===== BROWSER CONSOLE for ${testInfo.title} =====\n${logs.join('\n')}\n===== END =====\n`)
-      await testInfo.attach('browser-console.log', { body: logs.join('\n'), contentType: 'text/plain' })
+    const allowErrors = testInfo.annotations.some(a => a.type === 'allow-console-errors')
+    const shouldFail = !allowErrors && errors.length > 0 && testInfo.status === testInfo.expectedStatus
+    if (testInfo.status !== testInfo.expectedStatus || shouldFail) {
+      if (logs.length) {
+        process.stderr.write(`\n===== BROWSER CONSOLE for ${testInfo.title} =====\n${logs.join('\n')}\n===== END =====\n`)
+        await testInfo.attach('browser-console.log', { body: logs.join('\n'), contentType: 'text/plain' })
+      }
+    }
+    if (shouldFail) {
+      throw new Error(
+        `Test passed but emitted ${errors.length} browser console error(s):\n` +
+        errors.slice(0, 5).map(e => '  ' + e).join('\n') +
+        (errors.length > 5 ? `\n  …and ${errors.length - 5} more` : '') +
+        `\n\nAdd test.info().annotations.push({ type: 'allow-console-errors' }) to opt out if intentional.`
+      )
     }
   },
 

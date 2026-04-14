@@ -86,17 +86,21 @@ test.describe('User theme', () => {
     expect(light.myapp).toBe('rgb(255, 0, 255)')
   })
 
-  test('/admin/theme.css 404s when no user file exists', async ({ page, testSite }) => {
+  test('/admin/theme.css returns empty CSS when no user file exists', async ({ page, testSite }) => {
     // Make sure no theme file is present — the worker copies the starter which
     // does not include one, but be explicit in case prior tests added it.
     await rm(join(testSite.projectDir, 'admin/theme.css'), { force: true })
     const res = await page.request.get('/admin/theme.css')
-    expect(res.status()).toBe(404)
+    // 200 with empty body (not 404) — see mountUserThemeRoute. A 404 would
+    // trigger a browser console error on every cold load.
+    expect(res.status()).toBe(200)
+    expect(await res.text()).toBe('')
   })
 })
 
 test.describe('Toast', () => {
   test('error toasts persist and have a dismiss button', async ({ page }) => {
+    test.info().annotations.push({ type: 'allow-console-errors' })
     // Force every page-load to fail — opening home triggers selection.selectPage,
     // which calls toast.showError on failure. That's a real error path that
     // exercises the persistence + dismiss behavior end-to-end.
@@ -703,6 +707,7 @@ test.describe('Publish dialog', () => {
   })
 
   test('compare failure surfaces an error message', async ({ page, testSite: _ }) => {
+    test.info().annotations.push({ type: 'allow-console-errors' })
     // Intercept the compare call and force a 500
     await page.route('**/admin/api/compare*', route => route.fulfill({
       status: 500, contentType: 'application/json',
@@ -841,6 +846,7 @@ test.describe('Publish dialog', () => {
   })
 
   test('invalid templates are surfaced and block publish', async ({ page, testSite }) => {
+    test.info().annotations.push({ type: 'allow-console-errors' })
     await wipe(testSite.projectDir)
     // Break the 'hero' template — not parseable js. Compare should still
     // complete but report invalidTemplates.
