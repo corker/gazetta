@@ -2,8 +2,9 @@ import { Hono } from 'hono'
 import { join } from 'node:path'
 import type { StorageProvider } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
+import type { SourceSidecarWriter } from '../../source-sidecars.js'
 
-export function pageRoutes(siteDir: string, storage: StorageProvider) {
+export function pageRoutes(siteDir: string, storage: StorageProvider, sidecarWriter?: SourceSidecarWriter) {
   const app = new Hono()
 
   app.get('/api/pages', async (c) => {
@@ -36,6 +37,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
       components: [],
     }
     await storage.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+    await sidecarWriter?.writeFor('page', body.name)
     return c.json({ ok: true, name: body.name })
   })
 
@@ -68,6 +70,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider) {
     }
 
     await storage.writeFile(join(page.dir, 'page.json'), JSON.stringify(manifest, null, 2) + '\n')
+    await sidecarWriter?.writeFor('page', name)
     return c.json({ ok: true })
   })
 

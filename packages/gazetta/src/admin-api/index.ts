@@ -4,6 +4,7 @@ import { logger } from 'hono/logger'
 import type { StorageProvider, TargetConfig } from '../types.js'
 import { scanTemplates } from '../templates-scan.js'
 import { memoizeAsync } from '../concurrency.js'
+import { createSourceSidecarWriter, type SourceSidecarWriter } from '../source-sidecars.js'
 import { authMiddleware } from './middleware/auth.js'
 import { siteRoutes } from './routes/site.js'
 import { pageRoutes } from './routes/pages.js'
@@ -29,7 +30,10 @@ export interface AdminAppOptions {
   targetConfigs?: Record<string, TargetConfig>
 }
 
-type AdminApp = Hono & { invalidateTemplatesCache(): void }
+type AdminApp = Hono & {
+  invalidateTemplatesCache(): void
+  invalidateSourceSidecars(): void
+}
 export function createAdminApp(opts: AdminAppOptions): AdminApp
 export function createAdminApp(siteDir: string, storage: StorageProvider, targets?: Map<string, StorageProvider>): AdminApp
 export function createAdminApp(
@@ -62,9 +66,15 @@ export function createAdminApp(
   const scan = (tDir: string, root: string) =>
     tDir === templatesDir ? cachedScan.get() : scanTemplates(tDir, root)
 
+  const sidecarWriter: SourceSidecarWriter = createSourceSidecarWriter({
+    storage: opts.storage,
+    siteDir: opts.siteDir,
+    scanTemplates: () => cachedScan.get(),
+  })
+
   app.route('/', siteRoutes(opts.siteDir, opts.storage))
-  app.route('/', pageRoutes(opts.siteDir, opts.storage))
-  app.route('/', fragmentRoutes(opts.siteDir, opts.storage))
+  app.route('/', pageRoutes(opts.siteDir, opts.storage, sidecarWriter))
+  app.route('/', fragmentRoutes(opts.siteDir, opts.storage, sidecarWriter))
   app.route('/', templateRoutes(opts.siteDir, opts.storage, templatesDir, adminDir, opts.production))
   app.route('/', previewRoutes(opts.siteDir, opts.storage, templatesDir))
   app.route('/', publishRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir, scan))
@@ -76,5 +86,6 @@ export function createAdminApp(
   // Hono Request interface — the CLI casts the return.
   const appWithInvalidate = app as AdminApp
   appWithInvalidate.invalidateTemplatesCache = () => cachedScan.invalidate()
+  appWithInvalidate.invalidateSourceSidecars = () => sidecarWriter.invalidate()
   return appWithInvalidate
 }

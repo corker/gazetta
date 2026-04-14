@@ -1096,7 +1096,7 @@ async function runDev(siteDir: string, port: number) {
 
   // Admin Hono instance — captured so the template file watcher can
   // invalidate its memoized template-scan cache on .ts/.tsx changes.
-  let cmsApp: (Hono & { invalidateTemplatesCache(): void }) | null = null
+  let cmsApp: (Hono & { invalidateTemplatesCache(): void; invalidateSourceSidecars(): void }) | null = null
   if (isDevMode) {
     // Dev mode: mount CMS API inline (same process = shared template cache)
     cmsApp = await setupCmsApi(app, siteDir, storage, templatesDir, adminDir)
@@ -1273,6 +1273,7 @@ async function runDev(siteDir: string, port: number) {
           // Drop the admin-api's cached scan so next compare/publish
           // rehashes. Cheap (the scan is what's slow, not invalidation).
           cmsApp?.invalidateTemplatesCache()
+          cmsApp?.invalidateSourceSidecars()
           notifyReload()
         }
       }
@@ -1303,7 +1304,7 @@ function mountUserThemeRoute(cmsApp: Hono, adminDir: string) {
   })
 }
 
-async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string): Promise<Hono & { invalidateTemplatesCache(): void }> {
+async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string): Promise<Hono & { invalidateTemplatesCache(): void; invalidateSourceSidecars(): void }> {
   const siteYamlPath = join(siteDir, 'site.yaml')
   let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
   if (existsSync(siteYamlPath)) {

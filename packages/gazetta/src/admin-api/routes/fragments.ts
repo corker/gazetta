@@ -2,8 +2,9 @@ import { Hono } from 'hono'
 import { join } from 'node:path'
 import type { StorageProvider } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
+import type { SourceSidecarWriter } from '../../source-sidecars.js'
 
-export function fragmentRoutes(siteDir: string, storage: StorageProvider) {
+export function fragmentRoutes(siteDir: string, storage: StorageProvider, sidecarWriter?: SourceSidecarWriter) {
   const app = new Hono()
 
   app.get('/api/fragments', async (c) => {
@@ -31,6 +32,7 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider) {
     await storage.mkdir(fragDir)
     const manifest = { template: body.template, components: [] }
     await storage.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+    await sidecarWriter?.writeFor('fragment', body.name)
     return c.json({ ok: true, name: body.name })
   })
 
@@ -62,6 +64,7 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider) {
     }
 
     await storage.writeFile(join(fragment.dir, 'fragment.json'), JSON.stringify(manifest, null, 2) + '\n')
+    await sidecarWriter?.writeFor('fragment', name)
     return c.json({ ok: true })
   })
 
