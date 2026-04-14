@@ -45,35 +45,48 @@ const LOADER_HTML = `<!doctype html>
      whether the user has customized the admin theme. Mid-gray reads as
      "loading" on any conceivable admin background. */
   html, body { height: 100%; margin: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #262626; color: #a3a3a3; display: flex; align-items: center; justify-content: center; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #262626; color: #a3a3a3; display: flex; align-items: center; justify-content: center; transition: opacity 200ms ease; }
   body.light { background: #f5f5f5; color: #525252; }
-  .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+  body.leaving { opacity: 0; }
+  .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; opacity: 0; transition: opacity 300ms ease; }
+  .panel.shown { opacity: 1; }
   .spinner { width: 24px; height: 24px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .label { font-size: 0.875rem; }
 </style>
 </head>
 <body>
-  <div class="panel">
+  <div class="panel" role="status" aria-live="polite">
     <div class="spinner" aria-hidden="true"></div>
     <div class="label">Starting Gazetta admin…</div>
   </div>
   <script>
     // Match the user's saved admin theme if present; fall back to dark default
-    // (admin defaults to dark on first load). Avoids a jarring theme flash when
-    // the real admin renders.
+    // (admin defaults to dark on first load).
     try {
       var saved = localStorage.getItem('gazetta_theme')
       if (saved === 'light') document.body.classList.add('light')
     } catch (e) { /* ignore */ }
+
+    // Delay the spinner by 400ms so fast/warm restarts never paint it —
+    // user sees a brief gray flash at worst, not a flash of spinner.
+    var panel = document.querySelector('.panel')
+    var showTimer = setTimeout(function () { panel.classList.add('shown') }, 400)
+
     ;(function poll() {
       fetch('/admin/ping', { cache: 'no-store' })
-        .then(r => r.ok ? r.json() : null)
-        .then(j => {
-          if (j && j.ready) window.location.reload()
-          else setTimeout(poll, 500)
+        .then(function (r) { return r.ok ? r.json() : null })
+        .then(function (j) {
+          if (j && j.ready) {
+            clearTimeout(showTimer)
+            // Fade body out, then reload — softer handoff than an instant swap
+            document.body.classList.add('leaving')
+            setTimeout(function () { window.location.reload() }, 200)
+          } else {
+            setTimeout(poll, 500)
+          }
         })
-        .catch(() => setTimeout(poll, 500))
+        .catch(function () { setTimeout(poll, 500) })
     })()
   </script>
 </body>
