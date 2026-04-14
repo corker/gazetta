@@ -45,47 +45,10 @@ onKeyStroke('s', (e) => {
   }
 })
 
-// Theme CSS variables — set on the editor container for React editor to consume
-const themeVars = computed(() => {
-  if (theme.dark) {
-    return {
-      '--gz-bg-input': '#161622',
-      '--gz-bg-card': '#1a1a28',
-      '--gz-bg-toolbar': '#1a1a2a',
-      '--gz-bg-chip': '#252538',
-      '--gz-bg-code': '#12121e',
-      '--gz-text': '#e0e0e0',
-      '--gz-text-secondary': '#ccc',
-      '--gz-text-label': '#8888a0',
-      '--gz-text-hint': '#444',
-      '--gz-border': '#2a2a3a',
-      '--gz-border-subtle': '#1e1e2e',
-      '--gz-accent': '#667eea',
-      '--gz-error': '#f87171',
-      '--gz-success': '#4ade80',
-    }
-  }
-  return {
-    '--gz-bg-input': '#ffffff',
-    '--gz-bg-card': '#f9fafb',
-    '--gz-bg-toolbar': '#f3f4f6',
-    '--gz-bg-chip': '#e5e7eb',
-    '--gz-bg-code': '#f1f5f9',
-    '--gz-text': '#1a1a1a',
-    '--gz-text-secondary': '#4b5563',
-    '--gz-text-label': '#6b7280',
-    '--gz-text-hint': '#9ca3af',
-    '--gz-border': '#e5e7eb',
-    '--gz-border-subtle': '#f3f4f6',
-    '--gz-accent': '#667eea',
-    '--gz-error': '#dc2626',
-    '--gz-success': '#16a34a',
-  }
-})
 </script>
 
 <template>
-  <div class="editor-panel" data-testid="editor-panel" :style="themeVars">
+  <div class="editor-panel" data-testid="editor-panel">
     <div v-if="editing.loadError" class="editor-error" data-testid="editor-error">
       <i class="pi pi-exclamation-triangle" />
       <p>{{ editing.loadError }}</p>
@@ -103,11 +66,11 @@ const themeVars = computed(() => {
 </template>
 
 <style scoped>
-.editor-panel h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--gz-text-label); margin-bottom: 1rem; letter-spacing: 0.05em; }
-.editor-error { color: var(--gz-error); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; gap: 0.5rem; text-align: center; }
+.editor-panel h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--color-muted); margin-bottom: 1rem; letter-spacing: 0.05em; }
+.editor-error { color: var(--color-danger-fg); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; gap: 0.5rem; text-align: center; }
 .editor-error .pi { font-size: 2rem; }
 .editor-error p { max-width: 300px; line-height: 1.5; }
-.editor-empty { color: var(--gz-text-hint); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; }
+.editor-empty { color: var(--color-muted); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; }
 .editor-container { font-size: 0.875rem; }
-.editor-no-schema { color: var(--gz-text-hint); font-size: 0.875rem; }
+.editor-no-schema { color: var(--color-muted); font-size: 0.875rem; }
 </style>

@@ -4,6 +4,7 @@ import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
 import App from './App.vue'
 import { createRouter } from './router.js'
+import './assets/tokens.css'
 
 const app = createApp(App)
 app.use(createPinia())

@@ -265,25 +265,6 @@ function generateMockContent(schema: Record<string, unknown>): Record<string, un
   return mock
 }
 
-// --- Theme CSS vars ---
-const themeVars = computed(() => {
-  if (theme.dark) {
-    return {
-      '--gz-bg-input': '#161622', '--gz-bg-card': '#1a1a28', '--gz-bg-toolbar': '#1a1a2a',
-      '--gz-bg-chip': '#252538', '--gz-bg-code': '#12121e', '--gz-text': '#e0e0e0',
-      '--gz-text-secondary': '#ccc', '--gz-text-label': '#8888a0', '--gz-text-hint': '#444',
-      '--gz-border': '#2a2a3a', '--gz-border-subtle': '#1e1e2e', '--gz-accent': '#667eea',
-      '--gz-error': '#f87171', '--gz-success': '#4ade80',
-    }
-  }
-  return {
-    '--gz-bg-input': '#ffffff', '--gz-bg-card': '#f9fafb', '--gz-bg-toolbar': '#f3f4f6',
-    '--gz-bg-chip': '#e5e7eb', '--gz-bg-code': '#f1f5f9', '--gz-text': '#1a1a1a',
-    '--gz-text-secondary': '#4b5563', '--gz-text-label': '#6b7280', '--gz-text-hint': '#9ca3af',
-    '--gz-border': '#e5e7eb', '--gz-border-subtle': '#f3f4f6', '--gz-accent': '#667eea',
-    '--gz-error': '#dc2626', '--gz-success': '#16a34a',
-  }
-})
 </script>
 
 <template>
@@ -370,7 +351,7 @@ const themeVars = computed(() => {
 
         <!-- Content: editor + optional inspector side by side -->
         <div class="main-body">
-          <div class="main-content" :style="themeVars">
+          <div class="main-content">
             <div v-if="mountError" class="mount-error">{{ mountError }}</div>
             <div ref="mountRef" class="mount-container" data-testid="playground-mount" />
           </div>

@@ -37,7 +37,7 @@ function BrandColorPicker({ value, theme, onChange }: { value: string; theme: 'd
           <button key={p.value} type="button" title={p.label} onClick={() => handleChange(p.value)}
             style={{
               width: 28, height: 28, borderRadius: 6, background: p.value, border: 'none', cursor: 'pointer',
-              outline: color === p.value ? `2px solid var(--gz-accent, #667eea)` : 'none',
+              outline: color === p.value ? `2px solid var(--color-primary)` : 'none',
               outlineOffset: 2, transition: 'outline 0.1s',
             }} />
         ))}
@@ -47,15 +47,15 @@ function BrandColorPicker({ value, theme, onChange }: { value: string; theme: 'd
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <input ref={inputRef} type="color" value={color} onChange={e => handleChange(e.target.value)}
           style={{
-            width: 36, height: 36, border: `1px solid var(--gz-border, #2a2a3a)`, borderRadius: 6,
+            width: 36, height: 36, border: `1px solid var(--color-border)`, borderRadius: 6,
             padding: 2, cursor: 'pointer', background: 'transparent',
           }} />
         <input type="text" value={color} onChange={e => handleChange(e.target.value)}
           style={{
             flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.875rem', fontFamily: 'monospace',
-            background: `var(--gz-bg-input, ${isDark ? '#161622' : '#ffffff'})`,
-            color: `var(--gz-text, ${isDark ? '#e0e0e0' : '#1a1a1a'})`,
-            border: `1px solid var(--gz-border, ${isDark ? '#2a2a3a' : '#e5e7eb'})`,
+            background: `var(--color-input-bg)`,
+            color: `var(--color-fg)`,
+            border: `1px solid var(--color-border)`,
             borderRadius: 6, outline: 'none',
           }} />
       </div>
