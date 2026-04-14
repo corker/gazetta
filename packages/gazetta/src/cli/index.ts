@@ -1094,12 +1094,15 @@ async function runDev(siteDir: string, port: number) {
   const cmsStaticDir = findCmsStaticDir()
   const isDevMode = cmsWebDir !== null
 
+  // Admin Hono instance — captured so the template file watcher can
+  // invalidate its memoized template-scan cache on .ts/.tsx changes.
+  let cmsApp: (Hono & { invalidateTemplatesCache(): void }) | null = null
   if (isDevMode) {
     // Dev mode: mount CMS API inline (same process = shared template cache)
-    await setupCmsApi(app, siteDir, storage, templatesDir, adminDir)
+    cmsApp = await setupCmsApi(app, siteDir, storage, templatesDir, adminDir)
   } else if (cmsStaticDir) {
     // Production mode: inline CMS API + static files
-    await setupProductionMode(app, siteDir, storage, cmsStaticDir, templatesDir, adminDir)
+    cmsApp = await setupProductionMode(app, siteDir, storage, cmsStaticDir, templatesDir, adminDir)
   }
 
   // ---- 404 ----
@@ -1267,6 +1270,9 @@ async function runDev(siteDir: string, port: number) {
         if (parts.length >= 1) {
           console.log(`  Template changed: ${parts[0]}`)
           invalidateTemplate(parts[0])
+          // Drop the admin-api's cached scan so next compare/publish
+          // rehashes. Cheap (the scan is what's slow, not invalidation).
+          cmsApp?.invalidateTemplatesCache()
           notifyReload()
         }
       }
@@ -1297,7 +1303,7 @@ function mountUserThemeRoute(cmsApp: Hono, adminDir: string) {
   })
 }
 
-async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string) {
+async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string): Promise<Hono & { invalidateTemplatesCache(): void }> {
   const siteYamlPath = join(siteDir, 'site.yaml')
   let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
   if (existsSync(siteYamlPath)) {
@@ -1307,6 +1313,7 @@ async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeo
   const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, targetConfigs })
   mountUserThemeRoute(cmsApp, adminDir)
   app.route('/admin', cmsApp)
+  return cmsApp
 }
 
 // ---- Production mode: inline CMS API + static files from admin-dist/ ----
@@ -1340,6 +1347,7 @@ async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnTy
   }
   app.get('/admin/*', serveIndex)
   app.get('/admin', serveIndex)
+  return cmsApp
 }
 
 /** Find apps/admin source dir (monorepo dev mode) */

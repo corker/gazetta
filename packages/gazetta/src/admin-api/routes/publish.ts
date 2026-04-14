@@ -8,7 +8,7 @@ import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
 import { resolveEnvVars } from '../../targets.js'
-import { scanTemplates, templateHashesFrom } from '../../templates-scan.js'
+import { scanTemplates, templateHashesFrom, type TemplateInfo } from '../../templates-scan.js'
 import { hashManifest } from '../../hash.js'
 
 /**
@@ -29,8 +29,13 @@ export function publishRoutes(
   sourceStorage: StorageProvider,
   preInitTargets?: Map<string, StorageProvider>,
   targetConfigs?: Record<string, TargetConfig>,
-  templatesDir?: string
+  templatesDir?: string,
+  // Optional injected scanner — the admin-api server memoizes it and
+  // clears the cache via its template file watcher. Default: fresh scan
+  // on every call (used by the CLI and tests).
+  scanTemplatesInjected?: (templatesDir: string, projectRoot: string) => Promise<TemplateInfo[]>,
 ) {
+  const scan = scanTemplatesInjected ?? scanTemplates
   const app = new Hono()
 
   // Background target initialization
@@ -134,7 +139,7 @@ export function publishRoutes(
 
     const tdir = templatesDir ?? `${siteDir}/templates`
     const projectRoot = siteDir.replace(/\/sites\/[^/]+$/, '')
-    const templateInfos = await scanTemplates(tdir, projectRoot)
+    const templateInfos = await scan(tdir, projectRoot)
     const invalidTpls = templateInfos.filter(t => !t.valid)
     if (invalidTpls.length) {
       yield {

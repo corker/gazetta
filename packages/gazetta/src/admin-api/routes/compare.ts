@@ -3,13 +3,15 @@ import { join } from 'node:path'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { getPublishMode } from '../../types.js'
 import { compareTargets } from '../../compare.js'
+import type { TemplateInfo } from '../../templates-scan.js'
 
 export function compareRoutes(
   siteDir: string,
   sourceStorage: StorageProvider,
   preInitTargets?: Map<string, StorageProvider>,
   targetConfigs?: Record<string, TargetConfig>,
-  templatesDir?: string
+  templatesDir?: string,
+  scanTemplatesInjected?: (templatesDir: string, projectRoot: string) => Promise<TemplateInfo[]>,
 ) {
   const app = new Hono()
 
@@ -55,6 +57,7 @@ export function compareRoutes(
         templatesDir: tdir,
         projectRoot,
         publishMode,
+        scanTemplates: scanTemplatesInjected,
       })
       return c.json(result)
     } catch (err) {

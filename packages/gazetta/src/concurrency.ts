@@ -14,6 +14,47 @@
 export const DEFAULT_CONCURRENCY = 20
 
 /**
+ * Memoize a zero-arg async function until invalidate() is called. Concurrent
+ * callers share a single in-flight promise (no thundering herd on cold
+ * start). A failed call is NOT cached — the next call retries.
+ *
+ * Typical shape: a server owns the cache and exposes invalidate() to its
+ * file watcher. Keeps the underlying scanner pure — no module-level state,
+ * no surprise caching semantics when called from tests or the CLI.
+ */
+export interface Memoized<T> {
+  get(): Promise<T>
+  invalidate(): void
+}
+export function memoizeAsync<T>(fn: () => Promise<T>): Memoized<T> {
+  let pending: Promise<T> | null = null
+  let result: T | null = null
+  let hasResult = false
+  return {
+    async get(): Promise<T> {
+      if (hasResult) return result as T
+      if (pending) return pending
+      pending = (async () => {
+        try {
+          const v = await fn()
+          result = v
+          hasResult = true
+          return v
+        } finally {
+          pending = null
+        }
+      })()
+      return pending
+    },
+    invalidate(): void {
+      hasResult = false
+      result = null
+      pending = null
+    },
+  }
+}
+
+/**
  * Run `fn` on every item with at most `limit` in flight at once. Results
  * are returned in input order. Errors reject immediately (like Promise.all)
  * but in-flight work still completes in the background.

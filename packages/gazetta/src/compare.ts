@@ -1,6 +1,6 @@
 import { loadSite } from './site-loader.js'
 import { hashManifest, parseSidecarName } from './hash.js'
-import { scanTemplates, templateHashesFrom } from './templates-scan.js'
+import { scanTemplates, templateHashesFrom, type TemplateInfo } from './templates-scan.js'
 import { mapLimit } from './concurrency.js'
 import type { StorageProvider } from './types.js'
 
@@ -32,6 +32,12 @@ export interface CompareOptions {
    * Defaults to 'esi' (include fragments).
    */
   publishMode?: 'static' | 'esi'
+  /**
+   * Injectable template scanner. The default reads from disk every call; the
+   * admin-api server injects a memoized version invalidated by the template
+   * file watcher (5s → 0ms on large projects).
+   */
+  scanTemplates?: (templatesDir: string, projectRoot: string) => Promise<TemplateInfo[]>
 }
 
 /**
@@ -46,7 +52,8 @@ export interface CompareOptions {
  */
 export async function compareTargets(opts: CompareOptions): Promise<CompareResult> {
   // 1. Validate + hash templates
-  const templateInfos = await scanTemplates(opts.templatesDir, opts.projectRoot)
+  const scan = opts.scanTemplates ?? scanTemplates
+  const templateInfos = await scan(opts.templatesDir, opts.projectRoot)
   const invalidTemplates = templateInfos.filter(t => !t.valid)
     .map(t => ({ name: t.name, errors: t.errors }))
   const templateHashes = templateHashesFrom(templateInfos)
