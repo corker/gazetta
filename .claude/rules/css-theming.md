@@ -174,3 +174,27 @@ For a full palette swap, the user must override each shade explicitly. Document 
 ## Verification notes
 
 All PrimeVue token behaviors in this doc were verified live against the running dev server (chromium + `getComputedStyle(document.documentElement)`), not from documentation. If PrimeVue upgrades change token emission, re-run the check.
+
+## Visual testing (deferred)
+
+We tried a Playwright `toHaveScreenshot` baseline for PublishDialog and dropped it. Reasons to revisit later, not now:
+
+**Why we dropped it:**
+- Baselines are per-platform. CI is Linux, local dev is macOS — every dev needs docker to regenerate before commit, or only CI can update baselines (friction either way).
+- Every intentional visual change requires re-baselining. For a prototype UI moving fast, the maintenance tax outpaces the regression-catching value.
+- Catches pixel-level regressions but misses semantic regressions (a button moved to the wrong place but still renders). A11y / semantic tests catch more real bugs.
+- Site developers using Gazetta as an npm dependency never run our e2e suite — the snapshots only protect Gazetta core development, not their projects.
+
+**Alternatives when we need visual regression:**
+
+| Need | Tool |
+|---|---|
+| Catch unintended visual changes in core admin | Playwright `toHaveScreenshot` with CI-generated baselines. Gate to `process.platform === 'linux'` and commit only Linux PNGs. Regenerate via `docker run mcr.microsoft.com/playwright:vX.Y.Z-jammy ... --update-snapshots` |
+| Explore component variants while designing | The existing `/admin/dev` playground. Extend with fixture props if needed. |
+| Design-system-level visual review | Storybook or Histoire. Not worth the setup until there are 40+ components or a design-systems contributor |
+| Site developers catching their own regressions | They write their own Playwright tests against the running admin using our `data-testid` attributes |
+
+**When to reintroduce:**
+- Core admin stabilizes and visual changes are intentional, rare
+- Gazetta core gains a contributor who needs design-review workflows
+- A specific visual regression is found in the wild and warrants a regression test
