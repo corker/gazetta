@@ -3,6 +3,9 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30000,
+  // expect() default is 5s — too tight on CI where compare + walk runs
+  // 8-12s per test. Individual expect() calls can still override lower.
+  expect: { timeout: 15000 },
   retries: 0,
   use: {
     headless: true,
