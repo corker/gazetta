@@ -48,6 +48,48 @@ export async function mapLimit<T, U>(
 }
 
 /**
+ * Run `fn` on every item with at most `limit` in flight, yielding each
+ * result as it completes — in completion order, not input order. Use when
+ * the caller wants to react to each completion as it happens (e.g. emit
+ * a progress event mid-stream). For collect-all-then-return semantics,
+ * mapLimit is simpler.
+ *
+ * Each yield includes the original `index` so the consumer can reconstruct
+ * input order if needed.
+ */
+export async function* mapLimitStream<T, U>(
+  items: readonly T[],
+  fn: (item: T, index: number) => Promise<U>,
+  limit = DEFAULT_CONCURRENCY,
+): AsyncGenerator<{ item: T; result: U; index: number }> {
+  type Settled = { item: T; result: U; index: number; self: symbol }
+  // Each task gets a unique id — lets us remove from `active` by lookup
+  // without relying on Promise identity (which Promise.race doesn't give
+  // us directly).
+  const active = new Map<symbol, Promise<Settled>>()
+  let next = 0
+
+  function start(): void {
+    if (next >= items.length) return
+    const i = next++
+    const item = items[i]
+    const self = Symbol()
+    const p = fn(item, i).then((result): Settled => ({ item, result, index: i, self }))
+    active.set(self, p)
+  }
+
+  for (let i = 0; i < Math.min(limit, items.length); i++) start()
+  while (active.size > 0) {
+    // Promise.race resolves with the first settled value (and rejects on
+    // the first rejection — so errors propagate naturally).
+    const settled = await Promise.race(active.values())
+    active.delete(settled.self)
+    yield { item: settled.item, result: settled.result, index: settled.index }
+    start()
+  }
+}
+
+/**
  * Like mapLimit but doesn't throw on individual failures — returns a parallel
  * array of { ok: true, value } or { ok: false, error } per input. Useful
  * when a single bad manifest shouldn't abort a whole site walk.

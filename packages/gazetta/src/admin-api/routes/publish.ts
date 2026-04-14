@@ -3,6 +3,7 @@ import { streamSSE } from 'hono/streaming'
 import { getPublishMode, getEnvironment } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
+import { mapLimitStream } from '../../concurrency.js'
 import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
@@ -168,28 +169,36 @@ export function publishRoutes(
         current++
         yield { kind: 'progress', target: targetName, current, total, label: 'source files' }
 
-        // 2. Render each item
-        for (const item of allItems) {
+        // 2. Render items in bounded parallel. Progress events are yielded
+        // in completion order — the UI shows X/N + whatever finished last,
+        // which stays meaningful without needing input-order. Preserves the
+        // event contract: one 'progress' per item between 'target-start'
+        // and 'target-result'.
+        const renderItem = async (item: string): Promise<{ files: number }> => {
           if (item.startsWith('pages/')) {
             const pageName = item.replace('pages/', '')
             const page = site.pages.get(pageName)
             const manifestHash = page ? hashManifest(page, { templateHashes }) : undefined
             if (isStatic) {
-              const { files } = await publishPageStatic(pageName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
-              totalFiles += files
-            } else {
-              const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache, tdir, manifestHash, site)
-              totalFiles += files
+              return publishPageStatic(pageName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
             }
-          } else if (item.startsWith('fragments/')) {
-            if (!isStatic) {
-              const fragName = item.replace('fragments/', '')
-              const frag = site.fragments.get(fragName)
-              const manifestHash = frag ? hashManifest(frag, { templateHashes }) : undefined
-              const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
-              totalFiles += files
-            }
+            const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache, tdir, manifestHash, site)
+            return { files }
           }
+          if (item.startsWith('fragments/') && !isStatic) {
+            const fragName = item.replace('fragments/', '')
+            const frag = site.fragments.get(fragName)
+            const manifestHash = frag ? hashManifest(frag, { templateHashes }) : undefined
+            const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
+            return { files }
+          }
+          return { files: 0 } // skipped (e.g. fragment on static target)
+        }
+
+        // Render concurrency is lower than listing concurrency — each render
+        // may do multiple writes, so 10 in flight is the safe default.
+        for await (const { item, result } of mapLimitStream(allItems, renderItem, 10)) {
+          totalFiles += result.files
           current++
           yield { kind: 'progress', target: targetName, current, total, label: item }
         }

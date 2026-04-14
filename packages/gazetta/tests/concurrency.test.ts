@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapLimit, mapLimitSettled } from '../src/concurrency.js'
+import { mapLimit, mapLimitSettled, mapLimitStream } from '../src/concurrency.js'
 
 describe('mapLimit', () => {
   it('returns results in input order', async () => {
@@ -40,6 +40,56 @@ describe('mapLimit', () => {
       if (n === 2) throw new Error('bad')
       return n
     })).rejects.toThrow('bad')
+  })
+})
+
+describe('mapLimitStream', () => {
+  it('yields items as they complete (not batched)', async () => {
+    const emitted: number[] = []
+    const items = [300, 50, 200, 100]
+    for await (const { result } of mapLimitStream(items, (n) => new Promise(res => setTimeout(() => res(n), n)), 4)) {
+      emitted.push(result as number)
+    }
+    // Completion order matches delay order, not input order
+    expect(emitted).toEqual([50, 100, 200, 300])
+  })
+
+  it('respects concurrency limit', async () => {
+    let inFlight = 0
+    let peak = 0
+    const items = Array.from({ length: 20 }, (_, i) => i)
+    for await (const _ of mapLimitStream(items, async () => {
+      inFlight++
+      if (inFlight > peak) peak = inFlight
+      await new Promise(res => setTimeout(res, 5))
+      inFlight--
+    }, 3)) { /* drain */ }
+    expect(peak).toBeLessThanOrEqual(3)
+  })
+
+  it('preserves original index in each yield', async () => {
+    const items = ['a', 'b', 'c']
+    const received: Array<{ item: string; index: number }> = []
+    for await (const { item, index } of mapLimitStream(items, async (s) => s.toUpperCase(), 2)) {
+      received.push({ item, index })
+    }
+    // All three arrived, each with its original index
+    expect(received.map(r => r.item).sort()).toEqual(['a', 'b', 'c'])
+    expect(received.map(r => r.index).sort()).toEqual([0, 1, 2])
+  })
+
+  it('empty input yields nothing', async () => {
+    const yielded = []
+    for await (const x of mapLimitStream([], async () => 1)) yielded.push(x)
+    expect(yielded).toEqual([])
+  })
+
+  it('propagates the first error', async () => {
+    const gen = mapLimitStream([1, 2, 3], async (n) => {
+      if (n === 2) throw new Error('bad')
+      return n
+    }, 2)
+    await expect((async () => { for await (const _ of gen) { /* consume */ } })()).rejects.toThrow('bad')
   })
 })
 
