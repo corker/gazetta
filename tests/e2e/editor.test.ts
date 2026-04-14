@@ -136,7 +136,9 @@ test.describe('SiteTree dirty indicators', () => {
 
     await page.goto('/admin')
     // Wait for compare cycle
-    await page.locator('[data-testid="dirty-page-home"]').waitFor({ timeout: 8000 })
+    // Long timeout — on CI the picker tries production first (azurite refused,
+    // ~10s timeout) before falling back to staging, so first dots take longer.
+    await page.locator('[data-testid="dirty-page-home"]').waitFor({ timeout: 30000 })
     await expect(page.locator('[data-testid="dirty-page-home"]')).toBeVisible()
     await expect(page.locator('[data-testid="dirty-page-about"]')).toBeVisible()
     // showcase has no sidecar → added → dirty
@@ -153,7 +155,9 @@ test.describe('SiteTree dirty indicators', () => {
     await rm(stagingDir, { recursive: true, force: true })
     await page.goto('/admin')
     // First-publish path → every page dirty
-    await page.locator('[data-testid="dirty-page-home"]').waitFor({ timeout: 8000 })
+    // Long timeout — on CI the picker tries production first (azurite refused,
+    // ~10s timeout) before falling back to staging, so first dots take longer.
+    await page.locator('[data-testid="dirty-page-home"]').waitFor({ timeout: 30000 })
     await expect(page.locator('[data-testid="dirty-page-home"]')).toBeVisible()
     await expect(page.locator('[data-testid="dirty-page-about"]')).toBeVisible()
     await expect(page.locator('[data-testid="dirty-page-showcase"]')).toBeVisible()
