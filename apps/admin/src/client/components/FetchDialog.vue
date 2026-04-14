@@ -5,11 +5,13 @@ import Button from 'primevue/button'
 import Listbox from 'primevue/listbox'
 import { api } from '../api/client.js'
 import { useSiteStore } from '../stores/site.js'
+import { usePublishStatusStore } from '../stores/publishStatus.js'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const site = useSiteStore()
+const publishStatus = usePublishStatusStore()
 const targets = ref<string[]>([])
 const selectedTarget = ref<string | null>(null)
 const fetching = ref(false)
@@ -32,6 +34,9 @@ async function handleFetch() {
   try {
     result.value = await api.fetchFromTarget(selectedTarget.value)
     await site.load()
+    // Local content just changed — the SiteTree dirty dots are stale until
+    // we re-compare against the picked target. See #136.
+    publishStatus.refresh()
   } catch (err) {
     error.value = (err as Error).message
   } finally {
