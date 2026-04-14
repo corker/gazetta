@@ -44,28 +44,35 @@ const LOADER_HTML = `<!doctype html>
   /* Neutral tones — the loader is a transitional state and we don't yet know
      whether the user has customized the admin theme. Mid-gray reads as
      "loading" on any conceivable admin background. */
-  html, body { height: 100%; margin: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #262626; color: #a3a3a3; display: flex; align-items: center; justify-content: center; transition: opacity 200ms ease; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #262626; color: #a3a3a3; transition: opacity 200ms ease; position: relative; }
   body.light { background: #f5f5f5; color: #525252; }
   body.leaving { opacity: 0; }
-  .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-  .brand { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; color: currentColor; opacity: 0.9; }
-  /* Spinner + label only appear if startup actually takes a moment — warm
-     restarts paint the brand briefly, never the "Starting…" message. */
-  .progress { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; opacity: 0; transition: opacity 300ms ease; }
-  .progress.shown { opacity: 1; }
-  .spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; opacity: 0.6; }
+
+  /* Watermark — full-width brand fill, faint so it reads as background. */
+  .brand {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; letter-spacing: -0.04em; color: currentColor; opacity: 0.08;
+    font-size: clamp(6rem, 22vw, 18rem); line-height: 1;
+    pointer-events: none; user-select: none;
+  }
+
+  /* Status pill — top-left, fades in only if startup is slow. */
+  .progress {
+    position: absolute; top: 1rem; left: 1rem;
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.8125rem; opacity: 0; transition: opacity 300ms ease;
+  }
+  .progress.shown { opacity: 0.75; }
+  .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .label { font-size: 0.8125rem; opacity: 0.75; }
 </style>
 </head>
 <body>
-  <div class="panel" role="status" aria-live="polite">
-    <div class="brand">Gazetta</div>
-    <div class="progress">
-      <div class="spinner" aria-hidden="true"></div>
-      <div class="label">Starting admin…</div>
-    </div>
+  <div class="brand" aria-hidden="true">GAZETTA</div>
+  <div class="progress" role="status" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <span class="label">Starting admin…</span>
   </div>
   <script>
     // Match the user's saved admin theme if present; fall back to dark default
