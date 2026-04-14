@@ -184,7 +184,7 @@ function onUpdateVisible(v: boolean) {
 
 <template>
   <Drawer :visible="props.visible" @update:visible="onUpdateVisible" position="right"
-    :style="{ width: '400px' }" data-testid="changes-drawer">
+    :style="{ width: 'min(560px, 90vw)' }" data-testid="changes-drawer">
     <template #header>
       <div class="changes-header">
         <span class="changes-title">Changes</span>
