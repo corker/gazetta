@@ -45,28 +45,42 @@ export function parseTemplateSidecarName(entryName: string): string | null {
 }
 
 /**
- * Walk the component tree and substitute `template: "name"` with `template: "name#hash"`
- * using the provided template hashes. Returns a new normalized structure — input is not mutated.
+ * Walk the component tree and substitute template/fragment refs with their
+ * hashed forms (`"name#hash"`) using the provided maps. Returns a new
+ * normalized structure — input is not mutated.
+ *
+ * `fragmentHashes` is only provided for static-mode targets where fragments
+ * are baked into pages at publish time — a fragment content change must
+ * invalidate every page that uses it. In ESI mode fragments are published
+ * separately, so pages don't need fragment hashes in their own hash.
  */
-function substituteTemplateHashes(
+function substituteHashes(
   components: ComponentEntry[] | undefined,
-  templateHashes: Map<string, string>
+  templateHashes: Map<string, string>,
+  fragmentHashes?: Map<string, string>,
 ): ComponentEntry[] | undefined {
   if (!components) return undefined
   return components.map(entry => {
-    if (typeof entry === 'string') return entry
+    if (typeof entry === 'string') {
+      if (!fragmentHashes || !entry.startsWith('@')) return entry
+      const name = entry.slice(1)
+      const h = fragmentHashes.get(name)
+      return h ? `@${name}#${h}` : entry
+    }
     const hash = templateHashes.get(entry.template)
     return {
       name: entry.name,
       template: hash ? `${entry.template}#${hash}` : entry.template,
       content: entry.content,
-      components: substituteTemplateHashes(entry.components, templateHashes),
+      components: substituteHashes(entry.components, templateHashes, fragmentHashes),
     }
   })
 }
 
 export interface HashManifestOptions {
   templateHashes: Map<string, string>
+  /** Fragment content hashes — include only for static-mode page hashing. */
+  fragmentHashes?: Map<string, string>
 }
 
 /**
@@ -85,7 +99,7 @@ export function hashManifest(
   const normalized = {
     template: rootHash ? `${manifest.template}#${rootHash}` : manifest.template,
     content: manifest.content ?? null,
-    components: substituteTemplateHashes(manifest.components, opts.templateHashes) ?? null,
+    components: substituteHashes(manifest.components, opts.templateHashes, opts.fragmentHashes) ?? null,
   }
   const json = JSON.stringify(normalized, sortedReplacer)
   return createHash('md5').update(json).digest('hex').slice(0, 8)

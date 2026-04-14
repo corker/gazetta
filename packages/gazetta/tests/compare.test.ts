@@ -139,6 +139,42 @@ describe('compareTargets', () => {
     expect(r2.added).toContain('pages/home')
   })
 
+  it('static mode: fragment content change invalidates pages that use it', async () => {
+    // Page bakes in @header.
+    await writeFile(join(siteDir, 'pages/home/page.json'), JSON.stringify({
+      template: 'page',
+      content: { title: 'Hello' },
+      components: ['@header'],
+    }))
+
+    // Publish once: record the static-mode page hash on the target.
+    const { hashManifest } = await import('../src/hash.js')
+    const { scanTemplates, templateHashesFrom } = await import('../src/templates-scan.js')
+    const { loadSite } = await import('../src/site-loader.js')
+    const tpls = await scanTemplates(templatesDir, root)
+    const tHashes = templateHashesFrom(tpls)
+    let site = await loadSite({ siteDir, storage: source, templatesDir })
+    const fragHashes = new Map<string, string>()
+    for (const [n, f] of site.fragments) fragHashes.set(n, hashManifest(f, { templateHashes: tHashes }))
+    for (const [n, p] of site.pages) {
+      await writeSidecar(join(targetDir, 'pages', n), hashManifest(p, { templateHashes: tHashes, fragmentHashes: fragHashes }))
+    }
+
+    // Sanity: unchanged before any edit.
+    const r1 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, publishMode: 'static' })
+    expect(r1.unchanged).toContain('pages/home')
+
+    // Mutate the fragment's content — page manifest untouched.
+    await writeFile(join(siteDir, 'fragments/header/fragment.json'), JSON.stringify({
+      template: 'page',
+      content: { title: 'Header EDITED' },
+    }))
+
+    // Page must show modified — its baked-in output is now stale.
+    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, publishMode: 'static' })
+    expect(r2.modified).toContain('pages/home')
+  })
+
   it('uses source-side sidecar hash when present (skips re-hash)', async () => {
     // Fabricate a source sidecar with a made-up hash. If compare is using
     // it (instead of re-hashing the manifest), that hash will be matched

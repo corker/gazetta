@@ -537,10 +537,17 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     let skipped = 0
 
     if (isStatic) {
-      // Static mode — fully assembled HTML, no fragments needed separately
+      // Static mode — fully assembled HTML, no fragments needed separately.
+      // Page hash must include fragment hashes so a fragment change
+      // invalidates every page that bakes it in (compareTargets uses the
+      // same combination on the local side).
+      const fragmentHashes = new Map<string, string>()
+      for (const [fragName, frag] of site.fragments) {
+        fragmentHashes.set(fragName, hashManifest(frag, { templateHashes }))
+      }
       for (const [pageName, page] of site.pages) {
         if (unchanged.has(`pages/${pageName}`)) { skipped++; continue }
-        const manifestHash = hashManifest(page, { templateHashes })
+        const manifestHash = hashManifest(page, { templateHashes, fragmentHashes })
         const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir, manifestHash, site)
         totalFiles += files
         console.log(`    ${c.green('✓')} ${pageName}`)

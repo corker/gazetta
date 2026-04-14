@@ -68,18 +68,31 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
     listSidecars(opts.source, join(opts.siteDir, 'pages')),
     listSidecars(opts.source, join(opts.siteDir, 'fragments')),
   ])
+  // Hash fragments first (they don't depend on page hashes). Static-mode
+  // page hashes include fragment hashes so a fragment content change
+  // invalidates every page that bakes it in.
+  const fragmentHashes = new Map<string, string>()
+  for (const [name, frag] of site.fragments) {
+    const cached = sourceFragmentsSidecars.get(name)?.hash
+    fragmentHashes.set(name, cached ?? hashManifest(frag, { templateHashes }))
+  }
+
   const local = new Map<string, string>()
+  const pageHashOpts = opts.publishMode === 'static'
+    ? { templateHashes, fragmentHashes }
+    : { templateHashes }
   for (const [name, page] of site.pages) {
-    const cached = sourcePagesSidecars.get(name)?.hash
-    local.set(`pages/${name}`, cached ?? hashManifest(page, { templateHashes }))
+    // Source sidecars are written without fragmentHashes (source doesn't
+    // know target's publish mode). For static targets we must re-hash.
+    const cached = opts.publishMode === 'static' ? null : sourcePagesSidecars.get(name)?.hash
+    local.set(`pages/${name}`, cached ?? hashManifest(page, pageHashOpts))
   }
   // Static-mode targets bake fragments into pages — no fragment sidecars exist
   // on the target, and publishing @header/@footer is a no-op server-side. Omit
   // them from local so they don't appear as perpetually "added".
   if (opts.publishMode !== 'static') {
-    for (const [name, frag] of site.fragments) {
-      const cached = sourceFragmentsSidecars.get(name)?.hash
-      local.set(`fragments/${name}`, cached ?? hashManifest(frag, { templateHashes }))
+    for (const [name, hash] of fragmentHashes) {
+      local.set(`fragments/${name}`, hash)
     }
   }
 
