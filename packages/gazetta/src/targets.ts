@@ -83,18 +83,36 @@ export async function createStorageProvider(config: StorageConfig, siteDir: stri
   }
 }
 
+/**
+ * Per-target init timeout — guards against SDKs that hang on unreachable
+ * endpoints instead of surfacing the connection error. 10s is generous for
+ * cold-start against real cloud storage and still fast enough that a
+ * missing local emulator doesn't wedge the dev server for long.
+ */
+const TARGET_INIT_TIMEOUT_MS = 10000
+
 export async function createTargetRegistry(targets: Record<string, TargetConfig>, siteDir: string): Promise<Map<string, StorageProvider>> {
   const registry = new Map<string, StorageProvider>()
-  for (const [name, config] of Object.entries(targets)) {
+  // Init targets in parallel — a slow/failing target must not serialize
+  // behind the others. Each has its own timeout so a hang doesn't stall the
+  // registry indefinitely.
+  await Promise.all(Object.entries(targets).map(async ([name, config]) => {
     try {
-      const provider = await createStorageProvider(config.storage, siteDir)
-      if ('init' in provider && typeof provider.init === 'function') {
-        await (provider as StorageProvider & { init(): Promise<void> }).init()
+      const initOne = async () => {
+        const provider = await createStorageProvider(config.storage, siteDir)
+        if ('init' in provider && typeof provider.init === 'function') {
+          await (provider as StorageProvider & { init(): Promise<void> }).init()
+        }
+        return provider
       }
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`init timed out after ${TARGET_INIT_TIMEOUT_MS}ms`)), TARGET_INIT_TIMEOUT_MS),
+      )
+      const provider = await Promise.race([initOne(), timeout])
       registry.set(name, provider)
     } catch (err) {
       console.warn(`  Warning: target "${name}" failed to initialize: ${(err as Error).message}`)
     }
-  }
+  }))
   return registry
 }
