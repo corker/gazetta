@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import type { StorageProvider } from './types.js'
+import { parseUsesSidecarName, parseTemplateSidecarName } from './hash.js'
 
 export interface PublishRequest {
   source: string
@@ -238,5 +239,98 @@ export async function findFragmentDependents(
     }
   }
 
+  return { pages: [...pages].sort(), fragments: [...fragments].sort() }
+}
+
+/**
+ * Fast path for finding dependents against a *published* target.
+ *
+ * Uses `.uses-{fragment}` and `.tpl-{template}` sidecar filenames (written by
+ * writeSidecar in publish-rendered.ts). Needs listings only — no content
+ * reads, no JSON parsing. Scales to 10k pages at the cost of one LIST call
+ * per item directory.
+ *
+ * Handles transitive fragment→fragment dependencies: if @inner is referenced
+ * by @outer which is referenced by pages/home, querying "@inner" returns
+ * home and @outer.
+ *
+ * Intended for queries against target storage (where the sidecars live).
+ * Queries against source/local content should use findFragmentDependents.
+ */
+export async function findDependentsFromSidecars(
+  targetStorage: StorageProvider,
+  query: { fragment: string } | { template: string },
+): Promise<{ pages: string[]; fragments: string[] }> {
+  // Build an index of each item's declared dependencies in one pass. For
+  // each page/fragment directory, read its sidecar filenames and remember
+  // which @fragments and which template it uses.
+  type ItemInfo = { uses: Set<string>; template: string | null }
+  const pagesIndex = new Map<string, ItemInfo>()
+  const fragmentsIndex = new Map<string, ItemInfo>()
+
+  async function readItemSidecars(dir: string): Promise<ItemInfo | null> {
+    let entries
+    try { entries = await targetStorage.readDir(dir) } catch { return null }
+    const uses = new Set<string>()
+    let template: string | null = null
+    for (const e of entries) {
+      if (e.isDirectory) continue
+      const usesName = parseUsesSidecarName(e.name)
+      if (usesName) { uses.add(usesName); continue }
+      const tplName = parseTemplateSidecarName(e.name)
+      if (tplName) template = tplName
+    }
+    return { uses, template }
+  }
+
+  async function indexKind(kind: 'pages' | 'fragments', index: Map<string, ItemInfo>): Promise<void> {
+    let entries
+    try { entries = await targetStorage.readDir(kind) } catch { return }
+    await Promise.all(entries.filter(e => e.isDirectory).map(async (e) => {
+      // Nested pages/fragments (e.g. blog/[slug]) — check children too
+      const itemDir = `${kind}/${e.name}`
+      const info = await readItemSidecars(itemDir)
+      if (info && (info.uses.size || info.template)) index.set(e.name, info)
+      try {
+        const children = await targetStorage.readDir(itemDir)
+        await Promise.all(children.filter(c => c.isDirectory).map(async (c) => {
+          const nestedInfo = await readItemSidecars(`${itemDir}/${c.name}`)
+          if (nestedInfo && (nestedInfo.uses.size || nestedInfo.template)) {
+            index.set(`${e.name}/${c.name}`, nestedInfo)
+          }
+        }))
+      } catch { /* no nested */ }
+    }))
+  }
+
+  await Promise.all([
+    indexKind('pages', pagesIndex),
+    indexKind('fragments', fragmentsIndex),
+  ])
+
+  // Now walk the indexes in-memory. No more storage calls from this point.
+  const pages = new Set<string>()
+  const fragments = new Set<string>()
+
+  if ('template' in query) {
+    for (const [name, info] of pagesIndex) if (info.template === query.template) pages.add(name)
+    for (const [name, info] of fragmentsIndex) if (info.template === query.template) fragments.add(name)
+    return { pages: [...pages].sort(), fragments: [...fragments].sort() }
+  }
+
+  // Fragment query with transitive walk
+  const queue = [query.fragment]
+  const seen = new Set<string>([query.fragment])
+  while (queue.length) {
+    const current = queue.shift()!
+    for (const [name, info] of pagesIndex) {
+      if (info.uses.has(current)) pages.add(name)
+    }
+    for (const [name, info] of fragmentsIndex) {
+      if (info.uses.has(current) && !seen.has(name)) {
+        seen.add(name); fragments.add(name); queue.push(name)
+      }
+    }
+  }
   return { pages: [...pages].sort(), fragments: [...fragments].sort() }
 }

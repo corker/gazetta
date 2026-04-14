@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import type { ComponentEntry, FragmentManifest, PageManifest } from './types.js'
 
 const SIDECAR_RE = /^\.([0-9a-f]{8})\.hash$/
+const USES_SIDECAR_RE = /^\.uses-(.+)$/
+const TPL_SIDECAR_RE = /^\.tpl-(.+)$/
 
 export function sidecarNameFor(hash: string): string {
   return `.${hash}.hash`
@@ -10,6 +12,36 @@ export function sidecarNameFor(hash: string): string {
 export function parseSidecarName(entryName: string): string | null {
   const m = SIDECAR_RE.exec(entryName)
   return m ? m[1] : null
+}
+
+/**
+ * Filename-safe encoding for fragment/template names. Fragments can be
+ * subfolder-qualified (e.g. "buttons/primary"); we replace / with __ so the
+ * name works as a filename component and stays readable in listings.
+ */
+export function encodeRefName(name: string): string {
+  return name.replace(/\//g, '__')
+}
+export function decodeRefName(name: string): string {
+  return name.replace(/__/g, '/')
+}
+
+/** `.uses-header` for a page/fragment that references @header. */
+export function usesSidecarNameFor(fragmentName: string): string {
+  return `.uses-${encodeRefName(fragmentName)}`
+}
+export function parseUsesSidecarName(entryName: string): string | null {
+  const m = USES_SIDECAR_RE.exec(entryName)
+  return m ? decodeRefName(m[1]) : null
+}
+
+/** `.tpl-page-default` for a page/fragment rendered with that template. */
+export function templateSidecarNameFor(templateName: string): string {
+  return `.tpl-${encodeRefName(templateName)}`
+}
+export function parseTemplateSidecarName(entryName: string): string | null {
+  const m = TPL_SIDECAR_RE.exec(entryName)
+  return m ? decodeRefName(m[1]) : null
 }
 
 /**

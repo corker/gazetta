@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { getPublishMode, getEnvironment } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
-import { publishItems, resolveDependencies, findFragmentDependents } from '../../publish.js'
+import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
 import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
@@ -71,12 +71,18 @@ export function publishRoutes(
 
   /**
    * Reverse-dependency lookup for publish UI impact preview.
-   * GET /api/dependents?item=fragments/header
+   * GET /api/dependents?item=fragments/header[&target=staging]
    *   → { pages: string[], fragments: string[] }
    *
-   * Returned lists are the pages and nested fragments that transitively
-   * reference the queried fragment. The admin UI shows this as
-   * "Publishing @header affects: home, about, blog".
+   * Without `target`: scans local source manifests (authoritative for the
+   * current draft state — what's about to be published). Slow-ish on very
+   * large sites since it reads every manifest.
+   *
+   * With `target`: uses published .uses-* / .tpl-* sidecars on that target.
+   * Listings only, no content reads — scales to 10k+ items at the cost of
+   * reflecting only what's been published (not unsaved local changes).
+   * Useful for answering "what pages would need republish if this fragment
+   * changed" on large sites.
    */
   app.get('/api/dependents', async (c) => {
     const item = c.req.query('item')
@@ -84,7 +90,15 @@ export function publishRoutes(
       return c.json({ error: 'Missing or invalid "item" query (must be fragments/<name>)' }, 400)
     }
     const fragmentName = item.slice('fragments/'.length)
+    const targetName = c.req.query('target')
     try {
+      if (targetName) {
+        const t = await getTargets()
+        const targetStorage = t.get(targetName)
+        if (!targetStorage) return c.json({ error: `Unknown target: ${targetName}` }, 400)
+        const result = await findDependentsFromSidecars(targetStorage, { fragment: fragmentName })
+        return c.json(result)
+      }
       const result = await findFragmentDependents(sourceStorage, siteDir, fragmentName)
       return c.json(result)
     } catch (err) {

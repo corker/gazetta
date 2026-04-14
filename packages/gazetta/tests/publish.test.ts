@@ -352,3 +352,58 @@ describe('getPublishMode', () => {
     expect(getPublishMode({ storage: { type: 'r2' }, worker: { type: 'cloudflare' }, publishMode: 'static' })).toBe('static')
   })
 })
+
+describe('findDependentsFromSidecars', () => {
+  it('returns pages that reference a fragment via .uses-* sidecars', async () => {
+    const { findDependentsFromSidecars } = await import('../src/publish.js')
+    const target = createFilesystemProvider(targetDir)
+    await writeTestFile(targetDir, 'pages/home/.cf120e4b.hash', '')
+    await writeTestFile(targetDir, 'pages/home/.uses-header', '')
+    await writeTestFile(targetDir, 'pages/home/.uses-footer', '')
+    await writeTestFile(targetDir, 'pages/home/.tpl-page-default', '')
+    await writeTestFile(targetDir, 'pages/about/.abc12345.hash', '')
+    await writeTestFile(targetDir, 'pages/about/.uses-header', '')
+    await writeTestFile(targetDir, 'pages/about/.tpl-page-default', '')
+    await writeTestFile(targetDir, 'pages/blog/[slug]/.def67890.hash', '')
+    await writeTestFile(targetDir, 'pages/blog/[slug]/.uses-header', '')
+    await writeTestFile(targetDir, 'pages/blog/[slug]/.tpl-page-blog', '')
+
+    const r = await findDependentsFromSidecars(target, { fragment: 'header' })
+    expect(r.pages.sort()).toEqual(['about', 'blog/[slug]', 'home'])
+    expect(r.fragments).toEqual([])
+  })
+
+  it('walks transitive fragment→fragment references', async () => {
+    const { findDependentsFromSidecars } = await import('../src/publish.js')
+    const target = createFilesystemProvider(targetDir)
+    await writeTestFile(targetDir, 'fragments/header/.123.hash', '')
+    await writeTestFile(targetDir, 'fragments/header/.uses-inner-logo', '')
+    await writeTestFile(targetDir, 'pages/home/.456.hash', '')
+    await writeTestFile(targetDir, 'pages/home/.uses-header', '')
+
+    const r = await findDependentsFromSidecars(target, { fragment: 'inner-logo' })
+    expect(r.pages).toEqual(['home'])
+    expect(r.fragments).toEqual(['header'])
+  })
+
+  it('returns items that use a given template', async () => {
+    const { findDependentsFromSidecars } = await import('../src/publish.js')
+    const target = createFilesystemProvider(targetDir)
+    await writeTestFile(targetDir, 'pages/home/.uses-header', '')
+    await writeTestFile(targetDir, 'pages/home/.tpl-page-default', '')
+    await writeTestFile(targetDir, 'pages/blog/.tpl-page-blog', '')
+    await writeTestFile(targetDir, 'fragments/header/.tpl-header-layout', '')
+
+    const r = await findDependentsFromSidecars(target, { template: 'page-default' })
+    expect(r.pages).toEqual(['home'])
+    expect(r.fragments).toEqual([])
+  })
+
+  it('returns empty sets when target has no sidecars', async () => {
+    const { findDependentsFromSidecars } = await import('../src/publish.js')
+    const target = createFilesystemProvider(targetDir)
+    const r = await findDependentsFromSidecars(target, { fragment: 'header' })
+    expect(r.pages).toEqual([])
+    expect(r.fragments).toEqual([])
+  })
+})
