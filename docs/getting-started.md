@@ -375,6 +375,7 @@ targets:
       type: filesystem
       path: ./dist/staging
   production:
+    environment: production           # admin UI requires confirmation before publishing
     storage:
       type: r2
       accountId: "your-cloudflare-account-id"
@@ -389,6 +390,15 @@ targets:
         type: cloudflare
         apiToken: "${CLOUDFLARE_API_TOKEN}"
 ```
+
+### Target environment
+
+The optional `environment` field declares a target's intent — `local`, `staging`, or `production`. The admin UI uses it to:
+
+- Show a `prod` / `staging` badge next to the target name in the publish dialog
+- Require an explicit confirmation step before publishing to a `production` target
+
+Defaults: `filesystem` storage → `local`, everything else → `production`. Override in site.yaml when those defaults don't match your setup (e.g. a shared filesystem mount used as production, or a cloud target reserved for staging).
 
 ### Authentication
 

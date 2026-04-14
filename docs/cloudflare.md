@@ -29,6 +29,7 @@ npx wrangler r2 bucket create my-site
 name: My Site
 targets:
   production:
+    environment: production
     storage:
       type: r2
       accountId: "your-cloudflare-account-id"

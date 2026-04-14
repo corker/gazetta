@@ -233,6 +233,7 @@ targets:                                   # required — at least one target
     storage: { type: r2, ... }
     worker: { type: cloudflare, name: my-site }
     publishMode: esi                       # optional — esi | static (auto-detected from worker)
+    environment: production                # optional — local | staging | production. Default: local for filesystem, production otherwise. Drives admin UI confirmation prompts and badges.
     siteUrl: https://mysite.com            # optional — for cache purge URL resolution
     cache:                                 # optional — caching configuration
       browser: 0                           # browser cache TTL in seconds

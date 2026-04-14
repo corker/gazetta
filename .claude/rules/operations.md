@@ -290,17 +290,16 @@ Future: content-hash diffing. `gazetta publish --force` to bypass diffing.
 empty cache). It never uses stale templates — even if `gazetta dev` is running
 simultaneously with a different cached version. Both processes are independent.
 
-**Accidental publish to production from dev:** `gazetta dev` allows publishing to any
-configured target, including production. First publish to a non-filesystem target shows
-a confirmation prompt:
+**Accidental publish to production from dev:** Targets declare semantic intent via the
+`environment` field — `local`, `staging`, or `production`. Defaults: filesystem → `local`,
+everything else → `production`. The admin UI publish dialog requires an explicit
+confirmation step ("Yes, publish to production") for any selected target with
+`environment: production`. The Publish button is also disabled while compare is loading
+to prevent accidental fallback to a single-item publish.
 
-```
-gazetta dev
-> [Admin UI] Publishing to "production" (r2://my-site)
-> ⚠ This will update live content. Continue? [y/N]
-```
-
-CI (`CI=true`) skips the prompt. Future: target-level `confirm: true` flag in site.yaml.
+CLI publish does not currently prompt. CI (`CI=true`) is unaffected. Operators can
+override the default in site.yaml — e.g., a shared filesystem mount used as production
+should set `environment: production` explicitly.
 
 **Storage upload behavior:**
 

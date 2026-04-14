@@ -24,6 +24,7 @@ Same assembly logic as the [Cloudflare deployment](./cloudflare.md), but runs on
 name: My Site
 targets:
   production:
+    environment: production           # filesystem defaults to 'local'; opt this one into 'production' for admin UI confirmation
     storage:
       type: filesystem
       path: ./dist/production
