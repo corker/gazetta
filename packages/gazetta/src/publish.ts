@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { StorageProvider } from './types.js'
-import { parseUsesSidecarName, parseTemplateSidecarName } from './hash.js'
+import { listSidecars } from './sidecars.js'
 import { mapLimit } from './concurrency.js'
 
 export interface PublishRequest {
@@ -262,55 +262,24 @@ export async function findDependentsFromSidecars(
   targetStorage: StorageProvider,
   query: { fragment: string } | { template: string },
 ): Promise<{ pages: string[]; fragments: string[] }> {
-  // Build an index of each item's declared dependencies in one pass. For
-  // each page/fragment directory, read its sidecar filenames and remember
-  // which @fragments and which template it uses.
-  type ItemInfo = { uses: Set<string>; template: string | null }
-  const pagesIndex = new Map<string, ItemInfo>()
-  const fragmentsIndex = new Map<string, ItemInfo>()
-
-  async function readItemSidecars(dir: string): Promise<ItemInfo | null> {
-    let entries
-    try { entries = await targetStorage.readDir(dir) } catch { return null }
-    const uses = new Set<string>()
-    let template: string | null = null
-    for (const e of entries) {
-      if (e.isDirectory) continue
-      const usesName = parseUsesSidecarName(e.name)
-      if (usesName) { uses.add(usesName); continue }
-      const tplName = parseTemplateSidecarName(e.name)
-      if (tplName) template = tplName
-    }
-    return { uses, template }
-  }
-
-  async function indexKind(kind: 'pages' | 'fragments', index: Map<string, ItemInfo>): Promise<void> {
-    let entries
-    try { entries = await targetStorage.readDir(kind) } catch { return }
-    const topLevel = entries.filter(e => e.isDirectory)
-    // Bounded concurrency — 10k-page sites must not spawn 10k concurrent
-    // listings. Default limit (20) matches cloud storage sweet spot.
-    await mapLimit(topLevel, async (e) => {
-      const itemDir = `${kind}/${e.name}`
-      const info = await readItemSidecars(itemDir)
-      if (info && (info.uses.size || info.template)) index.set(e.name, info)
-      // Nested pages/fragments (e.g. blog/[slug]) — check children too
-      let children
-      try { children = await targetStorage.readDir(itemDir) } catch { return }
-      const nested = children.filter(c => c.isDirectory)
-      await mapLimit(nested, async (c) => {
-        const nestedInfo = await readItemSidecars(`${itemDir}/${c.name}`)
-        if (nestedInfo && (nestedInfo.uses.size || nestedInfo.template)) {
-          index.set(`${e.name}/${c.name}`, nestedInfo)
-        }
-      })
-    })
-  }
-
-  await Promise.all([
-    indexKind('pages', pagesIndex),
-    indexKind('fragments', fragmentsIndex),
+  // Single listing pass per root, then all reasoning is in-memory. Don't
+  // require a .hash — dependents queries care about .uses-* / .tpl-*, and
+  // an item with only those (partial state) is still relevant.
+  const [pagesList, fragmentsList] = await Promise.all([
+    listSidecars(targetStorage, 'pages', { requireHash: false }),
+    listSidecars(targetStorage, 'fragments', { requireHash: false }),
   ])
+  // Strip the 'pages/' or 'fragments/' prefix to match the name-only API.
+  const pagesIndex = new Map<string, { uses: Set<string>; template: string | null }>()
+  for (const [path, state] of pagesList) {
+    const name = path.slice('pages/'.length)
+    pagesIndex.set(name, { uses: new Set(state.uses), template: state.template })
+  }
+  const fragmentsIndex = new Map<string, { uses: Set<string>; template: string | null }>()
+  for (const [path, state] of fragmentsList) {
+    const name = path.slice('fragments/'.length)
+    fragmentsIndex.set(name, { uses: new Set(state.uses), template: state.template })
+  }
 
   // Now walk the indexes in-memory. No more storage calls from this point.
   const pages = new Set<string>()

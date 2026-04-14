@@ -1,7 +1,7 @@
 import { loadSite } from './site-loader.js'
-import { hashManifest, parseSidecarName } from './hash.js'
+import { hashManifest } from './hash.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from './templates-scan.js'
-import { mapLimit } from './concurrency.js'
+import { listSidecars } from './sidecars.js'
 import type { StorageProvider } from './types.js'
 
 export interface CompareResult {
@@ -73,12 +73,14 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
     }
   }
 
-  // 3. List target sidecars
+  // 3. List target sidecars — one pass per root, parallel inside.
   const target = new Map<string, string>()
-  await collectSidecars(opts.target, 'pages', target)
-  if (opts.publishMode !== 'static') {
-    await collectSidecars(opts.target, 'fragments', target)
-  }
+  const [pagesSidecars, fragmentsSidecars] = await Promise.all([
+    listSidecars(opts.target, 'pages'),
+    opts.publishMode !== 'static' ? listSidecars(opts.target, 'fragments') : Promise.resolve(new Map()),
+  ])
+  for (const [k, s] of pagesSidecars) target.set(k, s.hash)
+  for (const [k, s] of fragmentsSidecars) target.set(k, s.hash)
 
   // 4. Diff
   const result: CompareResult = {
@@ -103,37 +105,3 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   return result
 }
 
-/**
- * Walk `pages/` or `fragments/` looking for `.{8hex}.hash` sidecar files.
- * Records `pages/home` → `abc12345` for each found.
- *
- * Bounded-parallel recursion — flat Promise.all over 10k dirs would blow
- * the fd limit or provider rate limit.
- */
-async function collectSidecars(
-  storage: StorageProvider,
-  rootDir: string,
-  out: Map<string, string>,
-  prefix = rootDir
-): Promise<void> {
-  let entries: Awaited<ReturnType<StorageProvider['readDir']>>
-  try {
-    entries = await storage.readDir(rootDir)
-  } catch {
-    return
-  }
-  let foundSidecar: string | null = null
-  for (const e of entries) {
-    if (!e.isDirectory) {
-      const hash = parseSidecarName(e.name)
-      if (hash) foundSidecar = hash
-    }
-  }
-  if (foundSidecar) {
-    out.set(prefix, foundSidecar)
-  }
-  const subdirs = entries.filter(e => e.isDirectory)
-  await mapLimit(subdirs, async (e) => {
-    await collectSidecars(storage, `${rootDir}/${e.name}`, out, `${prefix}/${e.name}`)
-  })
-}

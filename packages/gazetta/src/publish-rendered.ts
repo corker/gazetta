@@ -4,73 +4,12 @@ import type { Site } from './site-loader.js'
 import { loadSite } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent, renderPage } from './renderer.js'
-import { parseSidecarName, sidecarNameFor, parseUsesSidecarName, usesSidecarNameFor, parseTemplateSidecarName, templateSidecarNameFor } from './hash.js'
+import { writeSidecars, collectFragmentRefs } from './sidecars.js'
 
 function contentHash(content: string): string {
   return createHash('md5').update(content).digest('hex').slice(0, 8)
 }
 
-/**
- * Walk a component tree and collect every @fragment reference, recursing
- * into inline components' children. Used to write .uses-* sidecars so the
- * reverse-dep lookup can skip content reads entirely — just readDir and
- * pattern-match on filenames.
- */
-function collectFragmentRefs(components: unknown[] | undefined): string[] {
-  const refs = new Set<string>()
-  function walk(entries: unknown[] | undefined) {
-    if (!Array.isArray(entries)) return
-    for (const entry of entries) {
-      if (typeof entry === 'string' && entry.startsWith('@')) refs.add(entry.slice(1))
-      else if (typeof entry === 'object' && entry !== null) {
-        walk((entry as { components?: unknown[] }).components)
-      }
-    }
-  }
-  walk(components)
-  return [...refs]
-}
-
-/**
- * Write sidecars for a published page/fragment:
- *   - .{hash}.hash — content hash, used by compare-targets
- *   - .uses-{fragment} — one per @ reference; used by findFragmentDependents
- *   - .tpl-{template} — template name; used to flag republish-needed when a
- *     template's schema changes
- *
- * All three are filename-only (zero-byte). A single readDir returns the full
- * dependency picture for this item without any content reads — so scanning
- * 10k pages for "who uses @header" costs N LIST calls, not N GET calls.
- *
- * Stale sidecars of each kind are removed first, so old .uses-* and .tpl-*
- * from a previous publish don't linger if the page now references different
- * fragments / uses a different template.
- */
-async function writeSidecar(
-  storage: StorageProvider,
-  dir: string,
-  hash: string,
-  uses: string[] = [],
-  template?: string,
-): Promise<void> {
-  const want = new Set<string>([sidecarNameFor(hash)])
-  for (const frag of uses) want.add(usesSidecarNameFor(frag))
-  if (template) want.add(templateSidecarNameFor(template))
-
-  // Remove stale sidecars of any known kind that aren't in `want`.
-  try {
-    const entries = await storage.readDir(dir)
-    for (const e of entries) {
-      if (want.has(e.name)) continue
-      if (parseSidecarName(e.name) || parseUsesSidecarName(e.name) || parseTemplateSidecarName(e.name)) {
-        try { await storage.rm(`${dir}/${e.name}`) } catch { /* already gone */ }
-      }
-    }
-  } catch { /* dir doesn't exist yet — mkdir below */ }
-  await storage.mkdir(dir)
-  // Write in parallel — these are tiny and independent.
-  await Promise.all([...want].map(name => storage.writeFile(`${dir}/${name}`, '')))
-}
 
 /** List existing hashed files (styles.*.css, script.*.js) in a directory */
 async function listHashedFiles(storage: StorageProvider, dir: string): Promise<string[]> {
@@ -217,7 +156,11 @@ ${bodyContent}
 
   // Write content-hash sidecar + reverse-dep sidecars for compare/dependents
   if (manifestHash) {
-    await writeSidecar(targetStorage, pageDir, manifestHash, collectFragmentRefs(page.components), page.template)
+    await writeSidecars(targetStorage, pageDir, {
+      hash: manifestHash,
+      uses: collectFragmentRefs(page.components),
+      template: page.template,
+    })
   }
 
   // Clean up old hashed files
@@ -259,7 +202,11 @@ export async function publishPageStatic(
   // + dependents find them the same way as for ESI targets. pages/ doesn't clash
   // with static serving (routes are / and /{route}, not /pages/*).
   if (manifestHash) {
-    await writeSidecar(targetStorage, `pages/${pageName}`, manifestHash, collectFragmentRefs(page.components), page.template)
+    await writeSidecars(targetStorage, `pages/${pageName}`, {
+      hash: manifestHash,
+      uses: collectFragmentRefs(page.components),
+      template: page.template,
+    })
   }
 
   return { files: 1 }
@@ -330,7 +277,11 @@ export async function publishFragmentRendered(
 
   // Write content-hash sidecar + reverse-dep sidecars for compare/dependents
   if (manifestHash) {
-    await writeSidecar(targetStorage, fragDir, manifestHash, collectFragmentRefs(fragment.components), fragment.template)
+    await writeSidecars(targetStorage, fragDir, {
+      hash: manifestHash,
+      uses: collectFragmentRefs(fragment.components),
+      template: fragment.template,
+    })
   }
 
   // Clean up old hashed files
