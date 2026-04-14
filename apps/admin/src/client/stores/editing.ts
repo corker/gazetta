@@ -5,6 +5,7 @@ import { ref, reactive, computed } from 'vue'
 import { useToastStore } from './toast.js'
 import { usePreviewStore } from './preview.js'
 import { useSelectionStore } from './selection.js'
+import { usePublishStatusStore } from './publishStatus.js'
 import { api } from '../api/client.js'
 import type { EditorMount } from 'gazetta/types'
 
@@ -268,7 +269,6 @@ export const useEditingStore = defineStore('editing', () => {
       usePreviewStore().invalidate()
       // Re-check publish state — saving may have flipped this page from
       // unchanged to dirty (or vice-versa if content matches the target).
-      const { usePublishStatusStore } = await import('./publishStatus.js')
       usePublishStatusStore().refresh()
       toast.show('Saved')
     } catch (err) {
