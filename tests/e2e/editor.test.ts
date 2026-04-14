@@ -824,6 +824,17 @@ test.describe('Publish dialog', () => {
     await expect(aboutRow.locator('.p-checkbox-checked')).toHaveCount(0)
   })
 
+  test('publish dialog matches visual snapshot (first publish + env badges)', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    await openPublish(page)
+    await selectStaging(page)
+    // Wait for compare to finish (first-publish banner appears)
+    await page.locator('[data-testid="publish-first-publish"]').waitFor()
+    await expect(page.locator('.p-dialog')).toHaveScreenshot('publish-first-publish.png', {
+      maxDiffPixelRatio: 0.02,
+    })
+  })
+
   test('publish streams per-target progress and lands on results', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     await openPublish(page)
