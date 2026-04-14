@@ -117,6 +117,31 @@ Only 8 `:global(.dark)` uses in the entire codebase — not a systemic pattern. 
 
 When refactoring, move these to `tokens.css` with the new `--color-*` names; rewrite mount.tsx and brand-color.tsx to use the new names. No backwards-compat constraint.
 
+## User theming (future)
+
+Site authors will eventually want to customize colors. The planned contract is **static CSS overrides, no API** — simplest path, defers the JS preset layer until the product is mature enough to justify it.
+
+Shape:
+
+```
+my-project/
+  admin/
+    theme.css          # optional, user-authored
+```
+
+Load order: PrimeVue Aura CSS → our `tokens.css` → user's `theme.css` (last, wins cascade). `gazetta dev` / `gazetta serve` injects the link tag when the file exists.
+
+User overrides any `--p-*` or `--color-*` token in `:root` and `.dark`:
+
+```css
+:root { --p-primary-color: #7c3aed; --color-danger-bg: #fef2f2; }
+.dark { --p-primary-color: #a78bfa; --color-danger-bg: #2a0a0a; }
+```
+
+**Known limitation — verified live against PrimeVue v4 + Aura:** derived tokens (`--p-primary-hover-color`, `--p-primary-active-color`, `--p-primary-contrast-color`) are emitted as literal hex values, not as `var(--p-primary-color)`. Overriding `--p-primary-color` cascades to some downstream tokens (`--p-button-primary-background` resolves via chained `var()`) but not to sibling shades.
+
+For a full palette swap, the user must override each shade explicitly. Document this as a known tradeoff of the no-API approach. A future `admin/theme.ts` JS preset bridge (using PrimeVue's `definePreset`) would fix this — deferred until product maturity warrants the added surface area.
+
 ## Don't use
 
 - **Tailwind / UnoCSS** — overkill for ~350 LOC of component CSS
