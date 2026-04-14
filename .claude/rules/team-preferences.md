@@ -55,3 +55,7 @@ Validated approaches and things to avoid. Each entry: rule, then why.
 14. **Editor mount composables: capture (mount, el) as a pair — don't rely on the ref's current value at unmount time.**
    When `editorMount` ref changes (e.g. default form → custom editor), calling `editorMount.value.unmount(el)` uses the NEW instance's unmount on a container mounted by the OLD one — it's a no-op, leaving the React root behind. Next `createRoot(el)` triggers "container already has root" warning. Fix: store `current = { mount, el }` at mount time, use `current.mount.unmount(current.el)` at unmount time.
    Why: Discovered while diagnosing #122. The React warning on its own didn't break things, but it compounded with the Vite reload bug.
+
+15. **Apply SOLID principles to every change.**
+   Single responsibility (one module = one reason to change — e.g. `sidecars.ts` owns sidecar I/O, nothing else), open/closed (extend via injection — `compareTargets` takes `scanTemplates` as an option rather than hard-coding the default), Liskov (substitutable providers — `StorageProvider` contract), interface segregation (narrow interfaces like `SourceSidecarWriter { writeFor, invalidate }` rather than god objects), dependency inversion (routes depend on the `SourceSidecarWriter` interface, not on `createSourceSidecarWriter`).
+   Why: Explicit user preference, reinforced in every major refactor of the performance work.
