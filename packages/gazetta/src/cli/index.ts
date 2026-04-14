@@ -41,12 +41,12 @@ const LOADER_HTML = `<!doctype html>
 <meta charset="utf-8">
 <title>Loading Gazetta admin…</title>
 <style>
-  /* Match the admin's body colors so there's no flash when the real UI
-     takes over. localStorage holds the user's previous choice; default
-     is dark (same as the admin's initial theme). */
+  /* Neutral tones — the loader is a transitional state and we don't yet know
+     whether the user has customized the admin theme. Mid-gray reads as
+     "loading" on any conceivable admin background. */
   html, body { height: 100%; margin: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #09090b; color: #e4e4e7; display: flex; align-items: center; justify-content: center; }
-  body.light { background: #fff; color: #1a1a1a; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #262626; color: #a3a3a3; display: flex; align-items: center; justify-content: center; }
+  body.light { background: #f5f5f5; color: #525252; }
   .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
   .spinner { width: 24px; height: 24px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
