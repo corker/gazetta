@@ -33,6 +33,7 @@ export interface AdminAppOptions {
 type AdminApp = Hono & {
   invalidateTemplatesCache(): void
   invalidateSourceSidecars(): void
+  writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void>
 }
 export function createAdminApp(opts: AdminAppOptions): AdminApp
 export function createAdminApp(siteDir: string, storage: StorageProvider, targets?: Map<string, StorageProvider>): AdminApp
@@ -87,5 +88,6 @@ export function createAdminApp(
   const appWithInvalidate = app as AdminApp
   appWithInvalidate.invalidateTemplatesCache = () => cachedScan.invalidate()
   appWithInvalidate.invalidateSourceSidecars = () => sidecarWriter.invalidate()
+  appWithInvalidate.writeSourceSidecar = (kind, name) => sidecarWriter.writeFor(kind, name)
   return appWithInvalidate
 }

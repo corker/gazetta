@@ -1122,7 +1122,11 @@ async function runDev(siteDir: string, port: number) {
 
   // Admin Hono instance — captured so the template file watcher can
   // invalidate its memoized template-scan cache on .ts/.tsx changes.
-  let cmsApp: (Hono & { invalidateTemplatesCache(): void; invalidateSourceSidecars(): void }) | null = null
+  let cmsApp: (Hono & {
+    invalidateTemplatesCache(): void
+    invalidateSourceSidecars(): void
+    writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void>
+  }) | null = null
   if (isDevMode) {
     // Dev mode: mount CMS API inline (same process = shared template cache)
     cmsApp = await setupCmsApi(app, siteDir, storage, templatesDir, adminDir)
@@ -1282,6 +1286,14 @@ async function runDev(siteDir: string, port: number) {
     if (filename.endsWith('.json') || filename.endsWith('.yaml')) {
       console.log(`  Manifest changed: ${filename}`)
       invalidateAllTemplates()
+      // Refresh source sidecars for external edits (git pull, direct file
+      // edit). PUT routes already handle their own writes — this catches
+      // everything outside the admin UI.
+      const norm = filename.replace(/\\/g, '/')
+      const pageMatch = /^pages\/(.+)\/page\.json$/.exec(norm)
+      const fragMatch = /^fragments\/(.+)\/fragment\.json$/.exec(norm)
+      if (pageMatch) cmsApp?.writeSourceSidecar('page', pageMatch[1]).catch(() => {})
+      else if (fragMatch) cmsApp?.writeSourceSidecar('fragment', fragMatch[1]).catch(() => {})
       notifyReload()
     }
   })
@@ -1330,7 +1342,7 @@ function mountUserThemeRoute(cmsApp: Hono, adminDir: string) {
   })
 }
 
-async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string): Promise<Hono & { invalidateTemplatesCache(): void; invalidateSourceSidecars(): void }> {
+async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string): Promise<Hono & { invalidateTemplatesCache(): void; invalidateSourceSidecars(): void; writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void> }> {
   const siteYamlPath = join(siteDir, 'site.yaml')
   let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
   if (existsSync(siteYamlPath)) {
