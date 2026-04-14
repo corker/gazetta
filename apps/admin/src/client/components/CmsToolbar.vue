@@ -10,6 +10,7 @@ import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
 import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
+import ChangesDrawer from './ChangesDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +23,7 @@ const theme = useThemeStore()
 const uiMode = useUiModeStore()
 const showPublish = ref(false)
 const showFetch = ref(false)
+const showChanges = ref(false)
 
 const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fragments')
 const publishItemName = computed(() => selection.name ?? '')
@@ -60,6 +62,8 @@ function handleBack() {
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
       <Button v-if="uiMode.mode === 'edit'" label="Save" icon="pi pi-save" severity="primary" :loading="editing.saving"
         data-testid="save-btn" :disabled="!editing.hasPendingEdits" @click="editing.save()" size="small" class="cms-btn" />
+      <Button icon="pi pi-arrow-right-arrow-left" text rounded title="Changes"
+        data-testid="changes-btn" @click="showChanges = true" size="small" class="cms-btn" />
       <Button label="Fetch" icon="pi pi-cloud-download" severity="info"
         data-testid="fetch-btn" @click="showFetch = true" size="small" class="cms-btn" />
       <Button label="Publish" icon="pi pi-cloud-upload" severity="success"
@@ -70,6 +74,7 @@ function handleBack() {
   <PublishDialog v-if="showPublish" :visible="showPublish" :itemType="publishItemType"
     :itemName="publishItemName" @close="showPublish = false" />
   <FetchDialog v-if="showFetch" :visible="showFetch" @close="showFetch = false" />
+  <ChangesDrawer v-model:visible="showChanges" />
 </template>
 
 <style scoped>
