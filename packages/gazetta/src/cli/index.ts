@@ -48,9 +48,12 @@ const LOADER_HTML = `<!doctype html>
   body { font-family: system-ui, -apple-system, sans-serif; background: #262626; color: #a3a3a3; display: flex; align-items: center; justify-content: center; transition: opacity 200ms ease; }
   body.light { background: #f5f5f5; color: #525252; }
   body.leaving { opacity: 0; }
-  .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; opacity: 0; transition: opacity 300ms ease; }
-  .panel.shown { opacity: 1; }
+  .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
   .brand { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; color: currentColor; opacity: 0.9; }
+  /* Spinner + label only appear if startup actually takes a moment — warm
+     restarts paint the brand briefly, never the "Starting…" message. */
+  .progress { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; opacity: 0; transition: opacity 300ms ease; }
+  .progress.shown { opacity: 1; }
   .spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; opacity: 0.6; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .label { font-size: 0.8125rem; opacity: 0.75; }
@@ -59,8 +62,10 @@ const LOADER_HTML = `<!doctype html>
 <body>
   <div class="panel" role="status" aria-live="polite">
     <div class="brand">Gazetta</div>
-    <div class="spinner" aria-hidden="true"></div>
-    <div class="label">Starting admin…</div>
+    <div class="progress">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="label">Starting admin…</div>
+    </div>
   </div>
   <script>
     // Match the user's saved admin theme if present; fall back to dark default
@@ -70,10 +75,11 @@ const LOADER_HTML = `<!doctype html>
       if (saved === 'light') document.body.classList.add('light')
     } catch (e) { /* ignore */ }
 
-    // Delay the spinner by 400ms so fast/warm restarts never paint it —
-    // user sees a brief gray flash at worst, not a flash of spinner.
-    var panel = document.querySelector('.panel')
-    var showTimer = setTimeout(function () { panel.classList.add('shown') }, 400)
+    // Delay the spinner + label by 400ms so warm restarts never paint them.
+    // The brand wordmark is always visible — it's safe; nothing about it
+    // implies "this is taking a while".
+    var progress = document.querySelector('.progress')
+    var showTimer = setTimeout(function () { progress.classList.add('shown') }, 400)
 
     ;(function poll() {
       fetch('/admin/ping', { cache: 'no-store' })
