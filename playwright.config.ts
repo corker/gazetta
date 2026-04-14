@@ -7,6 +7,13 @@ export default defineConfig({
   // 8-12s per test. Individual expect() calls can still override lower.
   expect: { timeout: 15000 },
   retries: 0,
+  // Local runs use multiple workers — each gets its own temp site copy
+  // and dev server on port 3100+workerIdx (see tests/e2e/fixtures.ts).
+  // On CI we shard across matrix jobs instead (one worker per shard),
+  // so fix it to 1 there to avoid doubly-parallelising. Locally, 2 workers
+  // is the reliable sweet spot — 4 hits timing races under load.
+  workers: process.env.CI ? 1 : 2,
+  fullyParallel: true,
   use: {
     headless: true,
     viewport: { width: 1440, height: 900 },

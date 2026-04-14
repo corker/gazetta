@@ -788,8 +788,9 @@ test.describe('Publish dialog', () => {
     await page.locator('[data-testid="publish-target-staging"]').click()
     // While compare is still running, Publish should be disabled
     await expect(page.locator('[data-testid="publish-submit"]')).toBeDisabled()
-    // After compare completes, it re-enables
-    await expect(page.locator('[data-testid="publish-submit"]')).toBeEnabled({ timeout: 5000 })
+    // After compare completes, it re-enables. Generous timeout — the slow-route
+    // stub applies per-request and the publish-status store hits compare first.
+    await expect(page.locator('[data-testid="publish-submit"]')).toBeEnabled({ timeout: 15000 })
   })
 
   test('works in light mode', async ({ page, testSite }) => {
