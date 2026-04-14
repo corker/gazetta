@@ -25,7 +25,7 @@ let activeAbort: AbortController | null = null
 
 async function loadTargets() {
   try {
-    targets.value = await api.getTargets()
+    targets.value = (await api.getTargets()).map(t => t.name)
     const saved = localStorage.getItem(TARGET_KEY)
     if (saved && targets.value.includes(saved)) selectedTarget.value = saved
     else if (targets.value.length) selectedTarget.value = targets.value[0]

@@ -4,16 +4,17 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
-import { api, type CompareResult } from '../api/client.js'
+import { api, type CompareResult, type TargetInfo } from '../api/client.js'
 
 const props = defineProps<{ visible: boolean; itemType: string; itemName: string }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const currentItem = computed(() => `${props.itemType}/${props.itemName}`)
 
-const targets = ref<string[]>([])
+const targets = ref<TargetInfo[]>([])
 const selectedTargets = ref<string[]>([])
 const publishing = ref(false)
+const confirming = ref(false)
 const results = ref<Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> | null>(null)
 
 // Per-target compare state
@@ -39,6 +40,11 @@ function abortAllCompares() {
   for (const ac of compareAborts.values()) ac.abort()
   compareAborts.clear()
 }
+
+// Any change in target selection clears the pending confirmation step —
+// otherwise user could flip targets after clicking "Publish" once and push
+// to a prod target they hadn't reviewed.
+watch(selectedTargets, () => { confirming.value = false })
 
 // Start compare for a newly selected target; abort when deselected
 watch(selectedTargets, (now, prev) => {
@@ -130,6 +136,23 @@ const summary = computed(() => {
 })
 
 const anyLoading = computed(() => compareLoadingTargets.value.size > 0)
+// Targets with environment === 'production' require an explicit confirmation
+// step before publishing, so users can't silently push to live content.
+const productionTargetsSelected = computed(() =>
+  targets.value.filter(t => t.environment === 'production' && selectedTargets.value.includes(t.name))
+)
+const needsConfirm = computed(() => productionTargetsSelected.value.length > 0)
+// Publish is blocked while compare is still running — otherwise a hasty click
+// falls back to publishing only the currently-edited item, which users rarely
+// intend when the changes panel is still about to populate.
+const publishBlocked = computed(() =>
+  selectedTargets.value.length === 0 || anyLoading.value || publishing.value
+)
+const publishDisabledReason = computed(() => {
+  if (selectedTargets.value.length === 0) return 'Select at least one target'
+  if (anyLoading.value) return 'Loading changes…'
+  return ''
+})
 const anyCompareDone = computed(() => compareByTarget.value.size > 0)
 const anyFirstPublish = computed(() => {
   for (const t of selectedTargets.value) {
@@ -172,8 +195,18 @@ function toggleItem(path: string) {
   selectedItems.value = s
 }
 
+async function onPublishClick() {
+  if (publishBlocked.value) return
+  if (needsConfirm.value && !confirming.value) {
+    confirming.value = true
+    return
+  }
+  await handlePublish()
+}
+
 async function handlePublish() {
   if (selectedTargets.value.length === 0) return
+  confirming.value = false
   abortAllCompares()
   publishing.value = true
   results.value = null
@@ -238,11 +271,24 @@ function onClose() {
       <template v-else-if="!results">
         <div class="publish-targets">
           <p class="publish-label">Select targets</p>
-          <div v-for="target in targets" :key="target" class="publish-target">
-            <Checkbox v-model="selectedTargets" :inputId="target" :value="target" :data-testid="`publish-target-${target}`" />
-            <label :for="target">{{ target }}</label>
-            <ProgressSpinner v-if="compareLoadingTargets.has(target)" style="width:14px;height:14px" strokeWidth="6" />
+          <div v-for="target in targets" :key="target.name" class="publish-target">
+            <Checkbox v-model="selectedTargets" :inputId="target.name" :value="target.name" :data-testid="`publish-target-${target.name}`" />
+            <label :for="target.name" class="publish-target-label">
+              {{ target.name }}
+              <span v-if="target.environment === 'production'" class="publish-env-badge publish-env-prod">prod</span>
+              <span v-else-if="target.environment === 'staging'" class="publish-env-badge publish-env-staging">staging</span>
+            </label>
+            <ProgressSpinner v-if="compareLoadingTargets.has(target.name)" style="width:14px;height:14px" strokeWidth="6" />
           </div>
+        </div>
+
+        <div v-if="confirming" class="publish-confirm-banner" data-testid="publish-confirm-banner">
+          <i class="pi pi-exclamation-triangle" />
+          <span>
+            This will publish to
+            <strong>{{ productionTargetsSelected.map(t => t.name).join(', ') }}</strong>
+            — live content will change.
+          </span>
         </div>
 
         <div v-if="compareError" class="publish-warning" data-testid="publish-compare-error">
@@ -323,10 +369,18 @@ function onClose() {
     <template #footer>
       <Button v-if="results" label="Done" data-testid="publish-done" @click="onClose" />
       <template v-else>
-        <Button label="Cancel" severity="secondary" text @click="onClose" />
-        <Button label="Publish" icon="pi pi-cloud-upload" :loading="publishing"
+        <Button :label="confirming ? 'Back' : 'Cancel'" severity="secondary" text
+          @click="confirming ? (confirming = false) : onClose()" />
+        <Button v-if="!confirming"
+          label="Publish" icon="pi pi-cloud-upload" :loading="publishing"
           data-testid="publish-submit"
-          :disabled="selectedTargets.length === 0" @click="handlePublish" />
+          :title="publishDisabledReason"
+          :disabled="publishBlocked" @click="onPublishClick" />
+        <Button v-else
+          :label="`Yes, publish to ${productionTargetsSelected.map(t => t.name).join(', ')}`"
+          icon="pi pi-exclamation-triangle" severity="danger" :loading="publishing"
+          data-testid="publish-confirm"
+          @click="handlePublish" />
       </template>
     </template>
   </Dialog>
@@ -343,6 +397,11 @@ function onClose() {
 .publish-target label { cursor: pointer; }
 .publish-warning { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #450a0a; color: #f87171; font-size: 0.875rem; }
 .publish-firstpublish { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #1e3a5f; color: #93c5fd; font-size: 0.875rem; }
+.publish-confirm-banner { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: #450a0a; color: #fca5a5; font-size: 0.875rem; }
+.publish-target-label { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.publish-env-badge { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.125rem 0.375rem; border-radius: 4px; font-weight: 600; }
+.publish-env-prod { background: #450a0a; color: #fca5a5; }
+.publish-env-staging { background: #422006; color: #fbbf24; }
 .publish-changes { display: flex; flex-direction: column; gap: 0.5rem; }
 .publish-nochanges { color: #888; font-size: 0.875rem; }
 .publish-changes-group { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -373,6 +432,9 @@ function onClose() {
 .light .publish-changes-list .publish-change-row:hover { background: rgba(0, 0, 0, 0.04); }
 .light .publish-warning { background: #fef2f2; color: #991b1b; }
 .light .publish-firstpublish { background: #eff6ff; color: #1e40af; }
+.light .publish-confirm-banner { background: #fef2f2; color: #991b1b; }
+.light .publish-env-prod { background: #fee2e2; color: #991b1b; }
+.light .publish-env-staging { background: #fef3c7; color: #92400e; }
 .light .publish-change-mark.added { color: #15803d; }
 .light .publish-change-mark.modified { color: #a16207; }
 .light .publish-change-mark.deleted { color: #6b7280; }

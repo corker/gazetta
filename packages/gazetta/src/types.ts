@@ -109,12 +109,21 @@ export interface WorkerConfig {
   name?: string
 }
 
+export type TargetEnvironment = 'local' | 'staging' | 'production'
+
 /** Target configuration in site.yaml */
 export interface TargetConfig {
   storage: StorageConfig
   worker?: WorkerConfig
   /** Publish mode — 'esi' for Workers/gazetta serve, 'static' for static hosting. Default: esi if worker configured, static otherwise. */
   publishMode?: 'esi' | 'static'
+  /**
+   * Semantic intent of this target — drives UI treatment (confirmation
+   * prompts, badges) and ops decisions. Default: 'local' for filesystem,
+   * 'production' otherwise. Override in site.yaml for shared filesystem
+   * mounts used as production, or for cloud targets used for staging.
+   */
+  environment?: TargetEnvironment
   /** Base URL of the site (e.g. https://gazetta.studio) */
   siteUrl?: string
   cache?: CacheConfig
@@ -123,6 +132,11 @@ export interface TargetConfig {
 /** Determine publish mode for a target — centralised logic used by CLI and admin API */
 export function getPublishMode(target: TargetConfig): 'esi' | 'static' {
   return target.publishMode ?? (target.worker ? 'esi' : 'static')
+}
+
+/** Resolve a target's environment, applying the storage-type default */
+export function getEnvironment(target: TargetConfig): TargetEnvironment {
+  return target.environment ?? (target.storage.type === 'filesystem' ? 'local' : 'production')
 }
 
 /** Site manifest (site.yaml) */

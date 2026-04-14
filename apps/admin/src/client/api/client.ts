@@ -40,6 +40,9 @@ export interface FragmentDetail extends FragmentSummary {
   dir: string
 }
 
+export type TargetEnvironment = 'local' | 'staging' | 'production'
+export interface TargetInfo { name: string; environment: TargetEnvironment }
+
 export interface CompareResult {
   added: string[]
   modified: string[]
@@ -64,7 +67,7 @@ export const api = {
   getTemplates: () => request<TemplateSummary[]>('/templates'),
   getTemplateSchema: (name: string) => request<Record<string, unknown>>(`/templates/${name}/schema`),
   getFields: () => request<FieldSummary[]>('/fields'),
-  getTargets: () => request<string[]>('/targets'),
+  getTargets: () => request<TargetInfo[]>('/targets'),
   publish: (items: string[], targets: string[]) => request<{ results: Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
   compare: (target: string, options?: RequestInit) => request<CompareResult>(`/compare?target=${encodeURIComponent(target)}`, options),
   fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),

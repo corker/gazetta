@@ -608,6 +608,46 @@ test.describe('Publish dialog', () => {
     await expect(page.locator('[data-testid="publish-compare-error"]')).toHaveCount(0)
   })
 
+  test('production target requires confirmation before publishing', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    await openPublish(page)
+    // 'production' in starter site.yaml is azure-blob → environment defaults to 'production'
+    await page.locator('[data-testid="publish-target-production"]').click()
+    // First click shows the confirm banner, no publish happens yet
+    await page.locator('[data-testid="publish-submit"]').click()
+    await expect(page.locator('[data-testid="publish-confirm-banner"]')).toBeVisible()
+    await expect(page.locator('[data-testid="publish-confirm"]')).toBeVisible()
+    // Back button clears confirmation
+    await page.locator('button', { hasText: 'Back' }).click()
+    await expect(page.locator('[data-testid="publish-confirm-banner"]')).toHaveCount(0)
+  })
+
+  test('filesystem target publishes without confirmation', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    await openPublish(page)
+    // 'staging' in starter site.yaml is filesystem → environment defaults to 'local'
+    await page.locator('[data-testid="publish-target-staging"]').click()
+    // No confirm banner after clicking Publish; goes straight to action
+    await expect(page.locator('[data-testid="publish-first-publish"]')).toBeVisible()
+    // Publish button is not gated by a confirmation step
+    await expect(page.locator('[data-testid="publish-confirm-banner"]')).toHaveCount(0)
+  })
+
+  test('publish button disabled while compare is loading', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    // Slow the compare so we can observe the disabled state
+    await page.route('**/admin/api/compare*', async (route) => {
+      await new Promise(r => setTimeout(r, 1500))
+      await route.continue()
+    })
+    await openPublish(page)
+    await page.locator('[data-testid="publish-target-staging"]').click()
+    // While compare is still running, Publish should be disabled
+    await expect(page.locator('[data-testid="publish-submit"]')).toBeDisabled()
+    // After compare completes, it re-enables
+    await expect(page.locator('[data-testid="publish-submit"]')).toBeEnabled({ timeout: 5000 })
+  })
+
   test('works in light mode', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     await page.goto('/admin')

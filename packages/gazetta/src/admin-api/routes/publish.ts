@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getPublishMode } from '../../types.js'
+import { getPublishMode, getEnvironment } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies } from '../../publish.js'
 import type { PublishResult } from '../../publish.js'
@@ -45,7 +45,10 @@ export function publishRoutes(
 
   app.get('/api/targets', async (c) => {
     const t = await getTargets()
-    return c.json([...t.keys()])
+    return c.json([...t.keys()].map(name => {
+      const cfg = getTargetConfig(name)
+      return { name, environment: cfg ? getEnvironment(cfg) : 'local' }
+    }))
   })
 
   app.post('/api/publish', async (c) => {

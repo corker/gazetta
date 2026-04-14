@@ -18,7 +18,7 @@ const error = ref<string | null>(null)
 
 onMounted(async () => {
   try {
-    targets.value = await api.getTargets()
+    targets.value = (await api.getTargets()).map(t => t.name)
   } catch {
     targets.value = []
   }
