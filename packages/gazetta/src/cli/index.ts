@@ -32,6 +32,54 @@ const c = {
 const args = process.argv.slice(2)
 const command = args[0]
 
+// Served to /admin/* requests during dev-server startup before Vite middleware
+// is attached. Polls /admin/ping every 500ms and reloads when the admin becomes
+// reachable. See #132 and cli/index.ts for why this is needed.
+const LOADER_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Loading Gazetta admin…</title>
+<style>
+  /* Neutral tones — readable in either admin theme. We read the user's saved
+     preference from localStorage at runtime to pick the right background;
+     the medium-gray spinner works on both. */
+  html, body { height: 100%; margin: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #262626; color: #a3a3a3; display: flex; align-items: center; justify-content: center; }
+  body.light { background: #f5f5f5; color: #525252; }
+  .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+  .spinner { width: 24px; height: 24px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .label { font-size: 0.875rem; }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="label">Starting Gazetta admin…</div>
+  </div>
+  <script>
+    // Match the user's saved admin theme if present; fall back to dark default
+    // (admin defaults to dark on first load). Avoids a jarring theme flash when
+    // the real admin renders.
+    try {
+      var saved = localStorage.getItem('gazetta_theme')
+      if (saved === 'light') document.body.classList.add('light')
+    } catch (e) { /* ignore */ }
+    ;(function poll() {
+      fetch('/admin/ping', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(j => {
+          if (j && j.ready) window.location.reload()
+          else setTimeout(poll, 500)
+        })
+        .catch(() => setTimeout(poll, 500))
+    })()
+  </script>
+</body>
+</html>`
+
+
 /**
  * Detect the project root from a site directory.
  * Walks up from siteDir looking for a parent that contains templates/.
@@ -1049,6 +1097,39 @@ async function runDev(siteDir: string, port: number) {
     console.log(`  ${c.dim('┃')} Frags    ${c.dim([...site.fragments.keys()].join(', ') || '(none)')}`)
 
     if (isDevMode && cmsWebDir) {
+      // While Vite is spinning up (compiling, scanning deps, attaching
+      // middleware), any /admin/* request falls through to the site's 404
+      // handler showing a raw page list. Intercept early and serve a loader
+      // page that polls /admin/ping until ready, then reloads (#132).
+      let cmsReady = false
+      const httpServer = nodeServer as unknown as import('node:http').Server
+      const originalListeners = httpServer.listeners('request').slice()
+      httpServer.removeAllListeners('request')
+
+      const loaderHandler = (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
+        const url = req.url ?? ''
+        if (url === '/admin/ping' || url.startsWith('/admin/ping?')) {
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+          res.end(JSON.stringify({ ready: cmsReady }))
+          return true
+        }
+        if (url === '/admin' || url.startsWith('/admin/') || url.startsWith('/@')) {
+          res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Retry-After': '2' })
+          res.end(LOADER_HTML)
+          return true
+        }
+        return false
+      }
+
+      // During startup: route /admin/* to the loader, everything else to Hono
+      httpServer.on('request', (req, res) => {
+        if (cmsReady) return  // real handler installed below will run
+        if (loaderHandler(req, res)) return
+        for (const l of originalListeners) {
+          (l as (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void)(req, res)
+        }
+      })
+
       try {
         const { createServer: createViteServer } = await import('vite')
         const { searchForWorkspaceRoot } = await import('vite')
@@ -1100,18 +1181,22 @@ async function runDev(siteDir: string, port: number) {
           },
         })
 
-        const httpServer = nodeServer as unknown as import('node:http').Server
-        const originalListeners = httpServer.listeners('request').slice()
-        httpServer.removeAllListeners('request')
-
         const honoHandler = (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
           for (const listener of originalListeners) {
             (listener as (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void)(req, res)
           }
         }
 
+        httpServer.removeAllListeners('request')
         httpServer.on('request', (req, res) => {
           const url = req.url ?? ''
+          // Keep /admin/ping live so the loader page can continue polling —
+          // useful if the server hot-reloads and Vite rebinds.
+          if (url === '/admin/ping' || url.startsWith('/admin/ping?')) {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+            res.end(JSON.stringify({ ready: true }))
+            return
+          }
           if (url.startsWith('/admin/api') || url.startsWith('/admin/preview')) {
             honoHandler(req, res)
           } else if (url.startsWith('/admin') || url.startsWith('/@')) {
@@ -1120,6 +1205,7 @@ async function runDev(siteDir: string, port: number) {
             honoHandler(req, res)
           }
         })
+        cmsReady = true
 
       } catch (err) {
         console.warn(`  Warning: CMS UI failed to start: ${(err as Error).message}`)
