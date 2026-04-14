@@ -29,6 +29,19 @@ const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fr
 const publishItemName = computed(() => selection.name ?? '')
 const canPublish = computed(() => selection.name && !editing.hasPendingEdits)
 
+// Disabled buttons need to explain themselves — silent click-with-nothing-happens
+// confuses users and is the most common UX gripe with the toolbar.
+const saveTitle = computed(() => {
+  if (editing.saving) return 'Saving…'
+  if (!editing.hasPendingEdits) return 'No unsaved changes'
+  return 'Save changes (⌘S)'
+})
+const publishTitle = computed(() => {
+  if (!selection.name) return 'Select a page or fragment to publish'
+  if (editing.hasPendingEdits) return 'Save changes before publishing'
+  return 'Publish to a target'
+})
+
 function handleBack() {
   const prefix = selection.type === 'page' ? '/pages' : '/fragments'
   router.push(`${prefix}/${selection.name}`)
@@ -61,13 +74,13 @@ function handleBack() {
       <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
       <Button v-if="uiMode.mode === 'edit'" label="Save" icon="pi pi-save" severity="primary" :loading="editing.saving"
-        data-testid="save-btn" :disabled="!editing.hasPendingEdits" @click="editing.save()" size="small" class="cms-btn" />
+        data-testid="save-btn" :title="saveTitle" :disabled="!editing.hasPendingEdits" @click="editing.save()" size="small" class="cms-btn" />
       <Button icon="pi pi-arrow-right-arrow-left" text rounded title="Changes"
         data-testid="changes-btn" @click="showChanges = true" size="small" class="cms-btn" />
       <Button label="Fetch" icon="pi pi-cloud-download" severity="info"
         data-testid="fetch-btn" @click="showFetch = true" size="small" class="cms-btn" />
       <Button label="Publish" icon="pi pi-cloud-upload" severity="success"
-        data-testid="publish-btn" :disabled="!canPublish" @click="showPublish = true" size="small" class="cms-btn" />
+        data-testid="publish-btn" :title="publishTitle" :disabled="!canPublish" @click="showPublish = true" size="small" class="cms-btn" />
     </template>
   </Toolbar>
 

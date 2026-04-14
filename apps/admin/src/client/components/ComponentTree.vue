@@ -287,7 +287,8 @@ async function addComponent(name: string, template: string) {
         @click="onSelect(node)"
         @mouseenter="onHover(node)"
         @mouseleave="onHoverEnd()">
-        <i v-if="node.data?.error" class="pi pi-exclamation-triangle node-icon node-error-icon" />
+        <i v-if="node.data?.error" class="pi pi-exclamation-triangle node-icon node-error-icon"
+          :title="node.data.error" />
         <i v-else :class="nodeIcon(node, depth)" class="node-icon" />
         <span v-if="node.data?.path && (editing.hasPendingEdit(node.data.path) || (editing.dirty && editing.path === node.data.path))" class="node-dirty-dot" />
         <span class="node-label">{{ node.label }}</span>

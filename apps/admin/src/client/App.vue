@@ -25,10 +25,14 @@ onMounted(() => {
 
     <!-- Global toast — visible over everything including fullscreen -->
     <Transition name="toast">
-      <div v-if="toast.current" class="global-toast" :class="toast.current.type === 'error' ? 'toast-error' : 'toast-success'">
+      <div v-if="toast.current" class="global-toast" :class="toast.current.type === 'error' ? 'toast-error' : 'toast-success'" data-testid="global-toast">
         <i :class="toast.current.type === 'error' ? 'pi pi-exclamation-circle' : 'pi pi-check-circle'" />
         <a v-if="toast.current.link" :href="toast.current.link" target="_blank" rel="noopener" class="toast-link">{{ toast.current.message }}</a>
         <template v-else>{{ toast.current.message }}</template>
+        <button v-if="toast.current.type === 'error'" type="button" class="toast-dismiss" data-testid="toast-dismiss"
+          aria-label="Dismiss" @click="toast.dismiss()">
+          <i class="pi pi-times" />
+        </button>
       </div>
     </Transition>
   </div>
@@ -48,6 +52,9 @@ body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; backgr
 .toast-error { color: #dc2626; }
 .dark .toast-error { color: hsl(358, 100%, 81%); }
 .toast-link { color: inherit; text-decoration: underline; }
+.toast-dismiss { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 2px 4px; margin-left: 4px; opacity: 0.7; display: flex; align-items: center; }
+.toast-dismiss:hover { opacity: 1; }
+.toast-dismiss .pi { font-size: 11px; }
 .toast-enter-active { transition: transform 200ms ease-out, opacity 200ms ease-out; }
 .toast-leave-active { transition: transform 150ms ease-in, opacity 150ms ease-in; }
 .toast-enter-from { opacity: 0; transform: translateX(-50%) translateY(-100%); }

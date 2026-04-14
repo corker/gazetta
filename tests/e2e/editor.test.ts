@@ -21,6 +21,38 @@ test.describe('Admin loads', () => {
   })
 })
 
+test.describe('Toolbar tooltips', () => {
+  test('publish button title explains why it is disabled', async ({ page }) => {
+    await page.goto('/admin')
+    // No selection → publish disabled with explanation
+    const publish = page.locator('[data-testid="publish-btn"]')
+    await expect(publish).toBeDisabled()
+    await expect(publish).toHaveAttribute('title', 'Select a page or fragment to publish')
+    // After selecting a page, the title flips to the success-case label
+    await page.goto('/admin/pages/home')
+    await expect(publish).toBeEnabled()
+    await expect(publish).toHaveAttribute('title', 'Publish to a target')
+  })
+})
+
+test.describe('Toast', () => {
+  test('error toasts persist and have a dismiss button', async ({ page }) => {
+    // Force every page-load to fail — opening home triggers selection.selectPage,
+    // which calls toast.showError on failure. That's a real error path that
+    // exercises the persistence + dismiss behavior end-to-end.
+    await page.route('**/admin/api/pages/home', route => route.fulfill({ status: 500, body: '{"error":"boom"}' }))
+    await page.goto('/admin/pages/home')
+    const toast = page.locator('[data-testid="global-toast"]')
+    await expect(toast).toBeVisible()
+    // Stays visible past the 3s success-toast auto-dismiss window
+    await page.waitForTimeout(3500)
+    await expect(toast).toBeVisible()
+    // Dismiss button removes it
+    await page.locator('[data-testid="toast-dismiss"]').click()
+    await expect(toast).toHaveCount(0)
+  })
+})
+
 test.describe('Theme toggle', () => {
   test('switches between dark and light mode', async ({ page }) => {
     await page.goto('/admin')
