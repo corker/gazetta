@@ -138,7 +138,22 @@ const summary = computed(() => {
     else if (item.change === 'modified') modified++
     else deleted++
   }
-  return { added, modified, deleted }
+  // Items unchanged on every selected target — truly nothing to do for them.
+  // Skipping the count when no targets are selected keeps the hint clean.
+  let unchanged = 0
+  if (selectedTargets.value.length > 0) {
+    const results = selectedTargets.value
+      .map(t => compareByTarget.value.get(t))
+      .filter((r): r is NonNullable<typeof r> => !!r)
+    if (results.length === selectedTargets.value.length && results.length > 0) {
+      const sets = results.map(r => new Set(r.unchanged))
+      const [first, ...rest] = sets
+      for (const item of first) {
+        if (rest.every(s => s.has(item))) unchanged++
+      }
+    }
+  }
+  return { added, modified, deleted, unchanged }
 })
 
 const anyLoading = computed(() => compareLoadingTargets.value.size > 0)
@@ -456,10 +471,11 @@ function onClose() {
           <p class="publish-label">
             Changes
             <span v-if="anyLoading" class="publish-label-hint">loading…</span>
-            <span v-else-if="changedItems.length" class="publish-label-hint" data-testid="publish-summary">
+            <span v-else-if="changedItems.length || summary.unchanged" class="publish-label-hint" data-testid="publish-summary">
               <span v-if="summary.modified">{{ summary.modified }} modified</span>
               <span v-if="summary.added">{{ summary.modified ? ' · ' : '' }}{{ summary.added }} added</span>
               <span v-if="summary.deleted">{{ summary.modified || summary.added ? ' · ' : '' }}{{ summary.deleted }} only on target</span>
+              <span v-if="summary.unchanged">{{ (summary.modified || summary.added || summary.deleted) ? ' · ' : '' }}{{ summary.unchanged }} unchanged</span>
             </span>
             <button v-if="!anyLoading && selectableItems.length > 0"
               type="button" class="publish-select-all"
