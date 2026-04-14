@@ -160,8 +160,26 @@ export function publishRoutes(
       const config = getTargetConfig(targetName)
       const isStatic = config ? getPublishMode(config) === 'static' : true
       const purgeConfig = config?.cache?.purge
+
+      // Static mode bakes fragments into pages at publish time — if the user
+      // picked @header, we must also republish every page that uses it.
+      // Expand per-target so ESI targets still get the narrow item set.
+      let targetItems = allItems
+      if (isStatic) {
+        const fragmentItems = items.filter(i => i.startsWith('fragments/'))
+        if (fragmentItems.length) {
+          const expanded = new Set(allItems)
+          for (const frag of fragmentItems) {
+            const name = frag.replace('fragments/', '')
+            const deps = await findFragmentDependents(sourceStorage, siteDir, name)
+            for (const p of deps.pages) expanded.add(`pages/${p}`)
+          }
+          targetItems = [...expanded]
+        }
+      }
+
       // Step count: source-copy + per-item render + manifest+index + (purge?)
-      const total = 1 + allItems.length + 1 + (purgeConfig?.type === 'cloudflare' ? 1 : 0)
+      const total = 1 + targetItems.length + 1 + (purgeConfig?.type === 'cloudflare' ? 1 : 0)
       yield { kind: 'target-start', target: targetName, total }
 
       let current = 0
@@ -169,7 +187,7 @@ export function publishRoutes(
         let totalFiles = 0
 
         // 1. Source copy
-        const { copiedFiles } = await publishItems(sourceStorage, siteDir, targetStorage, '', allItems)
+        const { copiedFiles } = await publishItems(sourceStorage, siteDir, targetStorage, '', targetItems)
         totalFiles += copiedFiles
         current++
         yield { kind: 'progress', target: targetName, current, total, label: 'source files' }
@@ -179,11 +197,22 @@ export function publishRoutes(
         // which stays meaningful without needing input-order. Preserves the
         // event contract: one 'progress' per item between 'target-start'
         // and 'target-result'.
+        // Static-mode page hashes must include fragment hashes (a fragment
+        // change invalidates every page that bakes it in). Matches the
+        // combination used by compareTargets.
+        const fragmentHashes = new Map<string, string>()
+        if (isStatic) {
+          for (const [fragName, frag] of site.fragments) {
+            fragmentHashes.set(fragName, hashManifest(frag, { templateHashes }))
+          }
+        }
+        const pageHashOpts = isStatic ? { templateHashes, fragmentHashes } : { templateHashes }
+
         const renderItem = async (item: string): Promise<{ files: number }> => {
           if (item.startsWith('pages/')) {
             const pageName = item.replace('pages/', '')
             const page = site.pages.get(pageName)
-            const manifestHash = page ? hashManifest(page, { templateHashes }) : undefined
+            const manifestHash = page ? hashManifest(page, pageHashOpts) : undefined
             if (isStatic) {
               return publishPageStatic(pageName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
             }
@@ -202,7 +231,7 @@ export function publishRoutes(
 
         // Render concurrency is lower than listing concurrency — each render
         // may do multiple writes, so 10 in flight is the safe default.
-        for await (const { item, result } of mapLimitStream(allItems, renderItem, 10)) {
+        for await (const { item, result } of mapLimitStream(targetItems, renderItem, 10)) {
           totalFiles += result.files
           current++
           yield { kind: 'progress', target: targetName, current, total, label: item }
@@ -221,13 +250,13 @@ export function publishRoutes(
           const zoneId = resolveEnvVars(purgeConfig.zoneId) ?? (config?.siteUrl && apiToken ? await lookupCloudflareZoneId(config.siteUrl, apiToken) : null)
           if (apiToken && zoneId) {
             const purge = createCloudflarePurge(zoneId, apiToken)
-            const hasFragments = allItems.some(i => i.startsWith('fragments/'))
+            const hasFragments = targetItems.some(i => i.startsWith('fragments/'))
             if (hasFragments) {
               await purge.purgeAll()
               console.log(`    ${targetName}: cache purged (all)`)
             } else if (config?.siteUrl) {
               const siteForUrls = await loadSite({ siteDir, storage: sourceStorage, templatesDir })
-              const urls = allItems
+              const urls = targetItems
                 .filter(i => i.startsWith('pages/'))
                 .map(i => {
                   const page = siteForUrls.pages.get(i.replace('pages/', ''))
