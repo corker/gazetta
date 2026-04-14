@@ -267,15 +267,12 @@ export async function findDependentsFromSidecars(
     listSidecars(targetStorage, 'pages'),
     listSidecars(targetStorage, 'fragments'),
   ])
-  // Strip the 'pages/' or 'fragments/' prefix to match the name-only API.
   const pagesIndex = new Map<string, { uses: Set<string>; template: string | null }>()
-  for (const [path, state] of pagesList) {
-    const name = path.slice('pages/'.length)
+  for (const [name, state] of pagesList) {
     pagesIndex.set(name, { uses: new Set(state.uses), template: state.template })
   }
   const fragmentsIndex = new Map<string, { uses: Set<string>; template: string | null }>()
-  for (const [path, state] of fragmentsList) {
-    const name = path.slice('fragments/'.length)
+  for (const [name, state] of fragmentsList) {
     fragmentsIndex.set(name, { uses: new Set(state.uses), template: state.template })
   }
 

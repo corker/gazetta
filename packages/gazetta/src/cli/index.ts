@@ -145,6 +145,7 @@ function printHelp() {
 
   Options:
     --port, -p <port>               Server port (default: 3000)
+    --force, -f                     Publish all items (skip unchanged check)
 
   Auto-detection:
     Site is auto-detected from sites/ directory. If multiple sites exist,
@@ -164,19 +165,22 @@ function printHelp() {
 `)
 }
 
-interface ParsedArgs { positional: string[]; port?: number }
+interface ParsedArgs { positional: string[]; port?: number; force?: boolean }
 
 function parseArgs(input: string[]): ParsedArgs {
   const positional: string[] = []
   let port: number | undefined
+  let force = false
   for (let i = 0; i < input.length; i++) {
     if (input[i] === '--port' || input[i] === '-p') {
       port = parseInt(input[++i], 10)
+    } else if (input[i] === '--force' || input[i] === '-f') {
+      force = true
     } else if (!input[i].startsWith('-')) {
       positional.push(input[i])
     }
   }
-  return { positional, port }
+  return { positional, port, force }
 }
 
 /**
@@ -439,7 +443,7 @@ export default template
   outro(`Done! Run: ${c.cyan(`${cdStep}npx gazetta dev`)}`)
 }
 
-async function runPublish(siteDir: string, targetName?: string) {
+async function runPublish(siteDir: string, targetName?: string, opts: { force?: boolean } = {}) {
   const storage = createFilesystemProvider()
   const projectRoot = detectProjectRoot(siteDir)
   const templatesDir = join(projectRoot, 'templates')
@@ -514,9 +518,28 @@ async function runPublish(siteDir: string, targetName?: string) {
     let totalFiles = 0
     let totalRemoved = 0
 
+    // Incremental: compare source hashes against target sidecars, skip
+    // items whose hash already matches the target. --force bypasses.
+    const unchanged = new Set<string>()
+    if (!opts.force) {
+      const { compareTargets } = await import('../compare.js')
+      const cmp = await compareTargets({
+        source: storage,
+        target: targetStorage,
+        siteDir,
+        templatesDir,
+        projectRoot,
+        publishMode,
+        scanTemplates: async () => templateInfos,
+      })
+      for (const item of cmp.unchanged) unchanged.add(item)
+    }
+    let skipped = 0
+
     if (isStatic) {
       // Static mode — fully assembled HTML, no fragments needed separately
       for (const [pageName, page] of site.pages) {
+        if (unchanged.has(`pages/${pageName}`)) { skipped++; continue }
         const manifestHash = hashManifest(page, { templateHashes })
         const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir, manifestHash, site)
         totalFiles += files
@@ -525,6 +548,7 @@ async function runPublish(siteDir: string, targetName?: string) {
     } else {
       // ESI mode — fragments separate, pages with placeholders
       for (const [fragName, frag] of site.fragments) {
+        if (unchanged.has(`fragments/${fragName}`)) { skipped++; continue }
         const manifestHash = hashManifest(frag, { templateHashes })
         const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage, templatesDir, manifestHash, site)
         totalFiles += files
@@ -532,6 +556,7 @@ async function runPublish(siteDir: string, targetName?: string) {
         console.log(`    ${c.green('✓')} @${fragName}`)
       }
       for (const [pageName, page] of site.pages) {
+        if (unchanged.has(`pages/${pageName}`)) { skipped++; continue }
         const manifestHash = hashManifest(page, { templateHashes })
         const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache, templatesDir, manifestHash, site)
         totalFiles += files
@@ -539,6 +564,7 @@ async function runPublish(siteDir: string, targetName?: string) {
         console.log(`    ${c.green('✓')} ${pageName}`)
       }
     }
+    if (skipped > 0) console.log(`    ${c.dim(`· ${skipped} unchanged (skipped)`)}`)
 
     // Site manifest + fragment index
     await publishSiteManifest(storage, siteDir, targetStorage, site)
@@ -1440,7 +1466,7 @@ async function main() {
 
   switch (command) {
     case 'publish':
-      await runPublish(siteDir, targetName)
+      await runPublish(siteDir, targetName, { force: parsed.force })
       break
     case 'serve':
       await runServe(siteDir, parsed.port ?? 3000, targetName)

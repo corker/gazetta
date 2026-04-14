@@ -138,4 +138,19 @@ describe('compareTargets', () => {
     // Pages still compared normally
     expect(r2.added).toContain('pages/home')
   })
+
+  it('uses source-side sidecar hash when present (skips re-hash)', async () => {
+    // Fabricate a source sidecar with a made-up hash. If compare is using
+    // it (instead of re-hashing the manifest), that hash will be matched
+    // against the target's hash — we can prove it by writing the SAME
+    // fabricated hash to the target and expecting "unchanged".
+    const fake = 'deadbeef'
+    await writeSidecar(join(siteDir, 'pages/home'), fake)
+    await writeSidecar(join(siteDir, 'fragments/header'), fake)
+    await writeSidecar(join(targetDir, 'pages/home'), fake)
+    await writeSidecar(join(targetDir, 'fragments/header'), fake)
+
+    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    expect(r.unchanged.sort()).toEqual(['fragments/header', 'pages/home'])
+  })
 })

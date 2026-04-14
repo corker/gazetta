@@ -88,30 +88,30 @@ export async function writeSidecars(
 }
 
 /**
- * Walk `pages/` or `fragments/` collecting every directory's sidecar state.
+ * Walk a directory tree collecting every sub-directory's sidecar state.
  * Bounded-parallel recursion — flat Promise.all over 10k dirs would blow
  * the fd limit or provider rate limit.
  *
- * Items without a .hash sidecar are skipped. `writeSidecars` always writes
- * all three kinds together, so partial state (uses/template without hash)
- * doesn't occur in real operation.
+ * Keys are paths relative to `rootDir` (e.g. `home`, `blog/[slug]`). Items
+ * without a .hash sidecar are skipped. `writeSidecars` always writes all
+ * three kinds together, so partial state doesn't occur in real operation.
  */
 export async function listSidecars(
   storage: StorageProvider,
-  rootDir: 'pages' | 'fragments',
+  rootDir: string,
 ): Promise<Map<string, SidecarState>> {
   const out = new Map<string, SidecarState>()
-  async function walk(dir: string, prefix: string): Promise<void> {
+  async function walk(dir: string, relative: string): Promise<void> {
     let entries
     try { entries = await storage.readDir(dir) } catch { return }
-    if (prefix !== rootDir) {
+    if (relative) {
       const state = await readSidecars(storage, dir).catch(() => null)
-      if (state) out.set(prefix, state)
+      if (state) out.set(relative, state)
     }
     const subdirs = entries.filter(e => e.isDirectory)
-    await mapLimit(subdirs, (e) => walk(`${dir}/${e.name}`, `${prefix}/${e.name}`))
+    await mapLimit(subdirs, (e) => walk(`${dir}/${e.name}`, relative ? `${relative}/${e.name}` : e.name))
   }
-  await walk(rootDir, rootDir)
+  await walk(rootDir, '')
   return out
 }
 

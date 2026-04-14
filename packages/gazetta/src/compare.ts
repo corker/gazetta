@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { loadSite } from './site-loader.js'
 import { hashManifest } from './hash.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from './templates-scan.js'
@@ -58,18 +59,27 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
     .map(t => ({ name: t.name, errors: t.errors }))
   const templateHashes = templateHashesFrom(templateInfos)
 
-  // 2. Load local site, compute manifest hashes
+  // 2. Load local site, compute manifest hashes.
+  // Source-side sidecars (written on save) let us skip re-hashing for items
+  // whose manifest + templates haven't changed since the last save. Fall
+  // back to hashManifest for items without a source sidecar.
   const site = await loadSite({ siteDir: opts.siteDir, storage: opts.source, templatesDir: opts.templatesDir })
+  const [sourcePagesSidecars, sourceFragmentsSidecars] = await Promise.all([
+    listSidecars(opts.source, join(opts.siteDir, 'pages')),
+    listSidecars(opts.source, join(opts.siteDir, 'fragments')),
+  ])
   const local = new Map<string, string>()
   for (const [name, page] of site.pages) {
-    local.set(`pages/${name}`, hashManifest(page, { templateHashes }))
+    const cached = sourcePagesSidecars.get(name)?.hash
+    local.set(`pages/${name}`, cached ?? hashManifest(page, { templateHashes }))
   }
   // Static-mode targets bake fragments into pages — no fragment sidecars exist
   // on the target, and publishing @header/@footer is a no-op server-side. Omit
   // them from local so they don't appear as perpetually "added".
   if (opts.publishMode !== 'static') {
     for (const [name, frag] of site.fragments) {
-      local.set(`fragments/${name}`, hashManifest(frag, { templateHashes }))
+      const cached = sourceFragmentsSidecars.get(name)?.hash
+      local.set(`fragments/${name}`, cached ?? hashManifest(frag, { templateHashes }))
     }
   }
 
@@ -79,8 +89,8 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
     listSidecars(opts.target, 'pages'),
     opts.publishMode !== 'static' ? listSidecars(opts.target, 'fragments') : Promise.resolve(new Map()),
   ])
-  for (const [k, s] of pagesSidecars) target.set(k, s.hash)
-  for (const [k, s] of fragmentsSidecars) target.set(k, s.hash)
+  for (const [k, s] of pagesSidecars) target.set(`pages/${k}`, s.hash)
+  for (const [k, s] of fragmentsSidecars) target.set(`fragments/${k}`, s.hash)
 
   // 4. Diff
   const result: CompareResult = {
