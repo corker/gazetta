@@ -4,7 +4,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
-import { api, type CompareResult, type TargetInfo } from '../api/client.js'
+import { api, type CompareResult, type PublishResult, type TargetInfo } from '../api/client.js'
 import { usePublishStatusStore } from '../stores/publishStatus.js'
 
 const props = defineProps<{ visible: boolean; itemType: string; itemName: string }>()
@@ -17,7 +17,11 @@ const targets = ref<TargetInfo[]>([])
 const selectedTargets = ref<string[]>([])
 const publishing = ref(false)
 const confirming = ref(false)
-const results = ref<Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> | null>(null)
+const results = ref<PublishResult[] | null>(null)
+
+// Streaming progress state — per-target current/total/label as events arrive.
+interface TargetProgress { current: number; total: number; label: string; status: 'pending' | 'in-progress' | 'done' | 'error' }
+const progress = ref(new Map<string, TargetProgress>())
 
 // Per-target compare state
 const compareByTarget = ref(new Map<string, CompareResult>())
@@ -246,6 +250,7 @@ async function handlePublish() {
   abortAllCompares()
   publishing.value = true
   results.value = null
+  progress.value = new Map()
   try {
     // If firstPublish for any target: publish ALL local items
     let items: string[]
@@ -261,9 +266,26 @@ async function handlePublish() {
       items = [...selectedItems.value]
       if (items.length === 0) items = [currentItem.value]
     }
-    const response = await api.publish(items, selectedTargets.value)
-    results.value = response.results
-    // Refresh the SiteTree dirty indicators against the new target state.
+    // Stream progress events; final results from the 'done' event drive
+    // the results view. Per-target progress feeds the in-flight UI.
+    const finalResults = await api.publishStream(items, selectedTargets.value, (ev) => {
+      if (ev.kind === 'target-start') {
+        const m = new Map(progress.value)
+        m.set(ev.target, { current: 0, total: ev.total, label: 'starting…', status: 'in-progress' })
+        progress.value = m
+      } else if (ev.kind === 'progress') {
+        const m = new Map(progress.value)
+        const existing = m.get(ev.target) ?? { current: 0, total: ev.total, label: '', status: 'in-progress' as const }
+        m.set(ev.target, { ...existing, current: ev.current, total: ev.total, label: ev.label })
+        progress.value = m
+      } else if (ev.kind === 'target-result') {
+        const m = new Map(progress.value)
+        const existing = m.get(ev.result.target)
+        if (existing) m.set(ev.result.target, { ...existing, status: ev.result.success ? 'done' : 'error', label: ev.result.success ? 'done' : (ev.result.error ?? 'failed') })
+        progress.value = m
+      }
+    })
+    results.value = finalResults
     publishStatus.refresh()
   } catch (err) {
     results.value = [{ target: '(all)', success: false, error: (err as Error).message, copiedFiles: 0 }]
@@ -412,7 +434,18 @@ function onClose() {
         </div>
       </template>
 
-      <div v-else class="publish-results">
+      <div v-if="publishing && !results && progress.size > 0" class="publish-progress" data-testid="publish-progress">
+        <div v-for="[targetName, p] in progress" :key="targetName" class="publish-progress-row">
+          <div class="publish-progress-header">
+            <span class="publish-progress-target">{{ targetName }}</span>
+            <span class="publish-progress-count">{{ p.current }} / {{ p.total }}</span>
+          </div>
+          <div class="publish-progress-bar"><div class="publish-progress-fill" :style="{ width: (p.total ? Math.round(100 * p.current / p.total) : 0) + '%' }" /></div>
+          <div class="publish-progress-label" :title="p.label">{{ p.label }}</div>
+        </div>
+      </div>
+
+      <div v-else-if="results" class="publish-results">
         <div v-for="result in results" :key="result.target" class="publish-result"
           :class="{ success: result.success, error: !result.success }">
           <i :class="result.success ? 'pi pi-check-circle' : 'pi pi-exclamation-circle'" />
@@ -484,6 +517,14 @@ function onClose() {
 .publish-change-mark.deleted { color: var(--color-change-deleted); }
 .publish-change-icon { color: var(--color-muted); font-size: 0.8rem; }
 .publish-change-label { font-size: 0.875rem; }
+.publish-progress { display: flex; flex-direction: column; gap: 0.75rem; }
+.publish-progress-row { display: flex; flex-direction: column; gap: 0.25rem; }
+.publish-progress-header { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8125rem; }
+.publish-progress-target { font-weight: 600; }
+.publish-progress-count { color: var(--color-muted); font-variant-numeric: tabular-nums; font-size: 0.75rem; }
+.publish-progress-bar { height: 4px; background: var(--color-hover-bg); border-radius: 2px; overflow: hidden; }
+.publish-progress-fill { height: 100%; background: var(--color-primary); transition: width 200ms ease; }
+.publish-progress-label { font-size: 0.75rem; color: var(--color-muted); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .publish-results { display: flex; flex-direction: column; gap: 0.5rem; }
 .publish-result { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border-radius: var(--p-border-radius-md); }
 .publish-result.success { background: var(--color-success-bg); color: var(--color-success-fg); }

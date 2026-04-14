@@ -824,6 +824,22 @@ test.describe('Publish dialog', () => {
     await expect(aboutRow.locator('.p-checkbox-checked')).toHaveCount(0)
   })
 
+  test('publish streams per-target progress and lands on results', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    await openPublish(page)
+    await selectStaging(page)
+    await page.locator('[data-testid="publish-submit"]').click()
+    // Progress block appears at least briefly during the publish
+    const progressBlock = page.locator('[data-testid="publish-progress"]')
+    // Either we see progress or the publish was so fast it went straight to results.
+    // Both are valid — what matters is the final 'Done' button.
+    await Promise.race([
+      progressBlock.waitFor({ timeout: 2000 }).catch(() => null),
+      page.locator('[data-testid="publish-done"]').waitFor({ timeout: 5000 }),
+    ])
+    await expect(page.locator('[data-testid="publish-done"]')).toBeVisible({ timeout: 10000 })
+  })
+
   test('invalid templates are surfaced and block publish', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     // Break the 'hero' template — not parseable js. Compare should still

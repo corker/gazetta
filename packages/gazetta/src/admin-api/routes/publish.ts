@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
 import { getPublishMode, getEnvironment } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies } from '../../publish.js'
@@ -8,6 +9,19 @@ import { loadSite } from '../../site-loader.js'
 import { resolveEnvVars } from '../../targets.js'
 import { scanTemplates, templateHashesFrom } from '../../templates-scan.js'
 import { hashManifest } from '../../hash.js'
+
+/**
+ * Progress events streamed by runPublish. Consumed both by the SSE route
+ * (forwarded to the client as event-stream messages) and the legacy
+ * synchronous route (which only takes the final 'done').
+ */
+export type PublishProgress =
+  | { kind: 'start'; targets: string[]; itemsPerTarget: number }
+  | { kind: 'target-start'; target: string; total: number }
+  | { kind: 'progress'; target: string; current: number; total: number; label: string }
+  | { kind: 'target-result'; result: PublishResult }
+  | { kind: 'done'; results: PublishResult[] }
+  | { kind: 'fatal'; error: string; invalidTemplates?: { name: string; errors: string[] }[] }
 
 export function publishRoutes(
   siteDir: string,
@@ -51,51 +65,69 @@ export function publishRoutes(
     }))
   })
 
-  app.post('/api/publish', async (c) => {
-    const body = await c.req.json() as { items: string[]; targets: string[] }
-    if (!body.items?.length) return c.json({ error: 'No items specified' }, 400)
-    if (!body.targets?.length) return c.json({ error: 'No targets specified' }, 400)
+  /**
+   * Run a publish, yielding progress events. Both the synchronous
+   * /api/publish route and the streaming /api/publish/stream route consume
+   * this generator. Caller can short-circuit by returning false from the
+   * iterator (or break) and we'll stop between items — but storage operations
+   * already in flight will complete.
+   *
+   * Pre-flight validation (unknown targets, invalid templates) is reported as
+   * 'fatal' before any 'target-start' event so callers can map to a 4xx.
+   */
+  async function* runPublish(items: string[], targetNames: string[]): AsyncGenerator<PublishProgress> {
+    if (!items?.length) { yield { kind: 'fatal', error: 'No items specified' }; return }
+    if (!targetNames?.length) { yield { kind: 'fatal', error: 'No targets specified' }; return }
 
     const t = await getTargets()
-
-    for (const name of body.targets) {
-      if (!t.has(name)) return c.json({ error: `Unknown target: ${name}` }, 400)
+    for (const name of targetNames) {
+      if (!t.has(name)) { yield { kind: 'fatal', error: `Unknown target: ${name}` }; return }
     }
 
-    // Resolve all dependencies (templates, fragments referenced by pages)
-    const allItems = await resolveDependencies(sourceStorage, siteDir, body.items)
+    const allItems = await resolveDependencies(sourceStorage, siteDir, items)
 
-    console.log(`  Publishing to ${body.targets.length} target(s):`)
-    console.log(`    Items: ${body.items.join(', ')} (+ ${allItems.length - body.items.length} dependencies)`)
-    console.log(`    Targets: ${body.targets.join(', ')}`)
+    console.log(`  Publishing to ${targetNames.length} target(s):`)
+    console.log(`    Items: ${items.join(', ')} (+ ${allItems.length - items.length} dependencies)`)
+    console.log(`    Targets: ${targetNames.join(', ')}`)
 
-    // Validate + hash templates once for this publish run
     const tdir = templatesDir ?? `${siteDir}/templates`
     const projectRoot = siteDir.replace(/\/sites\/[^/]+$/, '')
     const templateInfos = await scanTemplates(tdir, projectRoot)
     const invalidTpls = templateInfos.filter(t => !t.valid)
     if (invalidTpls.length) {
-      return c.json({
+      yield {
+        kind: 'fatal',
         error: 'Cannot publish: invalid templates',
         invalidTemplates: invalidTpls.map(t => ({ name: t.name, errors: t.errors })),
-      }, 400)
+      }
+      return
     }
     const templateHashes = templateHashesFrom(templateInfos)
     const site = await loadSite({ siteDir, storage: sourceStorage, templatesDir: tdir })
 
+    yield { kind: 'start', targets: targetNames, itemsPerTarget: allItems.length }
+
     const results: PublishResult[] = []
-    for (const targetName of body.targets) {
+    for (const targetName of targetNames) {
       const targetStorage = t.get(targetName)!
+      const config = getTargetConfig(targetName)
+      const isStatic = config ? getPublishMode(config) === 'static' : true
+      const purgeConfig = config?.cache?.purge
+      // Step count: source-copy + per-item render + manifest+index + (purge?)
+      const total = 1 + allItems.length + 1 + (purgeConfig?.type === 'cloudflare' ? 1 : 0)
+      yield { kind: 'target-start', target: targetName, total }
+
+      let current = 0
       try {
         let totalFiles = 0
 
-        // 1. Copy source files (YAML, templates) — target is a full copy
+        // 1. Source copy
         const { copiedFiles } = await publishItems(sourceStorage, siteDir, targetStorage, '', allItems)
         totalFiles += copiedFiles
+        current++
+        yield { kind: 'progress', target: targetName, current, total, label: 'source files' }
 
-        // 2. Pre-render pages and fragments (including dependencies)
-        const config = getTargetConfig(targetName)
-        const isStatic = config ? getPublishMode(config) === 'static' : true
+        // 2. Render each item
         for (const item of allItems) {
           if (item.startsWith('pages/')) {
             const pageName = item.replace('pages/', '')
@@ -117,15 +149,18 @@ export function publishRoutes(
               totalFiles += files
             }
           }
+          current++
+          yield { kind: 'progress', target: targetName, current, total, label: item }
         }
 
         // 3. Site manifest + fragment index
         await publishSiteManifest(sourceStorage, siteDir, targetStorage)
         await publishFragmentIndex(sourceStorage, siteDir, targetStorage)
         totalFiles += 2
+        current++
+        yield { kind: 'progress', target: targetName, current, total, label: 'site manifest' }
 
         // 4. Purge CDN cache
-        const purgeConfig = config?.cache?.purge
         if (purgeConfig?.type === 'cloudflare') {
           const apiToken = resolveEnvVars(purgeConfig.apiToken)
           const zoneId = resolveEnvVars(purgeConfig.zoneId) ?? (config?.siteUrl && apiToken ? await lookupCloudflareZoneId(config.siteUrl, apiToken) : null)
@@ -136,11 +171,11 @@ export function publishRoutes(
               await purge.purgeAll()
               console.log(`    ${targetName}: cache purged (all)`)
             } else if (config?.siteUrl) {
-              const site = await loadSite({ siteDir, storage: sourceStorage, templatesDir })
+              const siteForUrls = await loadSite({ siteDir, storage: sourceStorage, templatesDir })
               const urls = allItems
                 .filter(i => i.startsWith('pages/'))
                 .map(i => {
-                  const page = site.pages.get(i.replace('pages/', ''))
+                  const page = siteForUrls.pages.get(i.replace('pages/', ''))
                   return page ? `${config.siteUrl}${page.route}` : null
                 })
                 .filter(Boolean) as string[]
@@ -150,19 +185,56 @@ export function publishRoutes(
               }
             }
           }
+          current++
+          yield { kind: 'progress', target: targetName, current, total, label: 'cache purge' }
         }
 
-        results.push({ target: targetName, success: true, copiedFiles: totalFiles })
+        const result: PublishResult = { target: targetName, success: true, copiedFiles: totalFiles }
+        results.push(result)
         console.log(`    ${targetName}: ${totalFiles} files`)
+        yield { kind: 'target-result', result }
       } catch (err) {
         const error = (err as Error).message
-        results.push({ target: targetName, success: false, error, copiedFiles: 0 })
+        const result: PublishResult = { target: targetName, success: false, error, copiedFiles: 0 }
+        results.push(result)
         console.error(`    ${targetName}: FAILED — ${error}`)
+        yield { kind: 'target-result', result }
       }
     }
 
+    yield { kind: 'done', results }
+  }
+
+  app.post('/api/publish', async (c) => {
+    const body = await c.req.json() as { items: string[]; targets: string[] }
+    let results: PublishResult[] = []
+    let fatal: PublishProgress | null = null
+    for await (const ev of runPublish(body.items, body.targets)) {
+      if (ev.kind === 'fatal') fatal = ev
+      else if (ev.kind === 'done') results = ev.results
+    }
+    if (fatal) {
+      const status = fatal.error.startsWith('Cannot publish') ? 400 : 400
+      return c.json({ error: fatal.error, ...(fatal.invalidTemplates ? { invalidTemplates: fatal.invalidTemplates } : {}) }, status)
+    }
     const allSuccess = results.every(r => r.success)
     return c.json({ results }, allSuccess ? 200 : 207)
+  })
+
+  app.post('/api/publish/stream', async (c) => {
+    const body = await c.req.json() as { items: string[]; targets: string[] }
+    return streamSSE(c, async (stream) => {
+      try {
+        for await (const ev of runPublish(body.items, body.targets)) {
+          if (stream.aborted) return
+          await stream.writeSSE({ event: ev.kind, data: JSON.stringify(ev) })
+        }
+      } catch (err) {
+        if (!stream.aborted) {
+          await stream.writeSSE({ event: 'fatal', data: JSON.stringify({ kind: 'fatal', error: (err as Error).message }) })
+        }
+      }
+    })
   })
 
   app.post('/api/fetch', async (c) => {

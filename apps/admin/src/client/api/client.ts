@@ -14,6 +14,66 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+/**
+ * POST to /publish/stream and parse SSE events as they arrive. Calls
+ * onProgress for every event including the final 'done'. Returns the
+ * 'done' event's results once the stream closes. Throws on 'fatal'.
+ *
+ * EventSource isn't usable here (it only supports GET), so we read the
+ * response body as a stream and parse SSE manually.
+ */
+async function publishStream(
+  items: string[],
+  targets: string[],
+  onProgress: (ev: PublishProgress) => void,
+  signal?: AbortSignal,
+): Promise<PublishResult[]> {
+  const token = sessionStorage.getItem('gazetta_token')
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`${BASE}/publish/stream`, {
+    method: 'POST', headers, body: JSON.stringify({ items, targets }), signal,
+  })
+  if (!res.ok || !res.body) {
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(body.error ?? `Stream failed: ${res.status}`)
+  }
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+  let buffer = ''
+  let results: PublishResult[] = []
+  let fatalError: { error: string; invalidTemplates?: { name: string; errors: string[] }[] } | null = null
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += value
+    // SSE events are separated by blank lines (\n\n)
+    let idx: number
+    while ((idx = buffer.indexOf('\n\n')) !== -1) {
+      const raw = buffer.slice(0, idx)
+      buffer = buffer.slice(idx + 2)
+      const dataLines: string[] = []
+      for (const line of raw.split('\n')) {
+        if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+      }
+      if (!dataLines.length) continue
+      const ev = JSON.parse(dataLines.join('\n')) as PublishProgress
+      onProgress(ev)
+      if (ev.kind === 'done') results = ev.results
+      else if (ev.kind === 'fatal') fatalError = { error: ev.error, invalidTemplates: ev.invalidTemplates }
+    }
+  }
+
+  if (fatalError) {
+    const err = new Error(fatalError.error) as Error & { invalidTemplates?: { name: string; errors: string[] }[] }
+    if (fatalError.invalidTemplates) err.invalidTemplates = fatalError.invalidTemplates
+    throw err
+  }
+  return results
+}
+
 export interface PageSummary { name: string; route: string; template: string }
 export interface FragmentSummary { name: string; template: string }
 export interface TemplateSummary { name: string }
@@ -43,6 +103,15 @@ export interface FragmentDetail extends FragmentSummary {
 export type TargetEnvironment = 'local' | 'staging' | 'production'
 export interface TargetInfo { name: string; environment: TargetEnvironment }
 
+export interface PublishResult { target: string; success: boolean; error?: string; copiedFiles: number }
+export type PublishProgress =
+  | { kind: 'start'; targets: string[]; itemsPerTarget: number }
+  | { kind: 'target-start'; target: string; total: number }
+  | { kind: 'progress'; target: string; current: number; total: number; label: string }
+  | { kind: 'target-result'; result: PublishResult }
+  | { kind: 'done'; results: PublishResult[] }
+  | { kind: 'fatal'; error: string; invalidTemplates?: { name: string; errors: string[] }[] }
+
 export interface CompareResult {
   added: string[]
   modified: string[]
@@ -68,7 +137,8 @@ export const api = {
   getTemplateSchema: (name: string) => request<Record<string, unknown>>(`/templates/${name}/schema`),
   getFields: () => request<FieldSummary[]>('/fields'),
   getTargets: () => request<TargetInfo[]>('/targets'),
-  publish: (items: string[], targets: string[]) => request<{ results: Array<{ target: string; success: boolean; error?: string; copiedFiles: number }> }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
+  publish: (items: string[], targets: string[]) => request<{ results: PublishResult[] }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
+  publishStream,
   compare: (target: string, options?: RequestInit) => request<CompareResult>(`/compare?target=${encodeURIComponent(target)}`, options),
   fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),
 }
