@@ -754,14 +754,13 @@ test.describe('Publish dialog', () => {
 
   test('production target requires confirmation before publishing', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
+    // The fixture swaps the azure-blob production target for a filesystem
+    // one with environment:production so this test works without Azurite.
     await openPublish(page)
-    // 'production' in starter site.yaml is azure-blob → environment defaults to 'production'
     await page.locator('[data-testid="publish-target-production"]').click()
-    // First click shows the confirm banner, no publish happens yet
     await page.locator('[data-testid="publish-submit"]').click()
     await expect(page.locator('[data-testid="publish-confirm-banner"]')).toBeVisible()
     await expect(page.locator('[data-testid="publish-confirm"]')).toBeVisible()
-    // Back button clears confirmation
     await page.locator('button', { hasText: 'Back' }).click()
     await expect(page.locator('[data-testid="publish-confirm-banner"]')).toHaveCount(0)
   })

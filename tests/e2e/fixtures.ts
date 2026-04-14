@@ -77,6 +77,21 @@ export const test = base.extend<{ page: Page }, { testSite: TestSite; baseURL: s
       filter: (src) => !src.includes('/dist') && !src.includes('/node_modules') && !src.includes('/.tmp'),
     })
 
+    // Swap the azure-blob 'production' target for a filesystem one with
+    // environment:production. Azurite isn't reachable in CI and takes 10s to
+    // time out, which would drop it from the target registry and break tests
+    // that click [data-testid="publish-target-production"]. Using a local
+    // filesystem target preserves the prod semantics (badge + confirmation
+    // prompt via environment: production) without a network dependency.
+    const { readFile, writeFile: writeFileFs } = await import('node:fs/promises')
+    const siteYamlPath = resolve(projectDir, 'sites/main/site.yaml')
+    const yaml = await readFile(siteYamlPath, 'utf-8')
+    const patched = yaml.replace(
+      /production:\s*\n\s*storage:\s*\n\s*type: azure-blob[\s\S]*?container: "[^"]*"/,
+      'production:\n    environment: production\n    storage:\n      type: filesystem\n      path: ./dist/prod-test',
+    )
+    await writeFileFs(siteYamlPath, patched)
+
     const server = spawnDev(projectDir, port)
     try {
       await waitForServer(port, server)
