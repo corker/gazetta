@@ -71,6 +71,11 @@ Request:   Browser → Node/Bun → static from cache, dynamic SSR'd fresh → a
 
 You can publish a page or a fragment. No full-site rebuilds.
 
+Incremental publish, reverse-dependency queries, and the "N unchanged" admin
+summary are all driven by **sidecar files** — zero-byte files whose filenames
+encode the hash, fragment references, and template of each item. See
+[sidecars.md](../../docs/sidecars.md) for the model.
+
 | Publish | Static target | Dynamic target |
 |---------|--------------|----------------|
 | A page | CMS SSR's the page's local components, pushes HTML to storage | Pushes source to storage |
