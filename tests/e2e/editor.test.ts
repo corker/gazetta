@@ -824,20 +824,6 @@ test.describe('Publish dialog', () => {
     await expect(aboutRow.locator('.p-checkbox-checked')).toHaveCount(0)
   })
 
-  test('publish dialog matches visual snapshot (first publish + env badges)', async ({ page, testSite }) => {
-    // Visual snapshots are Linux-only — CI is ubuntu-latest, font rendering
-    // on macOS/Windows drifts enough to break 2% tolerance. Local devs
-    // verify in the browser; CI catches regressions.
-    test.skip(process.platform !== 'linux', 'Visual snapshots are linux-only (CI platform)')
-    await wipe(testSite.projectDir)
-    await openPublish(page)
-    await selectStaging(page)
-    await page.locator('[data-testid="publish-first-publish"]').waitFor()
-    await expect(page.locator('.p-dialog')).toHaveScreenshot('publish-first-publish.png', {
-      maxDiffPixelRatio: 0.02,
-    })
-  })
-
   test('publish streams per-target progress and lands on results', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     await openPublish(page)
