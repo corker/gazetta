@@ -518,7 +518,7 @@ async function runPublish(siteDir: string, targetName?: string) {
       // Static mode — fully assembled HTML, no fragments needed separately
       for (const [pageName, page] of site.pages) {
         const manifestHash = hashManifest(page, { templateHashes })
-        const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir, manifestHash)
+        const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir, manifestHash, site)
         totalFiles += files
         console.log(`    ${c.green('✓')} ${pageName}`)
       }
@@ -526,14 +526,14 @@ async function runPublish(siteDir: string, targetName?: string) {
       // ESI mode — fragments separate, pages with placeholders
       for (const [fragName, frag] of site.fragments) {
         const manifestHash = hashManifest(frag, { templateHashes })
-        const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage, templatesDir, manifestHash)
+        const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage, templatesDir, manifestHash, site)
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} @${fragName}`)
       }
       for (const [pageName, page] of site.pages) {
         const manifestHash = hashManifest(page, { templateHashes })
-        const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache, templatesDir, manifestHash)
+        const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache, templatesDir, manifestHash, site)
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} ${pageName}`)
@@ -541,8 +541,8 @@ async function runPublish(siteDir: string, targetName?: string) {
     }
 
     // Site manifest + fragment index
-    await publishSiteManifest(storage, siteDir, targetStorage)
-    await publishFragmentIndex(storage, siteDir, targetStorage)
+    await publishSiteManifest(storage, siteDir, targetStorage, site)
+    await publishFragmentIndex(storage, siteDir, targetStorage, site)
     totalFiles += 2
 
     const removedMsg = totalRemoved > 0 ? c.dim(` (${totalRemoved} old files cleaned)`) : ''

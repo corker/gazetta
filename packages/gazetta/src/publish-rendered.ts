@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { StorageProvider, PurgeStrategy, CacheConfig } from './types.js'
+import type { Site } from './site-loader.js'
 import { loadSite } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent, renderPage } from './renderer.js'
@@ -108,8 +109,11 @@ export async function publishPageRendered(
   targetCache?: CacheConfig,
   templatesDir?: string,
   manifestHash?: string,
+  preloadedSite?: Site,
 ): Promise<{ files: number; removed: number }> {
-  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
+  // Reuse a preloaded site when the caller already has one (runPublish loops
+  // over N items; loading per-item was quadratic). loadSite is idempotent.
+  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
@@ -234,8 +238,9 @@ export async function publishPageStatic(
   targetStorage: StorageProvider,
   templatesDir?: string,
   manifestHash?: string,
+  preloadedSite?: Site,
 ): Promise<{ files: number }> {
-  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
+  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
@@ -271,8 +276,9 @@ export async function publishFragmentRendered(
   targetStorage: StorageProvider,
   templatesDir?: string,
   manifestHash?: string,
+  preloadedSite?: Site,
 ): Promise<{ files: number; removed: number }> {
-  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
+  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
   const fragment = site.fragments.get(fragmentName)
   if (!fragment) throw new Error(`Fragment "${fragmentName}" not found`)
 
@@ -340,8 +346,9 @@ export async function publishSiteManifest(
   sourceStorage: StorageProvider,
   sourceDir: string,
   targetStorage: StorageProvider,
+  preloadedSite?: Site,
 ): Promise<void> {
-  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage })
+  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage })
   const manifest = { name: site.manifest.name, version: site.manifest.version }
   await targetStorage.writeFile('site.json', JSON.stringify(manifest))
 }
@@ -354,8 +361,9 @@ export async function publishFragmentIndex(
   sourceStorage: StorageProvider,
   sourceDir: string,
   targetStorage: StorageProvider,
+  preloadedSite?: Site,
 ): Promise<Record<string, string[]>> {
-  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage })
+  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage })
   const index: Record<string, string[]> = {}
 
   for (const [_pageName, page] of site.pages) {

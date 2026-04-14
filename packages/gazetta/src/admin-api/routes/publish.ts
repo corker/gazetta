@@ -175,10 +175,10 @@ export function publishRoutes(
             const page = site.pages.get(pageName)
             const manifestHash = page ? hashManifest(page, { templateHashes }) : undefined
             if (isStatic) {
-              const { files } = await publishPageStatic(pageName, sourceStorage, siteDir, targetStorage, tdir, manifestHash)
+              const { files } = await publishPageStatic(pageName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
               totalFiles += files
             } else {
-              const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache, tdir, manifestHash)
+              const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache, tdir, manifestHash, site)
               totalFiles += files
             }
           } else if (item.startsWith('fragments/')) {
@@ -186,7 +186,7 @@ export function publishRoutes(
               const fragName = item.replace('fragments/', '')
               const frag = site.fragments.get(fragName)
               const manifestHash = frag ? hashManifest(frag, { templateHashes }) : undefined
-              const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage, tdir, manifestHash)
+              const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
               totalFiles += files
             }
           }
@@ -195,8 +195,8 @@ export function publishRoutes(
         }
 
         // 3. Site manifest + fragment index
-        await publishSiteManifest(sourceStorage, siteDir, targetStorage)
-        await publishFragmentIndex(sourceStorage, siteDir, targetStorage)
+        await publishSiteManifest(sourceStorage, siteDir, targetStorage, site)
+        await publishFragmentIndex(sourceStorage, siteDir, targetStorage, site)
         totalFiles += 2
         current++
         yield { kind: 'progress', target: targetName, current, total, label: 'site manifest' }
