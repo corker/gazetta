@@ -78,7 +78,7 @@ export function createAdminApp(
   app.route('/', fragmentRoutes(opts.siteDir, opts.storage, sidecarWriter))
   app.route('/', templateRoutes(opts.siteDir, opts.storage, templatesDir, adminDir, opts.production))
   app.route('/', previewRoutes(opts.siteDir, opts.storage, templatesDir))
-  app.route('/', publishRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir, scan))
+  app.route('/', publishRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir, scan, sidecarWriter))
   app.route('/', compareRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir, scan))
   app.route('/', fieldRoutes(opts.siteDir, opts.storage, adminDir))
 

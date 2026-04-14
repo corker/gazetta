@@ -4,6 +4,8 @@ import { getPublishMode, getEnvironment } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
 import { listSidecars } from '../../sidecars.js'
+import type { SourceSidecarWriter } from '../../source-sidecars.js'
+import { mapLimit } from '../../concurrency.js'
 import { mapLimitStream } from '../../concurrency.js'
 import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
@@ -35,6 +37,7 @@ export function publishRoutes(
   // clears the cache via its template file watcher. Default: fresh scan
   // on every call (used by the CLI and tests).
   scanTemplatesInjected?: (templatesDir: string, projectRoot: string) => Promise<TemplateInfo[]>,
+  sidecarWriter?: SourceSidecarWriter,
 ) {
   const scan = scanTemplatesInjected ?? scanTemplates
   const app = new Hono()
@@ -106,19 +109,28 @@ export function publishRoutes(
         const result = await findDependentsFromSidecars(targetStorage, { fragment: fragmentName })
         return c.json(result)
       }
-      // Source-side: prefer sidecars (listings only) when present. If the
-      // project has any source sidecars, trust them — empty means "no
-      // dependents," not "stale." Fall back to a full manifest scan only
-      // when sidecars don't exist (e.g. project was never opened in the
-      // admin UI).
-      const [pagesList, fragmentsList] = await Promise.all([
-        listSidecars(sourceStorage, `${siteDir}/pages`),
-        listSidecars(sourceStorage, `${siteDir}/fragments`),
-      ])
-      if (pagesList.size || fragmentsList.size) {
+      // Source-side: use sidecars for the listing-only fast path. Backfill
+      // any missing ones first so the answer is complete — without this,
+      // items whose sidecars haven't been written yet (fresh dev server,
+      // items never saved through the admin) would be invisible.
+      if (sidecarWriter) {
+        const site = await loadSite({ siteDir, storage: sourceStorage, templatesDir })
+        const [pagesList, fragmentsList] = await Promise.all([
+          listSidecars(sourceStorage, `${siteDir}/pages`),
+          listSidecars(sourceStorage, `${siteDir}/fragments`),
+        ])
+        const missingPages = [...site.pages.keys()].filter(n => !pagesList.has(n))
+        const missingFragments = [...site.fragments.keys()].filter(n => !fragmentsList.has(n))
+        if (missingPages.length || missingFragments.length) {
+          await mapLimit([
+            ...missingPages.map(n => ({ kind: 'page' as const, name: n })),
+            ...missingFragments.map(n => ({ kind: 'fragment' as const, name: n })),
+          ], it => sidecarWriter.writeFor(it.kind, it.name))
+        }
         const result = await findDependentsFromSidecars(sourceStorage, { fragment: fragmentName }, { baseDir: siteDir })
         return c.json(result)
       }
+      // No writer injected (legacy setup) — fall back to the manifest walker.
       const result = await findFragmentDependents(sourceStorage, siteDir, fragmentName)
       return c.json(result)
     } catch (err) {
