@@ -1243,8 +1243,12 @@ async function runDev(siteDir: string, port: number) {
   })
 
   // ---- File watching ----
-  // Watch site dir for content changes (JSON manifests + site.yaml config)
-  watch(siteDir, { recursive: true }, (_event, filename) => {
+  // Watch site dir for content changes (JSON manifests + site.yaml config).
+  // Swallow FSWatcher 'error' events — Node's recursive watcher throws ENOENT
+  // when a watched subdir disappears (rm -rf during publish, git checkout).
+  // Letting it crash would take the whole dev server down; logging a warning
+  // is enough, the watcher recovers for still-existing paths.
+  const siteWatcher = watch(siteDir, { recursive: true }, (_event, filename) => {
     if (!filename) return
     if (filename.endsWith('.json') || filename.endsWith('.yaml')) {
       console.log(`  Manifest changed: ${filename}`)
@@ -1252,10 +1256,11 @@ async function runDev(siteDir: string, port: number) {
       notifyReload()
     }
   })
+  siteWatcher.on('error', (err) => console.warn(`  File watcher warning (site): ${(err as Error).message}`))
 
   // Watch templates dir for template source changes
   if (existsSync(templatesDir)) {
-    watch(templatesDir, { recursive: true }, (_event, filename) => {
+    const tplWatcher = watch(templatesDir, { recursive: true }, (_event, filename) => {
       if (!filename) return
       if (filename.endsWith('.ts') || filename.endsWith('.tsx')) {
         const parts = filename.split('/')
@@ -1266,6 +1271,7 @@ async function runDev(siteDir: string, port: number) {
         }
       }
     })
+    tplWatcher.on('error', (err) => console.warn(`  File watcher warning (templates): ${(err as Error).message}`))
   }
 }
 
