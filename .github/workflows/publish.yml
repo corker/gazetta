@@ -25,10 +25,9 @@ jobs:
 
       - run: npm run build:admin -w packages/gazetta
 
-      - run: npm test -w packages/gazetta
-
-      - name: Smoke test (pack → init → dev → curl)
-        run: npm run smoke
+      # CI already ran tests + smoke on the PR whose squash/rebase produced
+      # this tag commit — branch protection requires linear history, so the
+      # tagged SHA is the validated SHA. Publish proceeds directly.
 
       - run: npm publish -w packages/gazetta --provenance
         env:

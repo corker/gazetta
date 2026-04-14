@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  # Cancel older runs on PR branches only. On main, let every commit's
+  # run finish — cancelling mid-flight could leave a push unvalidated
+  # and races with deploy/publish workflows that trust CI.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
