@@ -18,6 +18,7 @@ import type { TemplateInfo } from './templates-scan.js'
 import { templateHashesFrom } from './templates-scan.js'
 import { hashManifest } from './hash.js'
 import { writeSidecars, collectFragmentRefs } from './sidecars.js'
+import { createContentRoot, type ContentRoot } from './content-root.js'
 import type { PageManifest, FragmentManifest } from './types.js'
 
 export interface SourceSidecarWriter {
@@ -26,14 +27,22 @@ export interface SourceSidecarWriter {
 }
 
 export interface SourceSidecarWriterOptions {
-  storage: StorageProvider
-  siteDir: string
+  /** Content root for source. Preferred shape. */
+  contentRoot?: ContentRoot
+  /** @deprecated Prefer `contentRoot`. */
+  storage?: StorageProvider
+  /** @deprecated Prefer `contentRoot`. */
+  siteDir?: string
   scanTemplates: () => Promise<TemplateInfo[]>
 }
 
 export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): SourceSidecarWriter {
-  let templateHashes: Promise<Map<string, string>> | null = null
+  const root: ContentRoot = opts.contentRoot
+    ?? (opts.storage && opts.siteDir !== undefined
+      ? createContentRoot(opts.storage, opts.siteDir)
+      : (() => { throw new Error('createSourceSidecarWriter: pass `contentRoot` (or legacy `storage` + `siteDir`)') })())
 
+  let templateHashes: Promise<Map<string, string>> | null = null
   const getTemplateHashes = () => {
     if (!templateHashes) templateHashes = opts.scanTemplates().then(templateHashesFrom)
     return templateHashes
@@ -43,19 +52,19 @@ export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): Sou
     async writeFor(kind, name) {
       const subdir = kind === 'page' ? 'pages' : 'fragments'
       const manifestName = kind === 'page' ? 'page.json' : 'fragment.json'
-      const itemDir = join(opts.siteDir, subdir, name)
+      const itemDir = root.path(subdir, name)
       const manifestPath = join(itemDir, manifestName)
 
       let manifest: PageManifest | FragmentManifest
       try {
-        manifest = JSON.parse(await opts.storage.readFile(manifestPath))
+        manifest = JSON.parse(await root.storage.readFile(manifestPath))
       } catch {
         return
       }
 
       const hashes = await getTemplateHashes()
       const hash = hashManifest(manifest, { templateHashes: hashes })
-      await writeSidecars(opts.storage, itemDir, {
+      await writeSidecars(root.storage, itemDir, {
         hash,
         uses: collectFragmentRefs(manifest.components),
         template: manifest.template,
