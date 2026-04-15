@@ -54,7 +54,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     const resolved = await resolvePage('home', site)
 
     expect(resolved.children).toHaveLength(1)
@@ -72,7 +72,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     const resolved = await resolvePage('home', site)
 
     expect(resolved.children).toHaveLength(1)
@@ -95,7 +95,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     const resolved = await resolvePage('home', site)
 
     expect(resolved.children).toHaveLength(1)
@@ -123,7 +123,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     const resolved = await resolvePage('home', site)
 
     const features = resolved.children[0]
@@ -134,7 +134,7 @@ describe('resolvePage', () => {
 
   it('throws on missing page', async () => {
     await writeSite({ 'site.yaml': 'name: "Test"' })
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     await expect(resolvePage('nope', site)).rejects.toThrow('Page "nope" not found')
   })
 
@@ -148,7 +148,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     await expect(resolvePage('home', site)).rejects.toThrow('Fragment "@missing" not found')
   })
 
@@ -162,7 +162,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     await expect(resolvePage('home', site)).rejects.toThrow('string entries must be fragment references')
   })
 
@@ -172,7 +172,7 @@ describe('resolvePage', () => {
       'pages/home/page.json': JSON.stringify({ template: 'nonexistent' }),
     })
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     await expect(resolvePage('home', site)).rejects.toThrow('Template "nonexistent" not found')
   })
 
@@ -188,7 +188,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     try {
       await resolvePage('home', site)
       expect.fail('should have thrown')
@@ -217,7 +217,7 @@ describe('resolvePage', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     const resolved = await resolvePage('home', site)
 
     expect(resolved.treePath).toBe('')
@@ -238,7 +238,7 @@ describe('resolveFragment', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     const resolved = await resolveFragment('header', site)
 
     expect(resolved.content?.text).toBe('Header')
@@ -257,7 +257,7 @@ describe('resolveFragment', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     const resolved = await resolveFragment('header', site)
 
     expect(resolved.children).toHaveLength(1)
@@ -267,7 +267,7 @@ describe('resolveFragment', () => {
 
   it('throws on missing fragment', async () => {
     await writeSite({ 'site.yaml': 'name: "Test"' })
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     await expect(resolveFragment('nope', site)).rejects.toThrow('Fragment "nope" not found')
   })
 
@@ -279,7 +279,7 @@ describe('resolveFragment', () => {
     })
     await writeTemplate('echo')
 
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     try {
       await resolveFragment('missing', site)
       expect.fail('should have thrown')
