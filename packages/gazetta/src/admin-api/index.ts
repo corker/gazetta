@@ -85,6 +85,7 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
     sidecarWriter = opts.source.sidecarWriter ?? createSourceSidecarWriter({
       contentRoot: opts.source.contentRoot,
       scanTemplates: () => cachedScan.get(),
+      templatesDir,
     })
     if (!opts.source.sidecarWriter) {
       source = { ...opts.source, sidecarWriter }
@@ -97,6 +98,7 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
     sidecarWriter = createSourceSidecarWriter({
       contentRoot: bootstrapRoot,
       scanTemplates: () => cachedScan.get(),
+      templatesDir,
     })
     source = createSourceContext({
       storage: opts.storage,
