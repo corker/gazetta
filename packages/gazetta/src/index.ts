@@ -20,6 +20,13 @@ export type {
 } from './types.js'
 export { getType, isEditable } from './types.js'
 export type { TargetType } from './types.js'
+export type {
+  HistoryProvider,
+  Revision,
+  RevisionManifest,
+  RevisionOperation,
+  HistoryRetention,
+} from './history.js'
 
 // Renderer
 export { renderComponent, renderFragment, renderPage } from './renderer.js'
