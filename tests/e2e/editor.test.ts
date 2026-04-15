@@ -794,16 +794,23 @@ test.describe('Publish panel', () => {
     await wipe(testSite.projectDir)
     // Break the 'hero' template — not parseable ts. The server emits a
     // 'fatal' SSE event with invalidTemplates, which the panel renders in
-    // the error block.
+    // the error block. Restore afterward because the testSite fixture is
+    // worker-scoped — a corrupted hero template would cascade into every
+    // later test that renders the home page.
+    const { readFile } = await import('node:fs/promises')
     const tpl = join(testSite.projectDir, 'templates/hero/index.ts')
+    const orig = await readFile(tpl, 'utf-8')
     await writeFile(tpl, 'this is not valid ts!!!')
-
-    await openPublish(page)
-    await pickDestination(page, 'staging')
-    await page.locator('[data-testid="publish-panel-confirm"]').click()
-    const banner = page.locator('[data-testid="publish-invalid-templates"]')
-    await expect(banner).toBeVisible({ timeout: 10000 })
-    await expect(banner).toContainText('hero')
+    try {
+      await openPublish(page)
+      await pickDestination(page, 'staging')
+      await page.locator('[data-testid="publish-panel-confirm"]').click()
+      const banner = page.locator('[data-testid="publish-invalid-templates"]')
+      await expect(banner).toBeVisible({ timeout: 10000 })
+      await expect(banner).toContainText('hero')
+    } finally {
+      await writeFile(tpl, orig)
+    }
   })
 
   test('works in light mode', async ({ page, testSite }) => {
@@ -857,10 +864,10 @@ test.describe('Fragment blast radius', () => {
   })
 })
 
-test.describe('Preview target tabs', () => {
+test.describe('Target switch preserves preview', () => {
   /**
    * Publish everything from local → staging so both targets have the home
-   * page. Without this the staging tab shows a 404 and we can't assert
+   * page. Without this the staging target returns 404 and we can't assert
    * on scroll-preserved content swap.
    */
   async function seedStaging(baseURL: string) {
@@ -875,7 +882,7 @@ test.describe('Preview target tabs', () => {
     if (!res.ok) throw new Error(`seed publish failed: ${res.status}`)
   }
 
-  test('scroll position is preserved across target tab swap', async ({ page, testSite }) => {
+  test('scroll position is preserved when switching active target', async ({ page, testSite }) => {
     await seedStaging(testSite.baseURL)
 
     // Shorter viewport forces the home page to actually overflow so the
@@ -892,7 +899,7 @@ test.describe('Preview target tabs', () => {
       })
     }, { timeout: 10000 }).toBe(true)
 
-    // Scroll the iframe
+    // Scroll the iframe.
     await page.evaluate(() => {
       const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
       f?.contentWindow?.scrollTo(0, 400)
@@ -907,20 +914,44 @@ test.describe('Preview target tabs', () => {
       return f?.contentWindow?.scrollY ?? 0
     })
 
-    // Click the staging tab — content should swap via morphdom, preserving scroll.
-    await page.locator('[data-testid="preview-target-tab-staging"]').click()
+    // Open the top-bar target switcher and select staging. The preview
+    // should swap content via morphdom, preserving scroll.
+    await page.locator('[data-testid="active-target-indicator"]').click()
+    await page.locator('[data-testid="active-target-menu"]').getByText('staging', { exact: true }).click()
 
-    // Give the fetch + morph a moment to land, then assert the scroll survived.
-    // Using poll here because the assertion is time-sensitive: the fetch
-    // completes asynchronously, and we want to check AFTER the morph lands.
     await expect.poll(async () => page.evaluate(() => {
       const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
       return f?.contentWindow?.scrollY ?? 0
     }), { timeout: 5000 }).toBe(scrolled)
 
-    // Sanity: the iframe still has content (so we know we morphed, not just
-    // skipped the swap). Any regression that unmounts the iframe would also
-    // wipe this. The tab should show as active after click.
-    await expect(page.locator('[data-testid="preview-target-tab-staging"]')).toHaveClass(/active/)
+    // Sanity: the indicator now reflects staging as active.
+    await expect(page.locator('[data-testid="active-target-indicator"]')).toContainText('staging')
+  })
+})
+
+test.describe('Target switch with unsaved edits', () => {
+  test('Cancel keeps the user on the current target with edits intact', async ({ page }) => {
+    // Enter edit mode and make a change to mark the editor dirty.
+    await openEditor(page, 'home')
+    await page.locator('[data-testid="component-hero"]').click()
+    await page.waitForTimeout(300)
+    const titleField = page.locator('input[name="root_title"]').first()
+    await titleField.waitFor({ timeout: 5000 })
+    const original = await titleField.inputValue()
+    await titleField.fill(original + ' — dirty')
+    // Save button becomes enabled when there are pending edits.
+    await expect(page.locator('[data-testid="save-btn"]')).toBeEnabled()
+
+    // Try to switch to staging → the unsaved-dialog opens.
+    await page.locator('[data-testid="active-target-indicator"]').click()
+    await page.locator('[data-testid="active-target-menu"]').getByText('staging', { exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: /unsaved changes/i })
+    await dialog.waitFor({ timeout: 5000 })
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+
+    // Still on local (the original active target), edits preserved.
+    await expect(page.locator('[data-testid="active-target-indicator"]')).toContainText('local')
+    await expect(page.locator('[data-testid="save-btn"]')).toBeEnabled()
+    await expect(titleField).toHaveValue(original + ' — dirty')
   })
 })
