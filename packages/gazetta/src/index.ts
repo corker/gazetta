@@ -20,6 +20,13 @@ export type {
 } from './types.js'
 export { getType, isEditable } from './types.js'
 export type { TargetType } from './types.js'
+export {
+  createTargetRegistryView,
+  listEditableTargets,
+  UnknownTargetError,
+  NoEditableTargetError,
+} from './targets.js'
+export type { TargetRegistry } from './targets.js'
 export type {
   HistoryProvider,
   Revision,
