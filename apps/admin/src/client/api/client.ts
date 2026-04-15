@@ -57,14 +57,16 @@ async function publishStream(
   items: string[],
   targets: string[],
   onProgress: (ev: PublishProgress) => void,
-  signal?: AbortSignal,
+  options?: { source?: string; signal?: AbortSignal },
 ): Promise<PublishResult[]> {
   const token = sessionStorage.getItem('gazetta_token')
   const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
+  const body: Record<string, unknown> = { items, targets }
+  if (options?.source) body.source = options.source
   const res = await fetch(`${BASE}/publish/stream`, {
-    method: 'POST', headers, body: JSON.stringify({ items, targets }), signal,
+    method: 'POST', headers, body: JSON.stringify(body), signal: options?.signal,
   })
   if (!res.ok || !res.body) {
     const body = await res.json().catch(() => ({ error: res.statusText }))

@@ -23,6 +23,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
+import { api, type PublishResult } from '../api/client.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useSyncStatusStore } from '../stores/syncStatus.js'
 import PublishItemList from './PublishItemList.vue'
@@ -70,6 +71,97 @@ const selectedItems = ref<Set<string>>(new Set())
 // Destination names as an array (PublishItemList takes string[]).
 const destinationNames = computed(() => [...selectedDestinations.value])
 
+// --- Publish execution (R38c) -----------------------------------------
+
+interface TargetProgress {
+  current: number
+  total: number
+  label: string
+  status: 'pending' | 'in-progress' | 'done' | 'error'
+}
+const publishing = ref(false)
+const confirming = ref(false)
+const progress = ref(new Map<string, TargetProgress>())
+const results = ref<PublishResult[] | null>(null)
+const publishError = ref<string | null>(null)
+const invalidTemplates = ref<{ name: string; errors: string[] }[]>([])
+
+// Production destinations require explicit confirmation to avoid accidental
+// pushes to live content — same pattern as the old PublishDialog.
+const productionDestinations = computed(() =>
+  activeTarget.targets.filter(t =>
+    t.environment === 'production' && selectedDestinations.value.has(t.name),
+  ),
+)
+const needsConfirm = computed(() => productionDestinations.value.length > 0)
+
+function resetPublishState() {
+  publishing.value = false
+  confirming.value = false
+  progress.value = new Map()
+  results.value = null
+  publishError.value = null
+  invalidTemplates.value = []
+}
+
+async function handlePublishClick() {
+  if (!canPublish.value || publishing.value) return
+  if (needsConfirm.value && !confirming.value) {
+    confirming.value = true
+    return
+  }
+  await runPublish()
+}
+
+async function runPublish() {
+  const src = sourceName.value
+  if (!src) return
+  const dests = [...selectedDestinations.value]
+  const items = [...selectedItems.value]
+  confirming.value = false
+  publishing.value = true
+  results.value = null
+  publishError.value = null
+  invalidTemplates.value = []
+  progress.value = new Map(dests.map(d => [d, { current: 0, total: 0, label: 'pending…', status: 'pending' as const }]))
+  try {
+    const finalResults = await api.publishStream(items, dests, (ev) => {
+      if (ev.kind === 'target-start') {
+        const m = new Map(progress.value)
+        m.set(ev.target, { current: 0, total: ev.total, label: 'starting…', status: 'in-progress' })
+        progress.value = m
+      } else if (ev.kind === 'progress') {
+        const m = new Map(progress.value)
+        const existing = m.get(ev.target) ?? { current: 0, total: ev.total, label: '', status: 'in-progress' as const }
+        m.set(ev.target, { ...existing, current: ev.current, total: ev.total, label: ev.label })
+        progress.value = m
+      } else if (ev.kind === 'target-result') {
+        const m = new Map(progress.value)
+        const existing = m.get(ev.result.target)
+        if (existing) {
+          m.set(ev.result.target, {
+            ...existing,
+            status: ev.result.success ? 'done' : 'error',
+            label: ev.result.success ? `done · ${ev.result.copiedFiles} files` : (ev.result.error ?? 'failed'),
+          })
+        }
+        progress.value = m
+      }
+    }, { source: src })
+    results.value = finalResults
+    // Any target that was published is now potentially in a new state —
+    // refresh its sync status so chips / item list reflect it.
+    for (const d of dests) syncStatus.invalidate(d)
+    syncStatus.refreshAll()
+  } catch (err) {
+    const e = err as Error & { invalidTemplates?: { name: string; errors: string[] }[] }
+    publishError.value = e.message
+    if (e.invalidTemplates) invalidTemplates.value = e.invalidTemplates
+  } finally {
+    publishing.value = false
+  }
+}
+
 // --- Panel lifecycle --------------------------------------------------
 
 watch(() => props.visible, (v) => {
@@ -77,8 +169,10 @@ watch(() => props.visible, (v) => {
     // Clear selection on close so stale state doesn't leak between
     // invocations (e.g., different source next time).
     selectedItems.value = new Set()
+    resetPublishState()
     return
   }
+  resetPublishState()
   sourceName.value = pickDefaultSource()
   const preselect = new Set<string>()
   if (props.initialDestination && destinationOptions.value.some(t => t.name === props.initialDestination)) {
@@ -101,6 +195,11 @@ watch(sourceName, (name) => {
     selectedDestinations.value = next
   }
 })
+
+// Any change to destinations or items invalidates a pending confirmation —
+// otherwise the user could flip selections after clicking once and push
+// somewhere they didn't review.
+watch([selectedDestinations, selectedItems], () => { confirming.value = false })
 
 function close() { emit('update:visible', false) }
 
@@ -206,18 +305,94 @@ function envClass(env: string | undefined): string {
           @update:selected="(v: Set<string>) => selectedItems = v"
         />
       </div>
+
+      <!-- Confirmation banner for production destinations -->
+      <div v-if="confirming" class="publish-confirm-banner" data-testid="publish-confirm-banner">
+        <i class="pi pi-exclamation-triangle" />
+        <span>
+          This will publish to
+          <strong>{{ productionDestinations.map(t => t.name).join(', ') }}</strong>
+          — live content will change.
+        </span>
+      </div>
+
+      <!-- Invalid templates (fatal) -->
+      <div v-if="invalidTemplates.length > 0" class="publish-error" data-testid="publish-invalid-templates">
+        <i class="pi pi-exclamation-triangle" />
+        <div class="publish-error-body">
+          <p><strong>{{ invalidTemplates.length }} template{{ invalidTemplates.length === 1 ? '' : 's' }} can't be rendered.</strong></p>
+          <ul class="publish-invalid-list">
+            <li v-for="tpl in invalidTemplates" :key="tpl.name">
+              <span class="publish-invalid-name">{{ tpl.name }}</span>
+              <span class="publish-invalid-error">{{ tpl.errors[0] }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Generic fatal error -->
+      <div v-else-if="publishError" class="publish-error" data-testid="publish-error">
+        <i class="pi pi-exclamation-circle" />
+        <span>{{ publishError }}</span>
+      </div>
+
+      <!-- Progress: streaming per-destination -->
+      <div v-if="publishing && progress.size > 0" class="publish-progress" data-testid="publish-progress">
+        <div v-for="[destName, p] in progress" :key="destName" class="progress-row">
+          <div class="progress-header">
+            <span class="progress-target">{{ destName }}</span>
+            <span class="progress-count">{{ p.current }} / {{ p.total }}</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill"
+              :style="{ width: (p.total ? Math.round(100 * p.current / p.total) : 0) + '%' }" />
+          </div>
+          <div class="progress-label" :title="p.label">{{ p.label }}</div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div v-if="results" class="publish-results" data-testid="publish-results">
+        <div v-for="r in results" :key="r.target" class="publish-result"
+          :class="{ success: r.success, error: !r.success }"
+          :data-testid="`publish-result-${r.target}`">
+          <i :class="r.success ? 'pi pi-check-circle' : 'pi pi-exclamation-circle'" />
+          <span class="result-target">{{ r.target }}</span>
+          <span v-if="r.success" class="result-detail">{{ r.copiedFiles }} files</span>
+          <span v-else class="result-detail">{{ r.error }}</span>
+        </div>
+      </div>
     </div>
 
     <template #footer>
-      <Button label="Cancel" severity="secondary" @click="close"
-        data-testid="publish-panel-cancel" />
-      <Button
-        :label="publishLabel"
-        severity="success"
-        :disabled="!canPublish"
-        data-testid="publish-panel-confirm"
-        :title="publishTitle"
-      />
+      <template v-if="results">
+        <Button label="Done" data-testid="publish-panel-done" @click="close" />
+      </template>
+      <template v-else>
+        <Button
+          :label="confirming ? 'Back' : 'Cancel'"
+          severity="secondary"
+          @click="confirming ? (confirming = false) : close()"
+          data-testid="publish-panel-cancel" />
+        <Button v-if="!confirming"
+          :label="publishLabel"
+          :icon="publishing ? undefined : 'pi pi-cloud-upload'"
+          severity="success"
+          :loading="publishing"
+          :disabled="!canPublish || publishing"
+          :title="publishTitle"
+          data-testid="publish-panel-confirm"
+          @click="handlePublishClick"
+        />
+        <Button v-else
+          :label="`Yes, publish to ${productionDestinations.map(t => t.name).join(', ')}`"
+          icon="pi pi-exclamation-triangle"
+          severity="danger"
+          :loading="publishing"
+          data-testid="publish-panel-confirm-prod"
+          @click="runPublish"
+        />
+      </template>
     </template>
   </Dialog>
 </template>
@@ -331,4 +506,46 @@ function envClass(env: string | undefined): string {
 .destination.env-staging {
   border-left: 3px solid var(--color-env-staging-fg);
 }
+
+.publish-confirm-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--p-border-radius-md);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-fg);
+  font-size: 0.875rem;
+}
+.publish-error {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--p-border-radius-md);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-fg);
+  font-size: 0.875rem;
+}
+.publish-error-body { display: flex; flex-direction: column; gap: 0.375rem; flex: 1; }
+.publish-error-body p { margin: 0; }
+.publish-invalid-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.publish-invalid-list li { display: flex; flex-direction: column; gap: 0.125rem; font-size: 0.8125rem; }
+.publish-invalid-name { font-family: ui-monospace, monospace; font-weight: 600; }
+.publish-invalid-error { opacity: 0.85; font-size: 0.75rem; }
+
+.publish-progress { display: flex; flex-direction: column; gap: 0.75rem; }
+.progress-row { display: flex; flex-direction: column; gap: 0.25rem; }
+.progress-header { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8125rem; }
+.progress-target { font-weight: 600; }
+.progress-count { color: var(--color-muted); font-variant-numeric: tabular-nums; font-size: 0.75rem; }
+.progress-bar { height: 4px; background: var(--color-hover-bg); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--p-primary-color); transition: width 200ms ease; }
+.progress-label { font-size: 0.75rem; color: var(--color-muted); font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.publish-results { display: flex; flex-direction: column; gap: 0.5rem; }
+.publish-result { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border-radius: var(--p-border-radius-md); }
+.publish-result.success { background: var(--color-success-bg); color: var(--color-success-fg); }
+.publish-result.error { background: var(--color-danger-bg); color: var(--color-danger-fg); }
+.result-target { font-weight: 600; }
+.result-detail { margin-left: auto; font-size: 0.875rem; opacity: 0.8; }
 </style>
