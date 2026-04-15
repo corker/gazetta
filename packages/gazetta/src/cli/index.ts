@@ -523,10 +523,10 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     const unchanged = new Set<string>()
     if (!opts.force) {
       const { compareTargets } = await import('../compare.js')
+      const { createContentRoot } = await import('../content-root.js')
       const cmp = await compareTargets({
-        source: storage,
+        sourceRoot: createContentRoot(storage, siteDir),
         target: targetStorage,
-        siteDir,
         templatesDir,
         projectRoot,
         type: targetType,
