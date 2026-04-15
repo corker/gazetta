@@ -34,7 +34,7 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    const { copiedFiles } = await publishItems(source, '', target, '', ['pages/home'])
+    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), ['pages/home'])
     expect(copiedFiles).toBeGreaterThanOrEqual(2) // page.json + site.yaml
     expect(await target.exists('pages/home/page.json')).toBe(true)
     expect(await target.exists('site.yaml')).toBe(true)
@@ -48,7 +48,7 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    const { copiedFiles } = await publishItems(source, '', target, '', ['pages/home', 'fragments/header'])
+    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), ['pages/home', 'fragments/header'])
     expect(copiedFiles).toBeGreaterThanOrEqual(3)
     expect(await target.exists('pages/home/page.json')).toBe(true)
     expect(await target.exists('fragments/header/fragment.json')).toBe(true)
@@ -61,7 +61,7 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    const { copiedFiles } = await publishItems(source, '', target, '', ['pages/blog/[slug]'])
+    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), ['pages/blog/[slug]'])
     expect(copiedFiles).toBeGreaterThanOrEqual(2)
     expect(await target.exists('pages/blog/[slug]/page.json')).toBe(true)
   })
@@ -74,7 +74,7 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    await publishItems(source, '', target, '', ['pages/home'])
+    await publishItems(createContentRoot(source), createContentRoot(target), ['pages/home'])
     const copied = await target.readFile('pages/home/page.json')
     expect(copied).toBe(content)
   })
@@ -85,7 +85,7 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    const { copiedFiles } = await publishItems(source, '', target, '', ['pages/home'])
+    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), ['pages/home'])
     expect(copiedFiles).toBe(1) // only page.json, no site.yaml
   })
 
@@ -95,7 +95,7 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    const { copiedFiles } = await publishItems(source, '', target, '', ['pages/nonexistent'])
+    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), ['pages/nonexistent'])
     expect(copiedFiles).toBe(1) // only site.yaml
   })
 
@@ -122,7 +122,7 @@ describe('resolveDependencies', () => {
     await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'default' }))
 
     const storage = createFilesystemProvider(sourceDir)
-    const deps = await resolveDependencies(storage, '', ['pages/home'])
+    const deps = await resolveDependencies(createContentRoot(storage), ['pages/home'])
     expect(deps).toContain('pages/home')
   })
 
@@ -146,7 +146,7 @@ describe('resolveDependencies', () => {
     await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'page-default' }))
 
     const storage = createFilesystemProvider(sourceDir)
-    const deps = await resolveDependencies(storage, '', ['pages/home'])
+    const deps = await resolveDependencies(createContentRoot(storage), ['pages/home'])
     expect(deps).toContain('templates/page-default')
   })
 
@@ -157,7 +157,7 @@ describe('resolveDependencies', () => {
     }))
 
     const storage = createFilesystemProvider(sourceDir)
-    const deps = await resolveDependencies(storage, '', ['pages/home'])
+    const deps = await resolveDependencies(createContentRoot(storage), ['pages/home'])
     expect(deps).toContain('fragments/header')
     expect(deps).toContain('templates/hero')
   })
@@ -176,7 +176,7 @@ describe('resolveDependencies', () => {
     }))
 
     const storage = createFilesystemProvider(sourceDir)
-    const deps = await resolveDependencies(storage, '', ['pages/home'])
+    const deps = await resolveDependencies(createContentRoot(storage), ['pages/home'])
     expect(deps).toContain('fragments/header')
     expect(deps).toContain('templates/header-layout')
     expect(deps).toContain('templates/logo')
@@ -188,7 +188,7 @@ describe('resolveDependencies', () => {
     await writeTestFile(sourceDir, 'pages/about/page.json', JSON.stringify({ template: 'default', components: ['@header', '@footer'] }))
 
     const storage = createFilesystemProvider(sourceDir)
-    const deps = await resolveDependencies(storage, '', ['pages/home', 'pages/about'])
+    const deps = await resolveDependencies(createContentRoot(storage), ['pages/home', 'pages/about'])
     const templateCount = deps.filter(d => d === 'templates/default').length
     expect(templateCount).toBe(1) // not duplicated
   })
@@ -197,7 +197,7 @@ describe('resolveDependencies', () => {
     await mkdir(join(sourceDir, 'pages/empty'), { recursive: true })
 
     const storage = createFilesystemProvider(sourceDir)
-    const deps = await resolveDependencies(storage, '', ['pages/empty'])
+    const deps = await resolveDependencies(createContentRoot(storage), ['pages/empty'])
     expect(deps).toContain('pages/empty')
     expect(deps).toHaveLength(1)
   })
@@ -436,7 +436,7 @@ describe('findDependentsFromSidecars', () => {
     await writeTestFile(targetDir, 'pages/blog/[slug]/.uses-header', '')
     await writeTestFile(targetDir, 'pages/blog/[slug]/.tpl-page-blog', '')
 
-    const r = await findDependentsFromSidecars(target, { fragment: 'header' })
+    const r = await findDependentsFromSidecars(createContentRoot(target), { fragment: 'header' })
     expect(r.pages.sort()).toEqual(['about', 'blog/[slug]', 'home'])
     expect(r.fragments).toEqual([])
   })
@@ -449,7 +449,7 @@ describe('findDependentsFromSidecars', () => {
     await writeTestFile(targetDir, 'pages/home/.87654321.hash', '')
     await writeTestFile(targetDir, 'pages/home/.uses-header', '')
 
-    const r = await findDependentsFromSidecars(target, { fragment: 'inner-logo' })
+    const r = await findDependentsFromSidecars(createContentRoot(target), { fragment: 'inner-logo' })
     expect(r.pages).toEqual(['home'])
     expect(r.fragments).toEqual(['header'])
   })
@@ -466,7 +466,7 @@ describe('findDependentsFromSidecars', () => {
     await writeTestFile(targetDir, 'fragments/header/.33333333.hash', '')
     await writeTestFile(targetDir, 'fragments/header/.tpl-header-layout', '')
 
-    const r = await findDependentsFromSidecars(target, { template: 'page-default' })
+    const r = await findDependentsFromSidecars(createContentRoot(target), { template: 'page-default' })
     expect(r.pages).toEqual(['home'])
     expect(r.fragments).toEqual([])
   })
@@ -474,7 +474,7 @@ describe('findDependentsFromSidecars', () => {
   it('returns empty sets when target has no sidecars', async () => {
     const { findDependentsFromSidecars } = await import('../src/publish.js')
     const target = createFilesystemProvider(targetDir)
-    const r = await findDependentsFromSidecars(target, { fragment: 'header' })
+    const r = await findDependentsFromSidecars(createContentRoot(target), { fragment: 'header' })
     expect(r.pages).toEqual([])
     expect(r.fragments).toEqual([])
   })
@@ -486,7 +486,7 @@ describe('findDependentsFromSidecars', () => {
     await writeTestFile(sourceDir, 'pages/home/.uses-header', '')
     const source = createFilesystemProvider()
 
-    const r = await findDependentsFromSidecars(source, { fragment: 'header' }, { baseDir: sourceDir })
+    const r = await findDependentsFromSidecars(createContentRoot(source, sourceDir), { fragment: 'header' })
     expect(r.pages).toEqual(['home'])
   })
 })

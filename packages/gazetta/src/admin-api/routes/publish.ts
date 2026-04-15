@@ -106,7 +106,8 @@ export function publishRoutes(
         const t = await getTargets()
         const targetStorage = t.get(targetName)
         if (!targetStorage) return c.json({ error: `Unknown target: ${targetName}` }, 400)
-        const result = await findDependentsFromSidecars(targetStorage, { fragment: fragmentName })
+        const { createContentRoot } = await import('../../content-root.js')
+        const result = await findDependentsFromSidecars(createContentRoot(targetStorage), { fragment: fragmentName })
         return c.json(result)
       }
       // Source-side: use sidecars for the listing-only fast path. Backfill
