@@ -1,7 +1,72 @@
 import { resolve } from 'node:path'
 import { execSync } from 'node:child_process'
 import type { StorageProvider, TargetConfig, StorageConfig } from './types.js'
+import { isEditable } from './types.js'
 import { createFilesystemProvider } from './providers/filesystem.js'
+
+/**
+ * Target resolution surface used by route handlers and anything that needs
+ * to act on a specific named target. Narrow by intent: route factories that
+ * only list targets take `list()`; handlers that load content take `get()`;
+ * publish-aware code reads `getConfig()` to branch on type or environment.
+ *
+ * Implementations decide how to initialize providers — eagerly at boot,
+ * lazily on first access, or mocked for tests.
+ */
+export interface TargetRegistry {
+  /** Resolve a target name to its storage provider. Throws if unknown. */
+  get(name: string): StorageProvider
+  /** Configuration for a target (type, environment, editable). */
+  getConfig(name: string): TargetConfig | undefined
+  /** All known target names. */
+  list(): string[]
+  /**
+   * Name of the default editable target for this site. Throws if none exists.
+   * Resolution: first target where `isEditable(config) === true`, in the order
+   * they appear in site.yaml.
+   */
+  defaultEditable(): string
+}
+
+export class UnknownTargetError extends Error {
+  constructor(name: string) { super(`Unknown target: ${name}`); this.name = 'UnknownTargetError' }
+}
+export class NoEditableTargetError extends Error {
+  constructor() { super('No editable target is configured. At least one target in site.yaml must be editable.'); this.name = 'NoEditableTargetError' }
+}
+
+/**
+ * Build a TargetRegistry from already-initialized providers and their configs.
+ * The factory that boots the dev server populates `providers` by running
+ * `createStorageProvider` per target; tests pass in-memory providers.
+ */
+export function createTargetRegistryView(
+  providers: Map<string, StorageProvider>,
+  configs: Record<string, TargetConfig>,
+): TargetRegistry {
+  const orderedNames = Object.keys(configs)
+  return {
+    get(name) {
+      const p = providers.get(name)
+      if (!p) throw new UnknownTargetError(name)
+      return p
+    },
+    getConfig(name) { return configs[name] },
+    list() { return [...orderedNames] },
+    defaultEditable() {
+      for (const name of orderedNames) {
+        const cfg = configs[name]
+        if (cfg && isEditable(cfg)) return name
+      }
+      throw new NoEditableTargetError()
+    },
+  }
+}
+
+/** Find all editable targets in declaration order. Pure helper. */
+export function listEditableTargets(configs: Record<string, TargetConfig>): string[] {
+  return Object.entries(configs).filter(([, cfg]) => isEditable(cfg)).map(([name]) => name)
+}
 
 export function resolveEnvVars(value: string | undefined): string | undefined {
   if (!value) return value
