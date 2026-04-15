@@ -22,11 +22,62 @@ import { api, type TargetInfo } from '../api/client.js'
 
 const STORAGE_KEY = 'gazetta_active_target'
 
+/**
+ * How the store obtains its list of targets. Injected so tests (and any
+ * future multi-source setups) can swap the transport without mocking the
+ * api client module.
+ */
+export type LoadTargets = () => Promise<TargetInfo[]>
+
+/**
+ * How the store persists the active target across reloads. Injected so
+ * tests (and non-browser environments) can stub without touching globals.
+ */
+export interface ActiveTargetPersistence {
+  get(): string | null
+  set(name: string): void
+}
+
+/** Default persistence backed by window.localStorage. No-op outside a browser. */
+const defaultPersistence: ActiveTargetPersistence = {
+  get() {
+    if (typeof window === 'undefined') return null
+    try { return window.localStorage.getItem(STORAGE_KEY) } catch { return null }
+  },
+  set(name: string) {
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem(STORAGE_KEY, name) } catch { /* private mode */ }
+  },
+}
+
+export interface ActiveTargetStoreOptions {
+  /** Override how the store loads its target list. Defaults to `api.getTargets()`. */
+  loadTargets?: LoadTargets
+  /** Override persistence of the active target name. Defaults to localStorage. */
+  persistence?: ActiveTargetPersistence
+}
+
+/**
+ * Pinia store for the active target. Accepts optional dependencies so tests
+ * can wire in their own loaders and persistence without touching module
+ * imports. In production both default to api.getTargets + localStorage.
+ */
 export const useActiveTargetStore = defineStore('activeTarget', () => {
   const targets = ref<TargetInfo[]>([])
   const activeTargetName = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  // Injected dependencies. Default to production wiring; tests (and any
+  // future alternative backend) call configure() before load().
+  let loadTargetsFn: LoadTargets = () => api.getTargets()
+  let persistence: ActiveTargetPersistence = defaultPersistence
+
+  /** Override the loader and/or persistence — call before load(). */
+  function configure(opts: ActiveTargetStoreOptions) {
+    if (opts.loadTargets) loadTargetsFn = opts.loadTargets
+    if (opts.persistence) persistence = opts.persistence
+  }
 
   /** The full TargetInfo for the active target, or null if not loaded / not found. */
   const activeTarget = computed<TargetInfo | null>(() => {
@@ -58,11 +109,11 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
     loading.value = true
     error.value = null
     try {
-      const list = await api.getTargets()
+      const list = await loadTargetsFn()
       targets.value = list
 
       // Prefer a persisted choice if it's still valid; otherwise pick default.
-      const saved = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null
+      const saved = persistence.get()
       if (saved && list.some(t => t.name === saved)) {
         activeTargetName.value = saved
       } else {
@@ -77,15 +128,13 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
     }
   }
 
-  /** Change the active target. Persists the choice to localStorage. */
+  /** Change the active target. Persists the choice via the configured persistence. */
   function setActiveTarget(name: string) {
     if (!targets.value.some(t => t.name === name)) {
       throw new Error(`Unknown target: ${name}`)
     }
     activeTargetName.value = name
-    if (typeof window !== 'undefined') {
-      try { window.localStorage.setItem(STORAGE_KEY, name) } catch { /* private mode */ }
-    }
+    persistence.set(name)
   }
 
   /** Clear the store (e.g., on logout or site switch). */
@@ -108,6 +157,7 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
     editableTargets,
     readOnlyTargets,
     // actions
+    configure,
     load,
     setActiveTarget,
     clear,
