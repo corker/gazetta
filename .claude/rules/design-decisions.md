@@ -195,3 +195,106 @@ Vue's `onMounted` + template refs make foreign component mounting straightforwar
 
 **Rejected:** React (missing tree component), Svelte (immature ecosystem for admin UIs),
 htmx (not designed for interactive SPAs), Lit (small community).
+
+## 14. Active target as the single UX spine
+
+**Decision:** The author's focus is always on exactly one target — the **active target**.
+Tree, editor, preview, save, publish defaults, and sync comparisons all orient around it.
+The active target can be editable or read-only; editability is a target property, not
+a separate UX mode.
+
+**Why:** Earlier designs conflated two jobs — "where am I editing?" and "what am I looking at?"
+— into a single "edit target" concept. Separating focus (active target) from write-capability
+(editable flag) lets the author browse any target (including production) without losing work,
+and makes switching cheap and reversible. Every UI element has a clear reference point.
+
+**Rejected:**
+- **Working copy** as a stateful first-class noun — contradicted the stateless-CMS invariant;
+  form state is enough
+- **Source of truth** flag — added a third concept (on top of active + editable) that did the same
+  UX job as "active target is the reference for comparisons," at the cost of confusion
+- **Mode-based navigation** (Edit / Review / Ship modes) — added a switching layer that
+  progressive disclosure makes unnecessary
+- **Target-centric framing** where the author picks a target up front — high cognitive load;
+  active-target with cheap switching is lighter
+
+## 15. Progressive disclosure over workflow profiles
+
+**Decision:** The CMS UI adapts to the user's configured targets. Features appear based on
+target count, `environment` values, and `editable` flags — not on user-selected profiles (Solo / Team /
+Enterprise). Target configuration *is* the workflow.
+
+**Why:** Users have wildly different workflows (solo blogger, marketing team with staging,
+multi-region ops). A fixed profile always feels wrong for someone whose setup sits between
+profiles. Since target configuration already encodes the workflow shape, the UI can read it
+directly.
+
+Examples of disclosure:
+- 1 target configured → no publish UI (save is all there is)
+- 2+ targets → publish affordance appears
+- `production` environment exists → prod chrome (red accents) applied wherever prod is referenced
+- Multiple editable targets → active-target switcher appears in the top bar
+
+**Rejected:**
+- **Named profiles** (Solo / Team / Enterprise) — arbitrary boundaries; evolves poorly as users grow
+- **Settings-based feature hiding** — maximalist-by-default UI alienates new users
+
+## 16. Publish is one verb with author-chosen direction
+
+**Decision:** Publish, Fetch, and Promote collapse into a single operation: Publish (source → destination).
+The author picks both endpoints; the CMS suggests based on `environment` but never restricts direction.
+
+**Why:** All three were the same "copy logical content between targets" operation — just named
+differently by which end happened to be the edit context. Unifying reduces the surface area,
+eliminates synonym confusion, and makes publishing to multiple destinations (e.g., multi-region
+prod) a natural extension rather than a new operation.
+
+**Rejected:**
+- Three named operations — created synonym overload ("do I publish or promote to prod?") and
+  prevented uniform treatment of cross-target movement
+- A pipeline concept with enforced upstream/downstream — too rigid; doesn't fit multi-region,
+  hotfix cultures, or evolving flows
+
+## 17. Logical comparison only; materialized output comparison is not needed
+
+**Decision:** Compare operates on logical content (manifest JSON + content values). It does
+not compare materialized (rendered) output between targets.
+
+**Why:** Targets may legitimately render differently (static vs dynamic rendering timing;
+future target-specific data like regional overrides). "Out of sync" in the UX means
+*authored content differs* — this is what the author actually cares about. Byte-level
+comparison between targets would flag expected differences as sync issues.
+
+**Rejected:** Byte-level/rendered-output comparison — would conflate expected target
+variance with actual authoring drift.
+
+## 18. Per-target history, stored inside the target, content-addressed, uniform across providers
+
+**Decision:** Every target keeps its own history of writes in a reserved `.gazetta/history/`
+namespace separate from the content tree. Revisions are content-addressed (shared blobs
+across revisions via hashes) and stored the same way for every storage provider — no
+provider-native versioning (S3 object versions, git commits).
+
+**Why:**
+- **History on the destination, not the source.** Undo needs to work after the source of a
+  publish has moved on. Example: publish staging → prod, then edit staging — prod still
+  needs to roll back. Storing history on prod itself is the only way.
+- **Separate namespace from content.** `.gazetta/` is invisible to the runtime — no
+  performance or correctness cost on request serving. Content tree stays clean.
+- **Uniform across providers.** The storage interface is already "read/write bytes at paths."
+  Layering provider-specific versioning (S3 object versions, git commits) would balloon the
+  adapter contract and create behavioral differences. Content-addressed blobs work identically
+  on filesystem, R2, S3, Azure Blob — anywhere bytes can be written.
+- **Deduplication through content-addressing.** Unchanged items share storage across
+  revisions; storage scales with unique content, not revision count.
+- **Soft undo only.** Restoring a revision creates a new forward revision, preserving the
+  full audit trail.
+
+**Rejected:**
+- **Peer target as backup.** "Just publish staging → prod to undo prod" fails the common
+  case where staging has moved on since the publish.
+- **Provider-native versioning.** Adapter contract explosion; behavioral inconsistency.
+- **External history store.** Breaks the stateless-CMS invariant (history becomes a
+  dependency); history is content about content — belongs with the target.
+- **Hard undo (destructive history).** Loses audit trail; soft undo is strictly safer and
+  architecturally identical.

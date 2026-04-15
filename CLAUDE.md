@@ -17,9 +17,10 @@ Stateless CMS that structures websites as composable fragments. All state lives 
 
 ## Design docs (auto-loaded by Claude)
 
-- `.claude/rules/design-concepts.md` — Fragment, page, node, target model
-- `.claude/rules/design-publishing.md` — Stateless CMS, bidirectional sync, targets
+- `.claude/rules/design-concepts.md` — Fragment, page, node, target model; target properties; active target
+- `.claude/rules/design-publishing.md` — Stateless CMS, bidirectional sync, targets, unified Publish
 - `.claude/rules/design-decisions.md` — Key decisions and rationale
+- `.claude/rules/design-editor-ux.md` — Active target UX spine, switching, progressive disclosure
 - `.claude/rules/architecture.md` — System architecture and package layout
 
 ## Build & Test
