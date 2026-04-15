@@ -1,0 +1,4 @@
+name: "Gazetta Starter"
+version: "1.0.0"
+systemPages:
+  - "404"

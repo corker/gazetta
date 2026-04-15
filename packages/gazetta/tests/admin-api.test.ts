@@ -4,14 +4,17 @@ import { resolve } from 'node:path'
 import type { Hono } from 'hono'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { createAdminApp } from '../src/admin-api/index.js'
+import { createSourceContext } from '../src/admin-api/source-context.js'
 import { tempDir } from './_helpers/temp.js'
 
 // Copy the starter into .tmp/ so admin API tests can mutate pages/fragments
 // without dirtying the real repo. See #123.
 const realStarter = resolve(import.meta.dirname, '../../../examples/starter')
 const projectRoot = tempDir('admin-api-test-' + Date.now())
-const siteDir = resolve(projectRoot, 'sites/main')
-const storage = createFilesystemProvider()
+const projectSiteDir = resolve(projectRoot, 'sites/main')
+// Content lives inside the local target (post-transformation layout).
+const localTargetDir = resolve(projectSiteDir, 'targets/local')
+const storage = createFilesystemProvider(localTargetDir)
 let app: Hono
 
 beforeAll(async () => {
@@ -20,9 +23,16 @@ beforeAll(async () => {
     recursive: true,
     filter: (src) => !src.includes('/dist') && !src.includes('/node_modules') && !src.includes('/.tmp'),
   })
-  app = createAdminApp({
-    siteDir,
+  // Target-rooted source: storage points at targets/local, siteDir is '',
+  // projectSiteDir is the actual project site directory.
+  const source = createSourceContext({
     storage,
+    siteDir: '',
+    projectSiteDir,
+  })
+  app = createAdminApp({
+    source,
+    siteDir: projectSiteDir,  // used for templatesDir/adminDir defaults
     templatesDir: resolve(projectRoot, 'templates'),
     adminDir: resolve(projectRoot, 'admin'),
   })
@@ -198,7 +208,7 @@ describe('GET /preview/@fragment', () => {
 
 describe('POST /preview/@fragment', () => {
   it('renders fragment with content overrides', async () => {
-    const footerPath = resolve(siteDir, 'fragments/footer')
+    const footerPath = resolve(localTargetDir, 'fragments/footer')
     const res = await app.request('/preview/@footer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -241,8 +251,8 @@ describe('POST /preview/*', () => {
 
 describe('POST /api/pages (create)', () => {
   afterAll(async () => {
-    await rm(resolve(siteDir, 'pages/test-page'), { recursive: true, force: true })
-    await rm(resolve(siteDir, 'pages/docs'), { recursive: true, force: true })
+    await rm(resolve(localTargetDir, 'pages/test-page'), { recursive: true, force: true })
+    await rm(resolve(localTargetDir, 'pages/docs'), { recursive: true, force: true })
   })
 
   it('creates a new page', async () => {
@@ -280,7 +290,7 @@ describe('POST /api/pages (create)', () => {
 
 describe('PUT /api/pages/:name', () => {
   afterAll(async () => {
-    await rm(resolve(siteDir, 'pages/update-test'), { recursive: true, force: true })
+    await rm(resolve(localTargetDir, 'pages/update-test'), { recursive: true, force: true })
   })
 
   it('updates page content', async () => {
@@ -376,7 +386,7 @@ describe('DELETE /api/pages/:name', () => {
 
 describe('POST /api/fragments (create)', () => {
   afterAll(async () => {
-    await rm(resolve(siteDir, 'fragments/test-frag'), { recursive: true, force: true })
+    await rm(resolve(localTargetDir, 'fragments/test-frag'), { recursive: true, force: true })
   })
 
   it('creates a new fragment', async () => {

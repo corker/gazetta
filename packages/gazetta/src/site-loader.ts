@@ -105,6 +105,12 @@ export interface LoadSiteOptions {
   contentRoot?: ContentRoot
   /** Override templates directory (default: siteDir/templates). */
   templatesDir?: string
+  /**
+   * Pre-parsed site manifest. If provided, site.yaml is not read from the
+   * content root. Used when site.yaml is a project-level bootstrap file
+   * that lives outside target storage.
+   */
+  manifest?: SiteManifest
 }
 
 /**
@@ -139,11 +145,17 @@ export async function loadSite(opts: LoadSiteOptions): Promise<Site> {
     templatesDir = opts.templatesDir ?? join(siteDir, 'templates')
   }
 
-  const siteYamlPath = contentRoot.path('site.yaml')
-  if (!await contentRoot.storage.exists(siteYamlPath)) {
-    throw new Error(`No site.yaml found at ${siteYamlPath}. Is this a Gazetta site directory?`)
+  let manifest: SiteManifest
+  if (opts.manifest) {
+    // Project-level bootstrap passed in the manifest — skip the storage read.
+    manifest = opts.manifest
+  } else {
+    const siteYamlPath = contentRoot.path('site.yaml')
+    if (!await contentRoot.storage.exists(siteYamlPath)) {
+      throw new Error(`No site.yaml found at ${siteYamlPath}. Is this a Gazetta site directory?`)
+    }
+    manifest = await parseSiteManifest(contentRoot.storage, siteYamlPath)
   }
-  const manifest = await parseSiteManifest(contentRoot.storage, siteYamlPath)
   const pages = await discoverPages(contentRoot.storage, contentRoot.path('pages'))
   const fragments = await discoverFragments(contentRoot.storage, contentRoot.path('fragments'))
 

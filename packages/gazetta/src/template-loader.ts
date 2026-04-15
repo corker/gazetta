@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { access } from 'node:fs/promises'
 import { createJiti } from 'jiti'
 import type { TemplateFunction, StorageProvider } from './types.js'
 
@@ -14,10 +15,15 @@ const importedPaths = new Set<string>()
 
 const TEMPLATE_FILES = ['index.ts', 'index.tsx']
 
-async function findTemplateFile(storage: StorageProvider, templatesDir: string, templateName: string): Promise<string | null> {
+/** Filesystem existence check — templates always live on disk at absolute paths. */
+async function fsExists(path: string): Promise<boolean> {
+  try { await access(path); return true } catch { return false }
+}
+
+async function findTemplateFile(templatesDir: string, templateName: string): Promise<string | null> {
   for (const file of TEMPLATE_FILES) {
     const path = join(templatesDir, templateName, file)
-    if (await storage.exists(path)) return path
+    if (await fsExists(path)) return path
   }
   return null
 }
@@ -36,11 +42,11 @@ async function importTemplate(templatePath: string): Promise<Record<string, unkn
   return await freshJiti.import(templatePath) as Record<string, unknown>
 }
 
-export async function loadTemplate(storage: StorageProvider, templatesDir: string, templateName: string): Promise<LoadedTemplate> {
+export async function loadTemplate(_storage: StorageProvider | undefined, templatesDir: string, templateName: string): Promise<LoadedTemplate> {
   const cached = cache.get(templateName)
   if (cached) return cached
 
-  const templatePath = await findTemplateFile(storage, templatesDir, templateName)
+  const templatePath = await findTemplateFile(templatesDir, templateName)
   if (!templatePath) {
     throw new Error(
       `Template "${templateName}" not found. Expected index.ts or index.tsx in ${join(templatesDir, templateName)}\n` +
@@ -81,14 +87,18 @@ export async function loadTemplate(storage: StorageProvider, templatesDir: strin
   return loaded
 }
 
-/** Check if a custom editor file exists for a template */
-export async function hasEditorFile(storage: StorageProvider, editorsDir: string, templateName: string): Promise<boolean> {
+/**
+ * Check if a custom editor file exists for a template. Editors live at
+ * project level on local filesystem, so this reads via fs.access regardless
+ * of what storage the admin app is bound to.
+ */
+export async function hasEditorFile(_storage: StorageProvider | undefined, editorsDir: string, templateName: string): Promise<boolean> {
   // Flat: admin/editors/hero.ts(x)
-  if (await storage.exists(join(editorsDir, `${templateName}.ts`))) return true
-  if (await storage.exists(join(editorsDir, `${templateName}.tsx`))) return true
+  if (await fsExists(join(editorsDir, `${templateName}.ts`))) return true
+  if (await fsExists(join(editorsDir, `${templateName}.tsx`))) return true
   // Directory: admin/editors/hero/index.ts(x)
-  if (await storage.exists(join(editorsDir, templateName, 'index.ts'))) return true
-  if (await storage.exists(join(editorsDir, templateName, 'index.tsx'))) return true
+  if (await fsExists(join(editorsDir, templateName, 'index.ts'))) return true
+  if (await fsExists(join(editorsDir, templateName, 'index.tsx'))) return true
   return false
 }
 

@@ -931,7 +931,6 @@ async function runDeploy(siteDir: string, targetName?: string) {
 }
 
 async function runValidate(siteDir: string) {
-  const storage = createFilesystemProvider()
   const projectRoot = detectProjectRoot(siteDir)
   const templatesDir = join(projectRoot, 'templates')
 
@@ -939,10 +938,12 @@ async function runValidate(siteDir: string) {
   console.log(`  ${c.bgGreen(c.bold(' gazetta '))} ${c.green('validate')} ${c.dim(siteDir)}`)
   console.log()
 
-  // 1. Check site.yaml
+  // 1. Check site.yaml + load default editable target's content
   let site: Awaited<ReturnType<typeof loadSite>>
   try {
-    site = await loadSite({ siteDir, storage, templatesDir })
+    const { buildSourceContext } = await import('./bootstrap.js')
+    const { source, manifest } = await buildSourceContext({ projectSiteDir: siteDir })
+    site = await loadSite({ contentRoot: source.contentRoot, templatesDir, manifest })
     console.log(`  ${c.green('✓')} site.yaml ${c.dim(`— ${site.manifest.name}`)}`)
   } catch (err) {
     console.error(`  ${c.red('✗')} site.yaml ${c.dim(`— ${(err as Error).message}`)}`)
@@ -980,11 +981,12 @@ async function runValidate(siteDir: string) {
     }
   }
 
-  // 4. List templates
+  // 4. List templates (project-level filesystem, not target content)
+  const projectStorage = createFilesystemProvider()
   let templateNames: string[] = []
   try {
-    const entries = await storage.readDir(templatesDir)
-    templateNames = entries.filter(e => e.isDirectory).map(e => e.name)
+    const entries = await projectStorage.readDir(templatesDir)
+    templateNames = entries.filter(e => e.isDirectory).map((e: { name: string }) => e.name)
     console.log(`  ${c.green('✓')} ${c.dim(`${templateNames.length} templates`)}`)
   } catch {
     console.log(`  ${c.yellow('⚠')} ${c.dim('templates/ directory not found')}`)
@@ -1010,7 +1012,7 @@ async function runValidate(siteDir: string) {
   const zod = await import('zod')
   for (const tplName of templateNames) {
     try {
-      const loaded = await loadTemplate(storage, templatesDir, tplName)
+      const loaded = await loadTemplate(projectStorage, templatesDir, tplName)
       const jsonSchema = zod.z.toJSONSchema(loaded.schema as import('zod').ZodType) as Record<string, unknown>
       const props = jsonSchema.properties as Record<string, Record<string, unknown>> | undefined
       if (!props) continue
