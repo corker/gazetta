@@ -327,7 +327,8 @@ describe('publishPageStatic', () => {
 
   it('publishes fully assembled HTML at URL path', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    await publishPageStatic('home', storage, starterDir, target, templatesDir)
+    const { createContentRoot } = await import('../src/content-root.js')
+    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
     const html = await target.readFile('index.html')
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('Welcome to Gazetta')
@@ -341,7 +342,8 @@ describe('publishPageStatic', () => {
 
   it('publishes about page at /about/index.html', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    await publishPageStatic('about', storage, starterDir, target, templatesDir)
+    const { createContentRoot } = await import('../src/content-root.js')
+    await publishPageStatic('about', createContentRoot(storage, starterDir), target, templatesDir)
     const html = await target.readFile('about/index.html')
     expect(html).toContain('About Gazetta')
     expect(html).not.toContain('<!--esi')
@@ -349,7 +351,8 @@ describe('publishPageStatic', () => {
 
   it('includes inline CSS and JS', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    await publishPageStatic('home', storage, starterDir, target, templatesDir)
+    const { createContentRoot } = await import('../src/content-root.js')
+    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
     const html = await target.readFile('index.html')
     expect(html).toContain('<style>')
     // Counter JS should be inline
@@ -358,7 +361,8 @@ describe('publishPageStatic', () => {
 
   it('no separate CSS/JS files', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    await publishPageStatic('home', storage, starterDir, target, templatesDir)
+    const { createContentRoot } = await import('../src/content-root.js')
+    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
     const entries = await target.readDir('.')
     const cssOrJs = entries.filter(e => e.name.endsWith('.css') || e.name.endsWith('.js'))
     expect(cssOrJs.length).toBe(0)
