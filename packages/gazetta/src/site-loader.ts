@@ -116,36 +116,25 @@ export interface LoadSiteOptions {
  * - **Legacy**: `{ siteDir, storage, templatesDir? }` — the pair is wrapped
  *   in a ContentRoot internally. Retained for callers that haven't
  *   migrated yet.
- *
- * Also accepts the very old `loadSite(siteDir, storage)` positional form.
  */
-export async function loadSite(
-  siteDirOrOpts: string | LoadSiteOptions,
-  storage?: StorageProvider,
-): Promise<Site> {
+export async function loadSite(opts: LoadSiteOptions): Promise<Site> {
   let contentRoot: ContentRoot
   let siteDir: string
   let templatesDir: string
 
-  if (typeof siteDirOrOpts === 'string') {
-    // loadSite(siteDir, storage) — very legacy positional form
-    siteDir = siteDirOrOpts
-    if (!storage) throw new Error('loadSite: storage is required when the first argument is a siteDir string')
-    contentRoot = createContentRoot(storage, siteDir)
-    templatesDir = join(siteDir, 'templates')
-  } else if (siteDirOrOpts.contentRoot) {
+  if (opts.contentRoot) {
     // Preferred: caller built the ContentRoot
-    contentRoot = siteDirOrOpts.contentRoot
+    contentRoot = opts.contentRoot
     siteDir = contentRoot.rootPath
-    templatesDir = siteDirOrOpts.templatesDir ?? join(siteDir, 'templates')
+    templatesDir = opts.templatesDir ?? join(siteDir, 'templates')
   } else {
     // Legacy options bag: { siteDir, storage, templatesDir? }
-    if (!siteDirOrOpts.siteDir || !siteDirOrOpts.storage) {
+    if (!opts.siteDir || !opts.storage) {
       throw new Error('loadSite: either contentRoot, or both siteDir and storage, must be provided')
     }
-    siteDir = siteDirOrOpts.siteDir
-    contentRoot = createContentRoot(siteDirOrOpts.storage, siteDir)
-    templatesDir = siteDirOrOpts.templatesDir ?? join(siteDir, 'templates')
+    siteDir = opts.siteDir
+    contentRoot = createContentRoot(opts.storage, siteDir)
+    templatesDir = opts.templatesDir ?? join(siteDir, 'templates')
   }
 
   const siteYamlPath = contentRoot.path('site.yaml')

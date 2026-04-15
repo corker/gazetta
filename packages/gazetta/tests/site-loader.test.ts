@@ -22,7 +22,7 @@ afterEach(async () => {
 describe('loadSite', () => {
   it('throws when site.yaml is missing', async () => {
     await mkdir(testDir, { recursive: true })
-    await expect(loadSite(testDir, storage)).rejects.toThrow('No site.yaml found')
+    await expect(loadSite({ siteDir: testDir, storage })).rejects.toThrow('No site.yaml found')
   })
 
   it('loads a minimal site', async () => {
@@ -31,7 +31,7 @@ describe('loadSite', () => {
     await mkdir(join(testDir, 'fragments'), { recursive: true })
 
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     expect(site.manifest.name).toBe('Test Site')
     expect(site.pages.size).toBe(0)
     expect(site.fragments.size).toBe(0)
@@ -45,7 +45,7 @@ describe('loadSite', () => {
     await mkdir(join(testDir, 'fragments'), { recursive: true })
 
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     expect(site.pages.size).toBe(2)
     expect(site.pages.has('home')).toBe(true)
     expect(site.pages.has('about')).toBe(true)
@@ -59,7 +59,7 @@ describe('loadSite', () => {
     await mkdir(join(testDir, 'fragments'), { recursive: true })
 
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     expect(site.pages.has('blog/[slug]')).toBe(true)
     expect(site.pages.get('blog/[slug]')!.route).toBe('/blog/:slug')
     spy.mockRestore()
@@ -72,7 +72,7 @@ describe('loadSite', () => {
     await writeTestFile('fragments/footer/fragment.json', JSON.stringify({ template: 'footer-layout' }))
 
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     expect(site.fragments.size).toBe(2)
     expect(site.fragments.has('header')).toBe(true)
     expect(site.fragments.has('footer')).toBe(true)
@@ -85,7 +85,7 @@ describe('loadSite', () => {
     await writeTestFile('fragments/header/fragment.json', JSON.stringify({ template: 'header-layout' }))
 
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     expect(site.pages.get('home')!.dir).toContain('pages/home')
     expect(site.fragments.get('header')!.dir).toContain('fragments/header')
     spy.mockRestore()
@@ -98,7 +98,7 @@ describe('loadSite', () => {
     await mkdir(join(testDir, 'fragments'), { recursive: true })
 
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const site = await loadSite(testDir, storage)
+    const site = await loadSite({ siteDir: testDir, storage })
     expect(site.pages.size).toBe(1)
     expect(site.pages.has('good')).toBe(true)
     spy.mockRestore()
@@ -110,7 +110,7 @@ describe('loadSite', () => {
     await mkdir(join(testDir, 'fragments'), { recursive: true })
 
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    await loadSite(testDir, storage)
+    await loadSite({ siteDir: testDir, storage })
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('no pages found'))
     spy.mockRestore()
   })
