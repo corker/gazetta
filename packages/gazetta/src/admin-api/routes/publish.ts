@@ -264,8 +264,8 @@ export function publishRoutes(
         }
 
         // 3. Site manifest + fragment index
-        await publishSiteManifest(sourceStorage, siteDir, targetStorage, site)
-        await publishFragmentIndex(sourceStorage, siteDir, targetStorage, site)
+        await publishSiteManifest(source.contentRoot, targetStorage, site)
+        await publishFragmentIndex(source.contentRoot, targetStorage, site)
         totalFiles += 2
         current++
         yield { kind: 'progress', target: targetName, current, total, label: 'site manifest' }

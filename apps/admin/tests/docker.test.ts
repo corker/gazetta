@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { resolve } from 'node:path'
 import { DockerComposeEnvironment, type StartedDockerComposeEnvironment } from 'testcontainers'
-import { createFilesystemProvider, createS3Provider, createAzureBlobProvider } from 'gazetta'
+import { createFilesystemProvider, createS3Provider, createAzureBlobProvider, createContentRoot } from 'gazetta'
 import { publishItems, resolveDependencies } from 'gazetta'
 import {
   publishPageRendered,
@@ -150,7 +150,7 @@ describe('Rendered publish (MinIO)', () => {
   })
 
   it('publishes site manifest', async () => {
-    await publishSiteManifest(source, starterDir, target)
+    await publishSiteManifest(createContentRoot(source, starterDir), target)
     const json = JSON.parse(await target.readFile('site.json'))
     expect(json.name).toBe('Gazetta Starter')
   })
@@ -177,7 +177,7 @@ describe('Rendered publish (MinIO)', () => {
   })
 
   it('builds reverse fragment index', async () => {
-    const index = await publishFragmentIndex(source, starterDir, target)
+    const index = await publishFragmentIndex(createContentRoot(source, starterDir), target)
     expect(index['@header']).toContain('/')
     expect(index['@footer']).toContain('/')
     const stored = JSON.parse(await target.readFile('index/fragments.json'))
@@ -195,7 +195,7 @@ describe('Edge composition caching (MinIO)', () => {
     await target.init()
 
     const source = createFilesystemProvider()
-    await publishSiteManifest(source, starterDir, target)
+    await publishSiteManifest(createContentRoot(source, starterDir), target)
     await publishFragmentRendered('header', source, starterDir, target)
     await publishFragmentRendered('footer', source, starterDir, target)
     await publishPageRendered('home', source, starterDir, target)

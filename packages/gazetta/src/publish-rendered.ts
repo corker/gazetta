@@ -5,6 +5,7 @@ import { loadSite } from './site-loader.js'
 import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent, renderPage } from './renderer.js'
 import { writeSidecars, collectFragmentRefs } from './sidecars.js'
+import { createContentRoot, type ContentRoot } from './content-root.js'
 
 function contentHash(content: string): string {
   return createHash('md5').update(content).digest('hex').slice(0, 8)
@@ -294,12 +295,11 @@ export async function publishFragmentRendered(
  * Publish site manifest (stripped of targets config).
  */
 export async function publishSiteManifest(
-  sourceStorage: StorageProvider,
-  sourceDir: string,
+  sourceRoot: ContentRoot,
   targetStorage: StorageProvider,
   preloadedSite?: Site,
 ): Promise<void> {
-  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage })
+  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot })
   const manifest = { name: site.manifest.name, version: site.manifest.version }
   await targetStorage.writeFile('site.json', JSON.stringify(manifest))
 }
@@ -309,12 +309,11 @@ export async function publishSiteManifest(
  * Maps each fragment to the list of page routes that use it.
  */
 export async function publishFragmentIndex(
-  sourceStorage: StorageProvider,
-  sourceDir: string,
+  sourceRoot: ContentRoot,
   targetStorage: StorageProvider,
   preloadedSite?: Site,
 ): Promise<Record<string, string[]>> {
-  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage })
+  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot })
   const index: Record<string, string[]> = {}
 
   for (const [_pageName, page] of site.pages) {
@@ -402,11 +401,12 @@ export async function publishPageWithPurge(
 ): Promise<{ files: number; purgedUrls: string[] }> {
   const result = await publishPageRendered(pageName, sourceStorage, sourceDir, targetStorage)
 
-  const site = await loadSite({ siteDir: sourceDir, storage: sourceStorage })
+  const sourceRoot = createContentRoot(sourceStorage, sourceDir)
+  const site = await loadSite({ contentRoot: sourceRoot })
   const page = site.pages.get(pageName)
   if (page) await purge.purgeUrls([page.route])
 
-  await publishFragmentIndex(sourceStorage, sourceDir, targetStorage)
+  await publishFragmentIndex(sourceRoot, targetStorage)
 
   return { ...result, purgedUrls: page ? [page.route] : [] }
 }

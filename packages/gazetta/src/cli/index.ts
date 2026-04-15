@@ -574,8 +574,10 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     if (skipped > 0) console.log(`    ${c.dim(`· ${skipped} unchanged (skipped)`)}`)
 
     // Site manifest + fragment index
-    await publishSiteManifest(storage, siteDir, targetStorage, site)
-    await publishFragmentIndex(storage, siteDir, targetStorage, site)
+    const { createContentRoot } = await import('../content-root.js')
+    const sourceRoot = createContentRoot(storage, siteDir)
+    await publishSiteManifest(sourceRoot, targetStorage, site)
+    await publishFragmentIndex(sourceRoot, targetStorage, site)
     totalFiles += 2
 
     const removedMsg = totalRemoved > 0 ? c.dim(` (${totalRemoved} old files cleaned)`) : ''
