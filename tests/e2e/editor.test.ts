@@ -101,7 +101,9 @@ test.describe('Toast', () => {
     // Force every page-load to fail — opening home triggers selection.selectPage,
     // which calls toast.showError on failure. That's a real error path that
     // exercises the persistence + dismiss behavior end-to-end.
-    await page.route('**/admin/api/pages/home', route => route.fulfill({ status: 500, body: '{"error":"boom"}' }))
+    // Wildcard suffix so the ?target=<active> query the api client auto-appends
+    // still matches. Without `**` after home, glob expects end-of-path.
+    await page.route('**/admin/api/pages/home**', route => route.fulfill({ status: 500, body: '{"error":"boom"}' }))
     await page.goto('/admin/pages/home')
     const toast = page.locator('[data-testid="global-toast"]')
     await expect(toast).toBeVisible()
