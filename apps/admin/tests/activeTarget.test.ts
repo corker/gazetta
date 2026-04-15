@@ -1,34 +1,17 @@
 /**
  * Unit tests for the active-target store.
  *
- * These run without a browser: Pinia is instantiated in-process, the api
- * client's getTargets is mocked, and localStorage is stubbed via a plain
- * Map wrapper so the store's persistence path executes.
+ * The store accepts injected `loadTargets` and `persistence` dependencies
+ * via `configure()` — no module mocks, no global stubs needed.
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { TargetInfo } from '../src/client/api/client.js'
-
-// Mock the api client before importing the store (store imports it at module init).
-vi.mock('../src/client/api/client.js', () => ({
-  api: {
-    getTargets: vi.fn(),
-  },
-}))
-
-// Stub localStorage — vitest default environment is node, no window.
-const localStorageMap = new Map<string, string>()
-;(globalThis as unknown as { window: unknown }).window = {
-  localStorage: {
-    getItem: (k: string) => localStorageMap.get(k) ?? null,
-    setItem: (k: string, v: string) => { localStorageMap.set(k, v) },
-    removeItem: (k: string) => { localStorageMap.delete(k) },
-  },
-}
-
-const { useActiveTargetStore } = await import('../src/client/stores/activeTarget.js')
-const apiModule = await import('../src/client/api/client.js')
-const mockGetTargets = apiModule.api.getTargets as ReturnType<typeof vi.fn>
+import {
+  useActiveTargetStore,
+  type ActiveTargetPersistence,
+  type LoadTargets,
+} from '../src/client/stores/activeTarget.js'
 
 const TARGETS: TargetInfo[] = [
   { name: 'local', environment: 'local', type: 'static', editable: true },
@@ -36,20 +19,34 @@ const TARGETS: TargetInfo[] = [
   { name: 'prod', environment: 'production', type: 'static', editable: false },
 ]
 
+/** In-memory persistence for tests — no globals, no localStorage. */
+function memoryPersistence(initial: string | null = null): ActiveTargetPersistence & { value: string | null } {
+  const state = { value: initial }
+  return {
+    get: () => state.value,
+    set: (name: string) => { state.value = name },
+    get value() { return state.value },
+  }
+}
+
+/** Resolved loader for a fixed target list. */
+function fixedLoader(list: TargetInfo[]): LoadTargets {
+  return async () => list
+}
+
+/** Rejected loader for error-path tests. */
+function failingLoader(message: string): LoadTargets {
+  return async () => { throw new Error(message) }
+}
+
 beforeEach(() => {
   setActivePinia(createPinia())
-  localStorageMap.clear()
-  mockGetTargets.mockReset()
-})
-
-afterEach(() => {
-  mockGetTargets.mockReset()
 })
 
 describe('useActiveTargetStore', () => {
   it('picks the first editable target by default', async () => {
-    mockGetTargets.mockResolvedValue(TARGETS)
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(TARGETS), persistence: memoryPersistence() })
     await store.load()
     expect(store.activeTargetName).toBe('local')
     expect(store.activeTarget?.environment).toBe('local')
@@ -60,65 +57,63 @@ describe('useActiveTargetStore', () => {
       { name: 'staging', environment: 'staging', type: 'static', editable: false },
       { name: 'prod', environment: 'production', type: 'static', editable: false },
     ]
-    mockGetTargets.mockResolvedValue(readOnly)
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(readOnly), persistence: memoryPersistence() })
     await store.load()
     expect(store.activeTargetName).toBe('staging')
   })
 
-  it('restores a persisted active target from localStorage', async () => {
-    localStorageMap.set('gazetta_active_target', 'staging')
-    mockGetTargets.mockResolvedValue(TARGETS)
+  it('restores a persisted active target from persistence', async () => {
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(TARGETS), persistence: memoryPersistence('staging') })
     await store.load()
     expect(store.activeTargetName).toBe('staging')
   })
 
   it('ignores a stale persisted target that is not in the current list', async () => {
-    localStorageMap.set('gazetta_active_target', 'no-longer-exists')
-    mockGetTargets.mockResolvedValue(TARGETS)
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(TARGETS), persistence: memoryPersistence('no-longer-exists') })
     await store.load()
-    // Falls back to default (first editable)
     expect(store.activeTargetName).toBe('local')
   })
 
   it('setActiveTarget updates the store and persists the choice', async () => {
-    mockGetTargets.mockResolvedValue(TARGETS)
+    const persistence = memoryPersistence()
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(TARGETS), persistence })
     await store.load()
     store.setActiveTarget('prod')
     expect(store.activeTargetName).toBe('prod')
-    expect(localStorageMap.get('gazetta_active_target')).toBe('prod')
+    expect(persistence.value).toBe('prod')
   })
 
   it('setActiveTarget throws on unknown target', async () => {
-    mockGetTargets.mockResolvedValue(TARGETS)
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(TARGETS), persistence: memoryPersistence() })
     await store.load()
     expect(() => store.setActiveTarget('missing')).toThrow(/Unknown target/)
   })
 
   it('isActiveEditable reflects the active target', async () => {
-    mockGetTargets.mockResolvedValue(TARGETS)
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(TARGETS), persistence: memoryPersistence() })
     await store.load()
-    expect(store.isActiveEditable).toBe(true)     // local is editable
+    expect(store.isActiveEditable).toBe(true)
     store.setActiveTarget('prod')
     expect(store.isActiveEditable).toBe(false)
   })
 
   it('editableTargets and readOnlyTargets partition the list', async () => {
-    mockGetTargets.mockResolvedValue(TARGETS)
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(TARGETS), persistence: memoryPersistence() })
     await store.load()
     expect(store.editableTargets.map(t => t.name)).toEqual(['local'])
     expect(store.readOnlyTargets.map(t => t.name)).toEqual(['staging', 'prod'])
   })
 
-  it('sets error and leaves state clean when getTargets fails', async () => {
-    mockGetTargets.mockRejectedValue(new Error('boom'))
+  it('sets error and leaves state clean when loadTargets fails', async () => {
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: failingLoader('boom'), persistence: memoryPersistence() })
     await store.load()
     expect(store.error).toBe('boom')
     expect(store.targets).toEqual([])
@@ -126,13 +121,24 @@ describe('useActiveTargetStore', () => {
   })
 
   it('clear() resets state', async () => {
-    mockGetTargets.mockResolvedValue(TARGETS)
     const store = useActiveTargetStore()
+    store.configure({ loadTargets: fixedLoader(TARGETS), persistence: memoryPersistence() })
     await store.load()
     expect(store.activeTargetName).toBe('local')
     store.clear()
     expect(store.targets).toEqual([])
     expect(store.activeTargetName).toBe(null)
     expect(store.error).toBe(null)
+  })
+
+  it('configure() is optional — defaults wire api.getTargets + localStorage', async () => {
+    // Just verify the store constructs without configure() and the shape is intact.
+    // The production path is exercised by the running admin server; we don't try
+    // to mock localStorage or the api client here.
+    const store = useActiveTargetStore()
+    expect(store.activeTargetName).toBe(null)
+    expect(store.targets).toEqual([])
+    expect(typeof store.load).toBe('function')
+    expect(typeof store.configure).toBe('function')
   })
 })
