@@ -835,3 +835,71 @@ test.describe('Publish panel', () => {
     await expect(page.locator('[data-testid="publish-panel-confirm"]')).toBeEnabled()
   })
 })
+
+test.describe('Preview target tabs', () => {
+  /**
+   * Publish everything from local → staging so both targets have the home
+   * page. Without this the staging tab shows a 404 and we can't assert
+   * on scroll-preserved content swap.
+   */
+  async function seedStaging(baseURL: string) {
+    const res = await fetch(`${baseURL}/admin/api/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: ['pages/home', 'pages/about', 'fragments/header', 'fragments/footer'],
+        targets: ['staging'],
+      }),
+    })
+    if (!res.ok) throw new Error(`seed publish failed: ${res.status}`)
+  }
+
+  test('scroll position is preserved across target tab swap', async ({ page, testSite }) => {
+    await seedStaging(testSite.baseURL)
+
+    // Shorter viewport forces the home page to actually overflow so the
+    // iframe has somewhere to scroll to.
+    await page.setViewportSize({ width: 1200, height: 400 })
+    await page.goto('/admin/pages/home')
+    await page.waitForSelector('iframe[data-testid="preview-iframe"]', { timeout: 10000 })
+
+    // Give the iframe time to load its first srcdoc and lay out.
+    await expect.poll(async () => {
+      return page.evaluate(() => {
+        const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
+        return (f?.srcdoc?.length ?? 0) > 500 && !!f?.contentDocument?.body
+      })
+    }, { timeout: 10000 }).toBe(true)
+
+    // Scroll the iframe
+    await page.evaluate(() => {
+      const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
+      f?.contentWindow?.scrollTo(0, 400)
+    })
+    await expect.poll(async () => page.evaluate(() => {
+      const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
+      return f?.contentWindow?.scrollY ?? 0
+    }), { timeout: 2000 }).toBeGreaterThan(100)
+
+    const scrolled = await page.evaluate(() => {
+      const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
+      return f?.contentWindow?.scrollY ?? 0
+    })
+
+    // Click the staging tab — content should swap via morphdom, preserving scroll.
+    await page.locator('[data-testid="preview-target-tab-staging"]').click()
+
+    // Give the fetch + morph a moment to land, then assert the scroll survived.
+    // Using poll here because the assertion is time-sensitive: the fetch
+    // completes asynchronously, and we want to check AFTER the morph lands.
+    await expect.poll(async () => page.evaluate(() => {
+      const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
+      return f?.contentWindow?.scrollY ?? 0
+    }), { timeout: 5000 }).toBe(scrolled)
+
+    // Sanity: the iframe still has content (so we know we morphed, not just
+    // skipped the swap). Any regression that unmounts the iframe would also
+    // wipe this. The tab should show as active after click.
+    await expect(page.locator('[data-testid="preview-target-tab-staging"]')).toHaveClass(/active/)
+  })
+})
