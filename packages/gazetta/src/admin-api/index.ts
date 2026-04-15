@@ -5,6 +5,7 @@ import type { StorageProvider, TargetConfig } from '../types.js'
 import { scanTemplates } from '../templates-scan.js'
 import { memoizeAsync } from '../concurrency.js'
 import { createSourceSidecarWriter, type SourceSidecarWriter } from '../source-sidecars.js'
+import { createContentRoot } from '../content-root.js'
 import { createSourceContext, type SourceContext } from './source-context.js'
 import { authMiddleware } from './middleware/auth.js'
 import { siteRoutes } from './routes/site.js'
@@ -81,11 +82,9 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
   if (opts.source) {
     source = opts.source
     sidecarWriter = opts.source.sidecarWriter ?? createSourceSidecarWriter({
-      storage: opts.source.storage,
-      siteDir: opts.source.siteDir,
+      contentRoot: opts.source.contentRoot,
       scanTemplates: () => cachedScan.get(),
     })
-    // If the provided context had no sidecar writer, wire one for invalidate/write access below.
     if (!opts.source.sidecarWriter) {
       source = { ...opts.source, sidecarWriter }
     }
@@ -93,9 +92,9 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
     if (!opts.storage) {
       throw new Error('createAdminApp: either `source` or `storage` must be provided')
     }
+    const bootstrapRoot = createContentRoot(opts.storage, opts.siteDir)
     sidecarWriter = createSourceSidecarWriter({
-      storage: opts.storage,
-      siteDir: opts.siteDir,
+      contentRoot: bootstrapRoot,
       scanTemplates: () => cachedScan.get(),
     })
     source = createSourceContext({
