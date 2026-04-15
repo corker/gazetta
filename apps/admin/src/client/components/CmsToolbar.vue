@@ -8,9 +8,9 @@ import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
-import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
 import ChangesDrawer from './ChangesDrawer.vue'
+import PublishPanel from './PublishPanel.vue'
 import ActiveTargetIndicator from './ActiveTargetIndicator.vue'
 import SyncIndicators from './SyncIndicators.vue'
 
@@ -38,9 +38,13 @@ function openChangesFor(name: string) {
 // falls back to the user's last-saved target selection.
 watch(showChanges, (open) => { if (!open) changesTarget.value = undefined })
 
-const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fragments')
-const publishItemName = computed(() => selection.name ?? '')
-const canPublish = computed(() => selection.name && !editing.hasPendingEdits)
+/**
+ * Publish availability — unlike the old PublishDialog (which was scoped to
+ * a single selected item), the new PublishPanel is a cross-target operation
+ * that needs a source and destinations, not a selected page/fragment.
+ * It's gated only on unsaved edits (to prevent publishing stale data).
+ */
+const canPublish = computed(() => !editing.hasPendingEdits)
 
 // Disabled buttons need to explain themselves — silent click-with-nothing-happens
 // confuses users and is the most common UX gripe with the toolbar.
@@ -50,9 +54,8 @@ const saveTitle = computed(() => {
   return 'Save changes (⌘S)'
 })
 const publishTitle = computed(() => {
-  if (!selection.name) return 'Select a page or fragment to publish'
   if (editing.hasPendingEdits) return 'Save changes before publishing'
-  return 'Publish to a target'
+  return 'Publish'
 })
 
 function handleBack() {
@@ -99,8 +102,7 @@ function handleBack() {
     </template>
   </Toolbar>
 
-  <PublishDialog v-if="showPublish" :visible="showPublish" :itemType="publishItemType"
-    :itemName="publishItemName" @close="showPublish = false" />
+  <PublishPanel v-model:visible="showPublish" />
   <FetchDialog v-if="showFetch" :visible="showFetch" @close="showFetch = false" />
   <ChangesDrawer v-model:visible="showChanges" :target="changesTarget" />
 </template>
