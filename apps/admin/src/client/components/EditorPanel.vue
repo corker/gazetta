@@ -2,14 +2,22 @@
 import { ref, computed } from 'vue'
 import { onKeyStroke } from '@vueuse/core'
 import { useEditingStore } from '../stores/editing.js'
+import { useSelectionStore } from '../stores/selection.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from 'gazetta/editor'
 import type { EditorMount } from 'gazetta/types'
+import FragmentBlastRadius from './FragmentBlastRadius.vue'
 
 const editing = useEditingStore()
+const selection = useSelectionStore()
 const theme = useThemeStore()
 const containerRef = ref<HTMLElement | null>(null)
+
+// Show blast radius when the selected root item is a fragment, regardless
+// of which sub-component is currently in the editor. The badge is about
+// the fragment's reach, not the current sub-edit.
+const fragmentName = computed(() => selection.type === 'fragment' ? selection.name : null)
 
 const hasProperties = computed(() => {
   const s = editing.schema as Record<string, unknown> | null
@@ -58,7 +66,10 @@ onKeyStroke('s', (e) => {
       <p>Select a component to edit</p>
     </div>
     <div v-else>
-      <h3>{{ editing.template }}</h3>
+      <div class="editor-header">
+        <h3>{{ editing.template }}</h3>
+        <FragmentBlastRadius v-if="fragmentName" :fragmentName="fragmentName" />
+      </div>
       <div v-if="hasProperties" ref="containerRef" class="editor-container" data-testid="editor-container" :key="editing.path" />
       <p v-else class="editor-no-schema">No editable content. Edit its children instead.</p>
     </div>
@@ -66,7 +77,8 @@ onKeyStroke('s', (e) => {
 </template>
 
 <style scoped>
-.editor-panel h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--color-muted); margin-bottom: 1rem; letter-spacing: 0.05em; }
+.editor-panel h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--color-muted); letter-spacing: 0.05em; margin: 0; }
+.editor-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .editor-error { color: var(--color-danger-fg); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; gap: 0.5rem; text-align: center; }
 .editor-error .pi { font-size: 2rem; }
 .editor-error p { max-width: 300px; line-height: 1.5; }
