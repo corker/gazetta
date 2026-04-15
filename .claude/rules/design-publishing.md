@@ -5,11 +5,14 @@ Gazetta's CMS is stateless. All content state lives in targets.
 ## Stateless CMS
 
 The CMS stores nothing. It:
-1. Fetches structure/pages/fragments from a target
-2. User edits in the browser (in memory)
-3. Publishes changes back to one or more targets
+1. Reads structure/pages/fragments from the **active target** (the target the author is focused on)
+2. User edits in the browser; form state is transient
+3. Saves write directly to the active target (if editable)
+4. Publishes copy content between any two targets
 
-Consequence: the CMS is disposable. Lose it, spin up a new one, connect to targets.
+There is no "working copy" inside the CMS. Form-state-in-progress is the only transient
+state; the moment save runs, content lives on a target. Consequence: the CMS is
+disposable. Lose it, spin up a new one, connect to targets.
 
 ## Targets
 
@@ -34,12 +37,28 @@ Targets can diverge — staging may have changes not yet in production.
 
 ## Operations
 
+Four verbs. Save and Publish share a write-and-render pipeline — they differ only in
+destination. Publish is one verb with an author-chosen direction; it subsumes what other
+CMSes call publish, fetch, and promote.
+
 | Operation | Flow | Description |
 |-----------|------|-------------|
-| Publish | CMS -> target | Push components/pages/fragments to a target |
-| Fetch | CMS <- target | Pull from a target into the editor |
-| Promote | Target A -> Target B | Copy between targets (e.g. staging -> production) |
-| Compare | Target A <-> Target B | Diff two targets to see what changed |
+| Edit | Browser (form state) | Modify content in the form; transient, not persisted |
+| Save | Form → active target | Write form-state to active target (+ render if static). Only if active is editable. |
+| Publish | Target A → Target B | Copy logical content from any target to any target (+ render if static destination). Direction is author-chosen. |
+| Compare | Target A ↔ Target B | Logical diff between two targets. No byte-level / materialized comparison. |
+
+**Publish is unified.** What used to be separate operations map to publish direction:
+
+| Intent | Publish direction |
+|--------|-------------------|
+| "Publish my edits to staging" | active (editable) → staging |
+| "Promote staging to prod" | staging → prod |
+| "Fetch hotfix back from prod" | prod → active (editable) |
+| "Bootstrap a new target" | any existing target → new target |
+
+Tags drive suggestions (e.g. if `staging` is ahead of `production`, suggest staging → prod)
+but never constrain direction. The author picks source and destination explicitly.
 
 ## Target Types
 
@@ -86,10 +105,75 @@ re-render or re-publish other pages. The runtime (edge or server) composes at re
 
 ## Bidirectional Sync
 
-The CMS can pull from any target. Use cases:
-- Hotfix applied directly to production? Fetch it back
-- Bootstrap a new CMS instance from an existing target
-- Migrate between hosts: fetch from old target, publish to new
+Because Publish is direction-neutral, the CMS can move content between any two targets.
+Use cases — all the same "Publish A → B" operation with different endpoints:
+- Hotfix applied directly to production? Publish prod → local to pull it back
+- Bootstrap a new CMS instance from an existing target: Publish prod → new-target
+- Migrate between hosts: Publish old-target → new-target
+
+## History
+
+Every target keeps its own history of writes. Save and publish each record a revision on
+the target they write to. Undo and rollback restore a prior revision; they reuse the same
+write-and-render pipeline as publish.
+
+### Storage shape
+
+History lives inside the target in a reserved `.gazetta/` namespace that the runtime never
+reads. Content-addressed blobs are shared across revisions — unchanged items deduplicate.
+
+```
+target root/
+├── site.yaml
+├── pages/              ← content tree (runtime reads this)
+├── fragments/
+├── templates/
+└── .gazetta/
+    └── history/
+        ├── index.json              ← ordered revision list
+        ├── objects/                ← content-addressed blobs
+        │   └── ab/cd1234...
+        └── revisions/
+            └── rev-0042.json       ← revision manifest (metadata + item → hash map)
+```
+
+Storage providers see history as ordinary read/write bytes at paths. No provider-native
+versioning (S3 object versions, git commits) — one uniform approach across all providers
+keeps the storage interface minimal.
+
+### Revision granularity
+
+One write = one revision. A save of one item creates one revision; a publish of many items
+creates one revision. Each revision records: timestamp, operation (`save` / `publish`),
+author identifier, source target (for publish), affected items with their content hashes,
+optional message.
+
+### Operations
+
+| Operation | What it does |
+|-----------|--------------|
+| **Undo** | Create new revision restoring the target's immediately prior state |
+| **Rollback** | Create new revision restoring any chosen past revision's state |
+| **View history** | List a target's revisions |
+
+Undo and rollback are the same mechanism — restore a revision's item→hash map to the
+content tree and re-render if static. The difference is entry point: Undo targets the most
+recent prior revision; Rollback picks an arbitrary one.
+
+**Soft undo only.** Restoring a revision creates a new forward revision; past history is
+never destroyed. Full audit trail preserved.
+
+### Retention
+
+Per-target configurable, default **keep last 50 revisions**. When the limit is hit, the
+oldest revision is evicted (its manifest deleted from `revisions/`, removed from
+`index.json`). Orphaned blobs in `objects/` are garbage-collected (lazy or on eviction).
+
+### Conflict handling
+
+The transient "Undo" affordance shown after a save or publish disappears once a newer write
+lands on that target — undoing the older action would silently lose the newer one. For
+explicit control, the history panel always allows rollback to any revision.
 
 ## Storage Providers
 
@@ -132,4 +216,5 @@ Built on **Hono** — runs on both edge (Cloudflare Workers, Deno) and server (N
 | **Dynamic** | SSR'd at request time (Node/Bun) | Zero | Fresh data from DB/API |
 | **Island** | SSR'd + hydrated in browser | Framework + component | Client-side interactivity |
 
-Import maps deduplicate island dependencies per page.
+Import maps deduplicate island dependencies across loaded pages. (Design originally
+specified per-page maps; current implementation shares a single map — alignment pending.)

@@ -45,8 +45,49 @@ interface Page extends Component {
 | Concept | Definition |
 |---------|-----------|
 | Template | An independent script: `(params) => { html, css, js }`. Created by developers. Can use any framework. |
-| Target | Storage + WinterTC runtime. Where state lives and pages are served. |
+| Target | Storage + WinterTC runtime. Where state lives and pages are served. Has properties: `type`, optional `environment`, `editable`. |
 | CMS | A stateless editor UI. Reads from and writes to targets. Stores nothing locally. |
+
+## Target Properties
+
+Each configured target carries three properties. Together they encode the user's workflow —
+the CMS adapts its UI progressively based on what's configured (see design-editor-ux.md).
+
+| Property | Values | Purpose |
+|----------|--------|---------|
+| **Type** | `static` / `dynamic` | When rendering happens (publish time vs request time) |
+| **Environment** | `local` / `staging` / `production` (or unset) | Drives UI treatment (colors, prod warnings) and suggestion hints. No custom values. |
+| **Editable** | `yes` / `no` | Whether author can save form-edits to this target and receive publishes into it |
+
+Properties are independent. Examples: `{type: static, environment: local, editable: yes}` for
+a local dev target; `{type: static, environment: production, editable: no}` for a publish-only
+prod; `{type: static, environment: production, editable: yes}` for a hotfix-accepting prod.
+
+Environments have no system-defined hierarchy — the CMS suggests flows (e.g. "promote staging
+→ prod" when both environments exist) but never enforces ordering. Multi-region or multi-site
+setups use the same `environment` value across peer targets (e.g. `prod-us` and `prod-eu`
+both have `environment: production`); they're distinguished by target name, not by environment.
+
+**Current code:** `environment` is already implemented on `TargetConfig`
+([packages/gazetta/src/types.ts](../../packages/gazetta/src/types.ts)). `type` replaces
+the existing `publishMode` field (`esi` → `dynamic`, `static` → `static`) with no
+backward-compatible alias — all `site.yaml` files must be migrated in the same change.
+`editable` is a new optional field, defaulting to `true`.
+
+## Active Target
+
+The **active target** is the target the author is currently focused on. It is the single
+spine around which the UX orients:
+
+- Tree, editor, and preview bind to the active target
+- Save writes to the active target (only if editable)
+- Publish defaults to/from the active target
+- Sync indicators on other targets are expressed relative to active ("staging: 3 behind", "prod: 2 ahead")
+- Compare is framed as "active vs X"
+
+The active target can be editable (author can write to it via the editor) or read-only
+(author can inspect tree/preview but not modify). Switching active target is cheap and
+reversible — never a commitment. See design-editor-ux.md for switching behavior.
 
 ## Templates
 
@@ -198,8 +239,9 @@ Publishing a fragment = SSR that fragment, push HTML to storage. Edge assembles 
 For **dynamic targets** (Node/Bun server): static components served from cache, dynamic
 components SSR'd per request, islands hydrated in browser.
 
-Import maps deduplicate island dependencies per page — React, Svelte, Chart.js, etc.
-loaded once regardless of how many islands use them.
+Import maps deduplicate island dependencies — React, Svelte, Chart.js, etc. loaded once
+regardless of how many islands use them. (Current implementation: a single shared import
+map across loaded pages; design originally called for per-page maps — alignment pending.)
 
 ## Fragments (Shared Components)
 
