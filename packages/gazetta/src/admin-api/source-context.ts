@@ -12,6 +12,7 @@
 import type { StorageProvider } from '../types.js'
 import { createContentRoot, type ContentRoot } from '../content-root.js'
 import type { SourceSidecarWriter } from '../source-sidecars.js'
+import type { TargetRegistry } from '../targets.js'
 
 export interface SourceContext {
   /** Storage provider for source reads and writes. */
@@ -40,4 +41,32 @@ export function createSourceContext(opts: CreateSourceContextOptions): SourceCon
     contentRoot: createContentRoot(opts.storage, opts.siteDir),
     sidecarWriter: opts.sidecarWriter,
   }
+}
+
+export interface SourceContextFromRegistryOptions {
+  registry: TargetRegistry
+  /** Target name to use as the source. Defaults to `registry.defaultEditable()`. */
+  targetName?: string
+  /**
+   * Site directory to use as the content root path prefix. Typically the
+   * absolute site directory when the registry's storage is cwd-rooted; empty
+   * when the registry's storage is already target-rooted.
+   */
+  siteDir: string
+  sidecarWriter?: SourceSidecarWriter
+}
+
+/**
+ * Construct a SourceContext from a TargetRegistry, picking the given target
+ * (or the default editable target) as the source. Throws if no editable
+ * target is configured and no explicit targetName is provided.
+ */
+export function createSourceContextFromRegistry(opts: SourceContextFromRegistryOptions): SourceContext {
+  const name = opts.targetName ?? opts.registry.defaultEditable()
+  const storage = opts.registry.get(name)
+  return createSourceContext({
+    storage,
+    siteDir: opts.siteDir,
+    sidecarWriter: opts.sidecarWriter,
+  })
 }
