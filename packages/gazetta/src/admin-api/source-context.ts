@@ -36,6 +36,14 @@ export interface SourceContext {
   readonly contentRoot: ContentRoot
   /** Optional sidecar writer for write-through hash/dependency tracking. */
   readonly sidecarWriter?: SourceSidecarWriter
+  /**
+   * Name of the target this source resolves to, when known. Set by the
+   * registry resolver; undefined for the legacy static resolver (which has
+   * no named target). Routes use this to detect when a `?target=<name>`
+   * query refers to the same target as the source — in which case the
+   * source-side read path should be used (it can backfill sidecars).
+   */
+  readonly targetName?: string
 }
 
 export interface CreateSourceContextOptions {
@@ -83,12 +91,15 @@ export interface SourceContextFromRegistryOptions {
 export function createSourceContextFromRegistry(opts: SourceContextFromRegistryOptions): SourceContext {
   const name = opts.targetName ?? opts.registry.defaultEditable()
   const storage = opts.registry.get(name)
-  return createSourceContext({
-    storage,
-    siteDir: opts.siteDir ?? '',
-    projectSiteDir: opts.projectSiteDir,
-    sidecarWriter: opts.sidecarWriter,
-  })
+  return {
+    ...createSourceContext({
+      storage,
+      siteDir: opts.siteDir ?? '',
+      projectSiteDir: opts.projectSiteDir,
+      sidecarWriter: opts.sidecarWriter,
+    }),
+    targetName: name,
+  }
 }
 
 /**

@@ -3,9 +3,7 @@ import { streamSSE } from 'hono/streaming'
 import { getType, getEnvironment, isEditable } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
-import { listSidecars } from '../../sidecars.js'
 import type { SourceContextResolver } from '../source-context.js'
-import { mapLimit } from '../../concurrency.js'
 import { mapLimitStream } from '../../concurrency.js'
 import type { PublishResult } from '../../publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
@@ -103,39 +101,35 @@ export function publishRoutes(
       return c.json({ error: 'Missing or invalid "item" query (must be fragments/<name>)' }, 400)
     }
     const fragmentName = item.slice('fragments/'.length)
-    // `target` — look up dependents on a specific published target's sidecars
-    // `source` — the source editable target for the manifest walker path
+    // `target`  — specific published target's sidecars (read-only listing).
+    //              Useful for "what would need republish on staging?" queries
+    //              where sidecars reflect the last publish, not the draft.
+    // `source`  — the editable source target (authoritative for the draft).
+    //              When target === source (common case: client sends the
+    //              active editable target), route through source so the
+    //              sidecar writer can backfill missing entries.
     const targetName = c.req.query('target')
+    const sourceName = c.req.query('source')
     try {
-      if (targetName) {
+      const source = await resolve(sourceName)
+      // Treat `target=local` (the active editable target) the same as no
+      // target — the source path is the authoritative one for the draft,
+      // and it's the only path that knows how to backfill sidecars on a
+      // fresh dev server.
+      const isTargetTheSource = !targetName || targetName === source.targetName
+      if (!isTargetTheSource) {
         const t = await getTargets()
-        const targetStorage = t.get(targetName)
+        const targetStorage = t.get(targetName!)
         if (!targetStorage) return c.json({ error: `Unknown target: ${targetName}` }, 400)
         const result = await findDependentsFromSidecars(createContentRoot(targetStorage), { fragment: fragmentName })
         return c.json(result)
       }
-      // Source-side: resolve the source editable target for this request.
-      const source = await resolve(c.req.query('source'))
-      const sourceStorage = source.storage
+      // Source-side path: ensure every item has a sidecar before reading.
+      // The writer memoizes the backfill — concurrent tree badges on a
+      // fresh dev server share one pass instead of racing to an empty index.
       const sidecarWriter = source.sidecarWriter
-      // Use sidecars for the listing-only fast path. Backfill any missing
-      // ones first so the answer is complete — without this, items whose
-      // sidecars haven't been written yet (fresh dev server, items never
-      // saved through the admin) would be invisible.
       if (sidecarWriter) {
-        const site = await loadSite({ contentRoot: source.contentRoot, templatesDir })
-        const [pagesList, fragmentsList] = await Promise.all([
-          listSidecars(sourceStorage, source.contentRoot.path('pages')),
-          listSidecars(sourceStorage, source.contentRoot.path('fragments')),
-        ])
-        const missingPages = [...site.pages.keys()].filter(n => !pagesList.has(n))
-        const missingFragments = [...site.fragments.keys()].filter(n => !fragmentsList.has(n))
-        if (missingPages.length || missingFragments.length) {
-          await mapLimit([
-            ...missingPages.map(n => ({ kind: 'page' as const, name: n })),
-            ...missingFragments.map(n => ({ kind: 'fragment' as const, name: n })),
-          ], it => sidecarWriter.writeFor(it.kind, it.name))
-        }
+        await sidecarWriter.ensureBackfilled()
         const result = await findDependentsFromSidecars(source.contentRoot, { fragment: fragmentName })
         return c.json(result)
       }
