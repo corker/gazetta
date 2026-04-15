@@ -17,8 +17,15 @@ import { compareRoutes } from './routes/compare.js'
 import { fieldRoutes } from './routes/fields.js'
 
 export interface AdminAppOptions {
+  /**
+   * Pre-built SourceContext — preferred when the caller controls source-content
+   * resolution (e.g., derived from a TargetRegistry via createSourceContextFromRegistry).
+   * When provided, `storage` is optional (the context carries its own).
+   */
+  source?: SourceContext
   siteDir: string
-  storage: StorageProvider
+  /** Fallback source storage when `source` is not provided. */
+  storage?: StorageProvider
   /** Directory containing template packages. Defaults to siteDir/templates. */
   templatesDir?: string
   /** Directory containing admin customizations (editors, fields). Defaults to siteDir/admin. */
@@ -67,20 +74,36 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
   const scan = (tDir: string, root: string) =>
     tDir === templatesDir ? cachedScan.get() : scanTemplates(tDir, root)
 
-  const sidecarWriter: SourceSidecarWriter = createSourceSidecarWriter({
-    storage: opts.storage,
-    siteDir: opts.siteDir,
-    scanTemplates: () => cachedScan.get(),
-  })
-
-  // SourceContext bundles the "where source content lives" concerns
-  // (storage, siteDir, content root, sidecar writer). Route factories that
-  // adopt it take one parameter instead of 3-4 positional args.
-  const source: SourceContext = createSourceContext({
-    storage: opts.storage,
-    siteDir: opts.siteDir,
-    sidecarWriter,
-  })
+  // Prefer an externally-provided SourceContext. Fall back to constructing
+  // one from opts.storage + opts.siteDir, which is the legacy shape.
+  let source: SourceContext
+  let sidecarWriter: SourceSidecarWriter
+  if (opts.source) {
+    source = opts.source
+    sidecarWriter = opts.source.sidecarWriter ?? createSourceSidecarWriter({
+      storage: opts.source.storage,
+      siteDir: opts.source.siteDir,
+      scanTemplates: () => cachedScan.get(),
+    })
+    // If the provided context had no sidecar writer, wire one for invalidate/write access below.
+    if (!opts.source.sidecarWriter) {
+      source = { ...opts.source, sidecarWriter }
+    }
+  } else {
+    if (!opts.storage) {
+      throw new Error('createAdminApp: either `source` or `storage` must be provided')
+    }
+    sidecarWriter = createSourceSidecarWriter({
+      storage: opts.storage,
+      siteDir: opts.siteDir,
+      scanTemplates: () => cachedScan.get(),
+    })
+    source = createSourceContext({
+      storage: opts.storage,
+      siteDir: opts.siteDir,
+      sidecarWriter,
+    })
+  }
 
   app.route('/', siteRoutes(source))
   app.route('/', pageRoutes(source))
