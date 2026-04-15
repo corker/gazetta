@@ -4,6 +4,7 @@ import { useSiteStore } from './stores/site.js'
 import { useThemeStore } from './stores/theme.js'
 import { useToastStore } from './stores/toast.js'
 import { useActiveTargetStore } from './stores/activeTarget.js'
+import { useSyncStatusStore } from './stores/syncStatus.js'
 import { setActiveTargetProvider } from './api/client.js'
 import Toolbar from './components/CmsToolbar.vue'
 import UnsavedDialog from './components/UnsavedDialog.vue'
@@ -12,24 +13,41 @@ const site = useSiteStore()
 const theme = useThemeStore()
 const toast = useToastStore()
 const activeTarget = useActiveTargetStore()
+const syncStatus = useSyncStatusStore()
 
 // Bridge the active-target store to the api client — from now on, every
 // content-reading request auto-appends ?target=<active>. Done once at boot;
 // the api client reads the current value on each request.
 setActiveTargetProvider(() => activeTarget.activeTargetName)
 
-// Reload site + content when the active target switches so the tree,
-// editor, and preview show the new target's view immediately.
+// Wire sync-status store to read its inputs from the active-target store.
+// Dependency injection keeps the stores decoupled — neither imports the
+// other at module-load time.
+syncStatus.configure({
+  listTargets: () => activeTarget.targets,
+  activeTarget: () => activeTarget.activeTargetName,
+})
+
+// Reload site + content when the active target switches. Invalidate the
+// previously-active target's sync status (it'll be recomputed next refresh)
+// and kick off a new sync refresh for the now-non-active targets.
 watch(() => activeTarget.activeTargetName, (name, prev) => {
   if (name && prev && name !== prev) {
     site.reload()
+    // The new active target no longer needs a sync status; the previously
+    // active one does (from source perspective). Easiest: clear + refresh.
+    syncStatus.clear()
+    syncStatus.refreshAll()
   }
+})
+
+// After the target list loads for the first time, run the initial compare.
+watch(() => activeTarget.targets.length, (n) => {
+  if (n > 1) syncStatus.refreshAll()
 })
 
 onMounted(() => {
   theme.init()
-  // Kick off target loading — the indicator renders once this resolves.
-  // Failures are stored on the store; the indicator simply hides.
   activeTarget.load()
 })
 </script>
