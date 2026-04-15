@@ -59,6 +59,10 @@ export type { R2RestProviderOptions } from './providers/r2.js'
 // Targets
 export { createStorageProvider, createTargetRegistry } from './targets.js'
 
+// Bootstrap helpers — read site.yaml, build registry, derive SourceContext
+export { bootstrapFromSiteYaml, buildSourceContext } from './cli/bootstrap.js'
+export type { BootstrapResult, BuildSourceContextOptions } from './cli/bootstrap.js'
+
 // Server
 export { createServer } from './serve.js'
 export type { ServeOptions } from './serve.js'
