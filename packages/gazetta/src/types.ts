@@ -126,9 +126,9 @@ export interface TargetConfig {
   type?: TargetType
   /**
    * Semantic intent of this target — drives UI treatment (confirmation
-   * prompts, badges) and ops decisions. Default: 'local' for filesystem,
-   * 'production' otherwise. Override in site.yaml for shared filesystem
-   * mounts used as production, or for cloud targets used for staging.
+   * prompts, badges) and ops decisions. Default: 'local'. Production
+   * targets must be marked explicitly — the default is safe, not
+   * alarming; prod opt-in prevents accidental prod chrome on dev targets.
    */
   environment?: TargetEnvironment
   /**
@@ -148,9 +148,9 @@ export function getType(target: TargetConfig): TargetType {
   return target.type ?? (target.worker ? 'dynamic' : 'static')
 }
 
-/** Resolve a target's environment, applying the storage-type default */
+/** Resolve a target's environment. Defaults to 'local' — production must be explicit. */
 export function getEnvironment(target: TargetConfig): TargetEnvironment {
-  return target.environment ?? (target.storage.type === 'filesystem' ? 'local' : 'production')
+  return target.environment ?? 'local'
 }
 
 /** Whether the author can save and receive publishes on this target from the CMS. Default: true. */
