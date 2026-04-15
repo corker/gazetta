@@ -341,13 +341,25 @@ async function findFragmentDependentsImpl(
  * Works against target storage (rooted at target base) or source storage
  * (pass `baseDir: siteDir` so the walker descends into `siteDir/pages`).
  */
+export async function findDependentsFromSidecars(sourceRoot: ContentRoot, query: { fragment: string } | { template: string }): Promise<{ pages: string[]; fragments: string[] }>
+export async function findDependentsFromSidecars(storage: StorageProvider, query: { fragment: string } | { template: string }, opts?: { baseDir?: string }): Promise<{ pages: string[]; fragments: string[] }>
 export async function findDependentsFromSidecars(
-  storage: StorageProvider,
+  rootOrStorage: ContentRoot | StorageProvider,
   query: { fragment: string } | { template: string },
   opts: { baseDir?: string } = {},
 ): Promise<{ pages: string[]; fragments: string[] }> {
-  const pagesRoot = opts.baseDir ? `${opts.baseDir}/pages` : 'pages'
-  const fragmentsRoot = opts.baseDir ? `${opts.baseDir}/fragments` : 'fragments'
+  let storage: StorageProvider
+  let pagesRoot: string
+  let fragmentsRoot: string
+  if (isContentRoot(rootOrStorage)) {
+    storage = rootOrStorage.storage
+    pagesRoot = rootOrStorage.path('pages')
+    fragmentsRoot = rootOrStorage.path('fragments')
+  } else {
+    storage = rootOrStorage
+    pagesRoot = opts.baseDir ? `${opts.baseDir}/pages` : 'pages'
+    fragmentsRoot = opts.baseDir ? `${opts.baseDir}/fragments` : 'fragments'
+  }
   // Single listing pass per root, then all reasoning is in-memory.
   const [pagesList, fragmentsList] = await Promise.all([
     listSidecars(storage, pagesRoot),
