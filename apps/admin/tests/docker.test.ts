@@ -14,7 +14,10 @@ import {
   publishFragmentIndex,
 } from 'gazetta'
 
-const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
+// Content lives under the local target (post-transformation layout).
+const starterDir = resolve(projectRoot, 'sites/main/targets/local')
+const templatesDir = resolve(projectRoot, 'templates')
 const composeDir = resolve(import.meta.dirname, '../../..')
 
 let env: StartedDockerComposeEnvironment
@@ -121,15 +124,16 @@ describe('Azure Blob publish (Azurite)', () => {
   })
 
   it('publishes a page to Azure Blob', async () => {
-    const allItems = await resolveDependencies(source, starterDir, ['pages/home'])
-    const { copiedFiles } = await publishItems(source, starterDir, blobProvider, '', allItems)
-    expect(copiedFiles).toBeGreaterThan(10)
+    const sourceRoot = createContentRoot(source, starterDir)
+    const allItems = await resolveDependencies(sourceRoot, ['pages/home'])
+    const { copiedFiles } = await publishItems(sourceRoot, createContentRoot(blobProvider), allItems)
+    expect(copiedFiles).toBeGreaterThanOrEqual(2) // page.json + site.yaml
     expect(await blobProvider.exists('pages/home/page.json')).toBe(true)
   })
 
   it('reads back published content', async () => {
     const content = await blobProvider.readFile('pages/home/page.json')
-    expect(content).toContain('template:')
+    expect(content).toContain('"template"')  // JSON manifest
   })
 
   it('lists published files', async () => {
@@ -156,7 +160,7 @@ describe('Rendered publish (MinIO)', () => {
   })
 
   it('publishes a fragment as HTML with hashed CSS', async () => {
-    const result = await publishFragmentRendered('header', createContentRoot(source, starterDir), target)
+    const result = await publishFragmentRendered('header', createContentRoot(source, starterDir), target, templatesDir)
     expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
     const html = await target.readFile('fragments/header/index.html')
     expect(html).toContain('<head>')
@@ -165,8 +169,8 @@ describe('Rendered publish (MinIO)', () => {
   })
 
   it('publishes a page as HTML with ESI placeholders', async () => {
-    await publishFragmentRendered('footer', createContentRoot(source, starterDir), target)
-    const result = await publishPageRendered('home', createContentRoot(source, starterDir), target)
+    await publishFragmentRendered('footer', createContentRoot(source, starterDir), target, templatesDir)
+    const result = await publishPageRendered('home', createContentRoot(source, starterDir), target, undefined, templatesDir)
     expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     const html = await target.readFile('pages/home/index.html')
@@ -195,11 +199,12 @@ describe('Edge composition caching (MinIO)', () => {
     await target.init()
 
     const source = createFilesystemProvider()
-    await publishSiteManifest(createContentRoot(source, starterDir), target)
-    await publishFragmentRendered('header', createContentRoot(source, starterDir), target)
-    await publishFragmentRendered('footer', createContentRoot(source, starterDir), target)
-    await publishPageRendered('home', createContentRoot(source, starterDir), target)
-    await publishPageRendered('about', createContentRoot(source, starterDir), target)
+    const sourceRoot = createContentRoot(source, starterDir)
+    await publishSiteManifest(sourceRoot, target)
+    await publishFragmentRendered('header', sourceRoot, target, templatesDir)
+    await publishFragmentRendered('footer', sourceRoot, target, templatesDir)
+    await publishPageRendered('home', sourceRoot, target, undefined, templatesDir)
+    await publishPageRendered('about', sourceRoot, target, undefined, templatesDir)
 
     // Build a test app with ESI assembly (same logic as the Cloudflare Worker)
     const { Hono } = await import('hono')
@@ -322,20 +327,22 @@ describe('Filesystem publish', () => {
   })
 
   it('publishes a page with dependencies', async () => {
-    const allItems = await resolveDependencies(source, starterDir, ['pages/home'])
+    const sourceRoot = createContentRoot(source, starterDir)
+    const allItems = await resolveDependencies(sourceRoot, ['pages/home'])
     expect(allItems).toContain('pages/home')
     expect(allItems).toContain('templates/hero')
     expect(allItems).toContain('fragments/header')
 
-    const { copiedFiles } = await publishItems(source, starterDir, target, '', allItems)
-    expect(copiedFiles).toBeGreaterThan(10)
+    const { copiedFiles } = await publishItems(sourceRoot, createContentRoot(target), allItems)
+    expect(copiedFiles).toBeGreaterThanOrEqual(2) // at least page.json + site.yaml
     expect(await target.exists('pages/home/page.json')).toBe(true)
   })
 
   it('publishes a fragment', async () => {
-    const allItems = await resolveDependencies(source, starterDir, ['fragments/header'])
+    const sourceRoot = createContentRoot(source, starterDir)
+    const allItems = await resolveDependencies(sourceRoot, ['fragments/header'])
     expect(allItems).toContain('templates/header-layout')
-    const { copiedFiles } = await publishItems(source, starterDir, target, '', allItems)
-    expect(copiedFiles).toBeGreaterThan(5)
+    const { copiedFiles } = await publishItems(sourceRoot, createContentRoot(target), allItems)
+    expect(copiedFiles).toBeGreaterThanOrEqual(2)
   })
 })
