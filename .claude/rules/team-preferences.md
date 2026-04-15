@@ -59,3 +59,12 @@ Validated approaches and things to avoid. Each entry: rule, then why.
 15. **Apply SOLID principles to every change.**
    Single responsibility (one module = one reason to change — e.g. `sidecars.ts` owns sidecar I/O, nothing else), open/closed (extend via injection — `compareTargets` takes `scanTemplates` as an option rather than hard-coding the default), Liskov (substitutable providers — `StorageProvider` contract), interface segregation (narrow interfaces like `SourceSidecarWriter { writeFor, invalidate }` rather than god objects), dependency inversion (routes depend on the `SourceSidecarWriter` interface, not on `createSourceSidecarWriter`).
    Why: Explicit user preference, reinforced in every major refactor of the performance work.
+
+16. **Rebase is the default git strategy.**
+   Main is rebase/fast-forward only — no merge commits. Branch protection on main requires linear history. Apply at every level:
+   - **PR merge:** `gh pr merge --rebase` (never `--merge`). Use `--squash` only when the branch has messy intermediate commits.
+   - **Updating a PR branch against main:** `git fetch && git rebase origin/main && git push --force-with-lease`. Never `git merge origin/main` into a feature branch.
+   - **Resolving conflicts:** fix during rebase, `git add`, `git rebase --continue`. Don't abort to a merge.
+   - **Stacked PRs:** rebase each downstream branch on its updated parent, don't cross-merge.
+
+   Why: Linear history on main is what lets publish.yml and deploy-site.yml trust push events without re-running CI — every commit on main is a SHA that already passed CI on its PR. Merge commits create new SHAs whose validation didn't happen.
