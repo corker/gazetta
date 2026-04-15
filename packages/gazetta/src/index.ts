@@ -27,6 +27,8 @@ export {
   NoEditableTargetError,
 } from './targets.js'
 export type { TargetRegistry } from './targets.js'
+export { createContentRoot } from './content-root.js'
+export type { ContentRoot } from './content-root.js'
 export type {
   HistoryProvider,
   Revision,
