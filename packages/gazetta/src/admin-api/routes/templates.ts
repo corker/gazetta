@@ -1,13 +1,14 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import { z } from 'zod'
-import type { StorageProvider } from '../../types.js'
 import { loadTemplate, hasEditorFile } from '../../template-loader.js'
+import type { SourceContext } from '../source-context.js'
 
 const EDITOR_EXTENSIONS = ['.tsx', '.ts']
 
-export function templateRoutes(siteDir: string, storage: StorageProvider, templatesDir?: string, adminDir?: string, production?: boolean) {
+export function templateRoutes(source: SourceContext, templatesDir?: string, adminDir?: string, production?: boolean) {
   const app = new Hono()
+  const { storage, siteDir } = source
   const tplDir = templatesDir ?? join(siteDir, 'templates')
   const admDir = adminDir ?? join(siteDir, 'admin')
   const editorsDir = join(admDir, 'editors')

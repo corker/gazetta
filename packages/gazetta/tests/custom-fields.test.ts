@@ -95,7 +95,9 @@ describe('templates API includes fieldsBaseUrl', () => {
     const storage = createFilesystemProvider()
 
     const { templateRoutes } = await import('../src/admin-api/routes/templates.js')
-    const app = templateRoutes(siteDir, storage, join(projectRoot, 'templates'), join(projectRoot, 'admin'))
+    const { createSourceContext } = await import('../src/admin-api/source-context.js')
+    const source = createSourceContext({ storage, siteDir })
+    const app = templateRoutes(source, join(projectRoot, 'templates'), join(projectRoot, 'admin'))
 
     const res = await app.request('/api/templates/hero/schema')
     expect(res.status).toBe(200)
@@ -112,7 +114,9 @@ describe('templates API includes fieldsBaseUrl', () => {
     const storage = createFilesystemProvider()
 
     const { templateRoutes } = await import('../src/admin-api/routes/templates.js')
-    const app = templateRoutes(siteDir, storage, join(projectRoot, 'templates'), join(projectRoot, 'admin'))
+    const { createSourceContext } = await import('../src/admin-api/source-context.js')
+    const source = createSourceContext({ storage, siteDir })
+    const app = templateRoutes(source, join(projectRoot, 'templates'), join(projectRoot, 'admin'))
 
     const res = await app.request('/api/templates/banner/schema')
     expect(res.status).toBe(200)

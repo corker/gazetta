@@ -1,10 +1,11 @@
 import { Hono, type Context } from 'hono'
-import type { StorageProvider, ResolvedComponent } from '../../types.js'
+import type { ResolvedComponent } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
 import { resolveFragment, resolvePage } from '../../resolver.js'
 import { renderFragment, renderPage } from '../../renderer.js'
+import type { SourceContext } from '../source-context.js'
 
-export function previewRoutes(siteDir: string, storage: StorageProvider, templatesDir?: string) {
+export function previewRoutes(source: SourceContext, templatesDir?: string) {
   const app = new Hono()
 
   // No caching — preview always serves fresh content for editing
@@ -14,12 +15,12 @@ export function previewRoutes(siteDir: string, storage: StorageProvider, templat
   })
 
   app.get('/preview/*', async (c) => {
-    return renderPreview(c, siteDir, storage, undefined, templatesDir)
+    return renderPreview(c, source, undefined, templatesDir)
   })
 
   app.post('/preview/*', async (c) => {
     const body = await c.req.json() as { overrides?: Record<string, Record<string, unknown>> }
-    return renderPreview(c, siteDir, storage, body.overrides, templatesDir)
+    return renderPreview(c, source, body.overrides, templatesDir)
   })
 
   return app
@@ -27,12 +28,11 @@ export function previewRoutes(siteDir: string, storage: StorageProvider, templat
 
 async function renderPreview(
   c: Context,
-  siteDir: string,
-  storage: StorageProvider,
+  source: SourceContext,
   overrides?: Record<string, Record<string, unknown>>,
   templatesDir?: string
 ) {
-  const site = await loadSite({ siteDir, storage, templatesDir })
+  const site = await loadSite({ contentRoot: source.contentRoot, templatesDir })
   const requestPath = c.req.path.replace(/^.*\/preview/, '') || '/'
 
   // Fragment preview: /preview/@fragmentName
