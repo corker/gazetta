@@ -1,5 +1,9 @@
 name: "Gazetta Studio"
 targets:
+  local:
+    storage:
+      type: filesystem
+    # Defaults: environment=local (editable); path=./targets/local
   production:
     storage:
       type: r2
@@ -10,6 +14,7 @@ targets:
     worker:
       type: cloudflare
       name: gazetta-studio
+    environment: production
     siteUrl: "https://gazetta.studio"
     cache:
       browser: 0
