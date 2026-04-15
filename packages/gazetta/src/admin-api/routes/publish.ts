@@ -116,8 +116,8 @@ export function publishRoutes(
       if (sidecarWriter) {
         const site = await loadSite({ siteDir, storage: sourceStorage, templatesDir })
         const [pagesList, fragmentsList] = await Promise.all([
-          listSidecars(sourceStorage, `${siteDir}/pages`),
-          listSidecars(sourceStorage, `${siteDir}/fragments`),
+          listSidecars(sourceStorage, source.contentRoot.path('pages')),
+          listSidecars(sourceStorage, source.contentRoot.path('fragments')),
         ])
         const missingPages = [...site.pages.keys()].filter(n => !pagesList.has(n))
         const missingFragments = [...site.fragments.keys()].filter(n => !fragmentsList.has(n))
