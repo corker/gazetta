@@ -4,6 +4,7 @@ import { writeFile, mkdir, rm, readdir } from 'node:fs/promises'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { publishItems, resolveDependencies } from '../src/publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered } from '../src/publish-rendered.js'
+import { createContentRoot } from '../src/content-root.js'
 import { tempDir } from './_helpers/temp.js'
 
 const testDir = tempDir('publish-test-' + Date.now())
@@ -104,7 +105,7 @@ describe('publishItems', () => {
 
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
-    const { createContentRoot } = await import('../src/content-root.js')
+
 
     const sourceRoot = createContentRoot(source)
     const targetRoot = createContentRoot(target)
@@ -132,7 +133,7 @@ describe('resolveDependencies', () => {
     }))
 
     const storage = createFilesystemProvider(sourceDir)
-    const { createContentRoot } = await import('../src/content-root.js')
+
     const root = createContentRoot(storage)
 
     const deps = await resolveDependencies(root, ['pages/home'])
@@ -234,7 +235,8 @@ describe('publishRendered', () => {
 
   it('publishes a fragment as HTML with hashed CSS', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    const { files } = await publishFragmentRendered('header', storage, starterDir, target, templatesDir)
+
+    const { files } = await publishFragmentRendered('header', createContentRoot(storage, starterDir), target, templatesDir)
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     const html = await target.readFile('fragments/header/index.html')
@@ -251,7 +253,8 @@ describe('publishRendered', () => {
     const target = createFilesystemProvider(renderTargetDir)
 
     // First publish
-    await publishFragmentRendered('header', storage, starterDir, target, templatesDir)
+
+    await publishFragmentRendered('header', createContentRoot(storage, starterDir), target, templatesDir)
     const entries1 = await target.readDir('fragments/header')
     const css1 = entries1.find(e => e.name.endsWith('.css'))!.name
 
@@ -261,7 +264,8 @@ describe('publishRendered', () => {
     expect(entriesBefore.filter(e => e.name.endsWith('.css')).length).toBe(2)
 
     // Publish again — same content, same hash
-    await publishFragmentRendered('header', storage, starterDir, target, templatesDir)
+
+    await publishFragmentRendered('header', createContentRoot(storage, starterDir), target, templatesDir)
     const entriesAfter = await target.readDir('fragments/header')
     const cssAfter = entriesAfter.filter(e => e.name.endsWith('.css'))
 
@@ -327,7 +331,7 @@ describe('publishPageStatic', () => {
 
   it('publishes fully assembled HTML at URL path', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    const { createContentRoot } = await import('../src/content-root.js')
+
     await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
     const html = await target.readFile('index.html')
     expect(html).toContain('<!DOCTYPE html>')
@@ -342,7 +346,7 @@ describe('publishPageStatic', () => {
 
   it('publishes about page at /about/index.html', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    const { createContentRoot } = await import('../src/content-root.js')
+
     await publishPageStatic('about', createContentRoot(storage, starterDir), target, templatesDir)
     const html = await target.readFile('about/index.html')
     expect(html).toContain('About Gazetta')
@@ -351,7 +355,7 @@ describe('publishPageStatic', () => {
 
   it('includes inline CSS and JS', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    const { createContentRoot } = await import('../src/content-root.js')
+
     await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
     const html = await target.readFile('index.html')
     expect(html).toContain('<style>')
@@ -361,7 +365,7 @@ describe('publishPageStatic', () => {
 
   it('no separate CSS/JS files', async () => {
     const target = createFilesystemProvider(staticTargetDir)
-    const { createContentRoot } = await import('../src/content-root.js')
+
     await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
     const entries = await target.readDir('.')
     const cssOrJs = entries.filter(e => e.name.endsWith('.css') || e.name.endsWith('.js'))

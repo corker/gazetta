@@ -156,7 +156,7 @@ describe('Rendered publish (MinIO)', () => {
   })
 
   it('publishes a fragment as HTML with hashed CSS', async () => {
-    const result = await publishFragmentRendered('header', source, starterDir, target)
+    const result = await publishFragmentRendered('header', createContentRoot(source, starterDir), target)
     expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
     const html = await target.readFile('fragments/header/index.html')
     expect(html).toContain('<head>')
@@ -165,7 +165,7 @@ describe('Rendered publish (MinIO)', () => {
   })
 
   it('publishes a page as HTML with ESI placeholders', async () => {
-    await publishFragmentRendered('footer', source, starterDir, target)
+    await publishFragmentRendered('footer', createContentRoot(source, starterDir), target)
     const result = await publishPageRendered('home', source, starterDir, target)
     expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
@@ -196,8 +196,8 @@ describe('Edge composition caching (MinIO)', () => {
 
     const source = createFilesystemProvider()
     await publishSiteManifest(createContentRoot(source, starterDir), target)
-    await publishFragmentRendered('header', source, starterDir, target)
-    await publishFragmentRendered('footer', source, starterDir, target)
+    await publishFragmentRendered('header', createContentRoot(source, starterDir), target)
+    await publishFragmentRendered('footer', createContentRoot(source, starterDir), target)
     await publishPageRendered('home', source, starterDir, target)
     await publishPageRendered('about', source, starterDir, target)
 
