@@ -5,7 +5,7 @@ import type { SourceContext } from '../source-context.js'
 
 export function pageRoutes(source: SourceContext) {
   const app = new Hono()
-  const { storage, siteDir, sidecarWriter } = source
+  const { storage, sidecarWriter } = source
 
   app.get('/api/pages', async (c) => {
     const site = await loadSite({ contentRoot: source.contentRoot })
@@ -23,7 +23,7 @@ export function pageRoutes(source: SourceContext) {
       return c.json({ error: 'Missing required fields: name, template' }, 400)
     }
 
-    const pageDir = join(join(siteDir, 'pages'), body.name)
+    const pageDir = source.contentRoot.path('pages', body.name)
     const manifestPath = join(pageDir, 'page.json')
 
     if (await storage.exists(manifestPath)) {
