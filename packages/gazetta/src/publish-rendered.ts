@@ -43,8 +43,7 @@ async function cleanupOldFiles(storage: StorageProvider, oldFiles: string[], new
  */
 export async function publishPageRendered(
   pageName: string,
-  sourceStorage: StorageProvider,
-  sourceDir: string,
+  sourceRoot: ContentRoot,
   targetStorage: StorageProvider,
   targetCache?: CacheConfig,
   templatesDir?: string,
@@ -53,7 +52,7 @@ export async function publishPageRendered(
 ): Promise<{ files: number; removed: number }> {
   // Reuse a preloaded site when the caller already has one (runPublish loops
   // over N items; loading per-item was quadratic). loadSite is idempotent.
-  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
+  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot, templatesDir })
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
@@ -397,9 +396,9 @@ export async function publishPageWithPurge(
   targetStorage: StorageProvider,
   purge: PurgeStrategy,
 ): Promise<{ files: number; purgedUrls: string[] }> {
-  const result = await publishPageRendered(pageName, sourceStorage, sourceDir, targetStorage)
-
   const sourceRoot = createContentRoot(sourceStorage, sourceDir)
+  const result = await publishPageRendered(pageName, sourceRoot, targetStorage)
+
   const site = await loadSite({ contentRoot: sourceRoot })
   const page = site.pages.get(pageName)
   if (page) await purge.purgeUrls([page.route])

@@ -567,7 +567,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       for (const [pageName, page] of site.pages) {
         if (unchanged.has(`pages/${pageName}`)) { skipped++; continue }
         const manifestHash = hashManifest(page, { templateHashes })
-        const { files, removed } = await publishPageRendered(pageName, storage, siteDir, targetStorage, targetConfig?.cache, templatesDir, manifestHash, site)
+        const { files, removed } = await publishPageRendered(pageName, sourceRoot, targetStorage, targetConfig?.cache, templatesDir, manifestHash, site)
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} ${pageName}`)
