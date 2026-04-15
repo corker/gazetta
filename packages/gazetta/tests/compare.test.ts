@@ -131,7 +131,7 @@ describe('compareTargets', () => {
     expect(r1.added.some(x => x.startsWith('fragments/'))).toBe(true)
 
     // Static mode: fragments excluded from local + target walks
-    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, publishMode: 'static' })
+    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, type: 'static' })
     expect(r2.added.some(x => x.startsWith('fragments/'))).toBe(false)
     expect(r2.modified.some(x => x.startsWith('fragments/'))).toBe(false)
     expect(r2.unchanged.some(x => x.startsWith('fragments/'))).toBe(false)
@@ -161,7 +161,7 @@ describe('compareTargets', () => {
     }
 
     // Sanity: unchanged before any edit.
-    const r1 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, publishMode: 'static' })
+    const r1 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, type: 'static' })
     expect(r1.unchanged).toContain('pages/home')
 
     // Mutate the fragment's content — page manifest untouched.
@@ -171,7 +171,7 @@ describe('compareTargets', () => {
     }))
 
     // Page must show modified — its baked-in output is now stale.
-    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, publishMode: 'static' })
+    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, type: 'static' })
     expect(r2.modified).toContain('pages/home')
   })
 

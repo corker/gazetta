@@ -7,23 +7,23 @@
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 import { createHash } from 'node:crypto'
-import type { StorageProvider } from './types.js'
+import type { StorageProvider, TargetType } from './types.js'
 import { assembleEsi, parseCacheComment, splitFragment, findEsiPaths } from './assemble.js'
 
 export interface ServeOptions {
   storage: StorageProvider
-  /** Serve mode: 'esi' assembles fragments at request time, 'static' serves pre-rendered HTML directly */
-  mode?: 'esi' | 'static'
+  /** Target type: 'dynamic' assembles fragments at request time (ESI), 'static' serves pre-rendered HTML directly */
+  type?: TargetType
 }
 
 export function createServer(options: ServeOptions) {
-  const { storage, mode = 'esi' } = options
+  const { storage, type = 'dynamic' } = options
   const app = new Hono()
 
   app.use(logger())
   app.get('/health', (c) => c.json({ ok: true }))
 
-  if (mode === 'static') {
+  if (type === 'static') {
     // Static mode — serve pre-rendered HTML files directly
     app.get('*', async (c) => {
       const requestPath = new URL(c.req.url).pathname

@@ -101,8 +101,8 @@ export interface FragmentDetail extends FragmentSummary {
 }
 
 export type TargetEnvironment = 'local' | 'staging' | 'production'
-export type PublishMode = 'esi' | 'static'
-export interface TargetInfo { name: string; environment: TargetEnvironment; publishMode: PublishMode }
+export type TargetType = 'static' | 'dynamic'
+export interface TargetInfo { name: string; environment: TargetEnvironment; type: TargetType }
 
 export interface PublishResult { target: string; success: boolean; error?: string; copiedFiles: number }
 export type PublishProgress =

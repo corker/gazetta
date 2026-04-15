@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { getPublishMode, getEnvironment } from '../../types.js'
+import { getType, getEnvironment } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
 import { listSidecars } from '../../sidecars.js'
@@ -74,7 +74,7 @@ export function publishRoutes(
       return {
         name,
         environment: cfg ? getEnvironment(cfg) : 'local',
-        publishMode: cfg ? getPublishMode(cfg) : 'static',
+        type: cfg ? getType(cfg) : 'static',
       }
     }))
   })
@@ -184,7 +184,7 @@ export function publishRoutes(
     for (const targetName of targetNames) {
       const targetStorage = t.get(targetName)!
       const config = getTargetConfig(targetName)
-      const isStatic = config ? getPublishMode(config) === 'static' : true
+      const isStatic = config ? getType(config) === 'static' : true
       const purgeConfig = config?.cache?.purge
 
       // Static mode bakes fragments into pages at publish time — if the user

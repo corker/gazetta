@@ -11,7 +11,7 @@ targets:
     storage:
       type: filesystem
       path: ./dist/esi-test
-    publishMode: esi
+    type: dynamic
   production:
     storage:
       type: azure-blob

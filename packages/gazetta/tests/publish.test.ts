@@ -332,24 +332,24 @@ describe('publishPageStatic', () => {
   })
 })
 
-describe('getPublishMode', () => {
+describe('getType', () => {
   // Import dynamically to avoid circular deps
-  it('returns esi when worker configured', async () => {
-    const { getPublishMode } = await import('../src/types.js')
-    expect(getPublishMode({ storage: { type: 'r2' }, worker: { type: 'cloudflare' } })).toBe('esi')
+  it('returns dynamic when worker configured', async () => {
+    const { getType } = await import('../src/types.js')
+    expect(getType({ storage: { type: 'r2' }, worker: { type: 'cloudflare' } })).toBe('dynamic')
   })
 
   it('returns static when no worker', async () => {
-    const { getPublishMode } = await import('../src/types.js')
-    expect(getPublishMode({ storage: { type: 'filesystem', path: './dist' } })).toBe('static')
+    const { getType } = await import('../src/types.js')
+    expect(getType({ storage: { type: 'filesystem', path: './dist' } })).toBe('static')
   })
 
-  it('respects explicit publishMode over worker config', async () => {
-    const { getPublishMode } = await import('../src/types.js')
-    // ESI without worker (for gazetta serve)
-    expect(getPublishMode({ storage: { type: 's3' }, publishMode: 'esi' })).toBe('esi')
+  it('respects explicit type over worker config', async () => {
+    const { getType } = await import('../src/types.js')
+    // Dynamic without worker (for gazetta serve)
+    expect(getType({ storage: { type: 's3' }, type: 'dynamic' })).toBe('dynamic')
     // Static even with worker (override)
-    expect(getPublishMode({ storage: { type: 'r2' }, worker: { type: 'cloudflare' }, publishMode: 'static' })).toBe('static')
+    expect(getType({ storage: { type: 'r2' }, worker: { type: 'cloudflare' }, type: 'static' })).toBe('static')
   })
 })
 

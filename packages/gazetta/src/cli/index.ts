@@ -511,10 +511,10 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     }
 
     const targetConfig = siteYaml.targets![name]
-    const { getPublishMode } = await import('../types.js')
-    const publishMode = targetConfig ? getPublishMode(targetConfig) : 'static'
-    const isStatic = publishMode === 'static'
-    console.log(`  ${c.bold(name)} ${c.dim(`(${publishMode})`)}`)
+    const { getType } = await import('../types.js')
+    const targetType = targetConfig ? getType(targetConfig) : 'static'
+    const isStatic = targetType === 'static'
+    console.log(`  ${c.bold(name)} ${c.dim(`(${targetType})`)}`)
     let totalFiles = 0
     let totalRemoved = 0
 
@@ -529,7 +529,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
         siteDir,
         templatesDir,
         projectRoot,
-        publishMode,
+        type: targetType,
         scanTemplates: async () => templateInfos,
       })
       for (const item of cmp.unchanged) unchanged.add(item)
@@ -827,9 +827,9 @@ async function runServe(siteDir: string, port: number, targetName?: string) {
 
   const { createStorageProvider } = await import('../targets.js')
   const storage = await createStorageProvider(config.storage, siteDir)
-  const { getPublishMode } = await import('../types.js')
+  const { getType } = await import('../types.js')
   const { createServer } = await import('../serve.js')
-  const app = createServer({ storage, mode: getPublishMode(config) })
+  const app = createServer({ storage, type: getType(config) })
 
   const server = serve({ fetch: app.fetch, port }, () => {
     console.log()

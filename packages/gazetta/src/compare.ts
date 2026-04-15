@@ -27,12 +27,12 @@ export interface CompareOptions {
   templatesDir: string
   projectRoot: string
   /**
-   * Target's publish mode. In static mode fragments are baked into pages, so
+   * Target's rendering type. In static mode fragments are baked into pages, so
    * they're not published as separate items — omit them from compare to avoid
    * listing @header / @footer as "added" when they can't actually be published.
-   * Defaults to 'esi' (include fragments).
+   * Defaults to 'dynamic' (include fragments).
    */
-  publishMode?: 'static' | 'esi'
+  type?: 'static' | 'dynamic'
   /**
    * Injectable template scanner. The default reads from disk every call; the
    * admin-api server injects a memoized version invalidated by the template
@@ -78,19 +78,19 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   }
 
   const local = new Map<string, string>()
-  const pageHashOpts = opts.publishMode === 'static'
+  const pageHashOpts = opts.type === 'static'
     ? { templateHashes, fragmentHashes }
     : { templateHashes }
   for (const [name, page] of site.pages) {
     // Source sidecars are written without fragmentHashes (source doesn't
-    // know target's publish mode). For static targets we must re-hash.
-    const cached = opts.publishMode === 'static' ? null : sourcePagesSidecars.get(name)?.hash
+    // know target's type). For static targets we must re-hash.
+    const cached = opts.type === 'static' ? null : sourcePagesSidecars.get(name)?.hash
     local.set(`pages/${name}`, cached ?? hashManifest(page, pageHashOpts))
   }
-  // Static-mode targets bake fragments into pages — no fragment sidecars exist
+  // Static targets bake fragments into pages — no fragment sidecars exist
   // on the target, and publishing @header/@footer is a no-op server-side. Omit
   // them from local so they don't appear as perpetually "added".
-  if (opts.publishMode !== 'static') {
+  if (opts.type !== 'static') {
     for (const [name, hash] of fragmentHashes) {
       local.set(`fragments/${name}`, hash)
     }
@@ -100,7 +100,7 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   const target = new Map<string, string>()
   const [pagesSidecars, fragmentsSidecars] = await Promise.all([
     listSidecars(opts.target, 'pages'),
-    opts.publishMode !== 'static' ? listSidecars(opts.target, 'fragments') : Promise.resolve(new Map()),
+    opts.type !== 'static' ? listSidecars(opts.target, 'fragments') : Promise.resolve(new Map()),
   ])
   for (const [k, s] of pagesSidecars) target.set(`pages/${k}`, s.hash)
   for (const [k, s] of fragmentsSidecars) target.set(`fragments/${k}`, s.hash)

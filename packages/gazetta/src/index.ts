@@ -18,7 +18,8 @@ export type {
   StorageProvider,
   PurgeStrategy,
 } from './types.js'
-export { getPublishMode } from './types.js'
+export { getType } from './types.js'
+export type { TargetType } from './types.js'
 
 // Renderer
 export { renderComponent, renderFragment, renderPage } from './renderer.js'
