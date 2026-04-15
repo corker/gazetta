@@ -2,16 +2,19 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Hono } from 'hono'
-import { createFilesystemProvider } from 'gazetta'
+import { createFilesystemProvider, createSourceContext } from 'gazetta'
 import { createAdminApp } from '../src/server/index.js'
 
-const starterDir = resolve(import.meta.dirname, '../../../examples/starter/sites/main')
+const projectSiteDir = resolve(import.meta.dirname, '../../../examples/starter/sites/main')
+// Content lives under the local target; tests mutate it in-place.
+const contentDir = resolve(projectSiteDir, 'targets/local')
 const templatesDir = resolve(import.meta.dirname, '../../../examples/starter/templates')
-const storage = createFilesystemProvider()
+const storage = createFilesystemProvider(contentDir)
 let app: Hono
 
 beforeAll(() => {
-  app = createAdminApp({ siteDir: starterDir, storage, templatesDir })
+  const source = createSourceContext({ storage, siteDir: '', projectSiteDir })
+  app = createAdminApp({ source, siteDir: projectSiteDir, templatesDir })
 })
 
 afterAll(async () => {
@@ -20,7 +23,7 @@ afterAll(async () => {
     'pages/.test-nested', 'pages/.test-comp-parent', 'pages/.test-to-delete',
     'fragments/.test-put-frag', 'fragments/.test-frag', 'fragments/.test-to-delete',
   ]
-  await Promise.all(dirs.map(d => rm(resolve(starterDir, d), { recursive: true, force: true })))
+  await Promise.all(dirs.map(d => rm(resolve(contentDir, d), { recursive: true, force: true })))
 })
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
