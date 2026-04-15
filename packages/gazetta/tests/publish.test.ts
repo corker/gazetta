@@ -216,7 +216,7 @@ describe('publishRendered', () => {
 
   it('publishes a page as HTML with ESI placeholders and hashed CSS', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    const { files } = await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
+    const { files } = await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     // Check page HTML exists with ESI tags and title from content
@@ -278,14 +278,14 @@ describe('publishRendered', () => {
     const target = createFilesystemProvider(renderTargetDir)
 
     // First publish
-    await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
+    await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
 
     // Write fake old files
     await target.writeFile('pages/home/styles.00000000.css', '.old {}')
     await target.writeFile('pages/home/script.00000000.js', '// old')
 
     // Publish again
-    await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
+    await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
     const entries = await target.readDir('pages/home')
     const oldCss = entries.filter(e => e.name === 'styles.00000000.css')
     const oldJs = entries.filter(e => e.name === 'script.00000000.js')
@@ -295,7 +295,7 @@ describe('publishRendered', () => {
 
   it('bakes cache config comment into page HTML with defaults', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
+    await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
     const html = await target.readFile('pages/home/index.html')
     expect(html).toMatch(/^<!--cache:browser=0,edge=86400-->/)
     expect(html).toContain('<!DOCTYPE html>')
@@ -303,14 +303,14 @@ describe('publishRendered', () => {
 
   it('bakes target cache config into page HTML', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', storage, starterDir, target, { browser: 120, edge: 3600 }, templatesDir)
+    await publishPageRendered('home', createContentRoot(storage, starterDir), target, { browser: 120, edge: 3600 }, templatesDir)
     const html = await target.readFile('pages/home/index.html')
     expect(html).toMatch(/^<!--cache:browser=120,edge=3600-->/)
   })
 
   it('cache comment is on first line before DOCTYPE', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', storage, starterDir, target, undefined, templatesDir)
+    await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
     const html = await target.readFile('pages/home/index.html')
     const lines = html.split('\n')
     expect(lines[0]).toMatch(/^<!--cache:/)

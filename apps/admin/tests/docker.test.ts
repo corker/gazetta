@@ -166,7 +166,7 @@ describe('Rendered publish (MinIO)', () => {
 
   it('publishes a page as HTML with ESI placeholders', async () => {
     await publishFragmentRendered('footer', createContentRoot(source, starterDir), target)
-    const result = await publishPageRendered('home', source, starterDir, target)
+    const result = await publishPageRendered('home', createContentRoot(source, starterDir), target)
     expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     const html = await target.readFile('pages/home/index.html')
@@ -198,8 +198,8 @@ describe('Edge composition caching (MinIO)', () => {
     await publishSiteManifest(createContentRoot(source, starterDir), target)
     await publishFragmentRendered('header', createContentRoot(source, starterDir), target)
     await publishFragmentRendered('footer', createContentRoot(source, starterDir), target)
-    await publishPageRendered('home', source, starterDir, target)
-    await publishPageRendered('about', source, starterDir, target)
+    await publishPageRendered('home', createContentRoot(source, starterDir), target)
+    await publishPageRendered('about', createContentRoot(source, starterDir), target)
 
     // Build a test app with ESI assembly (same logic as the Cloudflare Worker)
     const { Hono } = await import('hono')

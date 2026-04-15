@@ -242,7 +242,7 @@ export function publishRoutes(
             if (isStatic) {
               return publishPageStatic(pageName, source.contentRoot, targetStorage, tdir, manifestHash, site)
             }
-            const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache, tdir, manifestHash, site)
+            const { files } = await publishPageRendered(pageName, source.contentRoot, targetStorage, config?.cache, tdir, manifestHash, site)
             return { files }
           }
           if (item.startsWith('fragments/') && !isStatic) {
