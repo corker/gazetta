@@ -128,7 +128,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Windows smoke runs on main-only. PRs get Ubuntu + macOS for faster
+        # feedback; Windows catches path/shell regressions post-merge, before
+        # any tag is cut. Branch protection + linear history keeps the chain
+        # honest — a tag always points at a SHA that cleared all three.
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest","macos-latest"]') || fromJSON('["ubuntu-latest","macos-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
