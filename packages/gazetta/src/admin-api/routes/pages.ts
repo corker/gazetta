@@ -1,14 +1,14 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
-import type { StorageProvider } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
-import type { SourceSidecarWriter } from '../../source-sidecars.js'
+import type { SourceContext } from '../source-context.js'
 
-export function pageRoutes(siteDir: string, storage: StorageProvider, sidecarWriter?: SourceSidecarWriter) {
+export function pageRoutes(source: SourceContext) {
   const app = new Hono()
+  const { storage, siteDir, sidecarWriter } = source
 
   app.get('/api/pages', async (c) => {
-    const site = await loadSite(siteDir, storage)
+    const site = await loadSite({ contentRoot: source.contentRoot })
     const pages = [...site.pages.entries()].map(([name, page]) => ({
       name,
       route: page.route,
@@ -43,7 +43,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider, sidecarWri
 
   app.get('/api/pages/:name{.+}', async (c) => {
     const name = c.req.param('name')
-    const site = await loadSite(siteDir, storage)
+    const site = await loadSite({ contentRoot: source.contentRoot })
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
     return c.json({
@@ -58,7 +58,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider, sidecarWri
 
   app.put('/api/pages/:name{.+}', async (c) => {
     const name = c.req.param('name')
-    const site = await loadSite(siteDir, storage)
+    const site = await loadSite({ contentRoot: source.contentRoot })
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
 
@@ -76,7 +76,7 @@ export function pageRoutes(siteDir: string, storage: StorageProvider, sidecarWri
 
   app.delete('/api/pages/:name{.+}', async (c) => {
     const name = c.req.param('name')
-    const site = await loadSite(siteDir, storage)
+    const site = await loadSite({ contentRoot: source.contentRoot })
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
 

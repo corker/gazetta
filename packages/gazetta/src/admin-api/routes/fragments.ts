@@ -1,14 +1,14 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
-import type { StorageProvider } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
-import type { SourceSidecarWriter } from '../../source-sidecars.js'
+import type { SourceContext } from '../source-context.js'
 
-export function fragmentRoutes(siteDir: string, storage: StorageProvider, sidecarWriter?: SourceSidecarWriter) {
+export function fragmentRoutes(source: SourceContext) {
   const app = new Hono()
+  const { storage, siteDir, sidecarWriter } = source
 
   app.get('/api/fragments', async (c) => {
-    const site = await loadSite(siteDir, storage)
+    const site = await loadSite({ contentRoot: source.contentRoot })
     const fragments = [...site.fragments.entries()].map(([name, frag]) => ({
       name,
       template: frag.template,
@@ -38,7 +38,7 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider, sideca
 
   app.get('/api/fragments/:name', async (c) => {
     const name = c.req.param('name')
-    const site = await loadSite(siteDir, storage)
+    const site = await loadSite({ contentRoot: source.contentRoot })
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
     return c.json({
@@ -52,7 +52,7 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider, sideca
 
   app.put('/api/fragments/:name', async (c) => {
     const name = c.req.param('name')
-    const site = await loadSite(siteDir, storage)
+    const site = await loadSite({ contentRoot: source.contentRoot })
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
 
@@ -70,7 +70,7 @@ export function fragmentRoutes(siteDir: string, storage: StorageProvider, sideca
 
   app.delete('/api/fragments/:name', async (c) => {
     const name = c.req.param('name')
-    const site = await loadSite(siteDir, storage)
+    const site = await loadSite({ contentRoot: source.contentRoot })
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
 
