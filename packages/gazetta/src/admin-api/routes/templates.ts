@@ -2,13 +2,17 @@ import { Hono } from 'hono'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { loadTemplate, hasEditorFile } from '../../template-loader.js'
+import { createFilesystemProvider } from '../../providers/filesystem.js'
 import type { SourceContext } from '../source-context.js'
 
 const EDITOR_EXTENSIONS = ['.tsx', '.ts']
 
 export function templateRoutes(source: SourceContext, templatesDir?: string, adminDir?: string, production?: boolean) {
   const app = new Hono()
-  const { storage, projectSiteDir } = source
+  const { projectSiteDir } = source
+  // Templates and admin live at project level, outside target content storage.
+  // Read them via a cwd-rooted filesystem provider and absolute paths.
+  const storage = createFilesystemProvider()
   const tplDir = templatesDir ?? join(projectSiteDir, 'templates')
   const admDir = adminDir ?? join(projectSiteDir, 'admin')
   const editorsDir = join(admDir, 'editors')

@@ -205,7 +205,8 @@ describe('resolveDependencies', () => {
 
 describe('publishRendered', () => {
   const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
-  const starterDir = resolve(projectRoot, 'sites/main')
+  // Content lives under the local target (post-transformation layout).
+  const starterDir = resolve(projectRoot, 'sites/main/targets/local')
   const templatesDir = resolve(projectRoot, 'templates')
   const storage = createFilesystemProvider()
   const renderTargetDir = tempDir('render-test-' + Date.now())
@@ -320,7 +321,7 @@ describe('publishRendered', () => {
 
 describe('publishPageStatic', () => {
   const projectRoot2 = resolve(import.meta.dirname, '../../../examples/starter')
-  const starterDir = resolve(projectRoot2, 'sites/main')
+  const starterDir = resolve(projectRoot2, 'sites/main/targets/local')
   const templatesDir = resolve(projectRoot2, 'templates')
   const storage = createFilesystemProvider()
   const staticTargetDir = tempDir('static-test-' + Date.now())

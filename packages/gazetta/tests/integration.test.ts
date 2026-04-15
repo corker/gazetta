@@ -6,7 +6,7 @@ import { resolvePage } from '../src/resolver.js'
 import { renderComponent, renderPage } from '../src/renderer.js'
 
 const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
-const siteDir = resolve(projectRoot, 'sites/main')
+const siteDir = resolve(projectRoot, 'sites/main/targets/local')
 const templatesDir = resolve(projectRoot, 'templates')
 const storage = createFilesystemProvider()
 

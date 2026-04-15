@@ -117,7 +117,8 @@ describe('loadSite', () => {
 
   it('loads the real starter site', async () => {
     const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
-    const site = await loadSite({ siteDir: resolve(projectRoot, 'sites/main'), storage, templatesDir: resolve(projectRoot, 'templates') })
+    // Content lives inside the local target (post-transformation layout).
+    const site = await loadSite({ siteDir: resolve(projectRoot, 'sites/main/targets/local'), storage, templatesDir: resolve(projectRoot, 'templates') })
     expect(site.manifest.name).toBe('Gazetta Starter')
     expect(site.pages.size).toBeGreaterThanOrEqual(3)
     expect(site.fragments.size).toBe(2)

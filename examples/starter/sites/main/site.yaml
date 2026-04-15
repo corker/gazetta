@@ -3,17 +3,26 @@ version: "1.0.0"
 systemPages:
   - "404"
 targets:
+  local:
+    storage:
+      type: filesystem
+    # environment: local (default)
+    # editable: true (default for local environment)
+    # path defaults to ./targets/local
   staging:
     storage:
       type: filesystem
       path: ./dist/staging
+    environment: staging
   esi-test:
     storage:
       type: filesystem
       path: ./dist/esi-test
     type: dynamic
+    environment: staging
   production:
     storage:
       type: azure-blob
       connectionString: "UseDevelopmentStorage=true"
       container: "gazetta-production"
+    environment: production
