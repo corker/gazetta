@@ -5,7 +5,7 @@ import type { SourceContext } from '../source-context.js'
 
 export function fragmentRoutes(source: SourceContext) {
   const app = new Hono()
-  const { storage, siteDir, sidecarWriter } = source
+  const { storage, sidecarWriter } = source
 
   app.get('/api/fragments', async (c) => {
     const site = await loadSite({ contentRoot: source.contentRoot })
@@ -22,7 +22,7 @@ export function fragmentRoutes(source: SourceContext) {
       return c.json({ error: 'Missing required fields: name, template' }, 400)
     }
 
-    const fragDir = join(join(siteDir, 'fragments'), body.name)
+    const fragDir = source.contentRoot.path('fragments', body.name)
     const manifestPath = join(fragDir, 'fragment.json')
 
     if (await storage.exists(manifestPath)) {
