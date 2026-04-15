@@ -24,9 +24,9 @@ export interface AdminAppOptions {
   adminDir?: string
   /** Production mode — editors/fields are pre-bundled at /admin/editors/*.js */
   production?: boolean
-  /** Pre-initialized targets (legacy) */
+  /** @deprecated Pre-initialized target providers. Pass `targetConfigs` for lazy init. */
   targets?: Map<string, StorageProvider>
-  /** Raw target configs — targets will be initialized lazily on first publish/fetch */
+  /** Target configurations — providers are initialized lazily on first publish/fetch/compare. */
   targetConfigs?: Record<string, TargetConfig>
 }
 
@@ -35,17 +35,16 @@ type AdminApp = Hono & {
   invalidateSourceSidecars(): void
   writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void>
 }
-export function createAdminApp(opts: AdminAppOptions): AdminApp
-export function createAdminApp(siteDir: string, storage: StorageProvider, targets?: Map<string, StorageProvider>): AdminApp
-export function createAdminApp(
-  siteDirOrOpts: string | AdminAppOptions,
-  storage?: StorageProvider,
-  targets?: Map<string, StorageProvider>
-): AdminApp {
-  const opts: AdminAppOptions = typeof siteDirOrOpts === 'string'
-    ? { siteDir: siteDirOrOpts, storage: storage!, targets }
-    : siteDirOrOpts
 
+/**
+ * Create an admin API Hono app. Accepts a single options object.
+ *
+ * Target providers can be supplied either already-initialized via `targets`
+ * (legacy), or as configs via `targetConfigs` (lazy init on first use).
+ * Exactly one of these is expected when publish/fetch/compare routes are
+ * used; both may be present (pre-initialized entries override configs).
+ */
+export function createAdminApp(opts: AdminAppOptions): AdminApp {
   const app = new Hono()
 
   app.use(logger())
