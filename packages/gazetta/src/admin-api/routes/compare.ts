@@ -4,16 +4,17 @@ import type { StorageProvider, TargetConfig } from '../../types.js'
 import { getType } from '../../types.js'
 import { compareTargets } from '../../compare.js'
 import type { TemplateInfo } from '../../templates-scan.js'
+import type { SourceContext } from '../source-context.js'
 
 export function compareRoutes(
-  siteDir: string,
-  sourceStorage: StorageProvider,
+  source: SourceContext,
   preInitTargets?: Map<string, StorageProvider>,
   targetConfigs?: Record<string, TargetConfig>,
   templatesDir?: string,
   scanTemplatesInjected?: (templatesDir: string, projectRoot: string) => Promise<TemplateInfo[]>,
 ) {
   const app = new Hono()
+  const { siteDir } = source
 
   let targets: Map<string, StorageProvider> | null = preInitTargets ?? null
   const initPromise: Promise<Map<string, StorageProvider>> = preInitTargets
@@ -51,9 +52,8 @@ export function compareRoutes(
 
     try {
       const result = await compareTargets({
-        source: sourceStorage,
+        sourceRoot: source.contentRoot,
         target: targetStorage,
-        siteDir,
         templatesDir: tdir,
         projectRoot,
         type,
