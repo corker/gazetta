@@ -291,15 +291,15 @@ empty cache). It never uses stale templates — even if `gazetta dev` is running
 simultaneously with a different cached version. Both processes are independent.
 
 **Accidental publish to production from dev:** Targets declare semantic intent via the
-`environment` field — `local`, `staging`, or `production`. Defaults: filesystem → `local`,
-everything else → `production`. The admin UI publish dialog requires an explicit
-confirmation step ("Yes, publish to production") for any selected target with
-`environment: production`. The Publish button is also disabled while compare is loading
-to prevent accidental fallback to a single-item publish.
+`environment` field — `local`, `staging`, or `production`. Default: `local` for any
+target that doesn't set it. Production targets must be marked explicitly — the default
+is safe, not alarming, so a forgotten `environment` on a cloud target never produces
+surprise prod chrome. The admin UI publish dialog requires an explicit confirmation
+step ("Yes, publish to production") for any selected target with `environment:
+production`. The Publish button is also disabled while compare is loading to prevent
+accidental fallback to a single-item publish.
 
-CLI publish does not currently prompt. CI (`CI=true`) is unaffected. Operators can
-override the default in site.yaml — e.g., a shared filesystem mount used as production
-should set `environment: production` explicitly.
+CLI publish does not currently prompt. CI (`CI=true`) is unaffected.
 
 **Storage upload behavior:**
 
