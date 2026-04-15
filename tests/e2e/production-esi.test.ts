@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test.describe('Production ESI serve (gazetta serve with publishMode: esi)', () => {
+test.describe('Production dynamic serve (gazetta serve with type: dynamic)', () => {
   test('home page is served with assembled fragments', async ({ page }) => {
     const resp = await page.goto('/')
     expect(resp?.status()).toBe(200)

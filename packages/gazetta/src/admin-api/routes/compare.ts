@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import type { StorageProvider, TargetConfig } from '../../types.js'
-import { getPublishMode } from '../../types.js'
+import { getType } from '../../types.js'
 import { compareTargets } from '../../compare.js'
 import type { TemplateInfo } from '../../templates-scan.js'
 
@@ -47,7 +47,7 @@ export function compareRoutes(
     const projectRoot = siteDir.replace(/[\\/]sites[\\/][^\\/]+$/, '')
 
     const targetConfig = targetConfigs?.[targetName]
-    const publishMode = targetConfig ? getPublishMode(targetConfig) : 'esi'
+    const type = targetConfig ? getType(targetConfig) : 'dynamic'
 
     try {
       const result = await compareTargets({
@@ -56,7 +56,7 @@ export function compareRoutes(
         siteDir,
         templatesDir: tdir,
         projectRoot,
-        publishMode,
+        type,
         scanTemplates: scanTemplatesInjected,
       })
       return c.json(result)

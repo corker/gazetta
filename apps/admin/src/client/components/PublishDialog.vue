@@ -310,7 +310,7 @@ const showImpact = computed(() =>
 const anyStaticTargetSelected = computed(() => {
   for (const t of selectedTargets.value) {
     const cfg = targets.value.find(x => x.name === t)
-    if (cfg?.publishMode === 'static') return true
+    if (cfg?.type === 'static') return true
   }
   return false
 })

@@ -111,12 +111,19 @@ export interface WorkerConfig {
 
 export type TargetEnvironment = 'local' | 'staging' | 'production'
 
+export type TargetType = 'static' | 'dynamic'
+
 /** Target configuration in site.yaml */
 export interface TargetConfig {
   storage: StorageConfig
   worker?: WorkerConfig
-  /** Publish mode — 'esi' for Workers/gazetta serve, 'static' for static hosting. Default: esi if worker configured, static otherwise. */
-  publishMode?: 'esi' | 'static'
+  /**
+   * Rendering model:
+   * - `static`: pre-rendered at publish time, served from edge (no SSR at request)
+   * - `dynamic`: composed/SSR'd at request time on Node/Bun server (ESI-style assembly)
+   * Default: `dynamic` if worker configured, `static` otherwise.
+   */
+  type?: TargetType
   /**
    * Semantic intent of this target — drives UI treatment (confirmation
    * prompts, badges) and ops decisions. Default: 'local' for filesystem,
@@ -129,9 +136,9 @@ export interface TargetConfig {
   cache?: CacheConfig
 }
 
-/** Determine publish mode for a target — centralised logic used by CLI and admin API */
-export function getPublishMode(target: TargetConfig): 'esi' | 'static' {
-  return target.publishMode ?? (target.worker ? 'esi' : 'static')
+/** Determine rendering type for a target — centralised logic used by CLI and admin API */
+export function getType(target: TargetConfig): TargetType {
+  return target.type ?? (target.worker ? 'dynamic' : 'static')
 }
 
 /** Resolve a target's environment, applying the storage-type default */
