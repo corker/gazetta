@@ -619,12 +619,7 @@ test.describe('Component operations', () => {
   })
 })
 
-// R38d: The old item-scoped Publish dialog has been replaced by the
-// unified PublishPanel (source → destinations fan-out). These tests
-// exercise the old semantics (publish-btn opening an item-scoped dialog,
-// publish-target-<name> checkboxes, publish-submit button) and need to
-// be rewritten against the new panel's testids. Tracked as R39.
-test.describe.skip('Publish dialog', () => {
+test.describe('Publish panel', () => {
   // Staging target's storage path is ./dist/staging relative to sites/main
   function stagingDir(projectDir: string) {
     return join(projectDir, 'sites/main/dist/staging')
@@ -637,251 +632,206 @@ test.describe.skip('Publish dialog', () => {
     await rm(stagingDir(projectDir), { recursive: true, force: true })
   }
 
+  /** Open the unified Publish panel from the toolbar. Panel is not scoped
+   *  to a selected item — it's a cross-target operation. */
   async function openPublish(page: import('@playwright/test').Page) {
-    // Selecting a page enables the publish button
-    await page.goto('/admin/pages/home')
+    await page.goto('/admin')
     await page.locator('[data-testid="publish-btn"]').click()
-    await expect(page.locator('[data-testid="publish-current-item"]')).toBeVisible()
-  }
-  async function selectStaging(page: import('@playwright/test').Page) {
-    await page.locator('[data-testid="publish-target-staging"]').click()
+    await expect(page.locator('[data-testid="publish-panel"]')).toBeVisible()
   }
 
-  test('first publish shows info banner', async ({ page, testSite }) => {
-    await wipe(testSite.projectDir)
+  /** Check the destination by clicking its row. Source defaults to the
+   *  active target (local in starter). */
+  async function pickDestination(page: import('@playwright/test').Page, name: string) {
+    await page.locator(`[data-testid="publish-dest-${name}"]`).click()
+  }
+
+  test('opens with local as source and destinations listed', async ({ page, testSite: _ }) => {
     await openPublish(page)
-    await selectStaging(page)
-    await expect(page.locator('[data-testid="publish-first-publish"]')).toBeVisible()
+    // Single editable target in starter (local) — source renders as a fixed chip
+    await expect(page.locator('[data-testid="publish-source-fixed"]')).toContainText('local')
+    // Every non-source target appears as a destination row
+    await expect(page.locator('[data-testid="publish-dest-staging"]')).toBeVisible()
+    await expect(page.locator('[data-testid="publish-dest-esi-test"]')).toBeVisible()
+    await expect(page.locator('[data-testid="publish-dest-production"]')).toBeVisible()
   })
 
-  test('modified item shows filled-circle mark', async ({ page, testSite }) => {
-    // Seed a stale sidecar for pages/home so compare reports 'modified'
+  test('first-publish destination shows all items as added', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
+    await openPublish(page)
+    await pickDestination(page, 'staging')
+    // Every local page becomes an 'added' row against the empty staging target
+    const homeRow = page.locator('[data-testid="publish-item-pages/home"]')
+    await expect(homeRow).toBeVisible()
+    await expect(homeRow.locator('.marker-added')).toHaveText('+')
+  })
+
+  test('modified item shows modified marker and state chip', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    // Seed a stale sidecar for pages/home so compare reports 'modified' there,
+    // and a sidecar for pages/about so the target isn't empty (avoids every
+    // page being classified 'added' via firstPublish).
     await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/home'), '00000000')
+    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/about'), 'aaaaaaaa')
 
     await openPublish(page)
-    await selectStaging(page)
-    const row = page.locator('[data-testid="publish-change-pages/home"]')
+    await pickDestination(page, 'staging')
+    const row = page.locator('[data-testid="publish-item-pages/home"]')
     await expect(row).toBeVisible()
-    await expect(row.locator('.publish-change-mark.modified')).toHaveText('●')
+    await expect(row.locator('.marker-modified')).toHaveText('●')
+    await expect(row.locator('.dest-state-modified')).toContainText('modified')
   })
 
-  test('deleted item renders informational (no checkbox, dimmed)', async ({ page, testSite }) => {
+  test('deleted item renders informational (no checkbox, struck through)', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
-    // Seed a sidecar for a page that doesn't exist locally
+    // Seed a sidecar for a page that doesn't exist locally — it exists on
+    // staging but not on the source, so compare classifies it 'deleted'.
     await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/old-contact'), '11111111')
-    // And a real-page sidecar so firstPublish is false
-    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/home'), '00000000')
 
     await openPublish(page)
-    await selectStaging(page)
-    const deletedRow = page.locator('[data-testid="publish-change-pages/old-contact"]')
+    await pickDestination(page, 'staging')
+    const deletedRow = page.locator('[data-testid="publish-item-pages/old-contact"]')
     await expect(deletedRow).toBeVisible()
-    await expect(deletedRow).toHaveClass(/publish-change-row-deleted/)
+    await expect(deletedRow).toHaveClass(/item-deleted/)
+    // Deleted rows get a spacer instead of a checkbox
+    await expect(deletedRow.locator('.deleted-spacer')).toHaveCount(1)
     await expect(deletedRow.locator('.p-checkbox')).toHaveCount(0)
-    await expect(deletedRow.locator('.publish-change-mark.deleted')).toHaveText('−')
+    await expect(deletedRow.locator('.marker-deleted')).toHaveText('−')
   })
 
   test('summary line shows category counts', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/home'), '00000000')
     await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/old-contact'), '11111111')
-    // about + blog + showcase + 404 will be 'added' (no sidecar, local exists)
+    // Other local pages (about/blog/showcase/404) become 'added' rows.
 
     await openPublish(page)
-    await selectStaging(page)
-    const summary = page.locator('[data-testid="publish-summary"]')
+    await pickDestination(page, 'staging')
+    const summary = page.locator('[data-testid="publish-items-summary"]')
     await expect(summary).toBeVisible()
     await expect(summary).toContainText('modified')
     await expect(summary).toContainText('added')
-    await expect(summary).toContainText('only on target')
+    await expect(summary).toContainText('deleted')
   })
 
-  test('pages and fragments render in separate groups', async ({ page, testSite }) => {
-    // Staging is static-mode so fragments are excluded. Use firstPublish path
-    // with esi-test which includes fragments. Seed one fake sidecar to avoid
-    // the firstPublish banner short-circuit, so the grouped list renders.
+  test('fragment row shows blast-radius badge', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    // esi-test is the dynamic target — fragments appear as first-publish
+    // items there. Wipe first so we get a clean fan-out.
     const esiDir = join(testSite.projectDir, 'sites/main/dist/esi-test')
     await rm(esiDir, { recursive: true, force: true })
-    await seedSidecar(join(esiDir, 'pages/home'), '00000000')
 
-    await page.goto('/admin/pages/home')
-    await page.locator('[data-testid="publish-btn"]').click()
-    await page.locator('[data-testid="publish-target-esi-test"]').click()
-    await expect(page.locator('[data-testid="publish-group-pages"]')).toBeVisible()
-    await expect(page.locator('[data-testid="publish-group-fragments"]')).toBeVisible()
+    await openPublish(page)
+    await pickDestination(page, 'esi-test')
+    const headerRow = page.locator('[data-testid="publish-item-fragments/header"]')
+    await expect(headerRow).toBeVisible()
+    // Fragment rows mount a FragmentBlastRadius component (pulled in via
+    // api.getDependents) — the badge shows the count of pages that reference it.
+    await expect(headerRow.locator('[data-testid="fragment-blast-radius"]')).toBeVisible({ timeout: 5000 })
   })
 
-  test('compare failure surfaces an error message', async ({ page, testSite: _ }) => {
+  test('compare failure surfaces an inline error', async ({ page, testSite: _ }) => {
     test.info().annotations.push({ type: 'allow-console-errors' })
-    // Intercept the compare call and force a 500
+    // Intercept the compare call and force a 500. The item-list composable
+    // reports the error via its own state.
     await page.route('**/admin/api/compare*', route => route.fulfill({
       status: 500, contentType: 'application/json',
       body: JSON.stringify({ error: 'Storage unreachable' }),
     }))
     await openPublish(page)
-    await selectStaging(page)
-    const err = page.locator('[data-testid="publish-compare-error"]')
+    await pickDestination(page, 'staging')
+    const err = page.locator('[data-testid="publish-items-error"]')
     await expect(err).toBeVisible()
     await expect(err).toContainText('Storage unreachable')
   })
 
-  test('deselecting a target aborts its in-flight compare', async ({ page, testSite }) => {
+  test('production destination requires confirmation before publishing', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
-    const requests: { url: string; aborted: boolean }[] = []
-    // Slow the compare call so we have time to deselect before it completes
-    await page.route('**/admin/api/compare*', async (route) => {
-      requests.push({ url: route.request().url(), aborted: false })
-      await new Promise(r => setTimeout(r, 1500))
-      try { await route.continue() } catch { /* aborted */ }
-    })
-    page.on('requestfailed', req => {
-      if (req.url().includes('/admin/api/compare')) {
-        const entry = requests.find(r => r.url === req.url())
-        if (entry) entry.aborted = true
-      }
-    })
-
+    // Fixture swaps the azure-blob production target for a filesystem one
+    // with environment:production so this test doesn't need Azurite.
     await openPublish(page)
-    await selectStaging(page)
-    // Deselect before the slowed compare completes
-    await page.waitForTimeout(200)
-    await page.locator('[data-testid="publish-target-staging"]').click()
-    // The compare error/first-publish/summary should NOT appear, since the
-    // response was discarded. Wait long enough for the fulfillment to finish.
-    await page.waitForTimeout(2000)
-    await expect(page.locator('[data-testid="publish-first-publish"]')).toHaveCount(0)
-    await expect(page.locator('[data-testid="publish-compare-error"]')).toHaveCount(0)
-  })
-
-  test('publishing a fragment shows impacted pages', async ({ page, testSite }) => {
-    await wipe(testSite.projectDir)
-    // Open publish for @header — every starter page includes @header so the
-    // impact block should list them.
-    await page.goto('/admin/fragments/header')
-    await page.locator('[data-testid="publish-btn"]').click()
-    await page.locator('[data-testid="publish-target-esi-test"]').click()
-    const impact = page.locator('[data-testid="publish-impact"]')
-    await expect(impact).toBeVisible()
-    await expect(impact).toContainText('Also affects')
-    // home + about + showcase + 404 all reference @header via their page.json
-    await expect(impact).toContainText('home')
-    await expect(impact).toContainText('about')
-  })
-
-  test('production target requires confirmation before publishing', async ({ page, testSite }) => {
-    await wipe(testSite.projectDir)
-    // The fixture swaps the azure-blob production target for a filesystem
-    // one with environment:production so this test works without Azurite.
-    await openPublish(page)
-    await page.locator('[data-testid="publish-target-production"]').click()
-    await page.locator('[data-testid="publish-submit"]').click()
+    await pickDestination(page, 'production')
+    // First click on Publish reveals the confirmation banner; the button
+    // changes to a danger-styled "Yes, publish to production" variant.
+    await page.locator('[data-testid="publish-panel-confirm"]').click()
     await expect(page.locator('[data-testid="publish-confirm-banner"]')).toBeVisible()
-    await expect(page.locator('[data-testid="publish-confirm"]')).toBeVisible()
+    await expect(page.locator('[data-testid="publish-panel-confirm-prod"]')).toBeVisible()
     await page.locator('button', { hasText: 'Back' }).click()
     await expect(page.locator('[data-testid="publish-confirm-banner"]')).toHaveCount(0)
   })
 
-  test('filesystem target publishes without confirmation', async ({ page, testSite }) => {
+  test('non-production destination publishes without confirmation', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     await openPublish(page)
-    // 'staging' in starter site.yaml is filesystem → environment defaults to 'local'
-    await page.locator('[data-testid="publish-target-staging"]').click()
-    // No confirm banner after clicking Publish; goes straight to action
-    await expect(page.locator('[data-testid="publish-first-publish"]')).toBeVisible()
-    // Publish button is not gated by a confirmation step
+    await pickDestination(page, 'staging')
+    // Staging has environment:staging — no confirmation gate.
+    // Clicking Publish goes straight to the streaming action.
+    await page.locator('[data-testid="publish-panel-confirm"]').click()
     await expect(page.locator('[data-testid="publish-confirm-banner"]')).toHaveCount(0)
+    // Wait for completion — the Done button replaces Cancel/Publish on success.
+    await expect(page.locator('[data-testid="publish-panel-done"]')).toBeVisible({ timeout: 10000 })
   })
 
-  test('publish button disabled while compare is loading', async ({ page, testSite }) => {
+  test('publish streams per-destination progress and lands on results', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
-    // Slow the compare so we can observe the disabled state
-    await page.route('**/admin/api/compare*', async (route) => {
-      await new Promise(r => setTimeout(r, 1500))
-      await route.continue()
-    })
     await openPublish(page)
-    await page.locator('[data-testid="publish-target-staging"]').click()
-    // While compare is still running, Publish should be disabled
-    await expect(page.locator('[data-testid="publish-submit"]')).toBeDisabled()
-    // After compare completes, it re-enables. Generous timeout — the slow-route
-    // stub applies per-request and the publish-status store hits compare first.
-    await expect(page.locator('[data-testid="publish-submit"]')).toBeEnabled({ timeout: 15000 })
+    await pickDestination(page, 'staging')
+    await page.locator('[data-testid="publish-panel-confirm"]').click()
+    // Either we catch the progress block mid-stream, or the publish is fast
+    // enough to land straight on results — both are valid. What matters is
+    // the per-destination result row.
+    const progressBlock = page.locator('[data-testid="publish-progress"]')
+    await Promise.race([
+      progressBlock.waitFor({ timeout: 2000 }).catch(() => null),
+      page.locator('[data-testid="publish-result-staging"]').waitFor({ timeout: 5000 }),
+    ])
+    await expect(page.locator('[data-testid="publish-result-staging"]')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('[data-testid="publish-result-staging"]')).toHaveClass(/success/)
+  })
+
+  test('invalid templates surface as fatal error on publish', async ({ page, testSite }) => {
+    test.info().annotations.push({ type: 'allow-console-errors' })
+    await wipe(testSite.projectDir)
+    // Break the 'hero' template — not parseable ts. The server emits a
+    // 'fatal' SSE event with invalidTemplates, which the panel renders in
+    // the error block.
+    const tpl = join(testSite.projectDir, 'templates/hero/index.ts')
+    await writeFile(tpl, 'this is not valid ts!!!')
+
+    await openPublish(page)
+    await pickDestination(page, 'staging')
+    await page.locator('[data-testid="publish-panel-confirm"]').click()
+    const banner = page.locator('[data-testid="publish-invalid-templates"]')
+    await expect(banner).toBeVisible({ timeout: 10000 })
+    await expect(banner).toContainText('hero')
   })
 
   test('works in light mode', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     await page.goto('/admin')
-    // Toggle to light mode
     const html = page.locator('html')
     if ((await html.getAttribute('class'))?.includes('dark')) {
       await page.locator('[data-testid="theme-toggle"]').click()
     }
-    await openPublish(page)
-    await selectStaging(page)
-    await expect(page.locator('[data-testid="publish-first-publish"]')).toBeVisible()
-    // Sanity: html has light class, not dark
+    await page.locator('[data-testid="publish-btn"]').click()
+    await expect(page.locator('[data-testid="publish-panel"]')).toBeVisible()
+    await pickDestination(page, 'staging')
+    await expect(page.locator('[data-testid="publish-item-pages/home"]')).toBeVisible()
     await expect(html).not.toHaveClass(/dark/)
   })
 
-  test('select-all toggles all changed items at once', async ({ page, testSite }) => {
-    // Seed two stale sidecars + the worker's two fresh pages = 4 selectable
-    // changes (home is currentItem, always pinned). about/showcase/blog/404
-    // start un-checked.
+  test('select-all and select-none toggle every selectable item', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     await openPublish(page)
-    await selectStaging(page)
-    const toggle = page.locator('[data-testid="publish-select-all"]')
-    // First-publish path skips the per-item list entirely — seed a sidecar so
-    // the changes panel renders.
-    await wipe(testSite.projectDir)
-    await seedSidecar(join(stagingDir(testSite.projectDir), 'pages/home'), '00000000')
-    await page.locator('[data-testid="publish-target-staging"]').click()
-    await page.locator('[data-testid="publish-target-staging"]').click()
-    await expect(toggle).toBeVisible()
-    await expect(toggle).toHaveText('Select all')
-    await toggle.click()
-    await expect(toggle).toHaveText('Select none')
-    // Every non-deleted, non-current row's checkbox is now checked
-    const aboutRow = page.locator('[data-testid="publish-change-pages/about"]')
-    await expect(aboutRow.locator('.p-checkbox-checked')).toHaveCount(1)
-    await toggle.click()
-    await expect(toggle).toHaveText('Select all')
-    await expect(aboutRow.locator('.p-checkbox-checked')).toHaveCount(0)
-  })
-
-  test('publish streams per-target progress and lands on results', async ({ page, testSite }) => {
-    await wipe(testSite.projectDir)
-    await openPublish(page)
-    await selectStaging(page)
-    await page.locator('[data-testid="publish-submit"]').click()
-    // Progress block appears at least briefly during the publish
-    const progressBlock = page.locator('[data-testid="publish-progress"]')
-    // Either we see progress or the publish was so fast it went straight to results.
-    // Both are valid — what matters is the final 'Done' button.
-    await Promise.race([
-      progressBlock.waitFor({ timeout: 2000 }).catch(() => null),
-      page.locator('[data-testid="publish-done"]').waitFor({ timeout: 5000 }),
-    ])
-    await expect(page.locator('[data-testid="publish-done"]')).toBeVisible({ timeout: 10000 })
-  })
-
-  test('invalid templates are surfaced and block publish', async ({ page, testSite }) => {
-    test.info().annotations.push({ type: 'allow-console-errors' })
-    await wipe(testSite.projectDir)
-    // Break the 'hero' template — not parseable js. Compare should still
-    // complete but report invalidTemplates.
-    const tpl = join(testSite.projectDir, 'templates/hero/index.ts')
-    await writeFile(tpl, 'this is not valid ts!!!')
-
-    await openPublish(page)
-    await selectStaging(page)
-    const banner = page.locator('[data-testid="publish-invalid-templates"]')
-    await expect(banner).toBeVisible()
-    await expect(banner).toContainText('hero')
-    // Publish button is disabled with the explanatory title
-    const submit = page.locator('[data-testid="publish-submit"]')
-    await expect(submit).toBeDisabled()
-    await expect(submit).toHaveAttribute('title', 'Fix invalid templates before publishing')
+    await pickDestination(page, 'staging')
+    const selectAll = page.locator('[data-testid="publish-select-all"]')
+    const selectNone = page.locator('[data-testid="publish-select-none"]')
+    await expect(selectAll).toBeVisible()
+    // Starts with every item checked (default). Click Select none → button
+    // stays but Publish should become disabled (no items selected).
+    await selectNone.click()
+    await expect(page.locator('[data-testid="publish-panel-confirm"]')).toBeDisabled()
+    await selectAll.click()
+    await expect(page.locator('[data-testid="publish-panel-confirm"]')).toBeEnabled()
   })
 })

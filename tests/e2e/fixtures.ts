@@ -87,7 +87,7 @@ export const test = base.extend<{ page: Page }, { testSite: TestSite; baseURL: s
     const siteYamlPath = resolve(projectDir, 'sites/main/site.yaml')
     const yaml = await readFile(siteYamlPath, 'utf-8')
     const patched = yaml.replace(
-      /production:\s*\n\s*storage:\s*\n\s*type: azure-blob[\s\S]*?container: "[^"]*"/,
+      /production:\s*\n\s*storage:\s*\n\s*type: azure-blob[\s\S]*?container: "[^"]*"\s*\n\s*environment: production/,
       'production:\n    environment: production\n    storage:\n      type: filesystem\n      path: ./dist/prod-test',
     )
     await writeFileFs(siteYamlPath, patched)
