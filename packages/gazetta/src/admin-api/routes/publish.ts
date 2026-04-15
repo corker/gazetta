@@ -4,7 +4,7 @@ import { getType, getEnvironment, isEditable } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
 import { listSidecars } from '../../sidecars.js'
-import type { SourceSidecarWriter } from '../../source-sidecars.js'
+import type { SourceContext } from '../source-context.js'
 import { mapLimit } from '../../concurrency.js'
 import { mapLimitStream } from '../../concurrency.js'
 import type { PublishResult } from '../../publish.js'
@@ -28,8 +28,7 @@ export type PublishProgress =
   | { kind: 'fatal'; error: string; invalidTemplates?: { name: string; errors: string[] }[] }
 
 export function publishRoutes(
-  siteDir: string,
-  sourceStorage: StorageProvider,
+  source: SourceContext,
   preInitTargets?: Map<string, StorageProvider>,
   targetConfigs?: Record<string, TargetConfig>,
   templatesDir?: string,
@@ -37,10 +36,10 @@ export function publishRoutes(
   // clears the cache via its template file watcher. Default: fresh scan
   // on every call (used by the CLI and tests).
   scanTemplatesInjected?: (templatesDir: string, projectRoot: string) => Promise<TemplateInfo[]>,
-  sidecarWriter?: SourceSidecarWriter,
 ) {
   const scan = scanTemplatesInjected ?? scanTemplates
   const app = new Hono()
+  const { storage: sourceStorage, siteDir, sidecarWriter } = source
 
   // Background target initialization
   let targets: Map<string, StorageProvider> | null = preInitTargets ?? null
