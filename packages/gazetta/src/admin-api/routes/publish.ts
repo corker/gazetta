@@ -127,7 +127,7 @@ export function publishRoutes(
             ...missingFragments.map(n => ({ kind: 'fragment' as const, name: n })),
           ], it => sidecarWriter.writeFor(it.kind, it.name))
         }
-        const result = await findDependentsFromSidecars(sourceStorage, { fragment: fragmentName }, { baseDir: siteDir })
+        const result = await findDependentsFromSidecars(source.contentRoot, { fragment: fragmentName })
         return c.json(result)
       }
       // No writer injected (legacy setup) — fall back to the manifest walker.
