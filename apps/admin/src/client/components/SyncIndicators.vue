@@ -16,6 +16,8 @@ import type { TargetInfo } from '../api/client.js'
 
 const sync = useSyncStatusStore()
 
+const emit = defineEmits<{ (e: 'select', name: string): void }>()
+
 function environmentClass(t: TargetInfo): string {
   if (t.environment === 'production') return 'env-production'
   if (t.environment === 'staging') return 'env-staging'
@@ -48,18 +50,20 @@ const chips = computed(() => sync.nonActiveTargets)
 
 <template>
   <div v-if="chips.length > 0" class="sync-indicators" data-testid="sync-indicators">
-    <span
+    <button
       v-for="t in chips"
       :key="t.name"
+      type="button"
       class="sync-chip"
       :class="[environmentClass(t), statusClass(t)]"
       :data-testid="`sync-chip-${t.name}`"
-      :title="`${t.name}: ${statusLabel(t)}`">
+      :title="`${t.name}: ${statusLabel(t)} — click to see changes`"
+      @click="emit('select', t.name)">
       <span class="dot" aria-hidden="true" />
       <span class="name">{{ t.name }}</span>
       <span class="sep" aria-hidden="true">·</span>
       <span class="status">{{ statusLabel(t) }}</span>
-    </span>
+    </button>
   </div>
 </template>
 
@@ -81,6 +85,15 @@ const chips = computed(() => sync.nonActiveTargets)
   border: 1px solid var(--color-border);
   background: transparent;
   letter-spacing: -0.01em;
+  cursor: pointer;
+  font-family: inherit;
+}
+.sync-chip:hover {
+  background: var(--color-hover-bg);
+}
+.sync-chip:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 2px;
 }
 .dot {
   width: 0.375rem;

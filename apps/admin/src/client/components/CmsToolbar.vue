@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
@@ -26,6 +26,17 @@ const uiMode = useUiModeStore()
 const showPublish = ref(false)
 const showFetch = ref(false)
 const showChanges = ref(false)
+/** Target to preselect when the changes drawer opens (set by sync chip clicks). */
+const changesTarget = ref<string | undefined>(undefined)
+
+function openChangesFor(name: string) {
+  changesTarget.value = name
+  showChanges.value = true
+}
+
+// When the drawer closes, clear the override so the next manual open
+// falls back to the user's last-saved target selection.
+watch(showChanges, (open) => { if (!open) changesTarget.value = undefined })
 
 const publishItemType = computed(() => selection.type === 'page' ? 'pages' : 'fragments')
 const publishItemName = computed(() => selection.name ?? '')
@@ -63,7 +74,7 @@ function handleBack() {
       </span>
       <span v-if="site.manifest" class="cms-site-name">{{ site.manifest.name }}</span>
       <ActiveTargetIndicator />
-      <SyncIndicators />
+      <SyncIndicators @select="openChangesFor" />
     </template>
     <template #center>
       <Transition name="fade">
@@ -91,7 +102,7 @@ function handleBack() {
   <PublishDialog v-if="showPublish" :visible="showPublish" :itemType="publishItemType"
     :itemName="publishItemName" @close="showPublish = false" />
   <FetchDialog v-if="showFetch" :visible="showFetch" @close="showFetch = false" />
-  <ChangesDrawer v-model:visible="showChanges" />
+  <ChangesDrawer v-model:visible="showChanges" :target="changesTarget" />
 </template>
 
 <style scoped>
