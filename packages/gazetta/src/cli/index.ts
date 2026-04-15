@@ -559,7 +559,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       for (const [fragName, frag] of site.fragments) {
         if (unchanged.has(`fragments/${fragName}`)) { skipped++; continue }
         const manifestHash = hashManifest(frag, { templateHashes })
-        const { files, removed } = await publishFragmentRendered(fragName, storage, siteDir, targetStorage, templatesDir, manifestHash, site)
+        const { files, removed } = await publishFragmentRendered(fragName, sourceRoot, targetStorage, templatesDir, manifestHash, site)
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} @${fragName}`)

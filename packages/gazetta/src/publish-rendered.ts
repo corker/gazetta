@@ -218,14 +218,13 @@ export async function publishPageStatic(
  */
 export async function publishFragmentRendered(
   fragmentName: string,
-  sourceStorage: StorageProvider,
-  sourceDir: string,
+  sourceRoot: ContentRoot,
   targetStorage: StorageProvider,
   templatesDir?: string,
   manifestHash?: string,
   preloadedSite?: Site,
 ): Promise<{ files: number; removed: number }> {
-  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
+  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot, templatesDir })
   const fragment = site.fragments.get(fragmentName)
   if (!fragment) throw new Error(`Fragment "${fragmentName}" not found`)
 
@@ -369,7 +368,7 @@ export async function publishFragmentWithPurge(
   purge: PurgeStrategy,
   purgeMode: 'all' | 'url' = 'all',
 ): Promise<{ files: number; purgedUrls: string[] }> {
-  const result = await publishFragmentRendered(fragmentName, sourceStorage, sourceDir, targetStorage)
+  const result = await publishFragmentRendered(fragmentName, createContentRoot(sourceStorage, sourceDir), targetStorage)
 
   if (purgeMode === 'all') {
     await purge.purgeAll()

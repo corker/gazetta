@@ -249,7 +249,7 @@ export function publishRoutes(
             const fragName = item.replace('fragments/', '')
             const frag = site.fragments.get(fragName)
             const manifestHash = frag ? hashManifest(frag, { templateHashes }) : undefined
-            const { files } = await publishFragmentRendered(fragName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
+            const { files } = await publishFragmentRendered(fragName, source.contentRoot, targetStorage, tdir, manifestHash, site)
             return { files }
           }
           return { files: 0 } // skipped (e.g. fragment on static target)
