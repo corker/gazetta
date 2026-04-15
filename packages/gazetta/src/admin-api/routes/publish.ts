@@ -114,7 +114,7 @@ export function publishRoutes(
       // items whose sidecars haven't been written yet (fresh dev server,
       // items never saved through the admin) would be invisible.
       if (sidecarWriter) {
-        const site = await loadSite({ siteDir, storage: sourceStorage, templatesDir })
+        const site = await loadSite({ contentRoot: source.contentRoot, templatesDir })
         const [pagesList, fragmentsList] = await Promise.all([
           listSidecars(sourceStorage, source.contentRoot.path('pages')),
           listSidecars(sourceStorage, source.contentRoot.path('fragments')),
@@ -131,7 +131,7 @@ export function publishRoutes(
         return c.json(result)
       }
       // No writer injected (legacy setup) — fall back to the manifest walker.
-      const result = await findFragmentDependents(sourceStorage, siteDir, fragmentName)
+      const result = await findFragmentDependents(source.contentRoot, fragmentName)
       return c.json(result)
     } catch (err) {
       return c.json({ error: (err as Error).message }, 500)
@@ -157,7 +157,7 @@ export function publishRoutes(
       if (!t.has(name)) { yield { kind: 'fatal', error: `Unknown target: ${name}` }; return }
     }
 
-    const allItems = await resolveDependencies(sourceStorage, siteDir, items)
+    const allItems = await resolveDependencies(source.contentRoot, items)
 
     console.log(`  Publishing to ${targetNames.length} target(s):`)
     console.log(`    Items: ${items.join(', ')} (+ ${allItems.length - items.length} dependencies)`)
@@ -176,7 +176,7 @@ export function publishRoutes(
       return
     }
     const templateHashes = templateHashesFrom(templateInfos)
-    const site = await loadSite({ siteDir, storage: sourceStorage, templatesDir: tdir })
+    const site = await loadSite({ contentRoot: source.contentRoot, templatesDir: tdir })
 
     yield { kind: 'start', targets: targetNames, itemsPerTarget: allItems.length }
 
@@ -197,7 +197,7 @@ export function publishRoutes(
           const expanded = new Set(allItems)
           for (const frag of fragmentItems) {
             const name = frag.replace('fragments/', '')
-            const deps = await findFragmentDependents(sourceStorage, siteDir, name)
+            const deps = await findFragmentDependents(source.contentRoot, name)
             for (const p of deps.pages) expanded.add(`pages/${p}`)
           }
           targetItems = [...expanded]
@@ -213,7 +213,9 @@ export function publishRoutes(
         let totalFiles = 0
 
         // 1. Source copy
-        const { copiedFiles } = await publishItems(sourceStorage, siteDir, targetStorage, '', targetItems)
+        const { createContentRoot } = await import('../../content-root.js')
+        const targetRoot = createContentRoot(targetStorage)
+        const { copiedFiles } = await publishItems(source.contentRoot, targetRoot, targetItems)
         totalFiles += copiedFiles
         current++
         yield { kind: 'progress', target: targetName, current, total, label: 'source files' }
@@ -281,7 +283,7 @@ export function publishRoutes(
               await purge.purgeAll()
               console.log(`    ${targetName}: cache purged (all)`)
             } else if (config?.siteUrl) {
-              const siteForUrls = await loadSite({ siteDir, storage: sourceStorage, templatesDir })
+              const siteForUrls = await loadSite({ contentRoot: source.contentRoot, templatesDir })
               const urls = targetItems
                 .filter(i => i.startsWith('pages/'))
                 .map(i => {
@@ -390,7 +392,9 @@ export function publishRoutes(
     console.log(`    Items: ${items.join(', ')}`)
 
     try {
-      const { copiedFiles } = await publishItems(targetStorage, '', sourceStorage, siteDir, items)
+      const { createContentRoot } = await import('../../content-root.js')
+      const targetRoot = createContentRoot(targetStorage)
+      const { copiedFiles } = await publishItems(targetRoot, source.contentRoot, items)
       console.log(`    ${copiedFiles} files copied to working copy`)
       return c.json({ success: true, copiedFiles, items })
     } catch (err) {
