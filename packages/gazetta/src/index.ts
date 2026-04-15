@@ -29,6 +29,8 @@ export {
 export type { TargetRegistry } from './targets.js'
 export { createContentRoot } from './content-root.js'
 export type { ContentRoot } from './content-root.js'
+export { createSourceContext, createSourceContextFromRegistry } from './admin-api/source-context.js'
+export type { SourceContext } from './admin-api/source-context.js'
 export type {
   HistoryProvider,
   Revision,
