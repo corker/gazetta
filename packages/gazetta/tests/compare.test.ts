@@ -189,4 +189,14 @@ describe('compareTargets', () => {
     const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
     expect(r.unchanged.sort()).toEqual(['fragments/header', 'pages/home'])
   })
+
+  it('accepts sourceRoot as preferred shape', async () => {
+    const { createContentRoot } = await import('../src/content-root.js')
+    const sourceRoot = createContentRoot(source, siteDir)
+    const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
+    // Fresh start: everything is added (target is empty), firstPublish = true
+    expect(r.firstPublish).toBe(true)
+    expect(r.added).toContain('pages/home')
+    expect(r.added).toContain('fragments/header')
+  })
 })
