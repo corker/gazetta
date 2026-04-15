@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
@@ -8,8 +8,6 @@ import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
-import FetchDialog from './FetchDialog.vue'
-import ChangesDrawer from './ChangesDrawer.vue'
 import PublishPanel from './PublishPanel.vue'
 import ActiveTargetIndicator from './ActiveTargetIndicator.vue'
 import SyncIndicators from './SyncIndicators.vue'
@@ -23,27 +21,23 @@ const selection = useSelectionStore()
 const editing = useEditingStore()
 const theme = useThemeStore()
 const uiMode = useUiModeStore()
-const showPublish = ref(false)
-const showFetch = ref(false)
-const showChanges = ref(false)
-/** Target to preselect when the changes drawer opens (set by sync chip clicks). */
-const changesTarget = ref<string | undefined>(undefined)
 
-function openChangesFor(name: string) {
-  changesTarget.value = name
-  showChanges.value = true
+const showPublish = ref(false)
+/** Destination to preselect in the panel (set by sync chip clicks). */
+const publishInitialDestination = ref<string | undefined>(undefined)
+
+function openPublishFor(name: string) {
+  publishInitialDestination.value = name
+  showPublish.value = true
 }
 
-// When the drawer closes, clear the override so the next manual open
-// falls back to the user's last-saved target selection.
-watch(showChanges, (open) => { if (!open) changesTarget.value = undefined })
+function openPublish() {
+  publishInitialDestination.value = undefined
+  showPublish.value = true
+}
 
-/**
- * Publish availability — unlike the old PublishDialog (which was scoped to
- * a single selected item), the new PublishPanel is a cross-target operation
- * that needs a source and destinations, not a selected page/fragment.
- * It's gated only on unsaved edits (to prevent publishing stale data).
- */
+// Publish is a cross-target operation — gated only on unsaved edits so we
+// never publish stale data.
 const canPublish = computed(() => !editing.hasPendingEdits)
 
 // Disabled buttons need to explain themselves — silent click-with-nothing-happens
@@ -77,7 +71,7 @@ function handleBack() {
       </span>
       <span v-if="site.manifest" class="cms-site-name">{{ site.manifest.name }}</span>
       <ActiveTargetIndicator />
-      <SyncIndicators @select="openChangesFor" />
+      <SyncIndicators @select="openPublishFor" />
     </template>
     <template #center>
       <Transition name="fade">
@@ -93,18 +87,12 @@ function handleBack() {
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
       <Button v-if="uiMode.mode === 'edit'" label="Save" icon="pi pi-save" severity="primary" :loading="editing.saving"
         data-testid="save-btn" :title="saveTitle" :disabled="!editing.hasPendingEdits" @click="editing.save()" size="small" class="cms-btn" />
-      <Button icon="pi pi-arrow-right-arrow-left" text rounded title="Changes"
-        data-testid="changes-btn" @click="showChanges = true" size="small" class="cms-btn" />
-      <Button label="Fetch" icon="pi pi-cloud-download" severity="info"
-        data-testid="fetch-btn" @click="showFetch = true" size="small" class="cms-btn" />
       <Button label="Publish" icon="pi pi-cloud-upload" severity="success"
-        data-testid="publish-btn" :title="publishTitle" :disabled="!canPublish" @click="showPublish = true" size="small" class="cms-btn" />
+        data-testid="publish-btn" :title="publishTitle" :disabled="!canPublish" @click="openPublish" size="small" class="cms-btn" />
     </template>
   </Toolbar>
 
-  <PublishPanel v-model:visible="showPublish" />
-  <FetchDialog v-if="showFetch" :visible="showFetch" @close="showFetch = false" />
-  <ChangesDrawer v-model:visible="showChanges" :target="changesTarget" />
+  <PublishPanel v-model:visible="showPublish" :initialDestination="publishInitialDestination" />
 </template>
 
 <style scoped>
