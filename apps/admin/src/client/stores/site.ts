@@ -26,30 +26,40 @@ export const useSiteStore = defineStore('site', () => {
   async function doLoad(retries = 5) {
     loading.value = true
     error.value = null
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const [site, pageList, fragmentList] = await Promise.all([
-          api.getSite(),
-          api.getPages(),
-          api.getFragments(),
-        ])
-        manifest.value = site
-        pages.value = pageList
-        fragments.value = fragmentList
-        loading.value = false
-        return
-      } catch (err) {
-        const msg = (err as Error).message
-        if (attempt < retries && (msg.includes('502') || msg.includes('Failed to fetch') || msg.includes('not ready'))) {
-          await new Promise(r => setTimeout(r, 1000))
-          continue
+    try {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const [site, pageList, fragmentList] = await Promise.all([
+            api.getSite(),
+            api.getPages(),
+            api.getFragments(),
+          ])
+          manifest.value = site
+          pages.value = pageList
+          fragments.value = fragmentList
+          return
+        } catch (err) {
+          const msg = (err as Error).message
+          if (attempt < retries && (msg.includes('502') || msg.includes('Failed to fetch') || msg.includes('not ready'))) {
+            await new Promise(r => setTimeout(r, 1000))
+            continue
+          }
+          error.value = msg
+          return
         }
-        error.value = msg
       }
+    } finally {
+      loading.value = false
+      loadPromise = null  // Clear so subsequent load() calls actually re-fetch
     }
-    loading.value = false
-    loadPromise = null
   }
 
-  return { manifest, pages, fragments, loading, error, load, ensureLoaded }
+  /** Force-refetch site content — used when the active target switches. */
+  async function reload() {
+    loadPromise = null
+    manifest.value = null
+    return load()
+  }
+
+  return { manifest, pages, fragments, loading, error, load, reload, ensureLoaded }
 })
