@@ -239,7 +239,29 @@ async function collectComponentDeps(
  * baked into pages at publish time. On ESI targets, republishing the fragment
  * alone suffices because the edge composer resolves @fragments per request.
  */
+export async function findFragmentDependents(sourceRoot: ContentRoot, fragmentName: string): Promise<{ pages: string[]; fragments: string[] }>
+export async function findFragmentDependents(storage: StorageProvider, siteBase: string, fragmentName: string): Promise<{ pages: string[]; fragments: string[] }>
 export async function findFragmentDependents(
+  sourceOrStorage: ContentRoot | StorageProvider,
+  siteBaseOrFragmentName: string,
+  fragmentNameMaybe?: string,
+): Promise<{ pages: string[]; fragments: string[] }> {
+  let storage: StorageProvider
+  let siteBase: string
+  let fragmentName: string
+  if (isContentRoot(sourceOrStorage)) {
+    storage = sourceOrStorage.storage
+    siteBase = sourceOrStorage.rootPath
+    fragmentName = siteBaseOrFragmentName
+  } else {
+    storage = sourceOrStorage
+    siteBase = siteBaseOrFragmentName
+    fragmentName = fragmentNameMaybe!
+  }
+  return findFragmentDependentsImpl(storage, siteBase, fragmentName)
+}
+
+async function findFragmentDependentsImpl(
   storage: StorageProvider,
   siteBase: string,
   fragmentName: string,

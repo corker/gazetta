@@ -4,6 +4,7 @@ import { hashManifest } from './hash.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from './templates-scan.js'
 import { listSidecars } from './sidecars.js'
 import type { StorageProvider } from './types.js'
+import { createContentRoot, type ContentRoot } from './content-root.js'
 
 export interface CompareResult {
   /** Items present locally but not on target (no sidecar found) */
@@ -21,9 +22,17 @@ export interface CompareResult {
 }
 
 export interface CompareOptions {
-  source: StorageProvider
+  /**
+   * Source content root (preferred). When set, `source` and `siteDir` are
+   * derived from it. For backward compatibility, callers can still pass
+   * `source` and `siteDir` directly instead.
+   */
+  sourceRoot?: ContentRoot
+  /** @deprecated Prefer `sourceRoot`. */
+  source?: StorageProvider
   target: StorageProvider
-  siteDir: string
+  /** @deprecated Prefer `sourceRoot`. */
+  siteDir?: string
   templatesDir: string
   projectRoot: string
   /**
@@ -52,6 +61,18 @@ export interface CompareOptions {
  * `fragments/{name}` form so they can be passed back to publish.
  */
 export async function compareTargets(opts: CompareOptions): Promise<CompareResult> {
+  // Resolve source rooting once: prefer sourceRoot, else construct from
+  // the legacy (source, siteDir) pair.
+  let sourceRoot: ContentRoot
+  if (opts.sourceRoot) {
+    sourceRoot = opts.sourceRoot
+  } else {
+    if (!opts.source || opts.siteDir === undefined) {
+      throw new Error('compareTargets: either sourceRoot, or both source and siteDir, must be provided')
+    }
+    sourceRoot = createContentRoot(opts.source, opts.siteDir)
+  }
+
   // 1. Validate + hash templates
   const scan = opts.scanTemplates ?? scanTemplates
   const templateInfos = await scan(opts.templatesDir, opts.projectRoot)
@@ -63,10 +84,10 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   // Source-side sidecars (written on save) let us skip re-hashing for items
   // whose manifest + templates haven't changed since the last save. Fall
   // back to hashManifest for items without a source sidecar.
-  const site = await loadSite({ siteDir: opts.siteDir, storage: opts.source, templatesDir: opts.templatesDir })
+  const site = await loadSite({ contentRoot: sourceRoot, templatesDir: opts.templatesDir })
   const [sourcePagesSidecars, sourceFragmentsSidecars] = await Promise.all([
-    listSidecars(opts.source, join(opts.siteDir, 'pages')),
-    listSidecars(opts.source, join(opts.siteDir, 'fragments')),
+    listSidecars(sourceRoot.storage, sourceRoot.path('pages')),
+    listSidecars(sourceRoot.storage, sourceRoot.path('fragments')),
   ])
   // Hash fragments first (they don't depend on page hashes). Static-mode
   // page hashes include fragment hashes so a fragment content change
