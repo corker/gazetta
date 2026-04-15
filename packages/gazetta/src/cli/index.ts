@@ -444,25 +444,24 @@ export default template
 }
 
 async function runPublish(siteDir: string, targetName?: string, opts: { force?: boolean } = {}) {
-  const storage = createFilesystemProvider()
   const projectRoot = detectProjectRoot(siteDir)
   const templatesDir = join(projectRoot, 'templates')
 
-  const site = await loadSite({ siteDir, storage, templatesDir })
-
-  // Load target configs from site.yaml
-  const siteYamlPath = join(siteDir, 'site.yaml')
-  if (!existsSync(siteYamlPath)) {
-    console.error(`\n  ${c.red('Error:')} No site.yaml found at ${siteDir}\n`)
+  // Source comes from the default editable target in site.yaml.
+  const { buildSourceContext } = await import('./bootstrap.js')
+  let source, manifest, targetConfigs
+  try {
+    ({ source, manifest, targetConfigs } = await buildSourceContext({ projectSiteDir: siteDir }))
+  } catch (err) {
+    console.error(`\n  ${c.red('Error:')} ${(err as Error).message}\n`)
     process.exit(1)
   }
-  const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as import('../types.js').SiteManifest
+  const storage = source.storage
+  const site = await loadSite({ contentRoot: source.contentRoot, templatesDir, manifest })
+
+  const siteYaml = manifest
   if (!siteYaml.targets || Object.keys(siteYaml.targets).length === 0) {
-    console.error(`\n  Error: no targets configured in ${siteYamlPath}`)
-    console.error(`\n  Add a target to site.yaml:\n`)
-    console.error(`    targets:`)
-    console.error(`      staging:`)
-    console.error(`        storage: { type: filesystem, path: ./dist/staging }\n`)
+    console.error(`\n  Error: no targets configured in site.yaml`)
     process.exit(1)
   }
 
@@ -523,9 +522,8 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     const unchanged = new Set<string>()
     if (!opts.force) {
       const { compareTargets } = await import('../compare.js')
-      const { createContentRoot } = await import('../content-root.js')
       const cmp = await compareTargets({
-        sourceRoot: createContentRoot(storage, siteDir),
+        sourceRoot: source.contentRoot,
         target: targetStorage,
         templatesDir,
         projectRoot,
@@ -535,8 +533,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       for (const item of cmp.unchanged) unchanged.add(item)
     }
     let skipped = 0
-    const { createContentRoot } = await import('../content-root.js')
-    const sourceRoot = createContentRoot(storage, siteDir)
+    const sourceRoot = source.contentRoot
 
     if (isStatic) {
       // Static mode — fully assembled HTML, no fragments needed separately.
