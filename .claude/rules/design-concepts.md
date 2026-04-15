@@ -57,7 +57,7 @@ the CMS adapts its UI progressively based on what's configured (see design-edito
 |----------|--------|---------|
 | **Type** | `static` / `dynamic` | When rendering happens (publish time vs request time) |
 | **Environment** | `local` / `staging` / `production` (or unset) | Drives UI treatment (colors, prod warnings) and suggestion hints. No custom values. |
-| **Editable** | `yes` / `no` | Whether author can save form-edits to this target and receive publishes into it |
+| **Editable** | `yes` / `no` | Whether author can save form-edits to this target and receive publishes into it. Default: `yes` for `environment: local`, `no` for `staging` and `production`. Explicit override always wins. |
 
 Properties are independent. Examples: `{type: static, environment: local, editable: yes}` for
 a local dev target; `{type: static, environment: production, editable: no}` for a publish-only
