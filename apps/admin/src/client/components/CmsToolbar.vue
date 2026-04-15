@@ -11,6 +11,7 @@ import { useUiModeStore } from '../stores/uiMode.js'
 import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
 import ChangesDrawer from './ChangesDrawer.vue'
+import ActiveTargetIndicator from './ActiveTargetIndicator.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -60,6 +61,7 @@ function handleBack() {
         Gazetta
       </span>
       <span v-if="site.manifest" class="cms-site-name">{{ site.manifest.name }}</span>
+      <ActiveTargetIndicator />
     </template>
     <template #center>
       <Transition name="fade">

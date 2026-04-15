@@ -3,14 +3,19 @@ import { onMounted } from 'vue'
 import { useSiteStore } from './stores/site.js'
 import { useThemeStore } from './stores/theme.js'
 import { useToastStore } from './stores/toast.js'
+import { useActiveTargetStore } from './stores/activeTarget.js'
 import Toolbar from './components/CmsToolbar.vue'
 import UnsavedDialog from './components/UnsavedDialog.vue'
 
 const site = useSiteStore()
 const theme = useThemeStore()
 const toast = useToastStore()
+const activeTarget = useActiveTargetStore()
 onMounted(() => {
   theme.init()
+  // Kick off target loading — the indicator renders once this resolves.
+  // Failures are stored on the store; the indicator simply hides.
+  activeTarget.load()
 })
 </script>
 
