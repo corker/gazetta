@@ -240,7 +240,7 @@ export function publishRoutes(
             const page = site.pages.get(pageName)
             const manifestHash = page ? hashManifest(page, pageHashOpts) : undefined
             if (isStatic) {
-              return publishPageStatic(pageName, sourceStorage, siteDir, targetStorage, tdir, manifestHash, site)
+              return publishPageStatic(pageName, source.contentRoot, targetStorage, tdir, manifestHash, site)
             }
             const { files } = await publishPageRendered(pageName, sourceStorage, siteDir, targetStorage, config?.cache, tdir, manifestHash, site)
             return { files }

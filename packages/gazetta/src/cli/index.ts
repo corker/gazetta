@@ -535,6 +535,8 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       for (const item of cmp.unchanged) unchanged.add(item)
     }
     let skipped = 0
+    const { createContentRoot } = await import('../content-root.js')
+    const sourceRoot = createContentRoot(storage, siteDir)
 
     if (isStatic) {
       // Static mode — fully assembled HTML, no fragments needed separately.
@@ -548,7 +550,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       for (const [pageName, page] of site.pages) {
         if (unchanged.has(`pages/${pageName}`)) { skipped++; continue }
         const manifestHash = hashManifest(page, { templateHashes, fragmentHashes })
-        const { files } = await publishPageStatic(pageName, storage, siteDir, targetStorage, templatesDir, manifestHash, site)
+        const { files } = await publishPageStatic(pageName, sourceRoot, targetStorage, templatesDir, manifestHash, site)
         totalFiles += files
         console.log(`    ${c.green('✓')} ${pageName}`)
       }
@@ -574,8 +576,6 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     if (skipped > 0) console.log(`    ${c.dim(`· ${skipped} unchanged (skipped)`)}`)
 
     // Site manifest + fragment index
-    const { createContentRoot } = await import('../content-root.js')
-    const sourceRoot = createContentRoot(storage, siteDir)
     await publishSiteManifest(sourceRoot, targetStorage, site)
     await publishFragmentIndex(sourceRoot, targetStorage, site)
     totalFiles += 2

@@ -177,14 +177,13 @@ ${bodyContent}
  */
 export async function publishPageStatic(
   pageName: string,
-  sourceStorage: StorageProvider,
-  sourceDir: string,
+  sourceRoot: ContentRoot,
   targetStorage: StorageProvider,
   templatesDir?: string,
   manifestHash?: string,
   preloadedSite?: Site,
 ): Promise<{ files: number }> {
-  const site = preloadedSite ?? await loadSite({ siteDir: sourceDir, storage: sourceStorage, templatesDir })
+  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot, templatesDir })
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
