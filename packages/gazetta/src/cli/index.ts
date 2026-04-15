@@ -782,8 +782,9 @@ async function runAdmin(siteDir: string, port: number) {
   const app = new Hono()
   app.get('/__reload', (ctx) => ctx.body(null, 204))
 
-  const fsStorage = createFilesystemProvider()
-  await setupProductionMode(app, siteDir, fsStorage, builtAdminDir, templatesDir, adminDir)
+  const { buildSourceContext } = await import('./bootstrap.js')
+  const { source, targetConfigs } = await buildSourceContext({ projectSiteDir: siteDir })
+  await setupProductionMode(app, source, siteDir, builtAdminDir, templatesDir, adminDir, targetConfigs)
 
   // SPA fallback for non-API admin routes
   app.get('*', (ctx) => {
@@ -1084,12 +1085,16 @@ function renderErrorOverlay(err: Error): string {
 }
 
 async function runDev(siteDir: string, port: number) {
-  const storage = createFilesystemProvider()
   const projectRoot = detectProjectRoot(siteDir)
   const templatesDir = join(projectRoot, 'templates')
   const adminDir = join(projectRoot, 'admin')
 
-  const site = await loadSite({ siteDir, storage, templatesDir })
+  // Build the source context from the default editable target in site.yaml.
+  // Cloud targets aren't init'd — admin API handles them lazily.
+  const { buildSourceContext } = await import('./bootstrap.js')
+  const { source, manifest, targetConfigs } = await buildSourceContext({ projectSiteDir: siteDir })
+  const site = await loadSite({ contentRoot: source.contentRoot, templatesDir, manifest })
+  const storage = source.storage
 
   const app = new Hono()
 
@@ -1116,7 +1121,7 @@ async function runDev(siteDir: string, port: number) {
   for (const [pageName, page] of site.pages) {
     app.get(page.route, async (c) => {
       try {
-        const freshSite = await loadSite({ siteDir, storage, templatesDir })
+        const freshSite = await loadSite({ contentRoot: source.contentRoot, templatesDir, manifest })
         const resolved = await resolvePage(pageName, freshSite)
         const html = await renderPage(resolved, c.req.param())
         return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
@@ -1140,10 +1145,10 @@ async function runDev(siteDir: string, port: number) {
   }) | null = null
   if (isDevMode) {
     // Dev mode: mount CMS API inline (same process = shared template cache)
-    cmsApp = await setupCmsApi(app, siteDir, storage, templatesDir, adminDir)
+    cmsApp = await setupCmsApi(app, source, siteDir, templatesDir, adminDir, targetConfigs)
   } else if (cmsStaticDir) {
     // Production mode: inline CMS API + static files
-    cmsApp = await setupProductionMode(app, siteDir, storage, cmsStaticDir, templatesDir, adminDir)
+    cmsApp = await setupProductionMode(app, source, siteDir, cmsStaticDir, templatesDir, adminDir, targetConfigs)
   }
 
   // ---- 404 ----
@@ -1353,31 +1358,32 @@ function mountUserThemeRoute(cmsApp: Hono, adminDir: string) {
   })
 }
 
-async function setupCmsApi(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, templatesDir: string, adminDir: string): Promise<Hono & { invalidateTemplatesCache(): void; invalidateSourceSidecars(): void; writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void> }> {
-  const siteYamlPath = join(siteDir, 'site.yaml')
-  let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
-  if (existsSync(siteYamlPath)) {
-    const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as SiteManifest
-    targetConfigs = siteYaml.targets
-  }
-  const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, targetConfigs })
+async function setupCmsApi(
+  app: Hono,
+  source: import('../admin-api/source-context.js').SourceContext,
+  siteDir: string,
+  templatesDir: string,
+  adminDir: string,
+  targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined,
+): Promise<Hono & { invalidateTemplatesCache(): void; invalidateSourceSidecars(): void; writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void> }> {
+  const cmsApp = createAdminApp({ source, siteDir, templatesDir, adminDir, targetConfigs })
   mountUserThemeRoute(cmsApp, adminDir)
   app.route('/admin', cmsApp)
   return cmsApp
 }
 
 // ---- Production mode: inline CMS API + static files from admin-dist/ ----
-async function setupProductionMode(app: Hono, siteDir: string, storage: ReturnType<typeof createFilesystemProvider>, cmsStaticDir: string, templatesDir: string, adminDir: string) {
-  // Read target configs from site.yaml — targets are initialized lazily on first publish/fetch
-  const siteYamlPath = join(siteDir, 'site.yaml')
-  let targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined
-  if (existsSync(siteYamlPath)) {
-    const siteYaml = yaml.load(readFileSync(siteYamlPath, 'utf-8')) as SiteManifest
-    targetConfigs = siteYaml.targets
-  }
-
+async function setupProductionMode(
+  app: Hono,
+  source: import('../admin-api/source-context.js').SourceContext,
+  siteDir: string,
+  cmsStaticDir: string,
+  templatesDir: string,
+  adminDir: string,
+  targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined,
+) {
   // Mount CMS API inline at /admin (production mode — bundled editors/fields)
-  const cmsApp = createAdminApp({ siteDir, storage, templatesDir, adminDir, production: true, targetConfigs })
+  const cmsApp = createAdminApp({ source, siteDir, templatesDir, adminDir, production: true, targetConfigs })
   mountUserThemeRoute(cmsApp, adminDir)
   app.route('/admin', cmsApp)
 
