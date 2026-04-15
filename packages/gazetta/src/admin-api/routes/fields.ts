@@ -1,17 +1,17 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
-import type { StorageProvider } from '../../types.js'
+import type { SourceContext } from '../source-context.js'
 
 const FIELD_EXTENSIONS = ['.ts', '.tsx']
 
-export function fieldRoutes(siteDir: string, storage: StorageProvider, adminDir?: string) {
+export function fieldRoutes(source: SourceContext, adminDir?: string) {
   const app = new Hono()
-  const fieldsDir = join(adminDir ?? join(siteDir, 'admin'), 'fields')
+  const fieldsDir = join(adminDir ?? join(source.siteDir, 'admin'), 'fields')
 
   app.get('/api/fields', async (c) => {
-    if (!await storage.exists(fieldsDir)) return c.json([])
+    if (!await source.storage.exists(fieldsDir)) return c.json([])
 
-    const entries = await storage.readDir(fieldsDir)
+    const entries = await source.storage.readDir(fieldsDir)
     const fields = entries
       .filter(e => !e.isDirectory && FIELD_EXTENSIONS.some(ext => e.name.endsWith(ext)))
       .map(e => {
