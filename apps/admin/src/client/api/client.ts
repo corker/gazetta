@@ -1,12 +1,43 @@
 // API is relative to the CMS base path: /admin/api, /cms/api, or /api
 const BASE = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') + '/api'
 
+/**
+ * Active-target provider — injected at app boot. When set, content-reading
+ * api calls auto-append `?target=<active>` so the server reads from the
+ * target the author is focused on.
+ *
+ * Kept as an injected function rather than an import to preserve DIP: the
+ * api client doesn't depend on the active-target store (the store wires
+ * itself in via main.ts).
+ */
+type ActiveTargetProvider = () => string | null
+let activeTargetProvider: ActiveTargetProvider | null = null
+
+/** Wire the api client to read the active target from the provided source. */
+export function setActiveTargetProvider(provider: ActiveTargetProvider | null): void {
+  activeTargetProvider = provider
+}
+
+/**
+ * Append `?target=<active>` to a URL path when the active-target provider
+ * is set and the path doesn't already specify a target. Query string is
+ * added before any existing `#fragment` (none expected in api URLs).
+ */
+function withActiveTarget(path: string): string {
+  const name = activeTargetProvider?.()
+  if (!name) return path
+  // Skip if caller already set ?target= explicitly (e.g., compare destination)
+  if (/[?&]target=/.test(path)) return path
+  const sep = path.includes('?') ? '&' : '?'
+  return `${path}${sep}target=${encodeURIComponent(name)}`
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem('gazetta_token')
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers: { ...headers, ...options?.headers } })
+  const res = await fetch(`${BASE}${withActiveTarget(path)}`, { ...options, headers: { ...headers, ...options?.headers } })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(body.error ?? `Request failed: ${res.status}`)
@@ -145,7 +176,14 @@ export const api = {
   getTargets: () => request<TargetInfo[]>('/targets'),
   publish: (items: string[], targets: string[]) => request<{ results: PublishResult[] }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
   publishStream,
-  compare: (target: string, options?: RequestInit) => request<CompareResult>(`/compare?target=${encodeURIComponent(target)}`, options),
+  compare: (target: string, options?: RequestInit) => {
+    // Include active target as source override; server reads ?source= for the
+    // compare's source editable target. If no provider is set, server falls
+    // back to its default editable target.
+    const src = activeTargetProvider?.()
+    const qs = src ? `?target=${encodeURIComponent(target)}&source=${encodeURIComponent(src)}` : `?target=${encodeURIComponent(target)}`
+    return request<CompareResult>(`/compare${qs}`, options)
+  },
   getDependents: (item: string, options?: RequestInit) => request<{ pages: string[]; fragments: string[] }>(`/dependents?item=${encodeURIComponent(item)}`, options),
   fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),
 }

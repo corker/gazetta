@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useSiteStore } from './stores/site.js'
 import { useThemeStore } from './stores/theme.js'
 import { useToastStore } from './stores/toast.js'
 import { useActiveTargetStore } from './stores/activeTarget.js'
+import { setActiveTargetProvider } from './api/client.js'
 import Toolbar from './components/CmsToolbar.vue'
 import UnsavedDialog from './components/UnsavedDialog.vue'
 
@@ -11,6 +12,20 @@ const site = useSiteStore()
 const theme = useThemeStore()
 const toast = useToastStore()
 const activeTarget = useActiveTargetStore()
+
+// Bridge the active-target store to the api client — from now on, every
+// content-reading request auto-appends ?target=<active>. Done once at boot;
+// the api client reads the current value on each request.
+setActiveTargetProvider(() => activeTarget.activeTargetName)
+
+// Reload site + content when the active target switches so the tree,
+// editor, and preview show the new target's view immediately.
+watch(() => activeTarget.activeTargetName, (name, prev) => {
+  if (name && prev && name !== prev) {
+    site.reload()
+  }
+})
+
 onMounted(() => {
   theme.init()
   // Kick off target loading — the indicator renders once this resolves.
