@@ -1,13 +1,13 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import { loadSite } from '../../site-loader.js'
-import type { SourceContext } from '../source-context.js'
+import type { SourceContextResolver } from '../source-context.js'
 
-export function fragmentRoutes(source: SourceContext) {
+export function fragmentRoutes(resolve: SourceContextResolver) {
   const app = new Hono()
-  const { storage, sidecarWriter } = source
 
   app.get('/api/fragments', async (c) => {
+    const source = await resolve(c.req.query('target'))
     const site = await loadSite({ contentRoot: source.contentRoot })
     const fragments = [...site.fragments.entries()].map(([name, frag]) => ({
       name,
@@ -17,6 +17,8 @@ export function fragmentRoutes(source: SourceContext) {
   })
 
   app.post('/api/fragments', async (c) => {
+    const source = await resolve(c.req.query('target'))
+    const { storage, sidecarWriter } = source
     const body = await c.req.json() as { name: string; template: string }
     if (!body.name || !body.template) {
       return c.json({ error: 'Missing required fields: name, template' }, 400)
@@ -38,6 +40,7 @@ export function fragmentRoutes(source: SourceContext) {
 
   app.get('/api/fragments/:name', async (c) => {
     const name = c.req.param('name')
+    const source = await resolve(c.req.query('target'))
     const site = await loadSite({ contentRoot: source.contentRoot })
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
@@ -52,6 +55,8 @@ export function fragmentRoutes(source: SourceContext) {
 
   app.put('/api/fragments/:name', async (c) => {
     const name = c.req.param('name')
+    const source = await resolve(c.req.query('target'))
+    const { storage, sidecarWriter } = source
     const site = await loadSite({ contentRoot: source.contentRoot })
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
@@ -70,6 +75,8 @@ export function fragmentRoutes(source: SourceContext) {
 
   app.delete('/api/fragments/:name', async (c) => {
     const name = c.req.param('name')
+    const source = await resolve(c.req.query('target'))
+    const { storage } = source
     const site = await loadSite({ contentRoot: source.contentRoot })
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)

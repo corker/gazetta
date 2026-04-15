@@ -6,7 +6,8 @@ import { scanTemplates } from '../templates-scan.js'
 import { memoizeAsync } from '../concurrency.js'
 import { createSourceSidecarWriter, type SourceSidecarWriter } from '../source-sidecars.js'
 import { createContentRoot } from '../content-root.js'
-import { createSourceContext, type SourceContext } from './source-context.js'
+import { createTargetRegistryView } from '../targets.js'
+import { createSourceContext, staticSourceResolver, registrySourceResolver, type SourceContext, type SourceContextResolver } from './source-context.js'
 import { authMiddleware } from './middleware/auth.js'
 import { siteRoutes } from './routes/site.js'
 import { pageRoutes } from './routes/pages.js'
@@ -104,14 +105,38 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
     })
   }
 
-  app.route('/', siteRoutes(source))
-  app.route('/', pageRoutes(source))
-  app.route('/', fragmentRoutes(source))
-  app.route('/', templateRoutes(source, templatesDir, adminDir, opts.production))
-  app.route('/', previewRoutes(source, templatesDir))
+  // Build the per-request source resolver. When a target registry is
+  // available, routes can honor `?target=<name>` to read from any known
+  // target. Without a registry, the resolver is static — always returns
+  // the bootstrap source (legacy behavior).
+  //
+  // The static resolver is used when only `opts.source` or `opts.storage`
+  // is supplied (tests, single-target setups). The registry resolver is
+  // used when `opts.targets` + `opts.targetConfigs` are present (the
+  // production dev/admin path).
+  let resolveSource: SourceContextResolver
+  if (opts.targets && opts.targetConfigs && Object.keys(opts.targetConfigs).length > 0) {
+    const registry = createTargetRegistryView(opts.targets, opts.targetConfigs)
+    resolveSource = registrySourceResolver({
+      registry,
+      projectSiteDir: source.projectSiteDir,
+      sidecarWriter,
+      // The registry's filesystem targets are already content-rooted
+      // (path=./targets/<key>); siteDir on the resolved context is empty.
+      siteDir: '',
+    })
+  } else {
+    resolveSource = staticSourceResolver(source)
+  }
+
+  app.route('/', siteRoutes(resolveSource))
+  app.route('/', pageRoutes(resolveSource))
+  app.route('/', fragmentRoutes(resolveSource))
+  app.route('/', templateRoutes(resolveSource, templatesDir, adminDir, opts.production))
+  app.route('/', previewRoutes(resolveSource, templatesDir))
   app.route('/', publishRoutes(source, opts.targets, opts.targetConfigs, templatesDir, scan))
-  app.route('/', compareRoutes(source, opts.targets, opts.targetConfigs, templatesDir, scan))
-  app.route('/', fieldRoutes(source, adminDir))
+  app.route('/', compareRoutes(resolveSource, opts.targets, opts.targetConfigs, templatesDir, scan))
+  app.route('/', fieldRoutes(resolveSource, adminDir))
 
   // Exposed for the CLI's template file watcher: clears the memoized scan
   // so the next publish/compare picks up template edits. Not part of the

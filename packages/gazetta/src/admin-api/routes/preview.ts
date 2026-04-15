@@ -3,9 +3,9 @@ import type { ResolvedComponent } from '../../types.js'
 import { loadSite } from '../../site-loader.js'
 import { resolveFragment, resolvePage } from '../../resolver.js'
 import { renderFragment, renderPage } from '../../renderer.js'
-import type { SourceContext } from '../source-context.js'
+import type { SourceContext, SourceContextResolver } from '../source-context.js'
 
-export function previewRoutes(source: SourceContext, templatesDir?: string) {
+export function previewRoutes(resolve: SourceContextResolver, templatesDir?: string) {
   const app = new Hono()
 
   // No caching — preview always serves fresh content for editing
@@ -15,10 +15,12 @@ export function previewRoutes(source: SourceContext, templatesDir?: string) {
   })
 
   app.get('/preview/*', async (c) => {
+    const source = await resolve(c.req.query('target'))
     return renderPreview(c, source, undefined, templatesDir)
   })
 
   app.post('/preview/*', async (c) => {
+    const source = await resolve(c.req.query('target'))
     const body = await c.req.json() as { overrides?: Record<string, Record<string, unknown>> }
     return renderPreview(c, source, body.overrides, templatesDir)
   })
