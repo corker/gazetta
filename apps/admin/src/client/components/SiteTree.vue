@@ -10,6 +10,7 @@ import { usePublishStatusStore } from '../stores/publishStatus.js'
 import { api } from '../api/client.js'
 import CreatePageDialog from './CreatePageDialog.vue'
 import CreateFragmentDialog from './CreateFragmentDialog.vue'
+import FragmentBlastRadius from './FragmentBlastRadius.vue'
 
 interface SiteNode {
   key: string
@@ -136,6 +137,7 @@ async function handleDelete(node: SiteNode, e: Event) {
       @click="onSelect(node)">
       <i :class="node.icon" class="node-icon" />
       <span class="node-label">{{ node.label }}</span>
+      <FragmentBlastRadius :fragmentName="node.name" compact />
       <span v-if="isDirty(node)" class="node-dirty-dot" :title="dirtyTitle()"
         :data-testid="`dirty-${node.type}-${node.name}`" />
       <Button icon="pi pi-trash" text rounded size="small" severity="danger"

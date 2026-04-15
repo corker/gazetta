@@ -15,6 +15,9 @@ import { api } from '../api/client.js'
 const props = defineProps<{
   /** Fragment name (not including the leading @). */
   fragmentName: string
+  /** Compact mode — icon + count only, no "used on N pages" label.
+   *  For dense lists (tree rows) where full text would wrap or clutter. */
+  compact?: boolean
 }>()
 
 const pages = ref<string[] | null>(null)
@@ -39,11 +42,16 @@ const summary = (pages: string[]) => pages.length === 1 ? 'used on 1 page' : `us
 </script>
 
 <template>
-  <span v-if="pages" class="blast-radius" data-testid="fragment-blast-radius"
+  <span v-if="pages" :class="['blast-radius', { compact }]" data-testid="fragment-blast-radius"
     :title="pages.length > 0 ? `Used on: ${pages.join(', ')}` : 'Not used on any page yet'">
     <i class="pi pi-sitemap" aria-hidden="true" />
-    <span v-if="pages.length > 0">{{ summary(pages) }}</span>
-    <span v-else class="unused">not used yet</span>
+    <template v-if="compact">
+      <span class="count">{{ pages.length }}</span>
+    </template>
+    <template v-else>
+      <span v-if="pages.length > 0">{{ summary(pages) }}</span>
+      <span v-else class="unused">not used yet</span>
+    </template>
   </span>
 </template>
 
@@ -67,5 +75,15 @@ const summary = (pages: string[]) => pages.length === 1 ? 'used on 1 page' : `us
 .blast-radius .unused {
   font-style: italic;
   opacity: 0.75;
+}
+.blast-radius.compact {
+  padding: 0 0.25rem;
+  border: 0;
+  background: transparent;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.6875rem;
+}
+.blast-radius.compact .count {
+  font-weight: 600;
 }
 </style>
