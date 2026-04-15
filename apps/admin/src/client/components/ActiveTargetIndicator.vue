@@ -16,9 +16,13 @@
 import { computed, ref } from 'vue'
 import Menu from 'primevue/menu'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
+import { useEditingStore } from '../stores/editing.js'
+import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import type { TargetInfo } from '../api/client.js'
 
 const activeTarget = useActiveTargetStore()
+const editing = useEditingStore()
+const unsavedGuard = useUnsavedGuardStore()
 const menu = ref<InstanceType<typeof Menu> | null>(null)
 
 const visible = computed(() => activeTarget.targets.length > 0 && activeTarget.activeTarget !== null)
@@ -37,12 +41,27 @@ const menuItems = computed(() => activeTarget.targets.map((t: TargetInfo) => ({
   label: t.name,
   icon: iconFor(t),
   class: t.name === activeTarget.activeTargetName ? 'active' : '',
-  command: () => {
-    if (t.name !== activeTarget.activeTargetName) {
-      activeTarget.setActiveTarget(t.name)
-    }
-  },
+  command: () => switchTo(t.name),
 })))
+
+/**
+ * Switch active target with an unsaved-changes guard — same pattern as
+ * the router's route-leave hook. Without this, switching to another
+ * target while the editor has pending edits would either silently drop
+ * them (clear on switch) or save them against the new target (the save
+ * closure resolves `?target=<active>` at call time). Forcing a Save /
+ * Don't Save / Cancel decision keeps the author in control.
+ */
+async function switchTo(name: string) {
+  if (name === activeTarget.activeTargetName) return
+  if (editing.hasPendingEdits) {
+    const result = await unsavedGuard.guard()
+    if (result === 'cancel') return
+    if (result === 'save') await editing.save()
+    editing.clear()
+  }
+  activeTarget.setActiveTarget(name)
+}
 
 function iconFor(t: TargetInfo): string {
   if (t.name === activeTarget.activeTargetName) return 'pi pi-check'

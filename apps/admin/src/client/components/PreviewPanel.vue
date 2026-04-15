@@ -11,7 +11,6 @@ import { useUiModeStore } from '../stores/uiMode.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useRouter } from 'vue-router'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
-import PreviewTargetTabs from './PreviewTargetTabs.vue'
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
 function hashPath(path: string): string {
@@ -491,7 +490,6 @@ watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce:
       <p>Select a page or fragment to preview</p>
     </div>
     <template v-else>
-      <PreviewTargetTabs v-if="uiMode.mode !== 'fullscreen'" />
       <div class="preview-toolbar">
         <div class="preview-devices">
           <button v-for="(preset, i) in devicePresets" :key="preset.label"
