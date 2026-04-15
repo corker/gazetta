@@ -90,3 +90,62 @@ export function createSourceContextFromRegistry(opts: SourceContextFromRegistryO
     sidecarWriter: opts.sidecarWriter,
   })
 }
+
+/**
+ * Resolve a source for a request. Per-request indirection that lets the
+ * admin API pick the content source based on the caller's requested target
+ * (via `?target=<name>` query string, typically driven client-side by the
+ * active-target store).
+ *
+ * Implementations:
+ *   - Static: always returns the same SourceContext (single-target setups,
+ *     tests, or the "source is target" legacy path)
+ *   - Registry-backed: looks up `?target=<name>` in a TargetRegistry and
+ *     builds a SourceContext from the matched target
+ *
+ * The resolver is called once per handler invocation; implementations can
+ * memoize where appropriate.
+ */
+export type SourceContextResolver = (targetName: string | undefined) => SourceContext | Promise<SourceContext>
+
+/** Static resolver — always returns the given SourceContext regardless of requested target. */
+export function staticSourceResolver(source: SourceContext): SourceContextResolver {
+  return () => source
+}
+
+export interface RegistrySourceResolverOptions {
+  registry: TargetRegistry
+  /** Required — absolute project site directory for the returned context. */
+  projectSiteDir: string
+  /** Optional sidecar writer attached to every resolved context. */
+  sidecarWriter?: SourceSidecarWriter
+  /**
+   * Siteprefix to apply to the target's storage. Typically `''` since
+   * registry-sourced storage is already target-rooted.
+   */
+  siteDir?: string
+}
+
+/**
+ * Registry-backed resolver — picks the named target (or the registry's
+ * default editable when none is named) and wraps its storage in a
+ * SourceContext. Memoizes one context per target name so repeated
+ * requests for the same target share the same contentRoot instance.
+ */
+export function registrySourceResolver(opts: RegistrySourceResolverOptions): SourceContextResolver {
+  const cache = new Map<string, SourceContext>()
+  return (targetName: string | undefined) => {
+    const name = targetName ?? opts.registry.defaultEditable()
+    const cached = cache.get(name)
+    if (cached) return cached
+    const ctx = createSourceContextFromRegistry({
+      registry: opts.registry,
+      targetName: name,
+      projectSiteDir: opts.projectSiteDir,
+      siteDir: opts.siteDir,
+      sidecarWriter: opts.sidecarWriter,
+    })
+    cache.set(name, ctx)
+    return ctx
+  }
+}
