@@ -1,13 +1,13 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import { loadSite } from '../../site-loader.js'
-import type { SourceContext } from '../source-context.js'
+import type { SourceContextResolver } from '../source-context.js'
 
-export function pageRoutes(source: SourceContext) {
+export function pageRoutes(resolve: SourceContextResolver) {
   const app = new Hono()
-  const { storage, sidecarWriter } = source
 
   app.get('/api/pages', async (c) => {
+    const source = await resolve(c.req.query('target'))
     const site = await loadSite({ contentRoot: source.contentRoot })
     const pages = [...site.pages.entries()].map(([name, page]) => ({
       name,
@@ -18,6 +18,8 @@ export function pageRoutes(source: SourceContext) {
   })
 
   app.post('/api/pages', async (c) => {
+    const source = await resolve(c.req.query('target'))
+    const { storage, sidecarWriter } = source
     const body = await c.req.json() as { name: string; template: string; content?: Record<string, unknown> }
     if (!body.name || !body.template) {
       return c.json({ error: 'Missing required fields: name, template' }, 400)
@@ -43,6 +45,7 @@ export function pageRoutes(source: SourceContext) {
 
   app.get('/api/pages/:name{.+}', async (c) => {
     const name = c.req.param('name')
+    const source = await resolve(c.req.query('target'))
     const site = await loadSite({ contentRoot: source.contentRoot })
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
@@ -58,6 +61,8 @@ export function pageRoutes(source: SourceContext) {
 
   app.put('/api/pages/:name{.+}', async (c) => {
     const name = c.req.param('name')
+    const source = await resolve(c.req.query('target'))
+    const { storage, sidecarWriter } = source
     const site = await loadSite({ contentRoot: source.contentRoot })
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
@@ -76,6 +81,8 @@ export function pageRoutes(source: SourceContext) {
 
   app.delete('/api/pages/:name{.+}', async (c) => {
     const name = c.req.param('name')
+    const source = await resolve(c.req.query('target'))
+    const { storage } = source
     const site = await loadSite({ contentRoot: source.contentRoot })
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)

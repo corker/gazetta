@@ -3,26 +3,30 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { loadTemplate, hasEditorFile } from '../../template-loader.js'
 import { createFilesystemProvider } from '../../providers/filesystem.js'
-import type { SourceContext } from '../source-context.js'
+import type { SourceContextResolver } from '../source-context.js'
 
 const EDITOR_EXTENSIONS = ['.tsx', '.ts']
 
-export function templateRoutes(source: SourceContext, templatesDir?: string, adminDir?: string, production?: boolean) {
+export function templateRoutes(resolve: SourceContextResolver, templatesDir?: string, adminDir?: string, production?: boolean) {
   const app = new Hono()
-  const { projectSiteDir } = source
   // Templates and admin live at project level, outside target content storage.
   // Read them via a cwd-rooted filesystem provider and absolute paths.
   const storage = createFilesystemProvider()
-  const tplDir = templatesDir ?? join(projectSiteDir, 'templates')
-  const admDir = adminDir ?? join(projectSiteDir, 'admin')
-  const editorsDir = join(admDir, 'editors')
-  const fieldsDir = join(admDir, 'fields')
 
-  // In dev mode, Vite serves source files via /@fs/ URLs
-  // In production, pre-bundled JS files are served from /admin/editors/ and /admin/fields/
-  const fieldsBaseUrl = production ? '/admin/fields' : `/admin/@fs/${fieldsDir}`
+  async function dirs(c: import('hono').Context) {
+    const source = await resolve(c.req.query('target'))
+    const { projectSiteDir } = source
+    const tplDir = templatesDir ?? join(projectSiteDir, 'templates')
+    const admDir = adminDir ?? join(projectSiteDir, 'admin')
+    const editorsDir = join(admDir, 'editors')
+    const fieldsDir = join(admDir, 'fields')
+    // In dev mode, Vite serves source files via /@fs/ URLs
+    const fieldsBaseUrl = production ? '/admin/fields' : `/admin/@fs/${fieldsDir}`
+    return { tplDir, editorsDir, fieldsBaseUrl }
+  }
 
   app.get('/api/templates', async (c) => {
+    const { tplDir } = await dirs(c)
     if (!await storage.exists(tplDir)) return c.json([])
 
     const entries = await storage.readDir(tplDir)
@@ -32,6 +36,7 @@ export function templateRoutes(source: SourceContext, templatesDir?: string, adm
 
   app.get('/api/templates/:name/schema', async (c) => {
     const name = c.req.param('name')
+    const { tplDir, editorsDir, fieldsBaseUrl } = await dirs(c)
 
     try {
       const loaded = await loadTemplate(storage, tplDir, name)

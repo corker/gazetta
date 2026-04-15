@@ -51,8 +51,8 @@ describe('fields API', () => {
 
     const { fieldRoutes } = await import('../src/admin-api/routes/fields.js')
     const storage = createFilesystemProvider()
-    const { createSourceContext } = await import('../src/admin-api/source-context.js')
-    const app = fieldRoutes(createSourceContext({ storage, siteDir: testDir }))
+    const { createSourceContext, staticSourceResolver } = await import('../src/admin-api/source-context.js')
+    const app = fieldRoutes(staticSourceResolver(createSourceContext({ storage, siteDir: testDir })))
     const res = await app.request('/api/fields')
     expect(res.status).toBe(200)
     const fields = await res.json() as { name: string; path: string }[]
@@ -65,8 +65,8 @@ describe('fields API', () => {
 
     const { fieldRoutes } = await import('../src/admin-api/routes/fields.js')
     const storage = createFilesystemProvider()
-    const { createSourceContext } = await import('../src/admin-api/source-context.js')
-    const app = fieldRoutes(createSourceContext({ storage, siteDir: testDir }))
+    const { createSourceContext, staticSourceResolver } = await import('../src/admin-api/source-context.js')
+    const app = fieldRoutes(staticSourceResolver(createSourceContext({ storage, siteDir: testDir })))
     const res = await app.request('/api/fields')
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual([])
@@ -79,8 +79,8 @@ describe('fields API', () => {
 
     const { fieldRoutes } = await import('../src/admin-api/routes/fields.js')
     const storage = createFilesystemProvider()
-    const { createSourceContext } = await import('../src/admin-api/source-context.js')
-    const app = fieldRoutes(createSourceContext({ storage, siteDir: testDir }))
+    const { createSourceContext, staticSourceResolver } = await import('../src/admin-api/source-context.js')
+    const app = fieldRoutes(staticSourceResolver(createSourceContext({ storage, siteDir: testDir })))
     const res = await app.request('/api/fields')
     const fields = await res.json() as { name: string }[]
     expect(fields).toHaveLength(1)
@@ -95,9 +95,9 @@ describe('templates API includes fieldsBaseUrl', () => {
     const storage = createFilesystemProvider()
 
     const { templateRoutes } = await import('../src/admin-api/routes/templates.js')
-    const { createSourceContext } = await import('../src/admin-api/source-context.js')
+    const { createSourceContext, staticSourceResolver } = await import('../src/admin-api/source-context.js')
     const source = createSourceContext({ storage, siteDir })
-    const app = templateRoutes(source, join(projectRoot, 'templates'), join(projectRoot, 'admin'))
+    const app = templateRoutes(staticSourceResolver(source), join(projectRoot, 'templates'), join(projectRoot, 'admin'))
 
     const res = await app.request('/api/templates/hero/schema')
     expect(res.status).toBe(200)
@@ -114,9 +114,9 @@ describe('templates API includes fieldsBaseUrl', () => {
     const storage = createFilesystemProvider()
 
     const { templateRoutes } = await import('../src/admin-api/routes/templates.js')
-    const { createSourceContext } = await import('../src/admin-api/source-context.js')
+    const { createSourceContext, staticSourceResolver } = await import('../src/admin-api/source-context.js')
     const source = createSourceContext({ storage, siteDir })
-    const app = templateRoutes(source, join(projectRoot, 'templates'), join(projectRoot, 'admin'))
+    const app = templateRoutes(staticSourceResolver(source), join(projectRoot, 'templates'), join(projectRoot, 'admin'))
 
     const res = await app.request('/api/templates/banner/schema')
     expect(res.status).toBe(200)
