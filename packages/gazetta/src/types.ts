@@ -131,6 +131,13 @@ export interface TargetConfig {
    * mounts used as production, or for cloud targets used for staging.
    */
   environment?: TargetEnvironment
+  /**
+   * Whether the author can save form-edits to this target and whether it
+   * can receive publishes from the CMS. Default: `true`.
+   * Set to `false` for targets that should be read-only from the CMS
+   * (e.g., production published only via CLI/CI, not from the admin UI).
+   */
+  editable?: boolean
   /** Base URL of the site (e.g. https://gazetta.studio) */
   siteUrl?: string
   cache?: CacheConfig
@@ -144,6 +151,11 @@ export function getType(target: TargetConfig): TargetType {
 /** Resolve a target's environment, applying the storage-type default */
 export function getEnvironment(target: TargetConfig): TargetEnvironment {
   return target.environment ?? (target.storage.type === 'filesystem' ? 'local' : 'production')
+}
+
+/** Whether the author can save and receive publishes on this target from the CMS. Default: true. */
+export function isEditable(target: TargetConfig): boolean {
+  return target.editable ?? true
 }
 
 /** Site manifest (site.yaml) */

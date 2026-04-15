@@ -332,6 +332,24 @@ describe('publishPageStatic', () => {
   })
 })
 
+describe('isEditable', () => {
+  it('defaults to true when not set', async () => {
+    const { isEditable } = await import('../src/types.js')
+    expect(isEditable({ storage: { type: 'filesystem', path: './dist' } })).toBe(true)
+    expect(isEditable({ storage: { type: 'r2' } })).toBe(true)
+  })
+
+  it('respects explicit editable: false', async () => {
+    const { isEditable } = await import('../src/types.js')
+    expect(isEditable({ storage: { type: 'r2' }, editable: false })).toBe(false)
+  })
+
+  it('respects explicit editable: true', async () => {
+    const { isEditable } = await import('../src/types.js')
+    expect(isEditable({ storage: { type: 'r2' }, editable: true })).toBe(true)
+  })
+})
+
 describe('getType', () => {
   // Import dynamically to avoid circular deps
   it('returns dynamic when worker configured', async () => {

@@ -18,7 +18,7 @@ export type {
   StorageProvider,
   PurgeStrategy,
 } from './types.js'
-export { getType } from './types.js'
+export { getType, isEditable } from './types.js'
 export type { TargetType } from './types.js'
 
 // Renderer
