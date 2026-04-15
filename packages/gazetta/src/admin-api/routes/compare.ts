@@ -14,7 +14,7 @@ export function compareRoutes(
   scanTemplatesInjected?: (templatesDir: string, projectRoot: string) => Promise<TemplateInfo[]>,
 ) {
   const app = new Hono()
-  const { siteDir } = source
+  const { projectSiteDir } = source
 
   let targets: Map<string, StorageProvider> | null = preInitTargets ?? null
   const initPromise: Promise<Map<string, StorageProvider>> = preInitTargets
@@ -23,7 +23,7 @@ export function compareRoutes(
       ? Promise.resolve(new Map())
       : (async () => {
           const { createTargetRegistry } = await import('../../targets.js')
-          targets = await createTargetRegistry(targetConfigs, siteDir)
+          targets = await createTargetRegistry(targetConfigs, projectSiteDir)
           return targets
         })()
   if (!preInitTargets) {
@@ -43,9 +43,9 @@ export function compareRoutes(
     const targetStorage = t.get(targetName)
     if (!targetStorage) return c.json({ error: `Unknown target: ${targetName}` }, 400)
 
-    const tdir = templatesDir ?? join(siteDir, 'templates')
-    // Walk up from siteDir to find the project root (parent of "sites/")
-    const projectRoot = siteDir.replace(/[\\/]sites[\\/][^\\/]+$/, '')
+    const tdir = templatesDir ?? join(projectSiteDir, 'templates')
+    // Walk up from the project site dir to find the project root (parent of "sites/")
+    const projectRoot = projectSiteDir.replace(/[\\/]sites[\\/][^\\/]+$/, '')
 
     const targetConfig = targetConfigs?.[targetName]
     const type = targetConfig ? getType(targetConfig) : 'dynamic'

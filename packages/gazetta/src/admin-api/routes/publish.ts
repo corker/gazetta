@@ -39,7 +39,7 @@ export function publishRoutes(
 ) {
   const scan = scanTemplatesInjected ?? scanTemplates
   const app = new Hono()
-  const { storage: sourceStorage, siteDir, sidecarWriter } = source
+  const { storage: sourceStorage, projectSiteDir, sidecarWriter } = source
 
   // Background target initialization
   let targets: Map<string, StorageProvider> | null = preInitTargets ?? null
@@ -49,7 +49,7 @@ export function publishRoutes(
       ? Promise.resolve(new Map())
       : (async () => {
           const { createTargetRegistry } = await import('../../targets.js')
-          targets = await createTargetRegistry(targetConfigs, siteDir)
+          targets = await createTargetRegistry(targetConfigs, projectSiteDir)
           return targets
         })()
 
@@ -163,8 +163,8 @@ export function publishRoutes(
     console.log(`    Items: ${items.join(', ')} (+ ${allItems.length - items.length} dependencies)`)
     console.log(`    Targets: ${targetNames.join(', ')}`)
 
-    const tdir = templatesDir ?? `${siteDir}/templates`
-    const projectRoot = siteDir.replace(/\/sites\/[^/]+$/, '')
+    const tdir = templatesDir ?? `${projectSiteDir}/templates`
+    const projectRoot = projectSiteDir.replace(/\/sites\/[^/]+$/, '')
     const templateInfos = await scan(tdir, projectRoot)
     const invalidTpls = templateInfos.filter(t => !t.valid)
     if (invalidTpls.length) {

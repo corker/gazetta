@@ -23,9 +23,23 @@ describe('createSourceContext', () => {
     const source = createSourceContext({ storage, siteDir: '/abs/site' })
     expect(source.storage).toBe(storage)
     expect(source.siteDir).toBe('/abs/site')
+    expect(source.projectSiteDir).toBe('/abs/site')     // defaults to siteDir
     expect(source.contentRoot.storage).toBe(storage)
     expect(source.contentRoot.rootPath).toBe('/abs/site')
     expect(source.contentRoot.path('pages', 'home')).toBe('/abs/site/pages/home')
+  })
+
+  it('distinguishes siteDir (storage rooting) from projectSiteDir', () => {
+    const storage = mockProvider()
+    const source = createSourceContext({
+      storage,
+      siteDir: '',                         // target-rooted storage
+      projectSiteDir: '/abs/project/sites/main',
+    })
+    expect(source.siteDir).toBe('')
+    expect(source.projectSiteDir).toBe('/abs/project/sites/main')
+    // Content paths are target-relative
+    expect(source.contentRoot.path('pages', 'home')).toBe('pages/home')
   })
 
   it('forwards the sidecar writer when provided', () => {
@@ -52,9 +66,10 @@ describe('createSourceContextFromRegistry', () => {
     ])
     const registry = createTargetRegistryView(providers, configs)
 
-    const source = createSourceContextFromRegistry({ registry, siteDir: '/abs/site' })
+    const source = createSourceContextFromRegistry({ registry, projectSiteDir: '/abs/site' })
     expect(source.storage).toBe(localProvider)
-    expect(source.siteDir).toBe('/abs/site')
+    expect(source.siteDir).toBe('')              // storage-rooting prefix — empty for registry-sourced
+    expect(source.projectSiteDir).toBe('/abs/site')
   })
 
   it('honors an explicit targetName', () => {
@@ -65,7 +80,7 @@ describe('createSourceContextFromRegistry', () => {
     ])
     const registry = createTargetRegistryView(providers, configs)
 
-    const source = createSourceContextFromRegistry({ registry, targetName: 'staging', siteDir: '.' })
+    const source = createSourceContextFromRegistry({ registry, targetName: 'staging', projectSiteDir: '.' })
     expect(source.storage).toBe(stagingProvider)
   })
 
@@ -75,11 +90,11 @@ describe('createSourceContextFromRegistry', () => {
       prod: { storage: { type: 'r2' }, environment: 'production' },
     }
     const registry = createTargetRegistryView(new Map(), readOnlyConfigs)
-    expect(() => createSourceContextFromRegistry({ registry, siteDir: '.' })).toThrow(NoEditableTargetError)
+    expect(() => createSourceContextFromRegistry({ registry, projectSiteDir: '.' })).toThrow(NoEditableTargetError)
   })
 
   it('throws UnknownTargetError when an explicit targetName is not in the registry', () => {
     const registry = createTargetRegistryView(new Map(), configs)
-    expect(() => createSourceContextFromRegistry({ registry, targetName: 'missing', siteDir: '.' })).toThrow(UnknownTargetError)
+    expect(() => createSourceContextFromRegistry({ registry, targetName: 'missing', projectSiteDir: '.' })).toThrow(UnknownTargetError)
   })
 })

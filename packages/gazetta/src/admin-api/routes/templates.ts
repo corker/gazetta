@@ -8,9 +8,9 @@ const EDITOR_EXTENSIONS = ['.tsx', '.ts']
 
 export function templateRoutes(source: SourceContext, templatesDir?: string, adminDir?: string, production?: boolean) {
   const app = new Hono()
-  const { storage, siteDir } = source
-  const tplDir = templatesDir ?? join(siteDir, 'templates')
-  const admDir = adminDir ?? join(siteDir, 'admin')
+  const { storage, projectSiteDir } = source
+  const tplDir = templatesDir ?? join(projectSiteDir, 'templates')
+  const admDir = adminDir ?? join(projectSiteDir, 'admin')
   const editorsDir = join(admDir, 'editors')
   const fieldsDir = join(admDir, 'fields')
 

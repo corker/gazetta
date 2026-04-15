@@ -18,11 +18,21 @@ export interface SourceContext {
   /** Storage provider for source reads and writes. */
   readonly storage: StorageProvider
   /**
-   * Site directory path prefix — the path under `storage` where content lives.
-   * Empty string when storage is already rooted at the content root (target-rooted).
+   * Path prefix applied to storage operations — where content lives *under*
+   * the storage provider. Empty string when storage is already rooted at
+   * the content root (target-rooted), equal to `projectSiteDir` when storage
+   * is cwd-rooted (legacy).
+   * @deprecated Prefer `contentRoot.path(...)` for building content paths.
    */
   readonly siteDir: string
-  /** Content root (storage + siteDir paired for path construction). */
+  /**
+   * Absolute path to the project's site directory — where site.yaml lives,
+   * and the parent of `templates/` and `admin/`. Independent of storage
+   * rooting: always the on-disk project path, even when the content storage
+   * is target-rooted elsewhere.
+   */
+  readonly projectSiteDir: string
+  /** Content root (storage + rooting prefix paired for path construction). */
   readonly contentRoot: ContentRoot
   /** Optional sidecar writer for write-through hash/dependency tracking. */
   readonly sidecarWriter?: SourceSidecarWriter
@@ -30,7 +40,10 @@ export interface SourceContext {
 
 export interface CreateSourceContextOptions {
   storage: StorageProvider
+  /** Path prefix applied to storage — see SourceContext.siteDir. */
   siteDir: string
+  /** Absolute project site directory. Defaults to `siteDir` for backward compat. */
+  projectSiteDir?: string
   sidecarWriter?: SourceSidecarWriter
 }
 
@@ -38,6 +51,7 @@ export function createSourceContext(opts: CreateSourceContextOptions): SourceCon
   return {
     storage: opts.storage,
     siteDir: opts.siteDir,
+    projectSiteDir: opts.projectSiteDir ?? opts.siteDir,
     contentRoot: createContentRoot(opts.storage, opts.siteDir),
     sidecarWriter: opts.sidecarWriter,
   }
@@ -48,11 +62,16 @@ export interface SourceContextFromRegistryOptions {
   /** Target name to use as the source. Defaults to `registry.defaultEditable()`. */
   targetName?: string
   /**
-   * Site directory to use as the content root path prefix. Typically the
-   * absolute site directory when the registry's storage is cwd-rooted; empty
-   * when the registry's storage is already target-rooted.
+   * Path prefix applied to the target's storage. Typically `''` — most
+   * registry-sourced targets are already content-rooted (filesystem provider
+   * at `<siteDir>/targets/<key>`, cloud provider at a bucket).
    */
-  siteDir: string
+  siteDir?: string
+  /**
+   * Absolute project site directory — where site.yaml lives. Required.
+   * This is independent of the target's storage rooting.
+   */
+  projectSiteDir: string
   sidecarWriter?: SourceSidecarWriter
 }
 
@@ -66,7 +85,8 @@ export function createSourceContextFromRegistry(opts: SourceContextFromRegistryO
   const storage = opts.registry.get(name)
   return createSourceContext({
     storage,
-    siteDir: opts.siteDir,
+    siteDir: opts.siteDir ?? '',
+    projectSiteDir: opts.projectSiteDir,
     sidecarWriter: opts.sidecarWriter,
   })
 }

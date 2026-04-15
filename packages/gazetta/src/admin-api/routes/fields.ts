@@ -6,7 +6,7 @@ const FIELD_EXTENSIONS = ['.ts', '.tsx']
 
 export function fieldRoutes(source: SourceContext, adminDir?: string) {
   const app = new Hono()
-  const fieldsDir = join(adminDir ?? join(source.siteDir, 'admin'), 'fields')
+  const fieldsDir = join(adminDir ?? join(source.projectSiteDir, 'admin'), 'fields')
 
   app.get('/api/fields', async (c) => {
     if (!await source.storage.exists(fieldsDir)) return c.json([])
