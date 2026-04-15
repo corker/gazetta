@@ -32,12 +32,13 @@ hide the save button, and show read-only indicators.
 
 ## Switching active target
 
-Switching is always allowed and cheap — it's focus, not a commitment. No confirmation
-dialogs, no loading states. Two affordances for two intents:
+Switching is cheap in browse mode; in edit mode with unsaved changes it triggers the
+same unsaved-changes guard as any other navigation. One affordance, one place:
 
-### Global target switch (top-bar selector)
+### Top-bar switcher (sole switcher)
 
-**Intent:** "Navigate my workspace to a different target."
+**Intent:** navigate workspace focus to a different target — works equally for
+"show me this page on staging" (A/B comparison) and "go edit staging next."
 
 - Location: top bar, always visible
 - Shows: active target name + environment chrome + sync indicators for other targets
@@ -45,38 +46,30 @@ dialogs, no loading states. Two affordances for two intents:
   - If focused item (page/fragment) exists on destination → preserve focus, swap target
   - If focused item doesn't exist on destination → focus drops to site root; transient banner:
     *"pages/pricing isn't on staging — showing site root"* with one-click "back to pages/pricing on local"
-- Feel: deliberate, navigational
+  - If the editor has unsaved edits → unsaved-changes dialog (Save / Don't Save / Cancel)
+    runs before the switch, same flow as router-driven navigation. Keeps the author in
+    control and prevents silent drops or writes to the wrong target.
 
-### Page-context target switch (preview tabs)
-
-**Intent:** "Compare this page across targets."
-
-- Location: top of the preview pane (preview is always page-scoped, so scope is implicit)
-- Shows: one tab per target, active tab highlighted, disabled for targets missing this item
-- Behavior:
-  - Instant swap
-  - Preserves preview scroll, viewport, zoom
-  - Preserves editor scroll + per-target dirty form state
-  - Updates top-bar active target in sync
-  - Disabled tab tooltip: *"pages/pricing isn't on staging. [Publish from local]"*
-- Feel: rapid, A/B toggle, no commitment
-
-Both switchers mutate the same active-target state; they differ in affordance placement
-and implied intent.
+**Why one switcher, not two:** an earlier design had a second "preview tabs" affordance
+at the top of the preview pane for rapid A/B flipping. Since page selection survives
+target switches, the top-bar switcher already gives rapid A/B — the second affordance
+was redundant and invited accidental switches during editing. Same rationale as unified
+Publish: one verb per concern.
 
 ## What's preserved across switches
 
-Switching must not disorient the author. Preserve across active-target switches:
+Switching must not disorient the author. Preserve across active-target switches in
+browse mode:
 
 - **Preview**: scroll position, viewport size, zoom, device mode
-- **Editor**: scroll position, expanded fields, per-target dirty form state
 - **Tree**: expansion state
 - **Selection**: focused item + any sub-selection
-- **Form state per target**: each editable target has its own in-memory draft;
-  switching away and back restores it
 
-Per-target dirty form state means: edit on local → switch to prod to peek → switch back to local
-→ unsaved edits are still there. Only explicit "discard" or reload clears form state.
+In edit mode, the unsaved-changes guard runs first. On *Save* or *Don't Save* the
+editor clears (as with any page-to-page navigation); on *Cancel* nothing changes.
+Per-target dirty form state is not preserved — the guard makes the author's intent
+explicit, and preserving parallel drafts across targets invites drift that's hard to
+reason about ("which draft was I on again?").
 
 ## Making the active target unmistakable
 
@@ -87,7 +80,6 @@ active without conscious thought. Design commitments:
   Local is neutral. Staging is amber. Applied to the whole workspace, not just a corner —
   peripheral vision catches it.
 - **Persistent target name** in a fixed top-bar position, large enough to read without focus
-- **Strong active tab** styling on preview tabs
 - **Save button label** reflects the target: "Save to prod" when prod is active (when editable)
 
 If the author is editing production directly (allowed by `editable: yes` on prod), the prod
@@ -97,8 +89,8 @@ chrome is permanent — no confirmation dialog, but constant visual warning.
 
 An item is "available" on a target if its path exists there. Availability determines:
 
-- **Preview tab state**: disabled if item missing, enabled otherwise
-- **Global switch fallback**: if item missing on destination, drop focus to root
+- **Top-bar switcher menu**: targets missing the focused item still switch, but focus
+  falls back to the site root with a transient banner (see "Switching active target").
 - **Empty-state messaging**: when an item doesn't exist on the destination, show a publish
   affordance ("Publish pages/pricing from local to staging") rather than a raw error
 
@@ -148,12 +140,11 @@ set display ungrouped alongside groups.
 | Surface | ≤ 3 targets (flat) | 4+ targets (grouped) |
 |---------|--------------------|-----------------------|
 | Top-bar sync indicators | `staging · 3b   prod · 7b` | `staging · 3b   production (2) · 7b` (click → expand) |
-| Preview tabs | `[ local \| staging \| prod ]` | `[ local \| staging \| production ▾ ]` |
+| Top-bar switcher menu | Flat list of targets | Grouped by environment with sub-menus |
 | Publish picker (From / To) | Flat dropdown | Dropdown grouped by environment with headers |
 
-**Cycling within a group:** Clicking a group tab directly cycles through its members; the
-chevron opens an explicit member picker. When a group member is active, the tab/indicator
-shows which: `[ production: prod-us ▾ ]`.
+**Cycling within a group:** hovering a group in the switcher menu reveals its members;
+when a group member is active, the indicator shows which: `production: prod-us`.
 
 **Grouping is presentation only.** Environments remain non-hierarchical in the model;
 grouping is a UX compression for density, not a configured concept.
@@ -178,11 +169,10 @@ The UI adapts to configured targets. Features appear based on config, not user p
 |---------------|------------|
 | 1 target configured | No publish UI. Save is all. No target switcher. |
 | 2+ targets | Publish affordance appears. Sync indicators in top bar. |
-| 4+ targets | Environment-based grouping in sync indicators, preview tabs, and publish picker. |
+| 4+ targets | Environment-based grouping in sync indicators, switcher menu, and publish picker. |
 | 2+ peers share an environment | Fan-out publish available (multi-select in picker). |
 | 2+ targets, one tagged `production` | Prod chrome (red accents) everywhere prod is referenced. |
-| 2+ editable targets | Active-target switcher in top bar becomes interactive. |
-| Item focused with 2+ targets | Preview tabs appear for page-context comparison. |
+| 2+ targets | Active-target switcher in top bar becomes interactive. |
 | Editable target tagged `production` | Prod chrome on workspace when active; "Save to prod" labeling. |
 | Any target marked non-editable | That target appears read-only when active; save is absent. |
 
@@ -212,29 +202,35 @@ point by choosing what's active.
 
 The design above is forward-looking. Current code state:
 
-- **Active target** — partially exists as `usePublishStatusStore`'s "primary target" in
-  [apps/admin/src/client/stores/publishStatus.ts](../../apps/admin/src/client/stores/publishStatus.ts)
-  (picks production → staging → local for the tree's dirty-dot indicator). The designed
-  "active target as UX spine" extends this store rather than introducing it from scratch.
-- **Target properties** — `environment` is implemented on `TargetConfig`
-  ([packages/gazetta/src/types.ts](../../packages/gazetta/src/types.ts)). `type` and
-  `editable` are not yet in code.
-- **Unified Publish** — not yet; code has three separate dialogs (PublishDialog, FetchDialog,
-  ChangesDrawer). Compare endpoint (`/api/compare`) already does logical diff by hash.
-- **Preview tabs for per-page target switching** — not yet; PreviewPanel has no target
-  switcher today.
-- **Fragment preview** — already implemented via `/@{name}` routing in
+- **Active target** — implemented as `useActiveTargetStore`
+  ([apps/admin/src/client/stores/activeTarget.ts](../../apps/admin/src/client/stores/activeTarget.ts)).
+  Drives tree, editor, preview, and publish defaults. Persists to localStorage.
+- **Top-bar switcher** — `ActiveTargetIndicator.vue` shows the active target pill with
+  environment chrome; clicking reveals the switcher menu when 2+ targets exist. Guards
+  on unsaved edits via `useUnsavedGuardStore`.
+- **Sync indicators** — `SyncIndicators.vue` + `useSyncStatusStore` show "staging · 3 behind"
+  chips in the top bar, relative to active. Click opens PublishPanel pre-pointed at that
+  destination.
+- **Target properties** — `environment`, `type`, and `editable` are all on `TargetConfig`
+  ([packages/gazetta/src/types.ts](../../packages/gazetta/src/types.ts)). Defaults:
+  environment=local, editable=true for local else false.
+- **Unified Publish** — `PublishPanel.vue` is the sole surface. Source picker +
+  destinations fan-out + item list with diffs + streaming progress + prod confirmation.
+  Replaced the old PublishDialog / FetchDialog / ChangesDrawer trio.
+- **Preview target switching** — driven by the top-bar switcher. Iframe morphs content
+  in place (scroll/zoom preserved) when the active target changes on the same page.
+  There is no page-context preview-tabs affordance — see "Why one switcher" above.
+- **Fragment preview** — via `/@{name}` routing in
   [apps/admin/src/client/utils/selection.ts](../../apps/admin/src/client/utils/selection.ts).
-  Host-page selection provides preview context; standalone fragment preview works.
-- **Fragment blast radius** — shown in PublishDialog only; designed extension is to also
-  surface it inline in the tree and editor header (gap).
+- **Fragment blast radius** — implemented in PublishPanel item rows, editor header, and
+  site tree (compact count badge). Fetches via `/api/dependents`; the admin-api's source
+  sidecar writer memoizes backfill so concurrent tree badges share one pass.
 - **Undo / rollback / revision history** — not implemented. Designed: per-target history in
   `.gazetta/history/` inside the target, content-addressed blobs, soft undo (forward-only
   revisions). See design-publishing.md "History" section.
 
 ## Open spots (not yet designed)
 
-- **Fragment blast radius in tree and editor header** — currently only in PublishDialog
 - **Multi-author** — concurrent editing, locks, handoffs
 - **Batches / named releases** — grouping changes into a publishable unit
 - **Scheduled publishes** — delayed or time-triggered publish
