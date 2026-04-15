@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { getType, getEnvironment } from '../../types.js'
+import { getType, getEnvironment, isEditable } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
 import { listSidecars } from '../../sidecars.js'
@@ -75,6 +75,7 @@ export function publishRoutes(
         name,
         environment: cfg ? getEnvironment(cfg) : 'local',
         type: cfg ? getType(cfg) : 'static',
+        editable: cfg ? isEditable(cfg) : true,
       }
     }))
   })
