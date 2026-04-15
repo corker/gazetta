@@ -6,6 +6,7 @@ import { useToastStore } from './stores/toast.js'
 import { useActiveTargetStore } from './stores/activeTarget.js'
 import { useSyncStatusStore } from './stores/syncStatus.js'
 import { setActiveTargetProvider } from './api/client.js'
+import { useWorkspaceChrome } from './composables/useWorkspaceChrome.js'
 import Toolbar from './components/CmsToolbar.vue'
 import UnsavedDialog from './components/UnsavedDialog.vue'
 
@@ -14,6 +15,11 @@ const theme = useThemeStore()
 const toast = useToastStore()
 const activeTarget = useActiveTargetStore()
 const syncStatus = useSyncStatusStore()
+
+// Apply workspace-wide chrome when the active target is an editable
+// production target. Kept out of App.vue's inline setup so the rule has
+// a clear home and can evolve without the root component knowing.
+useWorkspaceChrome()
 
 // Bridge the active-target store to the api client — from now on, every
 // content-reading request auto-appends ?target=<active>. Done once at boot;
@@ -93,4 +99,21 @@ body { font-family: system-ui, -apple-system, sans-serif; color: var(--color-fg)
 .toast-leave-active { transition: transform 150ms ease-in, opacity 150ms ease-in; }
 .toast-enter-from { opacity: 0; transform: translateX(-50%) translateY(-100%); }
 .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-100%); }
+
+/* Workspace chrome — applied when the active target is an editable
+   production target. Matches the "permanent editing" intensity from
+   design-editor-ux.md: the author needs a constant visual reminder that
+   every save goes live.
+
+   Kept as a frame on the window (fixed position, top of z-stack) so it
+   remains visible even in preview fullscreen. Subtle enough not to fight
+   the content, bold enough to catch peripheral vision. */
+body.workspace-editable-prod::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  border: 3px solid var(--color-env-prod-fg);
+  z-index: 9999;
+}
 </style>
