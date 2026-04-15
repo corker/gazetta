@@ -133,9 +133,11 @@ export interface TargetConfig {
   environment?: TargetEnvironment
   /**
    * Whether the author can save form-edits to this target and whether it
-   * can receive publishes from the CMS. Default: `true`.
-   * Set to `false` for targets that should be read-only from the CMS
-   * (e.g., production published only via CLI/CI, not from the admin UI).
+   * can receive publishes from the CMS. Default: `true` for `environment:
+   * local` (or unset — local is the env default), `false` for `staging`
+   * and `production`.
+   * Override explicitly for hotfix-tolerant staging/prod setups
+   * (`editable: true`) or locked-down local targets (`editable: false`).
    */
   editable?: boolean
   /** Base URL of the site (e.g. https://gazetta.studio) */
@@ -153,9 +155,12 @@ export function getEnvironment(target: TargetConfig): TargetEnvironment {
   return target.environment ?? 'local'
 }
 
-/** Whether the author can save and receive publishes on this target from the CMS. Default: true. */
+/**
+ * Whether the author can save and receive publishes on this target from the CMS.
+ * Default: true for `environment: local`, false for `staging` / `production`.
+ */
 export function isEditable(target: TargetConfig): boolean {
-  return target.editable ?? true
+  return target.editable ?? (getEnvironment(target) === 'local')
 }
 
 /** Site manifest (site.yaml) */

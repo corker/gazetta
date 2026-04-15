@@ -333,20 +333,29 @@ describe('publishPageStatic', () => {
 })
 
 describe('isEditable', () => {
-  it('defaults to true when not set', async () => {
+  it('defaults to true for local environment (explicit or unset)', async () => {
     const { isEditable } = await import('../src/types.js')
     expect(isEditable({ storage: { type: 'filesystem', path: './dist' } })).toBe(true)
+    expect(isEditable({ storage: { type: 'r2' }, environment: 'local' })).toBe(true)
+    // Unset environment → defaults to 'local' → editable
     expect(isEditable({ storage: { type: 'r2' } })).toBe(true)
   })
 
-  it('respects explicit editable: false', async () => {
+  it('defaults to false for staging and production', async () => {
     const { isEditable } = await import('../src/types.js')
-    expect(isEditable({ storage: { type: 'r2' }, editable: false })).toBe(false)
+    expect(isEditable({ storage: { type: 'r2' }, environment: 'staging' })).toBe(false)
+    expect(isEditable({ storage: { type: 'r2' }, environment: 'production' })).toBe(false)
   })
 
-  it('respects explicit editable: true', async () => {
+  it('respects explicit editable: false on local target', async () => {
     const { isEditable } = await import('../src/types.js')
-    expect(isEditable({ storage: { type: 'r2' }, editable: true })).toBe(true)
+    expect(isEditable({ storage: { type: 'filesystem', path: './dist' }, editable: false })).toBe(false)
+  })
+
+  it('respects explicit editable: true on staging/production', async () => {
+    const { isEditable } = await import('../src/types.js')
+    expect(isEditable({ storage: { type: 'r2' }, environment: 'staging', editable: true })).toBe(true)
+    expect(isEditable({ storage: { type: 'r2' }, environment: 'production', editable: true })).toBe(true)
   })
 })
 
