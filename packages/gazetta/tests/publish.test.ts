@@ -97,6 +97,23 @@ describe('publishItems', () => {
     const { copiedFiles } = await publishItems(source, '', target, '', ['pages/nonexistent'])
     expect(copiedFiles).toBe(1) // only site.yaml
   })
+
+  it('accepts ContentRoot inputs (preferred shape)', async () => {
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'default' }))
+    await writeTestFile(sourceDir, 'site.yaml', 'name: Test')
+
+    const source = createFilesystemProvider(sourceDir)
+    const target = createFilesystemProvider(targetDir)
+    const { createContentRoot } = await import('../src/content-root.js')
+
+    const sourceRoot = createContentRoot(source)
+    const targetRoot = createContentRoot(target)
+
+    const { copiedFiles } = await publishItems(sourceRoot, targetRoot, ['pages/home'])
+    expect(copiedFiles).toBeGreaterThanOrEqual(2)
+    expect(await target.exists('pages/home/page.json')).toBe(true)
+    expect(await target.exists('site.yaml')).toBe(true)
+  })
 })
 
 describe('resolveDependencies', () => {
@@ -106,6 +123,22 @@ describe('resolveDependencies', () => {
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(storage, '', ['pages/home'])
     expect(deps).toContain('pages/home')
+  })
+
+  it('accepts ContentRoot input (preferred shape)', async () => {
+    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({
+      template: 'default',
+      components: ['@header', { name: 'hero', template: 'hero' }],
+    }))
+
+    const storage = createFilesystemProvider(sourceDir)
+    const { createContentRoot } = await import('../src/content-root.js')
+    const root = createContentRoot(storage)
+
+    const deps = await resolveDependencies(root, ['pages/home'])
+    expect(deps).toContain('pages/home')
+    expect(deps).toContain('fragments/header')
+    expect(deps).toContain('templates/hero')
   })
 
   it('resolves template dependency', async () => {

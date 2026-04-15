@@ -1,7 +1,15 @@
 import { join } from 'node:path'
 import type { StorageProvider } from './types.js'
+import type { ContentRoot } from './content-root.js'
 import { listSidecars } from './sidecars.js'
 import { mapLimit } from './concurrency.js'
+
+// Helper: is the first arg a ContentRoot? Shape-based so imports stay clean.
+function isContentRoot(x: unknown): x is ContentRoot {
+  return typeof x === 'object' && x !== null
+    && 'storage' in x && 'rootPath' in x && 'path' in x
+    && typeof (x as { path: unknown }).path === 'function'
+}
 
 export interface PublishRequest {
   source: string
@@ -20,17 +28,51 @@ export interface PublishResult {
  * Copy items from source storage to target storage.
  * Items are relative paths like "pages/home" or "fragments/header".
  * All files under each item directory are copied recursively.
+ *
+ * Two call shapes:
+ *   publishItems(sourceRoot, targetRoot, items)                    // preferred
+ *   publishItems(sourceStorage, sourceBase, targetStorage, targetBase, items)  // legacy
  */
+export async function publishItems(
+  sourceRoot: ContentRoot,
+  targetRoot: ContentRoot,
+  items: string[]
+): Promise<{ copiedFiles: number }>
 export async function publishItems(
   sourceStorage: StorageProvider,
   sourceBase: string,
   targetStorage: StorageProvider,
   targetBase: string,
   items: string[]
+): Promise<{ copiedFiles: number }>
+export async function publishItems(
+  sourceOrStorage: ContentRoot | StorageProvider,
+  targetOrBase: ContentRoot | string,
+  itemsOrTargetStorage: string[] | StorageProvider,
+  targetBaseMaybe?: string,
+  itemsMaybe?: string[]
 ): Promise<{ copiedFiles: number }> {
-  // Copy items in parallel (bounded). copyRecursive does its own bounded
-  // fan-out per item, so the outer limit here keeps total concurrency in
-  // check regardless of how deep any one item goes.
+  let sourceStorage: StorageProvider
+  let sourceBase: string
+  let targetStorage: StorageProvider
+  let targetBase: string
+  let items: string[]
+
+  if (isContentRoot(sourceOrStorage) && isContentRoot(targetOrBase)) {
+    sourceStorage = sourceOrStorage.storage
+    sourceBase = sourceOrStorage.rootPath
+    targetStorage = targetOrBase.storage
+    targetBase = targetOrBase.rootPath
+    items = itemsOrTargetStorage as string[]
+  } else {
+    sourceStorage = sourceOrStorage as StorageProvider
+    sourceBase = targetOrBase as string
+    targetStorage = itemsOrTargetStorage as StorageProvider
+    targetBase = targetBaseMaybe!
+    items = itemsMaybe!
+  }
+
+  // Copy items in parallel (bounded).
   const counts = await mapLimit(items, async (item) => {
     const sourcePath = join(sourceBase, item)
     const targetPath = join(targetBase, item)
@@ -97,12 +139,31 @@ function dirname(path: string): string {
 /**
  * Resolve dependencies for published items.
  * Given a list of items (pages/fragments), find all referenced templates and fragments.
+ *
+ * Two call shapes:
+ *   resolveDependencies(sourceRoot, items)                 // preferred
+ *   resolveDependencies(storage, siteBase, items)           // legacy
  */
+export async function resolveDependencies(sourceRoot: ContentRoot, items: string[]): Promise<string[]>
+export async function resolveDependencies(storage: StorageProvider, siteBase: string, items: string[]): Promise<string[]>
 export async function resolveDependencies(
-  storage: StorageProvider,
-  siteBase: string,
-  items: string[]
+  sourceOrStorage: ContentRoot | StorageProvider,
+  siteBaseOrItems: string | string[],
+  itemsMaybe?: string[],
 ): Promise<string[]> {
+  let storage: StorageProvider
+  let siteBase: string
+  let items: string[]
+  if (isContentRoot(sourceOrStorage)) {
+    storage = sourceOrStorage.storage
+    siteBase = sourceOrStorage.rootPath
+    items = siteBaseOrItems as string[]
+  } else {
+    storage = sourceOrStorage
+    siteBase = siteBaseOrItems as string
+    items = itemsMaybe!
+  }
+
   const allItems = new Set(items)
   const visited = new Set<string>()
 
