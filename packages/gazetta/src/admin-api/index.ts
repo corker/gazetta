@@ -88,7 +88,7 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
   app.route('/', templateRoutes(source, templatesDir, adminDir, opts.production))
   app.route('/', previewRoutes(source, templatesDir))
   app.route('/', publishRoutes(source.siteDir, source.storage, opts.targets, opts.targetConfigs, templatesDir, scan, source.sidecarWriter))
-  app.route('/', compareRoutes(source.siteDir, source.storage, opts.targets, opts.targetConfigs, templatesDir, scan))
+  app.route('/', compareRoutes(source, opts.targets, opts.targetConfigs, templatesDir, scan))
   app.route('/', fieldRoutes(source, adminDir))
 
   // Exposed for the CLI's template file watcher: clears the memoized scan
