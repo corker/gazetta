@@ -7,7 +7,11 @@ import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import { api, type CompareResult } from '../api/client.js'
 
-const props = defineProps<{ visible: boolean }>()
+const props = defineProps<{
+  visible: boolean
+  /** When provided, pre-select this target and skip the saved/first fallback. */
+  target?: string
+}>()
 const emit = defineEmits<{ (e: 'update:visible', v: boolean): void }>()
 
 const router = useRouter()
@@ -26,9 +30,14 @@ let activeAbort: AbortController | null = null
 async function loadTargets() {
   try {
     targets.value = (await api.getTargets()).map(t => t.name)
-    const saved = localStorage.getItem(TARGET_KEY)
-    if (saved && targets.value.includes(saved)) selectedTarget.value = saved
-    else if (targets.value.length) selectedTarget.value = targets.value[0]
+    // Preferred target: prop (opened for a specific target) > saved > first.
+    if (props.target && targets.value.includes(props.target)) {
+      selectedTarget.value = props.target
+    } else {
+      const saved = localStorage.getItem(TARGET_KEY)
+      if (saved && targets.value.includes(saved)) selectedTarget.value = saved
+      else if (targets.value.length) selectedTarget.value = targets.value[0]
+    }
   } catch {
     targets.value = []
   }
@@ -61,7 +70,22 @@ watch(() => props.visible, async (v) => {
     return
   }
   if (targets.value.length === 0) await loadTargets()
-  if (selectedTarget.value) runCompare()
+  // If opened for a specific target (chip click), honor it even if the
+  // drawer was already showing a different one.
+  if (props.target && targets.value.includes(props.target) && props.target !== selectedTarget.value) {
+    selectedTarget.value = props.target
+    // Selection watcher triggers the compare
+  } else if (selectedTarget.value) {
+    runCompare()
+  }
+})
+
+// Target prop can change while the drawer is open (e.g. user closes, then
+// clicks a different chip without the drawer animating out).
+watch(() => props.target, (t) => {
+  if (t && props.visible && targets.value.includes(t) && t !== selectedTarget.value) {
+    selectedTarget.value = t
+  }
 })
 
 watch(selectedTarget, (t) => {
