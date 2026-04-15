@@ -280,7 +280,11 @@ async function runInit(dir: string) {
   const name = target.split('/').pop() ?? 'my-site'
 
   const files: Record<string, string> = {
-    'sites/main/site.yaml': `name: ${name}\nversion: 1.0.0\nsystemPages:\n  - "404"\ntargets:\n  local:\n    storage:\n      type: filesystem\n      path: ./dist/local\n`,
+    'sites/main/site.yaml': `name: ${name}\nversion: 1.0.0\nsystemPages:\n  - "404"\ntargets:\n  local:\n    storage:\n      type: filesystem\n    # environment=local, editable=true (defaults); path=./targets/local (default)\n`,
+
+    // Target-level site.yaml — what gazetta publish would write. The local
+    // target is just another target; its content lives here.
+    'sites/main/targets/local/site.yaml': `name: ${name}\nversion: 1.0.0\nsystemPages:\n  - "404"\n`,
 
     'templates/page-layout/index.ts': `import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
@@ -374,12 +378,12 @@ const template: TemplateFunction = ({ content = {} }) => {
 export default template
 `,
 
-    'sites/main/fragments/header/fragment.json': JSON.stringify({
+    'sites/main/targets/local/fragments/header/fragment.json': JSON.stringify({
       template: 'nav',
       content: { brand: name, links: [{ label: 'Home', href: '/' }] },
     }, null, 2) + '\n',
 
-    'sites/main/pages/home/page.json': JSON.stringify({
+    'sites/main/targets/local/pages/home/page.json': JSON.stringify({
       template: 'page-layout',
       content: { title: name, description: 'A site built with Gazetta' },
       components: [
@@ -389,7 +393,7 @@ export default template
       ],
     }, null, 2) + '\n',
 
-    'sites/main/pages/404/page.json': JSON.stringify({
+    'sites/main/targets/local/pages/404/page.json': JSON.stringify({
       template: 'page-layout',
       content: { title: 'Page Not Found', description: "The page you're looking for doesn't exist." },
     }, null, 2) + '\n',
@@ -826,7 +830,8 @@ async function runServe(siteDir: string, port: number, targetName?: string) {
   }
 
   const { createStorageProvider } = await import('../targets.js')
-  const storage = await createStorageProvider(config.storage, siteDir)
+  // Pass targetName so filesystem path defaults to ./targets/<name> when unset.
+  const storage = await createStorageProvider(config.storage, siteDir, name)
   const { getType } = await import('../types.js')
   const { createServer } = await import('../serve.js')
   const app = createServer({ storage, type: getType(config) })
