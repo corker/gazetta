@@ -1,4 +1,4 @@
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import { execSync } from 'node:child_process'
 import type { StorageProvider, TargetConfig, StorageConfig } from './types.js'
 import { isEditable } from './types.js'
@@ -73,11 +73,22 @@ export function resolveEnvVars(value: string | undefined): string | undefined {
   return value.replace(/\$\{(\w+)\}/g, (_, name) => process.env[name] ?? '')
 }
 
-export async function createStorageProvider(config: StorageConfig, siteDir: string): Promise<StorageProvider> {
+/**
+ * Build a storage provider from config.
+ *
+ * For filesystem targets, `path` defaults to `./targets/<targetName>` (relative
+ * to the site dir). Users can override by setting `path` explicitly in
+ * site.yaml — useful for shared drives, existing layouts, or multi-site setups
+ * that need custom paths. If neither `path` nor `targetName` is available for
+ * a filesystem target, throws.
+ */
+export async function createStorageProvider(config: StorageConfig, siteDir: string, targetName?: string): Promise<StorageProvider> {
   switch (config.type) {
-    case 'filesystem':
-      if (!config.path) throw new Error('Filesystem storage requires "path"')
-      return createFilesystemProvider(resolve(siteDir, config.path))
+    case 'filesystem': {
+      const path = config.path ?? (targetName ? join('targets', targetName) : undefined)
+      if (!path) throw new Error('Filesystem storage requires "path" (or a target name to derive the default from)')
+      return createFilesystemProvider(resolve(siteDir, path))
+    }
     case 'azure-blob': {
       const connectionString = resolveEnvVars(config.connectionString)
       if (!connectionString) throw new Error('Azure Blob storage requires "connectionString"')
@@ -164,7 +175,7 @@ export async function createTargetRegistry(targets: Record<string, TargetConfig>
   await Promise.all(Object.entries(targets).map(async ([name, config]) => {
     try {
       const initOne = async () => {
-        const provider = await createStorageProvider(config.storage, siteDir)
+        const provider = await createStorageProvider(config.storage, siteDir, name)
         if ('init' in provider && typeof provider.init === 'function') {
           await (provider as StorageProvider & { init(): Promise<void> }).init()
         }

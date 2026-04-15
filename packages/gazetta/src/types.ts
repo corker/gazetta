@@ -92,6 +92,12 @@ export interface PageManifest extends ComponentManifest {
 /** Storage configuration */
 export interface StorageConfig {
   type: 'filesystem' | 'azure-blob' | 's3' | 'r2'
+  /**
+   * Filesystem storage directory, relative to the site directory.
+   * Defaults to `./targets/<target-key>` when unset — the target's key in
+   * site.yaml maps to a subdirectory under `targets/`. Override for shared
+   * drives, external mounts, or existing custom layouts.
+   */
   path?: string
   connectionString?: string
   container?: string

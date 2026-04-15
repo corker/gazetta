@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mkdir, rm } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import {
   createStorageProvider,
   createTargetRegistry,
@@ -49,9 +50,37 @@ describe('createStorageProvider', () => {
     expect(content).toBe('hello')
   })
 
-  it('throws for filesystem without path', async () => {
+  it('throws for filesystem without path or target name', async () => {
     const config: StorageConfig = { type: 'filesystem' }
     await expect(createStorageProvider(config, testDir)).rejects.toThrow('Filesystem storage requires "path"')
+  })
+
+  it('derives default path from target name when path is omitted', async () => {
+    await mkdir(testDir, { recursive: true })
+    const config: StorageConfig = { type: 'filesystem' }
+    const provider = await createStorageProvider(config, testDir, 'my-target')
+
+    await provider.mkdir('.')
+    await provider.writeFile('test.txt', 'hello')
+
+    // Default path is <siteDir>/targets/<name>
+    const { readFile } = await import('node:fs/promises')
+    const content = await readFile(resolve(testDir, 'targets/my-target/test.txt'), 'utf-8')
+    expect(content).toBe('hello')
+  })
+
+  it('explicit path overrides the target-name default', async () => {
+    await mkdir(testDir, { recursive: true })
+    const config: StorageConfig = { type: 'filesystem', path: './custom-location' }
+    const provider = await createStorageProvider(config, testDir, 'my-target')
+
+    await provider.mkdir('.')
+    await provider.writeFile('test.txt', 'explicit')
+
+    // Explicit path wins over default
+    const { readFile } = await import('node:fs/promises')
+    const content = await readFile(resolve(testDir, 'custom-location/test.txt'), 'utf-8')
+    expect(content).toBe('explicit')
   })
 
   it('throws for azure-blob without connectionString', async () => {
