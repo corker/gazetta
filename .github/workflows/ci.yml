@@ -14,23 +14,46 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
+  # Build once, reuse everywhere. All downstream jobs skip `npm run build`
+  # by downloading the `build-output` artifact.
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v6
-
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-
       - run: npm ci
       - run: npm run build -w packages/gazetta
+      - run: npm run build:admin -w packages/gazetta
+      - uses: actions/upload-artifact@v7
+        with:
+          name: build-output
+          path: |
+            packages/gazetta/dist/
+            packages/gazetta/admin-dist/
+          retention-days: 1
+          include-hidden-files: true
 
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-output
+          path: packages/gazetta/
       - run: npm test -w packages/gazetta
 
   e2e:
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -39,15 +62,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-
       - run: npm ci
-      - run: npm run build -w packages/gazetta
-      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-output
+          path: packages/gazetta/
+
+      # Cache Playwright browsers keyed by lockfile — version bumps
+      # invalidate automatically. `--with-deps` still runs (system libs)
+      # but browser download is skipped on cache hit.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
       - run: npx playwright test --project=dev --shard=${{ matrix.shard }}/3
 
       - name: Upload test-results on failure
@@ -58,8 +93,9 @@ jobs:
           path: test-results/
           retention-days: 7
 
-  # Pack once on linux — tarball is platform-independent.
+  # Pack uses the shared build — no rebuild. Tarball is platform-independent.
   pack:
+    needs: build
     runs-on: ubuntu-latest
     outputs:
       tarball: ${{ steps.pack.outputs.tarball }}
@@ -70,8 +106,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build -w packages/gazetta
-      - run: npm run build:admin -w packages/gazetta
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-output
+          path: packages/gazetta/
       - id: pack
         working-directory: packages/gazetta
         run: |
