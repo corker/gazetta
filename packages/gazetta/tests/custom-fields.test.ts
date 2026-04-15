@@ -51,7 +51,8 @@ describe('fields API', () => {
 
     const { fieldRoutes } = await import('../src/admin-api/routes/fields.js')
     const storage = createFilesystemProvider()
-    const app = fieldRoutes(testDir, storage)
+    const { createSourceContext } = await import('../src/admin-api/source-context.js')
+    const app = fieldRoutes(createSourceContext({ storage, siteDir: testDir }))
     const res = await app.request('/api/fields')
     expect(res.status).toBe(200)
     const fields = await res.json() as { name: string; path: string }[]
@@ -64,7 +65,8 @@ describe('fields API', () => {
 
     const { fieldRoutes } = await import('../src/admin-api/routes/fields.js')
     const storage = createFilesystemProvider()
-    const app = fieldRoutes(testDir, storage)
+    const { createSourceContext } = await import('../src/admin-api/source-context.js')
+    const app = fieldRoutes(createSourceContext({ storage, siteDir: testDir }))
     const res = await app.request('/api/fields')
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual([])
@@ -77,7 +79,8 @@ describe('fields API', () => {
 
     const { fieldRoutes } = await import('../src/admin-api/routes/fields.js')
     const storage = createFilesystemProvider()
-    const app = fieldRoutes(testDir, storage)
+    const { createSourceContext } = await import('../src/admin-api/source-context.js')
+    const app = fieldRoutes(createSourceContext({ storage, siteDir: testDir }))
     const res = await app.request('/api/fields')
     const fields = await res.json() as { name: string }[]
     expect(fields).toHaveLength(1)

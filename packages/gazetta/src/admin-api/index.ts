@@ -82,14 +82,14 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
     sidecarWriter,
   })
 
-  app.route('/', siteRoutes(source.siteDir, source.storage))
+  app.route('/', siteRoutes(source))
   app.route('/', pageRoutes(source.siteDir, source.storage, source.sidecarWriter))
   app.route('/', fragmentRoutes(source.siteDir, source.storage, source.sidecarWriter))
   app.route('/', templateRoutes(source.siteDir, source.storage, templatesDir, adminDir, opts.production))
   app.route('/', previewRoutes(source.siteDir, source.storage, templatesDir))
   app.route('/', publishRoutes(source.siteDir, source.storage, opts.targets, opts.targetConfigs, templatesDir, scan, source.sidecarWriter))
   app.route('/', compareRoutes(source.siteDir, source.storage, opts.targets, opts.targetConfigs, templatesDir, scan))
-  app.route('/', fieldRoutes(source.siteDir, source.storage, adminDir))
+  app.route('/', fieldRoutes(source, adminDir))
 
   // Exposed for the CLI's template file watcher: clears the memoized scan
   // so the next publish/compare picks up template edits. Not part of the
