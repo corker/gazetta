@@ -3,6 +3,7 @@ import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { compareTargets } from '../src/compare.js'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
+import { createContentRoot } from '../src/content-root.js'
 import { sidecarNameFor } from '../src/hash.js'
 import { tempDir } from './_helpers/temp.js'
 
@@ -12,6 +13,7 @@ const targetDir = join(root, 'dist/staging')
 const templatesDir = join(root, 'templates')
 
 const source = createFilesystemProvider()
+const sourceRoot = createContentRoot(source, siteDir)
 let target = createFilesystemProvider(targetDir)
 
 const TEMPLATE = `
@@ -50,7 +52,7 @@ async function writeSidecar(dir: string, hash: string) {
 
 describe('compareTargets', () => {
   it('returns firstPublish:true when target has no sidecars', async () => {
-    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r.firstPublish).toBe(true)
     // Both pages and fragments are "added" since target is empty
     expect(r.added.sort()).toEqual(['fragments/header', 'pages/home'])
@@ -60,7 +62,7 @@ describe('compareTargets', () => {
 
   it('returns unchanged when sidecars match', async () => {
     // First call to get the local hashes
-    const r1 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r1 = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     // Re-derive: we need the actual hashes — easiest is to publish "by hand" using r1.added
     // But we only have item names, not hashes. Easier: import hashManifest directly.
     const { hashManifest } = await import('../src/hash.js')
@@ -76,7 +78,7 @@ describe('compareTargets', () => {
       await writeSidecar(join(targetDir, 'fragments', name), hashManifest(frag, { templateHashes: tHashes }))
     }
 
-    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r2 = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r2.firstPublish).toBe(false)
     expect(r2.unchanged.sort()).toEqual(['fragments/header', 'pages/home'])
     expect(r2.added).toEqual([])
@@ -89,7 +91,7 @@ describe('compareTargets', () => {
     await writeSidecar(join(targetDir, 'pages/home'), '00000000')
     await writeSidecar(join(targetDir, 'fragments/header'), '00000000')
 
-    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r.firstPublish).toBe(false)
     expect(r.modified.sort()).toEqual(['fragments/header', 'pages/home'])
   })
@@ -98,7 +100,7 @@ describe('compareTargets', () => {
     await writeSidecar(join(targetDir, 'pages/home'), '00000000')
     await writeSidecar(join(targetDir, 'pages/old-page'), '11111111')
 
-    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r.deleted).toContain('pages/old-page')
   })
 
@@ -111,14 +113,14 @@ describe('compareTargets', () => {
     // Old sidecar for home so target isn't empty
     await writeSidecar(join(targetDir, 'pages/home'), '00000000')
 
-    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r.added).toContain('pages/about')
   })
 
   it('reports invalid templates without failing the compare', async () => {
     // Break the template
     await writeFile(join(templatesDir, 'page/index.js'), 'this is not js!!!')
-    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r.invalidTemplates.length).toBeGreaterThan(0)
     expect(r.invalidTemplates[0].name).toBe('page')
     // Compare still completes and lists items
@@ -127,11 +129,11 @@ describe('compareTargets', () => {
 
   it('omits fragments when target is static (#119)', async () => {
     // Default (esi): fragments included
-    const r1 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r1 = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r1.added.some(x => x.startsWith('fragments/'))).toBe(true)
 
     // Static mode: fragments excluded from local + target walks
-    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, type: 'static' })
+    const r2 = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root, type: 'static' })
     expect(r2.added.some(x => x.startsWith('fragments/'))).toBe(false)
     expect(r2.modified.some(x => x.startsWith('fragments/'))).toBe(false)
     expect(r2.unchanged.some(x => x.startsWith('fragments/'))).toBe(false)
@@ -161,7 +163,7 @@ describe('compareTargets', () => {
     }
 
     // Sanity: unchanged before any edit.
-    const r1 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, type: 'static' })
+    const r1 = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root, type: 'static' })
     expect(r1.unchanged).toContain('pages/home')
 
     // Mutate the fragment's content — page manifest untouched.
@@ -171,7 +173,7 @@ describe('compareTargets', () => {
     }))
 
     // Page must show modified — its baked-in output is now stale.
-    const r2 = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root, type: 'static' })
+    const r2 = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root, type: 'static' })
     expect(r2.modified).toContain('pages/home')
   })
 
@@ -186,17 +188,8 @@ describe('compareTargets', () => {
     await writeSidecar(join(targetDir, 'pages/home'), fake)
     await writeSidecar(join(targetDir, 'fragments/header'), fake)
 
-    const r = await compareTargets({ source, target, siteDir, templatesDir, projectRoot: root })
+    const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r.unchanged.sort()).toEqual(['fragments/header', 'pages/home'])
   })
 
-  it('accepts sourceRoot as preferred shape', async () => {
-    const { createContentRoot } = await import('../src/content-root.js')
-    const sourceRoot = createContentRoot(source, siteDir)
-    const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
-    // Fresh start: everything is added (target is empty), firstPublish = true
-    expect(r.firstPublish).toBe(true)
-    expect(r.added).toContain('pages/home')
-    expect(r.added).toContain('fragments/header')
-  })
 })

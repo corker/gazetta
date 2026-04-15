@@ -4,7 +4,7 @@ import { hashManifest } from './hash.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from './templates-scan.js'
 import { listSidecars } from './sidecars.js'
 import type { StorageProvider } from './types.js'
-import { createContentRoot, type ContentRoot } from './content-root.js'
+import type { ContentRoot } from './content-root.js'
 
 export interface CompareResult {
   /** Items present locally but not on target (no sidecar found) */
@@ -22,17 +22,9 @@ export interface CompareResult {
 }
 
 export interface CompareOptions {
-  /**
-   * Source content root (preferred). When set, `source` and `siteDir` are
-   * derived from it. For backward compatibility, callers can still pass
-   * `source` and `siteDir` directly instead.
-   */
-  sourceRoot?: ContentRoot
-  /** @deprecated Prefer `sourceRoot`. */
-  source?: StorageProvider
+  /** Source content root. */
+  sourceRoot: ContentRoot
   target: StorageProvider
-  /** @deprecated Prefer `sourceRoot`. */
-  siteDir?: string
   templatesDir: string
   projectRoot: string
   /**
@@ -61,17 +53,7 @@ export interface CompareOptions {
  * `fragments/{name}` form so they can be passed back to publish.
  */
 export async function compareTargets(opts: CompareOptions): Promise<CompareResult> {
-  // Resolve source rooting once: prefer sourceRoot, else construct from
-  // the legacy (source, siteDir) pair.
-  let sourceRoot: ContentRoot
-  if (opts.sourceRoot) {
-    sourceRoot = opts.sourceRoot
-  } else {
-    if (!opts.source || opts.siteDir === undefined) {
-      throw new Error('compareTargets: either sourceRoot, or both source and siteDir, must be provided')
-    }
-    sourceRoot = createContentRoot(opts.source, opts.siteDir)
-  }
+  const { sourceRoot } = opts
 
   // 1. Validate + hash templates
   const scan = opts.scanTemplates ?? scanTemplates
