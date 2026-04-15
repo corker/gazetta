@@ -12,6 +12,7 @@ import PublishDialog from './PublishDialog.vue'
 import FetchDialog from './FetchDialog.vue'
 import ChangesDrawer from './ChangesDrawer.vue'
 import ActiveTargetIndicator from './ActiveTargetIndicator.vue'
+import SyncIndicators from './SyncIndicators.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,6 +63,7 @@ function handleBack() {
       </span>
       <span v-if="site.manifest" class="cms-site-name">{{ site.manifest.name }}</span>
       <ActiveTargetIndicator />
+      <SyncIndicators />
     </template>
     <template #center>
       <Transition name="fade">
