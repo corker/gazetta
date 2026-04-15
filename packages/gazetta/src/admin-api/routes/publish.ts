@@ -4,7 +4,7 @@ import { getType, getEnvironment, isEditable } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
 import { listSidecars } from '../../sidecars.js'
-import type { SourceContext } from '../source-context.js'
+import type { SourceContextResolver } from '../source-context.js'
 import { mapLimit } from '../../concurrency.js'
 import { mapLimitStream } from '../../concurrency.js'
 import type { PublishResult } from '../../publish.js'
@@ -13,6 +13,7 @@ import { loadSite } from '../../site-loader.js'
 import { resolveEnvVars } from '../../targets.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from '../../templates-scan.js'
 import { hashManifest } from '../../hash.js'
+import { createContentRoot } from '../../content-root.js'
 
 /**
  * Progress events streamed by runPublish. Consumed both by the SSE route
@@ -28,7 +29,7 @@ export type PublishProgress =
   | { kind: 'fatal'; error: string; invalidTemplates?: { name: string; errors: string[] }[] }
 
 export function publishRoutes(
-  source: SourceContext,
+  resolve: SourceContextResolver,
   preInitTargets?: Map<string, StorageProvider>,
   targetConfigs?: Record<string, TargetConfig>,
   templatesDir?: string,
@@ -39,26 +40,28 @@ export function publishRoutes(
 ) {
   const scan = scanTemplatesInjected ?? scanTemplates
   const app = new Hono()
-  const { storage: sourceStorage, projectSiteDir, sidecarWriter } = source
 
-  // Background target initialization
+  // Background target initialization — lazy, needs the resolved source's
+  // projectSiteDir to resolve filesystem target paths. We call resolve()
+  // once with undefined (→ default editable) to obtain projectSiteDir.
   let targets: Map<string, StorageProvider> | null = preInitTargets ?? null
-  const initPromise: Promise<Map<string, StorageProvider>> = preInitTargets
-    ? Promise.resolve(preInitTargets)
-    : (!targetConfigs || Object.keys(targetConfigs).length === 0)
-      ? Promise.resolve(new Map())
-      : (async () => {
-          const { createTargetRegistry } = await import('../../targets.js')
-          targets = await createTargetRegistry(targetConfigs, projectSiteDir)
-          return targets
-        })()
-
-  if (!preInitTargets) {
-    initPromise.then(t => { targets = t }).catch(() => { targets = new Map() })
-  }
+  let initPromise: Promise<Map<string, StorageProvider>> | null = null
 
   async function getTargets(): Promise<Map<string, StorageProvider>> {
     if (targets) return targets
+    if (!targetConfigs || Object.keys(targetConfigs).length === 0) {
+      targets = new Map()
+      return targets
+    }
+    if (!initPromise) {
+      initPromise = (async () => {
+        const { createTargetRegistry } = await import('../../targets.js')
+        const bootstrapSource = await resolve(undefined)
+        const t = await createTargetRegistry(targetConfigs, bootstrapSource.projectSiteDir)
+        targets = t
+        return t
+      })().catch(() => { targets = new Map(); return targets })
+    }
     return initPromise
   }
 
@@ -100,20 +103,25 @@ export function publishRoutes(
       return c.json({ error: 'Missing or invalid "item" query (must be fragments/<name>)' }, 400)
     }
     const fragmentName = item.slice('fragments/'.length)
+    // `target` — look up dependents on a specific published target's sidecars
+    // `source` — the source editable target for the manifest walker path
     const targetName = c.req.query('target')
     try {
       if (targetName) {
         const t = await getTargets()
         const targetStorage = t.get(targetName)
         if (!targetStorage) return c.json({ error: `Unknown target: ${targetName}` }, 400)
-        const { createContentRoot } = await import('../../content-root.js')
         const result = await findDependentsFromSidecars(createContentRoot(targetStorage), { fragment: fragmentName })
         return c.json(result)
       }
-      // Source-side: use sidecars for the listing-only fast path. Backfill
-      // any missing ones first so the answer is complete — without this,
-      // items whose sidecars haven't been written yet (fresh dev server,
-      // items never saved through the admin) would be invisible.
+      // Source-side: resolve the source editable target for this request.
+      const source = await resolve(c.req.query('source'))
+      const sourceStorage = source.storage
+      const sidecarWriter = source.sidecarWriter
+      // Use sidecars for the listing-only fast path. Backfill any missing
+      // ones first so the answer is complete — without this, items whose
+      // sidecars haven't been written yet (fresh dev server, items never
+      // saved through the admin) would be invisible.
       if (sidecarWriter) {
         const site = await loadSite({ contentRoot: source.contentRoot, templatesDir })
         const [pagesList, fragmentsList] = await Promise.all([
@@ -149,9 +157,18 @@ export function publishRoutes(
    * Pre-flight validation (unknown targets, invalid templates) is reported as
    * 'fatal' before any 'target-start' event so callers can map to a 4xx.
    */
-  async function* runPublish(items: string[], targetNames: string[]): AsyncGenerator<PublishProgress> {
+  async function* runPublish(items: string[], targetNames: string[], sourceName?: string): AsyncGenerator<PublishProgress> {
     if (!items?.length) { yield { kind: 'fatal', error: 'No items specified' }; return }
     if (!targetNames?.length) { yield { kind: 'fatal', error: 'No targets specified' }; return }
+
+    // Resolve the source editable target for this publish run.
+    let source: Awaited<ReturnType<SourceContextResolver>>
+    try {
+      source = await resolve(sourceName)
+    } catch (err) {
+      yield { kind: 'fatal', error: (err as Error).message }; return
+    }
+    const { projectSiteDir } = source
 
     const t = await getTargets()
     for (const name of targetNames) {
@@ -214,7 +231,6 @@ export function publishRoutes(
         let totalFiles = 0
 
         // 1. Source copy
-        const { createContentRoot } = await import('../../content-root.js')
         const targetRoot = createContentRoot(targetStorage)
         const { copiedFiles } = await publishItems(source.contentRoot, targetRoot, targetItems)
         totalFiles += copiedFiles
@@ -319,10 +335,10 @@ export function publishRoutes(
   }
 
   app.post('/api/publish', async (c) => {
-    const body = await c.req.json() as { items: string[]; targets: string[] }
+    const body = await c.req.json() as { items: string[]; targets: string[]; source?: string }
     let results: PublishResult[] = []
     let fatal: PublishProgress | null = null
-    for await (const ev of runPublish(body.items, body.targets)) {
+    for await (const ev of runPublish(body.items, body.targets, body.source)) {
       if (ev.kind === 'fatal') fatal = ev
       else if (ev.kind === 'done') results = ev.results
     }
@@ -335,10 +351,10 @@ export function publishRoutes(
   })
 
   app.post('/api/publish/stream', async (c) => {
-    const body = await c.req.json() as { items: string[]; targets: string[] }
+    const body = await c.req.json() as { items: string[]; targets: string[]; source?: string }
     return streamSSE(c, async (stream) => {
       try {
-        for await (const ev of runPublish(body.items, body.targets)) {
+        for await (const ev of runPublish(body.items, body.targets, body.source)) {
           if (stream.aborted) return
           await stream.writeSSE({ event: ev.kind, data: JSON.stringify(ev) })
         }
@@ -351,12 +367,23 @@ export function publishRoutes(
   })
 
   app.post('/api/fetch', async (c) => {
-    const body = await c.req.json() as { source: string; items?: string[] }
+    // `source` (body) — target to fetch FROM (a published target)
+    // `destination` (body) — optional editable target to write INTO; defaults
+    // to the resolver's default editable target (the author's current source)
+    const body = await c.req.json() as { source: string; items?: string[]; destination?: string }
     if (!body.source) return c.json({ error: 'Missing "source" target name' }, 400)
 
     const t = await getTargets()
     const targetStorage = t.get(body.source)
     if (!targetStorage) return c.json({ error: `Unknown target: ${body.source}` }, 400)
+
+    // Resolve the destination editable target for this fetch.
+    let destination: Awaited<ReturnType<SourceContextResolver>>
+    try {
+      destination = await resolve(body.destination)
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400)
+    }
 
     let items: string[]
     if (body.items?.length) {
@@ -393,9 +420,8 @@ export function publishRoutes(
     console.log(`    Items: ${items.join(', ')}`)
 
     try {
-      const { createContentRoot } = await import('../../content-root.js')
       const targetRoot = createContentRoot(targetStorage)
-      const { copiedFiles } = await publishItems(targetRoot, source.contentRoot, items)
+      const { copiedFiles } = await publishItems(targetRoot, destination.contentRoot, items)
       console.log(`    ${copiedFiles} files copied to working copy`)
       return c.json({ success: true, copiedFiles, items })
     } catch (err) {
