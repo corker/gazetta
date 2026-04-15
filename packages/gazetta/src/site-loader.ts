@@ -14,18 +14,20 @@ export interface Site {
   manifest: SiteManifest
   pages: Map<string, PageManifest & { dir: string }>
   fragments: Map<string, FragmentManifest & { dir: string }>
-  /**
-   * Content root — `{storage, rootPath}` pair for accessing site content.
-   * Use this for new code; `siteDir` and `storage` below are retained for
-   * backward compatibility with callers that haven't migrated yet.
-   */
+  /** Content root — `{storage, rootPath}` pair for accessing site content. */
   contentRoot: ContentRoot
-  /** @deprecated Use `contentRoot.rootPath`. Retained for backward compatibility. */
-  siteDir: string
-  /** Directory containing template packages. Defaults to siteDir/templates for flat projects. */
-  templatesDir: string
-  /** @deprecated Use `contentRoot.storage`. Retained for backward compatibility. */
+  /**
+   * Storage provider for site content. Equivalent to `contentRoot.storage` —
+   * kept as a convenience because resolver and template loading use it directly.
+   */
   storage: StorageProvider
+  /**
+   * Rooting prefix for content under `storage`. Equivalent to `contentRoot.rootPath`.
+   * Empty string when storage is target-rooted.
+   */
+  siteDir: string
+  /** Directory containing template packages. Project-level, separate from content rooting. */
+  templatesDir: string
 }
 
 async function discoverPages(
