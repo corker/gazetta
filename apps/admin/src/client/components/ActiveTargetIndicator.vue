@@ -1,21 +1,28 @@
 <script setup lang="ts">
 /**
- * Active target indicator — read-only display of the current active target.
+ * Active target indicator + switcher.
  *
- * Shows the target name with environment-based chrome (neutral for local,
- * amber for staging, red for production). Read-only variant matches the
- * design's "transient" chrome intensity — the dropdown switcher (R31)
- * becomes the permanent/committed variant.
+ * Shows the active target's name with environment-based chrome. When 2+
+ * targets exist, clicking the pill opens a menu to switch. With only one
+ * target or none, the pill hides entirely (progressive disclosure).
  *
- * Hides when no targets loaded or only one target exists (progressive
- * disclosure: nothing to indicate when there's only one place for content).
+ * Environment chrome:
+ *   env-local:      neutral
+ *   env-staging:    amber
+ *   env-production: red
+ *
+ * Editable vs read-only shows as a sub-badge on the pill.
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import Menu from 'primevue/menu'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
+import type { TargetInfo } from '../api/client.js'
 
 const activeTarget = useActiveTargetStore()
+const menu = ref<InstanceType<typeof Menu> | null>(null)
 
-const visible = computed(() => activeTarget.targets.length > 1 && activeTarget.activeTarget !== null)
+const visible = computed(() => activeTarget.targets.length > 0 && activeTarget.activeTarget !== null)
+const interactive = computed(() => activeTarget.targets.length > 1)
 
 const environmentClass = computed(() => {
   const env = activeTarget.activeTarget?.environment
@@ -25,16 +32,47 @@ const environmentClass = computed(() => {
 })
 
 const editableLabel = computed(() => activeTarget.isActiveEditable ? 'editable' : 'read-only')
+
+const menuItems = computed(() => activeTarget.targets.map((t: TargetInfo) => ({
+  label: t.name,
+  icon: iconFor(t),
+  class: t.name === activeTarget.activeTargetName ? 'active' : '',
+  command: () => {
+    if (t.name !== activeTarget.activeTargetName) {
+      activeTarget.setActiveTarget(t.name)
+    }
+  },
+})))
+
+function iconFor(t: TargetInfo): string {
+  if (t.name === activeTarget.activeTargetName) return 'pi pi-check'
+  if (!t.editable) return 'pi pi-lock'
+  return 'pi pi-circle'
+}
+
+function onClick(event: Event) {
+  if (interactive.value) menu.value?.toggle(event)
+}
 </script>
 
 <template>
-  <span v-if="visible" class="active-target" :class="environmentClass"
-    data-testid="active-target-indicator"
-    :title="`Active target: ${activeTarget.activeTargetName} (${editableLabel})`">
-    <span class="dot" aria-hidden="true" />
-    <span class="name">{{ activeTarget.activeTargetName }}</span>
-    <span v-if="!activeTarget.isActiveEditable" class="readonly-badge">read-only</span>
-  </span>
+  <template v-if="visible">
+    <button type="button"
+      class="active-target"
+      :class="[environmentClass, { interactive }]"
+      data-testid="active-target-indicator"
+      :title="`Active target: ${activeTarget.activeTargetName} (${editableLabel})${interactive ? ' — click to switch' : ''}`"
+      :aria-haspopup="interactive ? 'menu' : undefined"
+      :disabled="!interactive"
+      @click="onClick">
+      <span class="dot" aria-hidden="true" />
+      <span class="name">{{ activeTarget.activeTargetName }}</span>
+      <span v-if="!activeTarget.isActiveEditable" class="readonly-badge">read-only</span>
+      <i v-if="interactive" class="pi pi-chevron-down chevron" aria-hidden="true" />
+    </button>
+    <Menu v-if="interactive" ref="menu" :model="menuItems" :popup="true"
+      data-testid="active-target-menu" />
+  </template>
 </template>
 
 <style scoped>
@@ -49,6 +87,18 @@ const editableLabel = computed(() => activeTarget.isActiveEditable ? 'editable' 
   background: var(--color-hover-bg);
   color: var(--color-fg);
   border: 1px solid var(--color-border);
+  cursor: default;
+  font-family: inherit;
+}
+.active-target.interactive {
+  cursor: pointer;
+}
+.active-target.interactive:hover {
+  filter: brightness(0.96);
+}
+.active-target.interactive:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 2px;
 }
 .dot {
   width: 0.5rem;
@@ -69,10 +119,12 @@ const editableLabel = computed(() => activeTarget.isActiveEditable ? 'editable' 
   border-left: 1px solid currentColor;
   margin-left: 0.125rem;
 }
+.chevron {
+  font-size: 0.625rem;
+  opacity: 0.6;
+  margin-left: 0.125rem;
+}
 
-/* Environment chrome — scales with "permanence": the indicator is a
-   subtle-to-moderate treatment. The switcher (R31) will go fuller when
-   prod is the editable active target. */
 .env-production {
   background: var(--color-env-prod-bg);
   color: var(--color-env-prod-fg);
@@ -83,5 +135,15 @@ const editableLabel = computed(() => activeTarget.isActiveEditable ? 'editable' 
   color: var(--color-env-staging-fg);
   border-color: var(--color-env-staging-fg);
 }
-/* env-local inherits the neutral treatment from the base style */
+</style>
+
+<style>
+/* Highlight the active target in the switcher menu. Non-scoped so PrimeVue's
+   generated class hash doesn't block the selector. */
+.p-menu .p-menuitem.active > .p-menuitem-content {
+  font-weight: 600;
+}
+.p-menu .p-menuitem.active .p-menuitem-icon {
+  color: var(--p-primary-color);
+}
 </style>
