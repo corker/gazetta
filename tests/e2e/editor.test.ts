@@ -931,6 +931,17 @@ test.describe('Target switch preserves preview', () => {
   })
 })
 
+test.describe('Save button labeling', () => {
+  test('generic "Save" label for local (non-production) active target', async ({ page }) => {
+    await openEditor(page, 'home')
+    const save = page.locator('[data-testid="save-btn"]')
+    await expect(save).toHaveText(/^\s*Save\s*$/)
+    // Primary severity — PrimeVue adds no class for p-button-primary, so
+    // assert the button is NOT the danger variant.
+    await expect(save).not.toHaveClass(/p-button-danger/)
+  })
+})
+
 test.describe('Target switch with unsaved edits', () => {
   test('Cancel keeps the user on the current target with edits intact', async ({ page }) => {
     // Enter edit mode and make a change to mark the editor dirty.
