@@ -62,7 +62,11 @@ onMounted(() => {
   <div class="cms-app">
     <Toolbar />
     <div v-if="site.error" class="cms-error">{{ site.error }}</div>
-    <div v-else-if="site.loading" class="cms-loading">Loading site...</div>
+    <!-- Only block on the first load. Subsequent reloads (e.g., on
+         active-target switch) keep the router-view mounted so the
+         preview iframe survives — unmounting would drop scroll/zoom
+         and defeat the "cheap comparison" intent of preview tabs. -->
+    <div v-else-if="!site.manifest" class="cms-loading">Loading site...</div>
     <router-view v-else />
 
     <UnsavedDialog />
