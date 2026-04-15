@@ -55,9 +55,11 @@ export const useSiteStore = defineStore('site', () => {
   }
 
   /** Force-refetch site content — used when the active target switches. */
+  /** Force-refetch. Keeps current manifest visible until the new one
+   *  arrives — otherwise the router-view briefly unmounts (drops the
+   *  preview iframe, loses scroll/zoom) on active-target switches. */
   async function reload() {
     loadPromise = null
-    manifest.value = null
     return load()
   }
 

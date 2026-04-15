@@ -8,6 +8,7 @@ import { usePreviewStore } from '../stores/preview.js'
 import { useToastStore } from '../stores/toast.js'
 import { useSiteStore } from '../stores/site.js'
 import { useUiModeStore } from '../stores/uiMode.js'
+import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useRouter } from 'vue-router'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
 import PreviewTargetTabs from './PreviewTargetTabs.vue'
@@ -28,6 +29,7 @@ const preview = usePreviewStore()
 const toast = useToastStore()
 const site = useSiteStore()
 const uiMode = useUiModeStore()
+const activeTarget = useActiveTargetStore()
 const router = useRouter()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
@@ -51,9 +53,16 @@ function sendSelection() {
 watch(() => focus.selectedGzId, sendSelection)
 
 const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+/** Logical route only — drives fresh-load vs morph behavior. Swapping the
+ *  active target must NOT force a fresh iframe load (scroll preservation). */
+const previewRoute = computed(() => selection.previewRoute)
+/** URL that's actually fetched. Includes ?target= so preview swaps content
+ *  when the active target changes (e.g., preview tab click). */
 const previewPath = computed(() => {
-  if (!selection.previewRoute) return null
-  return `${basePath}/preview${selection.previewRoute}`
+  if (!previewRoute.value) return null
+  const target = activeTarget.activeTargetName
+  const qs = target ? `?target=${encodeURIComponent(target)}` : ''
+  return `${basePath}/preview${previewRoute.value}${qs}`
 })
 
 // Fragment scope — gzId of the fragment root for dimming
@@ -463,7 +472,15 @@ function applyHtml(html: string, morph: boolean) {
 }
 
 watch(() => preview.version, () => fetchPreview(true))
-watch(previewPath, () => fetchPreview(false), { immediate: true })
+// Route change = fresh iframe load (srcdoc replaced). Scroll position
+// resets — the author navigated to a different page, so that's expected.
+watch(previewRoute, () => fetchPreview(false), { immediate: true })
+// Target change on the same route = morphed swap. Preserves scroll,
+// zoom, and iframe focus — that's the point of preview tabs per
+// design-editor-ux.md ("feels like flipping tabs, not navigating").
+watch(() => activeTarget.activeTargetName, (name, prev) => {
+  if (name && prev && name !== prev && previewRoute.value) fetchPreview(true)
+})
 watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce: 300 })
 </script>
 
