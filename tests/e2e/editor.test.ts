@@ -836,6 +836,27 @@ test.describe('Publish panel', () => {
   })
 })
 
+test.describe('Fragment blast radius', () => {
+  test('tree row shows compact blast-radius badge with page count', async ({ page }) => {
+    // On a fresh dev server, multiple tree badges mount in parallel and
+    // all hit /api/dependents before any sidecar has been written. The
+    // admin-api's sidecar writer memoizes the backfill, so concurrent
+    // callers share one in-flight pass — without that, they'd race to
+    // an empty index and the badge would render count=0. This test
+    // covers both the UI layer and that invariant.
+    await page.goto('/admin')
+    const row = page.locator('[data-testid="site-fragment-header"]')
+    await row.waitFor({ timeout: 10000 })
+    const badge = row.locator('[data-testid="fragment-blast-radius"]')
+    await badge.waitFor({ timeout: 5000 })
+    // Compact form — just the count, not the "used on N pages" text.
+    // Starter has 5 pages all referencing @header.
+    await expect(badge).toHaveText('5')
+    // Hover title lists the dependent pages.
+    await expect(badge).toHaveAttribute('title', /Used on:.*home/)
+  })
+})
+
 test.describe('Preview target tabs', () => {
   /**
    * Publish everything from local → staging so both targets have the home
