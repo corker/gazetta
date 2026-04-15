@@ -4,13 +4,6 @@ import type { ContentRoot } from './content-root.js'
 import { listSidecars } from './sidecars.js'
 import { mapLimit } from './concurrency.js'
 
-// Helper: is the first arg a ContentRoot? Shape-based so imports stay clean.
-function isContentRoot(x: unknown): x is ContentRoot {
-  return typeof x === 'object' && x !== null
-    && 'storage' in x && 'rootPath' in x && 'path' in x
-    && typeof (x as { path: unknown }).path === 'function'
-}
-
 export interface PublishRequest {
   source: string
   targets: string[]
@@ -28,49 +21,14 @@ export interface PublishResult {
  * Copy items from source storage to target storage.
  * Items are relative paths like "pages/home" or "fragments/header".
  * All files under each item directory are copied recursively.
- *
- * Two call shapes:
- *   publishItems(sourceRoot, targetRoot, items)                    // preferred
- *   publishItems(sourceStorage, sourceBase, targetStorage, targetBase, items)  // legacy
  */
 export async function publishItems(
   sourceRoot: ContentRoot,
   targetRoot: ContentRoot,
-  items: string[]
-): Promise<{ copiedFiles: number }>
-export async function publishItems(
-  sourceStorage: StorageProvider,
-  sourceBase: string,
-  targetStorage: StorageProvider,
-  targetBase: string,
-  items: string[]
-): Promise<{ copiedFiles: number }>
-export async function publishItems(
-  sourceOrStorage: ContentRoot | StorageProvider,
-  targetOrBase: ContentRoot | string,
-  itemsOrTargetStorage: string[] | StorageProvider,
-  targetBaseMaybe?: string,
-  itemsMaybe?: string[]
+  items: string[],
 ): Promise<{ copiedFiles: number }> {
-  let sourceStorage: StorageProvider
-  let sourceBase: string
-  let targetStorage: StorageProvider
-  let targetBase: string
-  let items: string[]
-
-  if (isContentRoot(sourceOrStorage) && isContentRoot(targetOrBase)) {
-    sourceStorage = sourceOrStorage.storage
-    sourceBase = sourceOrStorage.rootPath
-    targetStorage = targetOrBase.storage
-    targetBase = targetOrBase.rootPath
-    items = itemsOrTargetStorage as string[]
-  } else {
-    sourceStorage = sourceOrStorage as StorageProvider
-    sourceBase = targetOrBase as string
-    targetStorage = itemsOrTargetStorage as StorageProvider
-    targetBase = targetBaseMaybe!
-    items = itemsMaybe!
-  }
+  const { storage: sourceStorage, rootPath: sourceBase } = sourceRoot
+  const { storage: targetStorage, rootPath: targetBase } = targetRoot
 
   // Copy items in parallel (bounded).
   const counts = await mapLimit(items, async (item) => {
@@ -139,31 +97,9 @@ function dirname(path: string): string {
 /**
  * Resolve dependencies for published items.
  * Given a list of items (pages/fragments), find all referenced templates and fragments.
- *
- * Two call shapes:
- *   resolveDependencies(sourceRoot, items)                 // preferred
- *   resolveDependencies(storage, siteBase, items)           // legacy
  */
-export async function resolveDependencies(sourceRoot: ContentRoot, items: string[]): Promise<string[]>
-export async function resolveDependencies(storage: StorageProvider, siteBase: string, items: string[]): Promise<string[]>
-export async function resolveDependencies(
-  sourceOrStorage: ContentRoot | StorageProvider,
-  siteBaseOrItems: string | string[],
-  itemsMaybe?: string[],
-): Promise<string[]> {
-  let storage: StorageProvider
-  let siteBase: string
-  let items: string[]
-  if (isContentRoot(sourceOrStorage)) {
-    storage = sourceOrStorage.storage
-    siteBase = sourceOrStorage.rootPath
-    items = siteBaseOrItems as string[]
-  } else {
-    storage = sourceOrStorage
-    siteBase = siteBaseOrItems as string
-    items = itemsMaybe!
-  }
-
+export async function resolveDependencies(sourceRoot: ContentRoot, items: string[]): Promise<string[]> {
+  const { storage, rootPath: siteBase } = sourceRoot
   const allItems = new Set(items)
   const visited = new Set<string>()
 
@@ -239,26 +175,11 @@ async function collectComponentDeps(
  * baked into pages at publish time. On ESI targets, republishing the fragment
  * alone suffices because the edge composer resolves @fragments per request.
  */
-export async function findFragmentDependents(sourceRoot: ContentRoot, fragmentName: string): Promise<{ pages: string[]; fragments: string[] }>
-export async function findFragmentDependents(storage: StorageProvider, siteBase: string, fragmentName: string): Promise<{ pages: string[]; fragments: string[] }>
 export async function findFragmentDependents(
-  sourceOrStorage: ContentRoot | StorageProvider,
-  siteBaseOrFragmentName: string,
-  fragmentNameMaybe?: string,
+  sourceRoot: ContentRoot,
+  fragmentName: string,
 ): Promise<{ pages: string[]; fragments: string[] }> {
-  let storage: StorageProvider
-  let siteBase: string
-  let fragmentName: string
-  if (isContentRoot(sourceOrStorage)) {
-    storage = sourceOrStorage.storage
-    siteBase = sourceOrStorage.rootPath
-    fragmentName = siteBaseOrFragmentName
-  } else {
-    storage = sourceOrStorage
-    siteBase = siteBaseOrFragmentName
-    fragmentName = fragmentNameMaybe!
-  }
-  return findFragmentDependentsImpl(storage, siteBase, fragmentName)
+  return findFragmentDependentsImpl(sourceRoot.storage, sourceRoot.rootPath, fragmentName)
 }
 
 async function findFragmentDependentsImpl(
@@ -341,25 +262,13 @@ async function findFragmentDependentsImpl(
  * Works against target storage (rooted at target base) or source storage
  * (pass `baseDir: siteDir` so the walker descends into `siteDir/pages`).
  */
-export async function findDependentsFromSidecars(sourceRoot: ContentRoot, query: { fragment: string } | { template: string }): Promise<{ pages: string[]; fragments: string[] }>
-export async function findDependentsFromSidecars(storage: StorageProvider, query: { fragment: string } | { template: string }, opts?: { baseDir?: string }): Promise<{ pages: string[]; fragments: string[] }>
 export async function findDependentsFromSidecars(
-  rootOrStorage: ContentRoot | StorageProvider,
+  sourceRoot: ContentRoot,
   query: { fragment: string } | { template: string },
-  opts: { baseDir?: string } = {},
 ): Promise<{ pages: string[]; fragments: string[] }> {
-  let storage: StorageProvider
-  let pagesRoot: string
-  let fragmentsRoot: string
-  if (isContentRoot(rootOrStorage)) {
-    storage = rootOrStorage.storage
-    pagesRoot = rootOrStorage.path('pages')
-    fragmentsRoot = rootOrStorage.path('fragments')
-  } else {
-    storage = rootOrStorage
-    pagesRoot = opts.baseDir ? `${opts.baseDir}/pages` : 'pages'
-    fragmentsRoot = opts.baseDir ? `${opts.baseDir}/fragments` : 'fragments'
-  }
+  const { storage } = sourceRoot
+  const pagesRoot = sourceRoot.path('pages')
+  const fragmentsRoot = sourceRoot.path('fragments')
   // Single listing pass per root, then all reasoning is in-memory.
   const [pagesList, fragmentsList] = await Promise.all([
     listSidecars(storage, pagesRoot),
