@@ -8,6 +8,8 @@ import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
+import { useActiveTargetStore } from '../stores/activeTarget.js'
+import { saveButtonLabel, saveButtonSeverity } from '../composables/saveButtonBinding.js'
 import PublishPanel from './PublishPanel.vue'
 import ActiveTargetIndicator from './ActiveTargetIndicator.vue'
 import SyncIndicators from './SyncIndicators.vue'
@@ -21,6 +23,7 @@ const selection = useSelectionStore()
 const editing = useEditingStore()
 const theme = useThemeStore()
 const uiMode = useUiModeStore()
+const activeTarget = useActiveTargetStore()
 
 const showPublish = ref(false)
 /** Destination to preselect in the panel (set by sync chip clicks). */
@@ -51,6 +54,13 @@ const publishTitle = computed(() => {
   if (editing.hasPendingEdits) return 'Save changes before publishing'
   return 'Publish'
 })
+
+// Save button label + severity reflect the active target when it's an
+// editable production target — every save click lands on live content.
+// Delegated to saveButtonBinding.ts so the logic is unit-testable
+// without mounting the component.
+const saveLabel = computed(() => saveButtonLabel(activeTarget.activeTarget))
+const saveSeverity = computed(() => saveButtonSeverity(activeTarget.activeTarget))
 
 function handleBack() {
   const prefix = selection.type === 'page' ? '/pages' : '/fragments'
@@ -85,7 +95,7 @@ function handleBack() {
         data-testid="dev-playground-link" @click="router.push('/dev')" size="small" class="cms-btn" />
       <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
-      <Button v-if="uiMode.mode === 'edit'" label="Save" icon="pi pi-save" severity="primary" :loading="editing.saving"
+      <Button v-if="uiMode.mode === 'edit'" :label="saveLabel" icon="pi pi-save" :severity="saveSeverity" :loading="editing.saving"
         data-testid="save-btn" :title="saveTitle" :disabled="!editing.hasPendingEdits" @click="editing.save()" size="small" class="cms-btn" />
       <Button label="Publish" icon="pi pi-cloud-upload" severity="success"
         data-testid="publish-btn" :title="publishTitle" :disabled="!canPublish" @click="openPublish" size="small" class="cms-btn" />
