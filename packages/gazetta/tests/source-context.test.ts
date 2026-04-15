@@ -4,6 +4,8 @@ import { createTargetRegistryView, NoEditableTargetError, UnknownTargetError } f
 import {
   createSourceContext,
   createSourceContextFromRegistry,
+  staticSourceResolver,
+  registrySourceResolver,
 } from '../src/admin-api/source-context.js'
 
 function mockProvider(tag = 'mock'): StorageProvider {
@@ -96,5 +98,81 @@ describe('createSourceContextFromRegistry', () => {
   it('throws UnknownTargetError when an explicit targetName is not in the registry', () => {
     const registry = createTargetRegistryView(new Map(), configs)
     expect(() => createSourceContextFromRegistry({ registry, targetName: 'missing', projectSiteDir: '.' })).toThrow(UnknownTargetError)
+  })
+})
+
+describe('staticSourceResolver', () => {
+  it('returns the same SourceContext regardless of requested target name', () => {
+    const source = createSourceContext({ storage: mockProvider(), siteDir: '/abs/site' })
+    const resolve = staticSourceResolver(source)
+    expect(resolve(undefined)).toBe(source)
+    expect(resolve('local')).toBe(source)
+    expect(resolve('staging')).toBe(source)
+  })
+})
+
+describe('registrySourceResolver', () => {
+  const configs: Record<string, TargetConfig> = {
+    local: { storage: { type: 'filesystem' } },
+    staging: { storage: { type: 'r2' }, environment: 'staging', editable: true },
+    prod: { storage: { type: 'r2' }, environment: 'production' },
+  }
+
+  function buildRegistry() {
+    const providers = new Map<string, StorageProvider>([
+      ['local', mockProvider('local-p')],
+      ['staging', mockProvider('staging-p')],
+      ['prod', mockProvider('prod-p')],
+    ])
+    return createTargetRegistryView(providers, configs)
+  }
+
+  it('resolves to the default editable target when no name is given', async () => {
+    const registry = buildRegistry()
+    const resolve = registrySourceResolver({ registry, projectSiteDir: '/abs/site' })
+    const source = await resolve(undefined)
+    // local is the first editable target in declaration order
+    expect(source.storage).toBe(registry.get('local'))
+  })
+
+  it('resolves to the requested target when named', async () => {
+    const registry = buildRegistry()
+    const resolve = registrySourceResolver({ registry, projectSiteDir: '/abs/site' })
+    const source = await resolve('staging')
+    expect(source.storage).toBe(registry.get('staging'))
+  })
+
+  it('memoizes one context per target name', async () => {
+    const resolve = registrySourceResolver({ registry: buildRegistry(), projectSiteDir: '/abs/site' })
+    const a = await resolve('staging')
+    const b = await resolve('staging')
+    expect(a).toBe(b)
+  })
+
+  it('returns distinct contexts for different target names', async () => {
+    const resolve = registrySourceResolver({ registry: buildRegistry(), projectSiteDir: '/abs/site' })
+    const local = await resolve('local')
+    const staging = await resolve('staging')
+    expect(local).not.toBe(staging)
+    expect(local.storage).not.toBe(staging.storage)
+  })
+
+  it('throws UnknownTargetError for names not in the registry', async () => {
+    const resolve = registrySourceResolver({ registry: buildRegistry(), projectSiteDir: '/abs/site' })
+    await expect(async () => await resolve('missing')).rejects.toThrow(UnknownTargetError)
+  })
+
+  it('throws NoEditableTargetError when resolving the default on a registry with none editable', async () => {
+    const readOnlyConfigs: Record<string, TargetConfig> = {
+      staging: { storage: { type: 'r2' }, environment: 'staging' },
+      prod: { storage: { type: 'r2' }, environment: 'production' },
+    }
+    const providers = new Map<string, StorageProvider>([
+      ['staging', mockProvider('staging')],
+      ['prod', mockProvider('prod')],
+    ])
+    const registry = createTargetRegistryView(providers, readOnlyConfigs)
+    const resolve = registrySourceResolver({ registry, projectSiteDir: '.' })
+    await expect(async () => await resolve(undefined)).rejects.toThrow(NoEditableTargetError)
   })
 })
