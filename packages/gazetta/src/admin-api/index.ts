@@ -5,6 +5,7 @@ import type { StorageProvider, TargetConfig } from '../types.js'
 import { scanTemplates } from '../templates-scan.js'
 import { memoizeAsync } from '../concurrency.js'
 import { createSourceSidecarWriter, type SourceSidecarWriter } from '../source-sidecars.js'
+import { createSourceContext, type SourceContext } from './source-context.js'
 import { authMiddleware } from './middleware/auth.js'
 import { siteRoutes } from './routes/site.js'
 import { pageRoutes } from './routes/pages.js'
@@ -72,14 +73,23 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
     scanTemplates: () => cachedScan.get(),
   })
 
-  app.route('/', siteRoutes(opts.siteDir, opts.storage))
-  app.route('/', pageRoutes(opts.siteDir, opts.storage, sidecarWriter))
-  app.route('/', fragmentRoutes(opts.siteDir, opts.storage, sidecarWriter))
-  app.route('/', templateRoutes(opts.siteDir, opts.storage, templatesDir, adminDir, opts.production))
-  app.route('/', previewRoutes(opts.siteDir, opts.storage, templatesDir))
-  app.route('/', publishRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir, scan, sidecarWriter))
-  app.route('/', compareRoutes(opts.siteDir, opts.storage, opts.targets, opts.targetConfigs, templatesDir, scan))
-  app.route('/', fieldRoutes(opts.siteDir, opts.storage, adminDir))
+  // SourceContext bundles the "where source content lives" concerns
+  // (storage, siteDir, content root, sidecar writer). Route factories that
+  // adopt it take one parameter instead of 3-4 positional args.
+  const source: SourceContext = createSourceContext({
+    storage: opts.storage,
+    siteDir: opts.siteDir,
+    sidecarWriter,
+  })
+
+  app.route('/', siteRoutes(source.siteDir, source.storage))
+  app.route('/', pageRoutes(source.siteDir, source.storage, source.sidecarWriter))
+  app.route('/', fragmentRoutes(source.siteDir, source.storage, source.sidecarWriter))
+  app.route('/', templateRoutes(source.siteDir, source.storage, templatesDir, adminDir, opts.production))
+  app.route('/', previewRoutes(source.siteDir, source.storage, templatesDir))
+  app.route('/', publishRoutes(source.siteDir, source.storage, opts.targets, opts.targetConfigs, templatesDir, scan, source.sidecarWriter))
+  app.route('/', compareRoutes(source.siteDir, source.storage, opts.targets, opts.targetConfigs, templatesDir, scan))
+  app.route('/', fieldRoutes(source.siteDir, source.storage, adminDir))
 
   // Exposed for the CLI's template file watcher: clears the memoized scan
   // so the next publish/compare picks up template edits. Not part of the
