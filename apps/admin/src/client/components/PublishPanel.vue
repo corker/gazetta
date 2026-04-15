@@ -25,6 +25,7 @@ import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useSyncStatusStore } from '../stores/syncStatus.js'
+import PublishItemList from './PublishItemList.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -62,17 +63,29 @@ function toggleDestination(name: string) {
   selectedDestinations.value = next
 }
 
+// Items selected for publish. Managed via v-model:selected on the list;
+// list auto-populates when source/destinations change.
+const selectedItems = ref<Set<string>>(new Set())
+
+// Destination names as an array (PublishItemList takes string[]).
+const destinationNames = computed(() => [...selectedDestinations.value])
+
 // --- Panel lifecycle --------------------------------------------------
 
 watch(() => props.visible, (v) => {
-  if (!v) return
-  // Reset state on open so stale state doesn't leak between invocations.
+  if (!v) {
+    // Clear selection on close so stale state doesn't leak between
+    // invocations (e.g., different source next time).
+    selectedItems.value = new Set()
+    return
+  }
   sourceName.value = pickDefaultSource()
   const preselect = new Set<string>()
   if (props.initialDestination && destinationOptions.value.some(t => t.name === props.initialDestination)) {
     preselect.add(props.initialDestination)
   }
   selectedDestinations.value = preselect
+  selectedItems.value = new Set()
   // Kick off sync-status refresh so the destination list shows accurate
   // change counts. syncStatus caches per-target; this is cheap on reopen.
   if (activeTarget.targets.length > 1) syncStatus.refreshAll()
@@ -94,8 +107,24 @@ function close() { emit('update:visible', false) }
 // --- Action (stubbed in R38a; wired in R38c) -------------------------
 
 const canPublish = computed(() =>
-  !!sourceName.value && selectedDestinations.value.size > 0
+  !!sourceName.value
+    && selectedDestinations.value.size > 0
+    && selectedItems.value.size > 0
 )
+
+const publishLabel = computed(() => {
+  const items = selectedItems.value.size
+  const dests = selectedDestinations.value.size
+  if (items === 0 || dests === 0) return 'Publish'
+  return `Publish ${items} ${items === 1 ? 'item' : 'items'} → ${dests} ${dests === 1 ? 'target' : 'targets'}`
+})
+
+const publishTitle = computed(() => {
+  if (!sourceName.value) return 'Pick a source'
+  if (selectedDestinations.value.size === 0) return 'Pick at least one destination'
+  if (selectedItems.value.size === 0) return 'Pick at least one item'
+  return ''
+})
 
 function statusLabel(name: string): string {
   if (syncStatus.isLoading(name)) return '…'
@@ -118,7 +147,7 @@ function envClass(env: string | undefined): string {
 <template>
   <Dialog :visible="props.visible" @update:visible="v => emit('update:visible', v)"
     modal dismissableMask :closable="true" header="Publish"
-    :style="{ width: '640px', maxWidth: '95vw' }"
+    :style="{ width: '760px', maxWidth: '95vw' }"
     data-testid="publish-panel">
     <div class="publish-panel">
       <!-- Source picker -->
@@ -167,12 +196,15 @@ function envClass(env: string | undefined): string {
         </div>
       </div>
 
-      <!-- Items (R38b will fill this) -->
-      <div class="row">
+      <!-- Items -->
+      <div class="row row-items">
         <label class="row-label">Items</label>
-        <div class="row-value muted" data-testid="publish-items-placeholder">
-          Item list, diffs, and fan-out controls land in the next commit.
-        </div>
+        <PublishItemList
+          :source="sourceName"
+          :destinations="destinationNames"
+          :selected="selectedItems"
+          @update:selected="(v: Set<string>) => selectedItems = v"
+        />
       </div>
     </div>
 
@@ -180,11 +212,11 @@ function envClass(env: string | undefined): string {
       <Button label="Cancel" severity="secondary" @click="close"
         data-testid="publish-panel-cancel" />
       <Button
-        :label="`Publish ${selectedDestinations.size ? `→ ${selectedDestinations.size}` : ''}`"
+        :label="publishLabel"
         severity="success"
         :disabled="!canPublish"
         data-testid="publish-panel-confirm"
-        :title="canPublish ? '' : 'Pick a source and at least one destination'"
+        :title="publishTitle"
       />
     </template>
   </Dialog>
@@ -201,6 +233,14 @@ function envClass(env: string | undefined): string {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
+}
+.row-items {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+.row-items .row-label {
+  padding-top: 0;
 }
 .row-label {
   flex: 0 0 5rem;

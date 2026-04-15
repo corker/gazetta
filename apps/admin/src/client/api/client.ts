@@ -176,11 +176,10 @@ export const api = {
   getTargets: () => request<TargetInfo[]>('/targets'),
   publish: (items: string[], targets: string[]) => request<{ results: PublishResult[] }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
   publishStream,
-  compare: (target: string, options?: RequestInit) => {
-    // Include active target as source override; server reads ?source= for the
-    // compare's source editable target. If no provider is set, server falls
-    // back to its default editable target.
-    const src = activeTargetProvider?.()
+  compare: (target: string, options?: RequestInit & { source?: string }) => {
+    // `source` explicit wins. Otherwise fall back to the active-target
+    // provider (server resolves its own default if neither is set).
+    const src = options?.source ?? activeTargetProvider?.()
     const qs = src ? `?target=${encodeURIComponent(target)}&source=${encodeURIComponent(src)}` : `?target=${encodeURIComponent(target)}`
     return request<CompareResult>(`/compare${qs}`, options)
   },
