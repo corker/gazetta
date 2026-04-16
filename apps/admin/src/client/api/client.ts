@@ -134,6 +134,11 @@ import type {
   CompareResult as CompareResultShape,
   PublishResult as PublishResultShape,
   PublishProgress as PublishProgressShape,
+  RevisionSummary as RevisionSummaryShape,
+  RevisionOperation as RevisionOperationShape,
+  ListHistoryResponse as ListHistoryResponseShape,
+  RestoreRevisionResponse as RestoreRevisionResponseShape,
+  FetchResponse as FetchResponseShape,
 } from 'gazetta/admin-api/schemas'
 export type PageSummary = PageSummaryShape
 export type CreatePageRequest = CreatePageRequestShape
@@ -151,6 +156,11 @@ export type DependentsResponse = DependentsResponseShape
 export type CompareResult = CompareResultShape
 export type PublishResult = PublishResultShape
 export type PublishProgress = PublishProgressShape
+export type RevisionSummary = RevisionSummaryShape
+export type RevisionOperation = RevisionOperationShape
+export type ListHistoryResponse = ListHistoryResponseShape
+export type RestoreRevisionResponse = RestoreRevisionResponseShape
+export type FetchResponse = FetchResponseShape
 
 export interface InlineComponent {
   name: string
@@ -213,35 +223,23 @@ export const api = {
   getDependents: (item: string, options?: RequestInit) =>
     request<DependentsResponse>(`/dependents?item=${encodeURIComponent(item)}`, options),
   fetchFromTarget: (source: string, items?: string[]) =>
-    request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', {
+    request<FetchResponse>('/fetch', {
       method: 'POST',
       body: JSON.stringify({ source, items }),
     }),
   /** List revisions on a target, newest first. */
   listHistory: (target: string, limit = 50) =>
-    request<{ revisions: RevisionSummary[] }>(`/history?target=${encodeURIComponent(target)}&limit=${limit}`),
+    request<ListHistoryResponse>(`/history?target=${encodeURIComponent(target)}&limit=${limit}`),
   /** Undo the most recent write on a target — restores the previous
    *  revision as a forward 'rollback'. 409 when there's nothing to undo. */
   undoLastWrite: (target: string) =>
-    request<{ revision: RevisionSummary; restoredFrom: string }>(`/history/undo?target=${encodeURIComponent(target)}`, {
+    request<RestoreRevisionResponse>(`/history/undo?target=${encodeURIComponent(target)}`, {
       method: 'POST',
     }),
   /** Restore an arbitrary revision on a target. 404 when the id doesn't exist. */
   restoreRevision: (target: string, revisionId: string) =>
-    request<{ revision: RevisionSummary; restoredFrom: string }>(
+    request<RestoreRevisionResponse>(
       `/history/restore?target=${encodeURIComponent(target)}&id=${encodeURIComponent(revisionId)}`,
       { method: 'POST' },
     ),
-}
-
-/** Summary shape returned by history endpoints (no snapshot). */
-export interface RevisionSummary {
-  id: string
-  timestamp: string
-  operation: 'save' | 'publish' | 'rollback'
-  author?: string
-  source?: string
-  items: string[]
-  message?: string
-  restoredFrom?: string
 }
