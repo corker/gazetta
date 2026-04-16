@@ -36,14 +36,6 @@ const BASELINE: Array<{ id: string; reason: string }> = [
     id: 'color-contrast',
     reason: 'tinted state colors (muted labels, env badges) below 4.5:1 in dark mode — needs token-layer pass',
   },
-  {
-    id: 'label',
-    reason: 'several rjsf form inputs render without associated <label> — needs custom field wrapper fix',
-  },
-  {
-    id: 'nested-interactive',
-    reason: 'PrimeVue Checkbox inside a clickable row label; library-level issue with a clean fix via role=group',
-  },
 ]
 
 type Violation = { id: string; impact?: string | null; help: string; helpUrl: string; nodes: unknown[] }

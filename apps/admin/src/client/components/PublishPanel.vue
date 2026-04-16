@@ -373,21 +373,20 @@ function envClass(env: string | undefined): string {
             </label>
             <!-- Group header + indented members (4+ targets, 2+ in env) -->
             <template v-else>
-              <button
-                type="button"
+              <label
                 :class="['destination-group-header', envClass(entry.group.environment)]"
                 :data-testid="`publish-dest-group-${entry.group.environment}`"
-                @click="toggleGroup(entry.group)">
+                :for="`dest-group-${entry.group.environment}`">
                 <Checkbox
                   :modelValue="groupState(entry.group) === 'all'"
                   :indeterminate="groupState(entry.group) === 'some'"
                   :inputId="`dest-group-${entry.group.environment}`"
                   :binary="true"
-                  :tabindex="-1"
+                  @update:modelValue="() => toggleGroup(entry.group)"
                 />
                 <span class="group-label">{{ entry.group.environment }}</span>
                 <span class="group-count">{{ entry.group.members.length }} targets</span>
-              </button>
+              </label>
               <label
                 v-for="t in entry.group.members"
                 :key="t.name"
