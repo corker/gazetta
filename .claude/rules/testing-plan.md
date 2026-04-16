@@ -428,12 +428,73 @@ first migration keeps the API honest.
 
 ---
 
-#### ☐ Phase 3 — Scenarios
+#### ◐ Phase 3 — Scenarios
 
-- Write 5-10 journey tests using POMs
-- Additions, not replacements — feature tests cover unit behavior, scenarios cover intent
+Scenarios target **cross-surface integration gaps** — workflows that cross ≥3 surfaces
+where feature tests cover each surface alone but not the interactions between them. The
+surface codes below are used throughout for cross-referencing.
 
-**Estimate:** ~1-2 days.
+**Surfaces (shorthand for the matrix):**
+
+| Code | Surface |
+|------|---------|
+| `ED` | Editor form (field input, dirty state) |
+| `SV` | Save pipeline (API, toast) |
+| `PB` | PublishPanel (open, source, destinations, items) |
+| `PB.P` | Publish execution (actual stream + result) |
+| `PB.C` | Production confirmation flow |
+| `PB.G` | Destination groups / fan-out |
+| `ST` | Site tree (navigation, dirty dots) |
+| `CT` | Component tree (add/remove/move) |
+| `AT` | Active target switcher |
+| `UG` | Unsaved guard dialog |
+| `HI` | History / undo / rollback |
+| `SYN` | Sync indicators |
+| `TOAST` | Toast (success, error, action) |
+| `KEY` | Keyboard shortcuts |
+
+**Cross-surface combo coverage:**
+
+| Combo | Covered by | Status |
+|-------|------------|--------|
+| ED + SV + TOAST + HI | `history.spec` save-toast-undo | ✓ |
+| AT + HI + ED + ST | `history.spec` restore-via-panel | ✓ |
+| ED + UG + SV | `unsaved-guard.spec` unsaved-dialog | ✓ |
+| AT + UG + ED | `target-switch.spec` unsaved-cancel | ✓ |
+| **ED + SV + PB + PB.P + SYN** | Scenario #1 (this PR) | ◐ |
+| **PB + PB.G + PB.P** | Scenario #2 (this PR) | ◐ |
+| **AT + PB (reverse) + PB.P** | Scenario #3 (this PR) | ◐ |
+| **HI + ST + SYN** | Scenario #4 (this PR) | ◐ |
+
+**Filled by this PR — 3 scenarios under `tests/e2e/scenarios/`:**
+
+1. **Full edit → save → publish → sync cycle** (ED + SV + PB + PB.P + SYN) — the happy path users do dozens of times a day, never previously covered end-to-end
+2. **Fan-out publish with real execution** (PB + PB.G + PB.P) — existing `publish.spec` verifies the UI toggle but stops before dispatching the multi-target publish
+3. **Rollback → downstream sync refresh** (HI + ST + SYN) — existing `history.spec` tests restore but not the cascade into site tree dirty state and sync indicators
+
+**Deferred — hotfix: source=prod → local** (AT + PB reverse-direction + PB.P). Requires
+`editable: true` on the production target to make the source dropdown appear, but the
+dev server's site.yaml watcher doesn't invalidate the target registry on config change —
+a beforeEach patch isn't picked up by the already-running admin API. Two paths for the
+follow-up: (a) add a separate Playwright project that spawns its own dev server against
+a pre-patched site.yaml, or (b) fix the dev server to reload target registry on
+site.yaml change. Both are infrastructure work, not scenario work.
+
+**Test-data isolation:** scenarios mutate both the editable source (local's
+`pages/home/page.json`) and multiple target dist dirs. The worker-scoped `testSite`
+fixture shares state across tests on the same worker, so each scenario's `beforeEach`
+calls [scenarios/_isolation.ts](../../tests/e2e/scenarios/_isolation.ts)
+`resetScenarioState` — restores `page.json` to a pristine starter baseline and wipes
+every target's dist dir + history. Cost is a single file write + parallel `rm -rf`s,
+measured in tens of ms per scenario.
+
+**Not written — already covered by feature tests:**
+
+- Save + publish prod-confirm + execution (scenario #2 from the longer plan) — `publish.spec` already covers prod confirm requirement and non-prod execution separately
+- Full undo round-trip (scenario #5) — `history.spec` covers toast-undo end-to-end
+- Target switch with unsaved edits (scenario #6) — `target-switch.spec` covers all three branches (Save / Discard / Cancel)
+
+Adding these as scenarios too would duplicate existing coverage without closing a gap.
 
 ---
 
