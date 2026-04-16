@@ -43,7 +43,13 @@ function newViolations(all: Violation[]): Violation[] {
 }
 
 async function scan(page: import('@playwright/test').Page) {
-  return new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze()
+  // Exclude the preview iframe — it renders the user's site (in tests:
+  // examples/starter), not Gazetta's admin chrome. WCAG violations in
+  // the rendered site are the site author's concern, not ours; mixing
+  // them into the admin a11y scan would couple admin CI to whatever
+  // the starter template happens to set for its colors. Scan stays
+  // scoped to the admin SPA only.
+  return new AxeBuilder({ page }).withTags(WCAG_TAGS).exclude('iframe[data-testid="preview-iframe"]').analyze()
 }
 
 test.describe('accessibility', () => {
