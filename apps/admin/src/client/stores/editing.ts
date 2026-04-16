@@ -256,6 +256,37 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   /**
+   * Post-restore refresh — used after any undo or rollback that
+   * touches the current active target. Clears in-memory edit state,
+   * reloads site + selection, and re-opens the same editor against
+   * the restored content.
+   *
+   * Without this the editor form shows pre-restore content and a
+   * subsequent save would silently reintroduce what was just undone.
+   * Takes a snapshot of the current editing target at call time so
+   * the re-open lands on the same component/page/fragment.
+   */
+  async function refreshAfterRestore(): Promise<void> {
+    const targetSnapshot = target.value
+      ? { template: target.value.template, path: target.value.path }
+      : null
+    clear()
+    await useSiteStore().reload()
+    await useSelectionStore().reload()
+    if (targetSnapshot) {
+      if (targetSnapshot.path === '_root') {
+        const sel = useSelectionStore()
+        if (sel.type === 'page') await openPageRoot()
+        else if (sel.type === 'fragment' && sel.name) await openFragment(sel.name)
+      } else {
+        await openComponent(targetSnapshot.path, targetSnapshot.template)
+      }
+    }
+    usePreviewStore().invalidate()
+    usePublishStatusStore().refresh()
+  }
+
+  /**
    * Build the "Undo" toast action for a just-completed save. Captures
    * the active target at save time — if the user switches targets
    * before clicking Undo, the action still targets the right place.
@@ -266,42 +297,12 @@ export const useEditingStore = defineStore('editing', () => {
   function buildUndoAction(): { label: string; handler: () => Promise<void> } | undefined {
     const active = useActiveTargetStore().activeTargetName
     if (!active) return undefined
-    // Capture the editing target at save time so a subsequent undo can
-    // re-open the same editor against the restored content. Without
-    // this the user ends up in whatever editor was open on save — or
-    // the wrong one if we guess.
-    const targetSnapshot = target.value
-      ? { template: target.value.template, path: target.value.path }
-      : null
     return {
       label: 'Undo',
       handler: async () => {
         try {
           await api.undoLastWrite(active)
-          // Clear ALL in-memory edit state before re-opening — any
-          // pending/stashed edits captured pre-undo would otherwise be
-          // overlaid onto the restored content and silently reintroduce
-          // what the user just undid.
-          clear()
-          // Reload site + active selection so the UI reflects the
-          // restored content — the admin holds stale state otherwise.
-          await useSiteStore().reload()
-          await useSelectionStore().reload()
-          // Re-open the editor that was focused during the save.
-          // openComponent / openPageRoot / openFragment all read from
-          // the refreshed selection store, so content reflects post-
-          // undo state.
-          if (targetSnapshot) {
-            if (targetSnapshot.path === '_root') {
-              const sel = useSelectionStore()
-              if (sel.type === 'page') await openPageRoot()
-              else if (sel.type === 'fragment' && sel.name) await openFragment(sel.name)
-            } else {
-              await openComponent(targetSnapshot.path, targetSnapshot.template)
-            }
-          }
-          usePreviewStore().invalidate()
-          usePublishStatusStore().refresh()
+          await refreshAfterRestore()
           toast.show('Undone')
         } catch (err) {
           toast.showError(err, 'Undo failed')
@@ -344,5 +345,6 @@ export const useEditingStore = defineStore('editing', () => {
     hasPendingEdits, allOverrides,
     open, openComponent, openPageRoot, openFragment,
     clear, markDirty, discard, revertStashed, save, hasPendingEdit,
+    refreshAfterRestore,
   }
 })

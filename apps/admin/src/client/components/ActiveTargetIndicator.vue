@@ -23,6 +23,7 @@ import { useSelectionStore } from '../stores/selection.js'
 import { useToastStore } from '../stores/toast.js'
 import { groupedEntries } from '../composables/targetGrouping.js'
 import { api, type TargetInfo } from '../api/client.js'
+import HistoryPanel from './HistoryPanel.vue'
 
 const activeTarget = useActiveTargetStore()
 const editing = useEditingStore()
@@ -33,7 +34,10 @@ const router = useRouter()
 const menu = ref<InstanceType<typeof Menu> | null>(null)
 
 const visible = computed(() => activeTarget.targets.length > 0 && activeTarget.activeTarget !== null)
-const interactive = computed(() => activeTarget.targets.length > 1)
+// The pill is always interactive when there's a target — the menu
+// carries both switchTo entries (when 2+ targets) and "View history"
+// (always available for the active target).
+const interactive = computed(() => activeTarget.targets.length >= 1)
 
 const environmentClass = computed(() => {
   const env = activeTarget.activeTarget?.environment
@@ -53,7 +57,7 @@ const editableLabel = computed(() => activeTarget.isActiveEditable ? 'editable' 
  */
 const menuItems = computed(() => {
   const entries = groupedEntries(activeTarget.targets, activeTarget.targets.length)
-  return entries.map(entry => {
+  const targetItems = entries.map(entry => {
     if (entry.kind === 'single') return targetItem(entry.target)
     return {
       // PrimeVue Menu renders a label + nested items as a section.
@@ -62,7 +66,21 @@ const menuItems = computed(() => {
       items: entry.group.members.map(targetItem),
     }
   })
+  // History affordance at the bottom — separator + action for the
+  // current active target. Users wanting history on another target
+  // switch first (keeps this menu focused on "my focus", not per-item).
+  return [
+    ...targetItems,
+    { separator: true },
+    {
+      label: 'View history',
+      icon: 'pi pi-history',
+      command: () => { showHistory.value = true },
+    },
+  ]
 })
+
+const showHistory = ref(false)
 
 function targetItem(t: TargetInfo) {
   return {
@@ -177,6 +195,7 @@ function onClick(event: Event) {
     </button>
     <Menu v-if="interactive" ref="menu" :model="menuItems" :popup="true"
       data-testid="active-target-menu" />
+    <HistoryPanel v-model:visible="showHistory" />
   </template>
 </template>
 
