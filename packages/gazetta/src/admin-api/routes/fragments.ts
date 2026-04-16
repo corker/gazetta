@@ -78,9 +78,9 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
 
     const manifestPath = join(fragment.dir, 'fragment.json')
     const serialized = JSON.stringify(manifest, null, 2) + '\n'
-    await storage.writeFile(manifestPath, serialized)
-    await sidecarWriter?.writeFor('fragment', name)
 
+    // History first — see pages.ts PUT handler rationale (baseline must
+    // capture pre-write state).
     if (source.history) {
       await recordWrite({
         history: source.history,
@@ -89,6 +89,8 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
         items: [{ path: source.contentRoot.relative(manifestPath), content: serialized }],
       })
     }
+    await storage.writeFile(manifestPath, serialized)
+    await sidecarWriter?.writeFor('fragment', name)
     return c.json({ ok: true })
   })
 
@@ -101,8 +103,6 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
 
     const manifestPath = join(fragment.dir, 'fragment.json')
-    await storage.rm(fragment.dir)
-
     if (source.history) {
       await recordWrite({
         history: source.history,
@@ -111,6 +111,7 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
         items: [{ path: source.contentRoot.relative(manifestPath), content: null }],
       })
     }
+    await storage.rm(fragment.dir)
     return c.json({ ok: true })
   })
 

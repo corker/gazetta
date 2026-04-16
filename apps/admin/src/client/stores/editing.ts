@@ -6,6 +6,8 @@ import { useToastStore } from './toast.js'
 import { usePreviewStore } from './preview.js'
 import { useSelectionStore } from './selection.js'
 import { usePublishStatusStore } from './publishStatus.js'
+import { useActiveTargetStore } from './activeTarget.js'
+import { useSiteStore } from './site.js'
 import { api } from '../api/client.js'
 import type { EditorMount } from 'gazetta/types'
 
@@ -253,6 +255,61 @@ export const useEditingStore = defineStore('editing', () => {
     usePreviewStore().invalidateDraft()
   }
 
+  /**
+   * Build the "Undo" toast action for a just-completed save. Captures
+   * the active target at save time — if the user switches targets
+   * before clicking Undo, the action still targets the right place.
+   *
+   * Returns undefined when there's no active target (shouldn't happen
+   * during a save, but guards the null case).
+   */
+  function buildUndoAction(): { label: string; handler: () => Promise<void> } | undefined {
+    const active = useActiveTargetStore().activeTargetName
+    if (!active) return undefined
+    // Capture the editing target at save time so a subsequent undo can
+    // re-open the same editor against the restored content. Without
+    // this the user ends up in whatever editor was open on save — or
+    // the wrong one if we guess.
+    const targetSnapshot = target.value
+      ? { template: target.value.template, path: target.value.path }
+      : null
+    return {
+      label: 'Undo',
+      handler: async () => {
+        try {
+          await api.undoLastWrite(active)
+          // Clear ALL in-memory edit state before re-opening — any
+          // pending/stashed edits captured pre-undo would otherwise be
+          // overlaid onto the restored content and silently reintroduce
+          // what the user just undid.
+          clear()
+          // Reload site + active selection so the UI reflects the
+          // restored content — the admin holds stale state otherwise.
+          await useSiteStore().reload()
+          await useSelectionStore().reload()
+          // Re-open the editor that was focused during the save.
+          // openComponent / openPageRoot / openFragment all read from
+          // the refreshed selection store, so content reflects post-
+          // undo state.
+          if (targetSnapshot) {
+            if (targetSnapshot.path === '_root') {
+              const sel = useSelectionStore()
+              if (sel.type === 'page') await openPageRoot()
+              else if (sel.type === 'fragment' && sel.name) await openFragment(sel.name)
+            } else {
+              await openComponent(targetSnapshot.path, targetSnapshot.template)
+            }
+          }
+          usePreviewStore().invalidate()
+          usePublishStatusStore().refresh()
+          toast.show('Undone')
+        } catch (err) {
+          toast.showError(err, 'Undo failed')
+        }
+      },
+    }
+  }
+
   async function save() {
     if (!target.value && pendingEdits.size === 0) return
     saving.value = true
@@ -270,7 +327,9 @@ export const useEditingStore = defineStore('editing', () => {
       // Re-check publish state — saving may have flipped this page from
       // unchanged to dirty (or vice-versa if content matches the target).
       usePublishStatusStore().refresh()
-      toast.show('Saved')
+      toast.show('Saved', {
+        action: buildUndoAction(),
+      })
     } catch (err) {
       lastSaveError.value = (err as Error).message
       toast.showError(err, 'Failed to save')

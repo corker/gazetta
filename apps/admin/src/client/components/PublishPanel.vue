@@ -26,6 +26,7 @@ import Select from 'primevue/select'
 import { api, type PublishResult } from '../api/client.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useSyncStatusStore } from '../stores/syncStatus.js'
+import { useToastStore } from '../stores/toast.js'
 import { groupedEntries, type TargetGroup } from '../composables/targetGrouping.js'
 import PublishItemList from './PublishItemList.vue'
 
@@ -38,6 +39,7 @@ const emit = defineEmits<{ (e: 'update:visible', v: boolean): void }>()
 
 const activeTarget = useActiveTargetStore()
 const syncStatus = useSyncStatusStore()
+const toast = useToastStore()
 
 // --- Source selection -------------------------------------------------
 
@@ -122,6 +124,9 @@ const progress = ref(new Map<string, TargetProgress>())
 const results = ref<PublishResult[] | null>(null)
 const publishError = ref<string | null>(null)
 const invalidTemplates = ref<{ name: string; errors: string[] }[]>([])
+/** Destinations whose Undo was clicked — keeps the button latched
+ *  disabled so the user can't accidentally double-rollback. */
+const undoneTargets = ref(new Set<string>())
 
 // Production destinations require explicit confirmation to avoid accidental
 // pushes to live content — same pattern as the old PublishDialog.
@@ -139,6 +144,27 @@ function resetPublishState() {
   results.value = null
   publishError.value = null
   invalidTemplates.value = []
+  undoneTargets.value = new Set()
+}
+
+/**
+ * Undo a publish to a specific destination. Rolls that target back to
+ * its pre-publish revision (soft undo: recorded as a forward rollback).
+ * Refreshes sync status so the chip reflects the post-undo state.
+ */
+async function undoPublish(targetName: string) {
+  if (undoneTargets.value.has(targetName)) return
+  try {
+    await api.undoLastWrite(targetName)
+    const next = new Set(undoneTargets.value)
+    next.add(targetName)
+    undoneTargets.value = next
+    syncStatus.invalidate(targetName)
+    syncStatus.refreshOne(targetName)
+    toast.show(`Undone on ${targetName}`)
+  } catch (err) {
+    toast.showError(err, `Undo failed on ${targetName}`)
+  }
 }
 
 async function handlePublishClick() {
@@ -433,6 +459,18 @@ function envClass(env: string | undefined): string {
           <span class="result-target">{{ r.target }}</span>
           <span v-if="r.success" class="result-detail">{{ r.copiedFiles }} files</span>
           <span v-else class="result-detail">{{ r.error }}</span>
+          <!-- Undo affordance — rolls the destination back to the pre-
+               publish state. Only shown on success; disabled once
+               undone so a rapid double-click doesn't double-rollback. -->
+          <button
+            v-if="r.success"
+            type="button"
+            class="result-undo"
+            :disabled="undoneTargets.has(r.target)"
+            :data-testid="`publish-result-undo-${r.target}`"
+            @click="undoPublish(r.target)">
+            {{ undoneTargets.has(r.target) ? 'Undone' : 'Undo' }}
+          </button>
         </div>
       </div>
     </div>
@@ -666,4 +704,17 @@ function envClass(env: string | undefined): string {
 .publish-result.error { background: var(--color-danger-bg); color: var(--color-danger-fg); }
 .result-target { font-weight: 600; }
 .result-detail { margin-left: auto; font-size: 0.875rem; opacity: 0.8; }
+.result-undo {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--p-border-radius-sm);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.result-undo:hover:not(:disabled) { opacity: 1; }
+.result-undo:disabled { cursor: default; opacity: 0.5; }
 </style>

@@ -51,6 +51,8 @@ export type {
   WrittenItem,
   ScanLocation,
 } from './history-recorder.js'
+export { restoreRevision } from './history-restorer.js'
+export type { RestoreRevisionOptions } from './history-restorer.js'
 export {
   isHistoryEnabled,
   getHistoryRetention,

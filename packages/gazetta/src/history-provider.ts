@@ -55,10 +55,12 @@ export interface CreateHistoryProviderOptions {
  * Shape of the history index file. Kept minimal — the list is append-
  * heavy and read-cheap, so we serialize the full ordered id list
  * rather than try to be clever. Oldest first, newest last.
+ *
+ * IDs are timestamp-based (`rev-<unixMillis>[-<seq>]`) so retention
+ * evictions stay auditable ("what happened around Jan 5?") and lex-
+ * sort matches chronological order. See `formatId` for the full scheme.
  */
 interface HistoryIndex {
-  /** Counter for the next revision id. Monotonic; never decremented. */
-  nextId: number
   /** Revision ids in creation order (oldest first). */
   revisions: string[]
 }
@@ -78,9 +80,14 @@ export function createHistoryProvider(
   /** Read the index or return an empty one if it doesn't exist yet. */
   async function readIndex(): Promise<HistoryIndex> {
     if (!await storage.exists(indexPath)) {
-      return { nextId: 1, revisions: [] }
+      return { revisions: [] }
     }
-    return JSON.parse(await storage.readFile(indexPath)) as HistoryIndex
+    const parsed = JSON.parse(await storage.readFile(indexPath)) as HistoryIndex & { nextId?: number }
+    // Forward-compat: tolerate legacy `nextId` by ignoring it. Old indexes
+    // (from the numeric-id era) continue to read cleanly, new writes use
+    // the timestamp scheme. No migration pass needed — retention naturally
+    // evicts the legacy ids over time.
+    return { revisions: parsed.revisions ?? [] }
   }
 
   /**
@@ -117,9 +124,34 @@ export function createHistoryProvider(
     return createHash('sha256').update(content).digest('hex')
   }
 
-  /** Format a numeric id as `rev-NNNN`, zero-padded to 4 digits minimum. */
-  function formatId(n: number): string {
-    return `rev-${String(n).padStart(4, '0')}`
+  /**
+   * Allocate a fresh revision id. Scheme: `rev-<unixMillis>`, with a
+   * `-<seq>` suffix on same-millisecond collisions ("rev-1760...050",
+   * "rev-1760...050-2", ...). Collision tracking uses the current
+   * index's revisions list — assumes no concurrent writers against
+   * the same target (already true: Gazetta never has two admins
+   * writing the same target's history simultaneously).
+   *
+   * Why millis + suffix rather than a monotonic counter:
+   *   - Retention evictions leave you with a window of revisions you
+   *     can date-read from the filename alone.
+   *   - No counter to overflow or reset when history is disabled then
+   *     re-enabled.
+   *   - Lex-sort = chrono sort (13-digit ms are fixed-width through
+   *     year 5138 AD).
+   *
+   * `_clock` is injectable for deterministic tests — production uses
+   * Date.now(). Stays private to createHistoryProvider.
+   */
+  function formatId(existing: readonly string[], now: number): string {
+    const base = `rev-${now}`
+    if (!existing.some(id => id === base || id.startsWith(`${base}-`))) return base
+    // Same-millisecond collision: bump the suffix. Start from 2 so the
+    // first duplicate gets `-2` (matches the mental model "base, then
+    // the second, then the third").
+    let seq = 2
+    while (existing.includes(`${base}-${seq}`)) seq += 1
+    return `${base}-${seq}`
   }
 
   /**
@@ -138,7 +170,7 @@ export function createHistoryProvider(
 
   async function recordRevision(input: RevisionInput): Promise<Revision> {
     const idx = await readIndex()
-    const id = formatId(idx.nextId)
+    const id = formatId(idx.revisions, Date.now())
 
     // Write blobs (dedup via content-addressing) and build the
     // path → hash snapshot.
@@ -162,12 +194,11 @@ export function createHistoryProvider(
     }
     await writeWithParents(revisionPath(id), JSON.stringify(manifest, null, 2) + '\n')
 
-    // Update the index (append, bump counter) then apply retention. Do
-    // index writes last so a mid-write failure leaves orphan blobs and
-    // an orphan manifest (both harmless) rather than a dangling index
+    // Update the index (append) then apply retention. Do the index
+    // write last so a mid-write failure leaves orphan blobs and an
+    // orphan manifest (both harmless) rather than a dangling index
     // entry pointing at a missing manifest.
     idx.revisions.push(id)
-    idx.nextId += 1
     await writeIndex(idx)
     await applyRetention(idx)
 

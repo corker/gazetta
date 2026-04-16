@@ -19,6 +19,7 @@ import { previewRoutes } from './routes/preview.js'
 import { publishRoutes } from './routes/publish.js'
 import { compareRoutes } from './routes/compare.js'
 import { fieldRoutes } from './routes/fields.js'
+import { historyRoutes } from './routes/history.js'
 
 export interface AdminAppOptions {
   /**
@@ -89,8 +90,14 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
       scanTemplates: () => cachedScan.get(),
       templatesDir,
     })
-    if (!opts.source.sidecarWriter) {
-      source = { ...opts.source, sidecarWriter }
+    // Backfill history on the source if the caller didn't supply one —
+    // dev bootstrap builds a bare SourceContext and relies on admin-api
+    // to wire history per the target's config. Skip when the target's
+    // site.yaml has `history.enabled: false`, or when there's no
+    // matching targetConfig (legacy single-storage path).
+    const sourceHistory = opts.source.history ?? buildHistoryForSource(opts, source)
+    if (!opts.source.sidecarWriter || !opts.source.history) {
+      source = { ...opts.source, sidecarWriter, history: sourceHistory }
     }
   } else {
     if (!opts.storage) {
@@ -106,6 +113,7 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
       storage: opts.storage,
       siteDir: opts.siteDir,
       sidecarWriter,
+      history: buildHistoryForLegacySource(opts),
     })
   }
 
@@ -161,6 +169,7 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
   app.route('/', publishRoutes(resolveSource, opts.targets, opts.targetConfigs, templatesDir, scan))
   app.route('/', compareRoutes(resolveSource, opts.targets, opts.targetConfigs, templatesDir, scan))
   app.route('/', fieldRoutes(resolveSource, adminDir))
+  app.route('/', historyRoutes(resolveSource, opts.targets, opts.targetConfigs))
 
   // Exposed for the CLI's template file watcher: clears the memoized scan
   // so the next publish/compare picks up template edits. Not part of the
@@ -170,4 +179,43 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
   appWithInvalidate.invalidateSourceSidecars = () => sidecarWriter.invalidate()
   appWithInvalidate.writeSourceSidecar = (kind, name) => sidecarWriter.writeFor(kind, name)
   return appWithInvalidate
+}
+
+/**
+ * Build a HistoryProvider for the caller-supplied source. Used when
+ * the bootstrap gives us a SourceContext without history pre-wired
+ * (dev server, CLI scripts). Picks up the source target's config from
+ * `opts.targetConfigs` — respects `history.enabled: false`, honors the
+ * configured retention. Returns undefined when we can't identify the
+ * target or history is disabled.
+ */
+function buildHistoryForSource(opts: AdminAppOptions, source: SourceContext) {
+  const name = source.targetName
+  const config = name ? opts.targetConfigs?.[name] : undefined
+  if (!config || !isHistoryEnabled(config)) return undefined
+  return createHistoryProvider({
+    storage: source.storage,
+    retention: getHistoryRetention(config),
+  })
+}
+
+/**
+ * Legacy path: caller passed raw `opts.storage` rather than a
+ * SourceContext. No target name is available; default history to
+ * enabled with default retention, assuming the common single-target
+ * setup. Skipped when targetConfigs is absent — historical behavior
+ * (tests that rely on no `.gazetta/` writes happening).
+ */
+function buildHistoryForLegacySource(opts: AdminAppOptions) {
+  const configs = opts.targetConfigs
+  if (!configs) return undefined
+  // Pick the first editable target's config as the best-effort stand-in.
+  // Non-editable targets don't receive saves anyway, so the legacy
+  // single-storage path is necessarily an editable one.
+  const firstEditable = Object.entries(configs).find(([, c]) => isHistoryEnabled(c))
+  if (!firstEditable) return undefined
+  return createHistoryProvider({
+    storage: opts.storage!,
+    retention: getHistoryRetention(firstEditable[1]),
+  })
 }
