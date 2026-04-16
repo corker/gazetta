@@ -124,6 +124,11 @@ import type {
   FragmentSummary as FragmentSummaryShape,
   CreateFragmentRequest as CreateFragmentRequestShape,
   CreateFragmentResponse as CreateFragmentResponseShape,
+  TemplateSummary as TemplateSummaryShape,
+  FieldSummary as FieldSummaryShape,
+  TargetInfo as TargetInfoShape,
+  TargetEnvironment as TargetEnvironmentShape,
+  TargetType as TargetTypeShape,
 } from 'gazetta/admin-api/schemas'
 export type PageSummary = PageSummaryShape
 export type CreatePageRequest = CreatePageRequestShape
@@ -131,13 +136,11 @@ export type CreatePageResponse = CreatePageResponseShape
 export type FragmentSummary = FragmentSummaryShape
 export type CreateFragmentRequest = CreateFragmentRequestShape
 export type CreateFragmentResponse = CreateFragmentResponseShape
-export interface TemplateSummary {
-  name: string
-}
-export interface FieldSummary {
-  name: string
-  path: string
-}
+export type TemplateSummary = TemplateSummaryShape
+export type FieldSummary = FieldSummaryShape
+export type TargetInfo = TargetInfoShape
+export type TargetEnvironment = TargetEnvironmentShape
+export type TargetType = TargetTypeShape
 export interface SiteManifest {
   name: string
   version?: string
@@ -162,15 +165,6 @@ export interface FragmentDetail extends FragmentSummary {
   content?: Record<string, unknown>
   components?: ComponentEntry[]
   dir: string
-}
-
-export type TargetEnvironment = 'local' | 'staging' | 'production'
-export type TargetType = 'static' | 'dynamic'
-export interface TargetInfo {
-  name: string
-  environment: TargetEnvironment
-  type: TargetType
-  editable: boolean
 }
 
 export interface PublishResult {
