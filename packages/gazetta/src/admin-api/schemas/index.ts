@@ -13,6 +13,8 @@
  *   - GET  /api/dependents (reverse-dep lookup)
  *   - GET  /api/compare (logical diff result)
  *   - POST /api/publish + /api/publish/stream (result + SSE progress union)
+ *   - GET  /api/history + POST /api/history/{undo,restore} (revisions + restore)
+ *   - POST /api/fetch (cross-target copy)
  *
  * Add new endpoint modules here as they move to schema-validated contracts.
  */
@@ -25,3 +27,5 @@ export * from './site.js'
 export * from './dependents.js'
 export * from './compare.js'
 export * from './publish.js'
+export * from './history.js'
+export * from './fetch.js'

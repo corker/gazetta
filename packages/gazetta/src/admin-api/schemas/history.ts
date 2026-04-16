@@ -1,0 +1,42 @@
+/**
+ * Zod schemas for /api/history* endpoints.
+ *
+ * Revision mirrors the `Revision` interface in history.ts (metadata
+ * only — snapshot is server-internal and stripped from the wire).
+ * ListHistoryResponse wraps it in `{ revisions }`; RestoreResponse
+ * is the shared shape for both /undo and /restore.
+ */
+import { z } from 'zod'
+
+export const RevisionOperationSchema = z.enum(['save', 'publish', 'rollback'])
+export type RevisionOperation = z.infer<typeof RevisionOperationSchema>
+
+/** Summary of a single revision — server emits this from /history. */
+export const RevisionSummarySchema = z.object({
+  id: z.string(),
+  timestamp: z.string(),
+  operation: RevisionOperationSchema,
+  author: z.string().optional(),
+  source: z.string().optional(),
+  items: z.array(z.string()),
+  message: z.string().optional(),
+  restoredFrom: z.string().optional(),
+})
+export type RevisionSummary = z.infer<typeof RevisionSummarySchema>
+
+/** Response body for GET /api/history. */
+export const ListHistoryResponseSchema = z.object({
+  revisions: z.array(RevisionSummarySchema),
+})
+export type ListHistoryResponse = z.infer<typeof ListHistoryResponseSchema>
+
+/**
+ * Response body for both POST /api/history/undo and
+ * POST /api/history/restore. `restoredFrom` is the revision id the
+ * new revision rolled back to.
+ */
+export const RestoreRevisionResponseSchema = z.object({
+  revision: RevisionSummarySchema,
+  restoredFrom: z.string(),
+})
+export type RestoreRevisionResponse = z.infer<typeof RestoreRevisionResponseSchema>

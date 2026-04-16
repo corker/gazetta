@@ -30,6 +30,10 @@ import {
   CompareResultSchema,
   PublishResultSchema,
   PublishProgressSchema,
+  RevisionSummarySchema,
+  ListHistoryResponseSchema,
+  RestoreRevisionResponseSchema,
+  FetchResponseSchema,
 } from 'gazetta/admin-api/schemas'
 import type {
   CreatePageRequest,
@@ -46,6 +50,10 @@ import type {
   CompareResult,
   PublishResult,
   PublishProgress,
+  RevisionSummary,
+  ListHistoryResponse,
+  RestoreRevisionResponse,
+  FetchResponse,
 } from 'gazetta/admin-api/schemas'
 
 describe('POST /api/pages contract', () => {
@@ -368,5 +376,117 @@ describe('POST /api/publish + /api/publish/stream contract', () => {
       // `target-result` with a non-PublishResult result
       expect(PublishProgressSchema.safeParse({ kind: 'target-result', result: { target: 'x' } }).success).toBe(false)
     })
+  })
+})
+
+describe('GET /api/history + POST /api/history/{undo,restore} contract', () => {
+  describe('RevisionSummary', () => {
+    it('accepts a minimal save revision', () => {
+      const rev: RevisionSummary = {
+        id: 'rev-1713295810000',
+        timestamp: '2026-04-16T20:00:00.000Z',
+        operation: 'save',
+        items: ['pages/home'],
+      }
+      expect(RevisionSummarySchema.safeParse(rev).success).toBe(true)
+    })
+
+    it('accepts a rollback revision with all optional fields set', () => {
+      const rev: RevisionSummary = {
+        id: 'rev-1713295900000',
+        timestamp: '2026-04-16T20:10:00.000Z',
+        operation: 'rollback',
+        author: 'alice',
+        source: 'staging',
+        items: ['pages/home', 'fragments/header'],
+        message: 'Rollback to rev-1713295810000',
+        restoredFrom: 'rev-1713295810000',
+      }
+      expect(RevisionSummarySchema.safeParse(rev).success).toBe(true)
+    })
+
+    it('rejects unknown operation values', () => {
+      expect(
+        RevisionSummarySchema.safeParse({
+          id: 'rev-1',
+          timestamp: '2026-04-16T20:00:00.000Z',
+          operation: 'delete',
+          items: [],
+        }).success,
+      ).toBe(false)
+    })
+
+    it('rejects missing required fields', () => {
+      expect(
+        RevisionSummarySchema.safeParse({
+          id: 'rev-1',
+          timestamp: '2026-04-16T20:00:00.000Z',
+          operation: 'save',
+          // items missing
+        }).success,
+      ).toBe(false)
+    })
+  })
+
+  describe('ListHistoryResponse', () => {
+    it('accepts an empty history', () => {
+      const r: ListHistoryResponse = { revisions: [] }
+      expect(ListHistoryResponseSchema.safeParse(r).success).toBe(true)
+    })
+
+    it('accepts a populated history', () => {
+      const r: ListHistoryResponse = {
+        revisions: [
+          { id: 'rev-2', timestamp: '2026-04-16T20:10:00.000Z', operation: 'save', items: [] },
+          { id: 'rev-1', timestamp: '2026-04-16T20:00:00.000Z', operation: 'publish', items: ['x'] },
+        ],
+      }
+      expect(ListHistoryResponseSchema.safeParse(r).success).toBe(true)
+    })
+
+    it('rejects responses missing the revisions field', () => {
+      expect(ListHistoryResponseSchema.safeParse({}).success).toBe(false)
+    })
+  })
+
+  describe('RestoreRevisionResponse (shared by /undo and /restore)', () => {
+    it('accepts a well-formed response', () => {
+      const r: RestoreRevisionResponse = {
+        revision: {
+          id: 'rev-3',
+          timestamp: '2026-04-16T20:20:00.000Z',
+          operation: 'rollback',
+          items: [],
+          restoredFrom: 'rev-1',
+        },
+        restoredFrom: 'rev-1',
+      }
+      expect(RestoreRevisionResponseSchema.safeParse(r).success).toBe(true)
+    })
+
+    it('rejects responses missing restoredFrom', () => {
+      expect(
+        RestoreRevisionResponseSchema.safeParse({
+          revision: { id: 'rev-3', timestamp: 't', operation: 'rollback', items: [] },
+        }).success,
+      ).toBe(false)
+    })
+  })
+})
+
+describe('POST /api/fetch contract', () => {
+  it('accepts a well-formed response', () => {
+    const r: FetchResponse = { success: true, copiedFiles: 3, items: ['pages/home', 'fragments/header'] }
+    expect(FetchResponseSchema.safeParse(r).success).toBe(true)
+  })
+
+  it('accepts a zero-copy response', () => {
+    const r: FetchResponse = { success: true, copiedFiles: 0, items: [] }
+    expect(FetchResponseSchema.safeParse(r).success).toBe(true)
+  })
+
+  it('rejects responses missing required fields', () => {
+    expect(FetchResponseSchema.safeParse({ success: true, copiedFiles: 0 }).success).toBe(false)
+    expect(FetchResponseSchema.safeParse({ copiedFiles: 0, items: [] }).success).toBe(false)
   })
 })
