@@ -13,8 +13,22 @@
  * as each endpoint moves to the new pattern (testing-plan.md Priority 3.2).
  */
 import { describe, it, expect } from 'vitest'
-import { CreatePageRequestSchema, CreatePageResponseSchema, PageSummarySchema } from 'gazetta/admin-api/schemas'
-import type { CreatePageRequest, CreatePageResponse, PageSummary } from 'gazetta/admin-api/schemas'
+import {
+  CreatePageRequestSchema,
+  CreatePageResponseSchema,
+  PageSummarySchema,
+  CreateFragmentRequestSchema,
+  CreateFragmentResponseSchema,
+  FragmentSummarySchema,
+} from 'gazetta/admin-api/schemas'
+import type {
+  CreatePageRequest,
+  CreatePageResponse,
+  PageSummary,
+  CreateFragmentRequest,
+  CreateFragmentResponse,
+  FragmentSummary,
+} from 'gazetta/admin-api/schemas'
 
 describe('POST /api/pages contract', () => {
   describe('CreatePageRequest', () => {
@@ -69,6 +83,55 @@ describe('POST /api/pages contract', () => {
 
     it('rejects entries missing required fields', () => {
       expect(PageSummarySchema.safeParse({ name: 'home', route: '/' }).success).toBe(false)
+    })
+  })
+})
+
+describe('POST /api/fragments contract', () => {
+  describe('CreateFragmentRequest', () => {
+    it('accepts the minimal shape the client uses', () => {
+      const body: CreateFragmentRequest = { name: 'header', template: 'header-layout' }
+      expect(CreateFragmentRequestSchema.safeParse(body).success).toBe(true)
+    })
+
+    it('rejects empty name', () => {
+      const r = CreateFragmentRequestSchema.safeParse({ name: '', template: 'header-layout' })
+      expect(r.success).toBe(false)
+    })
+
+    it('rejects empty template', () => {
+      const r = CreateFragmentRequestSchema.safeParse({ name: 'header', template: '' })
+      expect(r.success).toBe(false)
+    })
+
+    it('rejects missing required fields', () => {
+      expect(CreateFragmentRequestSchema.safeParse({ name: 'header' }).success).toBe(false)
+      expect(CreateFragmentRequestSchema.safeParse({ template: 'header-layout' }).success).toBe(false)
+      expect(CreateFragmentRequestSchema.safeParse({}).success).toBe(false)
+    })
+  })
+
+  describe('CreateFragmentResponse', () => {
+    it('accepts the response shape the server emits', () => {
+      const resp: CreateFragmentResponse = { ok: true, name: 'header' }
+      expect(CreateFragmentResponseSchema.safeParse(resp).success).toBe(true)
+    })
+
+    it('rejects responses missing required fields', () => {
+      expect(CreateFragmentResponseSchema.safeParse({ ok: true }).success).toBe(false)
+      expect(CreateFragmentResponseSchema.safeParse({ name: 'header' }).success).toBe(false)
+    })
+  })
+
+  describe('FragmentSummary (GET /api/fragments list shape)', () => {
+    it('accepts a well-formed entry', () => {
+      const entry: FragmentSummary = { name: 'header', template: 'header-layout' }
+      expect(FragmentSummarySchema.safeParse(entry).success).toBe(true)
+    })
+
+    it('rejects entries missing required fields', () => {
+      expect(FragmentSummarySchema.safeParse({ name: 'header' }).success).toBe(false)
+      expect(FragmentSummarySchema.safeParse({ template: 'header-layout' }).success).toBe(false)
     })
   })
 })
