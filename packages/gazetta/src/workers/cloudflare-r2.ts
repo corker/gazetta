@@ -38,7 +38,7 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
   if (options?.middleware) options.middleware(app)
 
   // Health check
-  app.get('/health', async (c) => {
+  app.get('/health', async c => {
     const bucket = c.env[bindingName]
     const pages = await bucket.list({ prefix: 'pages/', delimiter: '/' })
     const fragments = await bucket.list({ prefix: 'fragments/', delimiter: '/' })
@@ -46,11 +46,11 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
   })
 
   // Static assets (CSS, JS) — immutable cache
-  app.get('/pages/*', async (c) => serveStatic(c, c.env[bindingName]))
-  app.get('/fragments/*', async (c) => serveStatic(c, c.env[bindingName]))
+  app.get('/pages/*', async c => serveStatic(c, c.env[bindingName]))
+  app.get('/fragments/*', async c => serveStatic(c, c.env[bindingName]))
 
   // Page serving with ESI assembly + Cache API
-  app.get('*', async (c) => {
+  app.get('*', async c => {
     const request = c.req.raw
     const cache = (caches as unknown as { default: Cache }).default
 
@@ -67,11 +67,11 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
         const { html: raw404 } = parseCacheComment(notFoundHtml)
         const fragPaths = findEsiPaths(raw404)
         const fragEntries = await Promise.all(
-          fragPaths.map(async (p) => {
+          fragPaths.map(async p => {
             const obj = await bucket.get(p.slice(1))
             if (!obj) return [p, { head: '', body: '' }] as const
             return [p, splitFragment(await obj.text())] as const
-          })
+          }),
         )
         return c.html(assembleEsi(raw404, new Map(fragEntries)), 404)
       }
@@ -83,12 +83,12 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
     // Read all fragments in parallel
     const fragmentPaths = findEsiPaths(rawHtml)
     const fragmentEntries = await Promise.all(
-      fragmentPaths.map(async (path) => {
+      fragmentPaths.map(async path => {
         const key = path.slice(1)
         const obj = await bucket.get(key)
         if (!obj) return [path, { head: '', body: `<!-- fragment not found: ${path} -->` }] as const
         return [path, splitFragment(await obj.text())] as const
-      })
+      }),
     )
     const fragments = new Map(fragmentEntries)
 
@@ -97,10 +97,13 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
     // Compute ETag
     const encoder = new TextEncoder()
     const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(assembled))
-    const etag = `"${[...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)}"`
+    const etag = `"${[...new Uint8Array(hashBuffer)]
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 16)}"`
 
     if (c.req.header('If-None-Match') === etag) {
-      return new Response(null, { status: 304, headers: { 'ETag': etag } })
+      return new Response(null, { status: 304, headers: { ETag: etag } })
     }
 
     const response = new Response(assembled, {
@@ -108,7 +111,7 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': `public, max-age=${browser}, s-maxage=${edge}`,
-        'ETag': etag,
+        ETag: etag,
       },
     })
 
@@ -135,8 +138,7 @@ async function serveStatic(c: any, bucket: R2Bucket) {
 }
 
 async function findPage(bucket: R2Bucket, requestPath: string): Promise<string | null> {
-  const pagePath = requestPath === '/' ? 'pages/home/index.html'
-    : `pages${requestPath}/index.html`
+  const pagePath = requestPath === '/' ? 'pages/home/index.html' : `pages${requestPath}/index.html`
 
   const obj = await bucket.get(pagePath)
   if (obj) return await obj.text()

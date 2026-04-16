@@ -20,14 +20,14 @@ import { createAdminApp } from '../admin-api/index.js'
 // ANSI color helpers — no dependency, suppressed when NO_COLOR or CI
 const noColor = !!process.env.NO_COLOR || !process.stdout.isTTY
 const c = {
-  bold: (s: string) => noColor ? s : `\x1b[1m${s}\x1b[22m`,
-  dim: (s: string) => noColor ? s : `\x1b[2m${s}\x1b[22m`,
-  cyan: (s: string) => noColor ? s : `\x1b[36m${s}\x1b[39m`,
-  green: (s: string) => noColor ? s : `\x1b[32m${s}\x1b[39m`,
-  yellow: (s: string) => noColor ? s : `\x1b[33m${s}\x1b[39m`,
-  red: (s: string) => noColor ? s : `\x1b[31m${s}\x1b[39m`,
-  magenta: (s: string) => noColor ? s : `\x1b[35m${s}\x1b[39m`,
-  bgGreen: (s: string) => noColor ? s : `\x1b[42m\x1b[30m${s}\x1b[39m\x1b[49m`,
+  bold: (s: string) => (noColor ? s : `\x1b[1m${s}\x1b[22m`),
+  dim: (s: string) => (noColor ? s : `\x1b[2m${s}\x1b[22m`),
+  cyan: (s: string) => (noColor ? s : `\x1b[36m${s}\x1b[39m`),
+  green: (s: string) => (noColor ? s : `\x1b[32m${s}\x1b[39m`),
+  yellow: (s: string) => (noColor ? s : `\x1b[33m${s}\x1b[39m`),
+  red: (s: string) => (noColor ? s : `\x1b[31m${s}\x1b[39m`),
+  magenta: (s: string) => (noColor ? s : `\x1b[35m${s}\x1b[39m`),
+  bgGreen: (s: string) => (noColor ? s : `\x1b[42m\x1b[30m${s}\x1b[39m\x1b[49m`),
 }
 
 const args = process.argv.slice(2)
@@ -108,7 +108,6 @@ const LOADER_HTML = `<!doctype html>
 </body>
 </html>`
 
-
 /**
  * Detect the project root from a site directory.
  * Walks up from siteDir looking for a parent that contains templates/.
@@ -176,7 +175,13 @@ function printHelp() {
 `)
 }
 
-interface ParsedArgs { positional: string[]; port?: number; force?: boolean; yes?: boolean; limit?: number }
+interface ParsedArgs {
+  positional: string[]
+  port?: number
+  force?: boolean
+  yes?: boolean
+  limit?: number
+}
 
 function parseArgs(input: string[]): ParsedArgs {
   const positional: string[] = []
@@ -227,16 +232,17 @@ async function resolveSiteDir(positionalSite?: string): Promise<string> {
   const sitesDir = resolve('sites')
   if (existsSync(sitesDir)) {
     const { readdirSync, statSync } = await import('node:fs')
-    const sites = readdirSync(sitesDir)
-      .filter(name => {
-        const dir = join(sitesDir, name)
-        return statSync(dir).isDirectory() && existsSync(join(dir, 'site.yaml'))
-      })
+    const sites = readdirSync(sitesDir).filter(name => {
+      const dir = join(sitesDir, name)
+      return statSync(dir).isDirectory() && existsSync(join(dir, 'site.yaml'))
+    })
 
     if (sites.length === 1) return join(sitesDir, sites[0])
     if (sites.length > 1) {
       if (process.env.CI) {
-        console.error(`\n  Error: multiple sites found. Specify one: gazetta ${command} <site>\n  Available: ${sites.join(', ')}\n`)
+        console.error(
+          `\n  Error: multiple sites found. Specify one: gazetta ${command} <site>\n  Available: ${sites.join(', ')}\n`,
+        )
         process.exit(1)
       }
       const { select } = await import('@clack/prompts')
@@ -272,7 +278,9 @@ async function resolveTarget(positionalTarget: string | undefined, siteDir: stri
   if (targets.length <= 1) return targets[0] // auto-select if 0 or 1
 
   if (process.env.CI) {
-    console.error(`\n  Error: multiple targets found. Specify one: gazetta ${command} <target>\n  Available: ${targets.join(', ')}\n`)
+    console.error(
+      `\n  Error: multiple targets found. Specify one: gazetta ${command} <target>\n  Available: ${targets.join(', ')}\n`,
+    )
     process.exit(1)
   }
 
@@ -395,37 +403,65 @@ const template: TemplateFunction = ({ content = {} }) => {
 export default template
 `,
 
-    'sites/main/targets/local/fragments/header/fragment.json': JSON.stringify({
-      template: 'nav',
-      content: { brand: name, links: [{ label: 'Home', href: '/' }] },
-    }, null, 2) + '\n',
+    'sites/main/targets/local/fragments/header/fragment.json':
+      JSON.stringify(
+        {
+          template: 'nav',
+          content: { brand: name, links: [{ label: 'Home', href: '/' }] },
+        },
+        null,
+        2,
+      ) + '\n',
 
-    'sites/main/targets/local/pages/home/page.json': JSON.stringify({
-      template: 'page-layout',
-      content: { title: name, description: 'A site built with Gazetta' },
-      components: [
-        '@header',
-        { name: 'hero', template: 'hero', content: { title: `Welcome to ${name}`, subtitle: 'A site built with Gazetta' } },
-        { name: 'intro', template: 'text-block', content: { body: '<p>Edit this content in the CMS at <a href="/admin">/admin</a>.</p>' } },
-      ],
-    }, null, 2) + '\n',
+    'sites/main/targets/local/pages/home/page.json':
+      JSON.stringify(
+        {
+          template: 'page-layout',
+          content: { title: name, description: 'A site built with Gazetta' },
+          components: [
+            '@header',
+            {
+              name: 'hero',
+              template: 'hero',
+              content: { title: `Welcome to ${name}`, subtitle: 'A site built with Gazetta' },
+            },
+            {
+              name: 'intro',
+              template: 'text-block',
+              content: { body: '<p>Edit this content in the CMS at <a href="/admin">/admin</a>.</p>' },
+            },
+          ],
+        },
+        null,
+        2,
+      ) + '\n',
 
-    'sites/main/targets/local/pages/404/page.json': JSON.stringify({
-      template: 'page-layout',
-      content: { title: 'Page Not Found', description: "The page you're looking for doesn't exist." },
-    }, null, 2) + '\n',
+    'sites/main/targets/local/pages/404/page.json':
+      JSON.stringify(
+        {
+          template: 'page-layout',
+          content: { title: 'Page Not Found', description: "The page you're looking for doesn't exist." },
+        },
+        null,
+        2,
+      ) + '\n',
 
     'admin/.gitkeep': '',
     '.gitignore': `node_modules/\ndist/\n.env.local\n`,
 
-    'package.json': JSON.stringify({
-      name,
-      private: true,
-      type: 'module',
-      engines: { node: '>=22' },
-      scripts: { dev: 'gazetta dev' },
-      dependencies: { gazetta: '*', react: '^19.0.0', 'react-dom': '^19.0.0', zod: '^4.0.0' },
-    }, null, 2) + '\n',
+    'package.json':
+      JSON.stringify(
+        {
+          name,
+          private: true,
+          type: 'module',
+          engines: { node: '>=22' },
+          scripts: { dev: 'gazetta dev' },
+          dependencies: { gazetta: '*', react: '^19.0.0', 'react-dom': '^19.0.0', zod: '^4.0.0' },
+        },
+        null,
+        2,
+      ) + '\n',
   }
 
   for (const [path, content] of Object.entries(files)) {
@@ -439,14 +475,14 @@ export default template
 
   note(
     `${c.bold('templates/')}          ${c.dim('4 templates (hero, nav, page-layout, text-block)')}\n` +
-    `${c.bold('admin/')}              ${c.dim('custom editors and fields')}\n` +
-    `${c.bold('sites/main/')}         ${c.dim('site content')}\n` +
-    `  ${c.dim('pages/home/')}       ${c.dim('home page with hero + intro')}\n` +
-    `  ${c.dim('pages/404/')}        ${c.dim('error page')}\n` +
-    `  ${c.dim('fragments/header/')} ${c.dim('shared header nav')}\n` +
-    `  ${c.dim('site.yaml')}         ${c.dim('site config + local target')}\n` +
-    `${c.bold('package.json')}`,
-    `Created ${c.green(name)}/`
+      `${c.bold('admin/')}              ${c.dim('custom editors and fields')}\n` +
+      `${c.bold('sites/main/')}         ${c.dim('site content')}\n` +
+      `  ${c.dim('pages/home/')}       ${c.dim('home page with hero + intro')}\n` +
+      `  ${c.dim('pages/404/')}        ${c.dim('error page')}\n` +
+      `  ${c.dim('fragments/header/')} ${c.dim('shared header nav')}\n` +
+      `  ${c.dim('site.yaml')}         ${c.dim('site config + local target')}\n` +
+      `${c.bold('package.json')}`,
+    `Created ${c.green(name)}/`,
   )
 
   // Run npm install
@@ -472,7 +508,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
   const { buildSourceContext } = await import('./bootstrap.js')
   let source, manifest, targetConfigs
   try {
-    ({ source, manifest, targetConfigs } = await buildSourceContext({ projectSiteDir: siteDir }))
+    ;({ source, manifest, targetConfigs } = await buildSourceContext({ projectSiteDir: siteDir }))
   } catch (err) {
     console.error(`\n  ${c.red('Error:')} ${(err as Error).message}\n`)
     process.exit(1)
@@ -499,10 +535,11 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
   const { createTargetRegistry } = await import('../targets.js')
   const targets = await createTargetRegistry(
     Object.fromEntries(targetNames.map(n => [n, siteYaml.targets![n]])),
-    siteDir
+    siteDir,
   )
 
-  const { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } = await import('../publish-rendered.js')
+  const { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } =
+    await import('../publish-rendered.js')
   const { scanTemplates, templateHashesFrom, reportTemplateErrors } = await import('../templates-scan.js')
   const { hashManifest } = await import('../hash.js')
 
@@ -566,7 +603,10 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
         fragmentHashes.set(fragName, hashManifest(frag, { templateHashes }))
       }
       for (const [pageName, page] of site.pages) {
-        if (unchanged.has(`pages/${pageName}`)) { skipped++; continue }
+        if (unchanged.has(`pages/${pageName}`)) {
+          skipped++
+          continue
+        }
         const manifestHash = hashManifest(page, { templateHashes, fragmentHashes })
         const { files } = await publishPageStatic(pageName, sourceRoot, targetStorage, templatesDir, manifestHash, site)
         totalFiles += files
@@ -575,17 +615,38 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     } else {
       // ESI mode — fragments separate, pages with placeholders
       for (const [fragName, frag] of site.fragments) {
-        if (unchanged.has(`fragments/${fragName}`)) { skipped++; continue }
+        if (unchanged.has(`fragments/${fragName}`)) {
+          skipped++
+          continue
+        }
         const manifestHash = hashManifest(frag, { templateHashes })
-        const { files, removed } = await publishFragmentRendered(fragName, sourceRoot, targetStorage, templatesDir, manifestHash, site)
+        const { files, removed } = await publishFragmentRendered(
+          fragName,
+          sourceRoot,
+          targetStorage,
+          templatesDir,
+          manifestHash,
+          site,
+        )
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} @${fragName}`)
       }
       for (const [pageName, page] of site.pages) {
-        if (unchanged.has(`pages/${pageName}`)) { skipped++; continue }
+        if (unchanged.has(`pages/${pageName}`)) {
+          skipped++
+          continue
+        }
         const manifestHash = hashManifest(page, { templateHashes })
-        const { files, removed } = await publishPageRendered(pageName, sourceRoot, targetStorage, targetConfig?.cache, templatesDir, manifestHash, site)
+        const { files, removed } = await publishPageRendered(
+          pageName,
+          sourceRoot,
+          targetStorage,
+          targetConfig?.cache,
+          templatesDir,
+          manifestHash,
+          site,
+        )
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} ${pageName}`)
@@ -609,11 +670,19 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     if (!purge) continue
     if (purge.type === 'cloudflare') {
       const apiToken = resolveEnvVars(purge.apiToken)
-      if (!apiToken) { console.log(`  ${name}: purge.apiToken not set, skipping cache purge`); continue }
+      if (!apiToken) {
+        console.log(`  ${name}: purge.apiToken not set, skipping cache purge`)
+        continue
+      }
       try {
         const { lookupCloudflareZoneId } = await import('../publish-rendered.js')
-        const zoneId = resolveEnvVars(purge.zoneId) ?? (config.siteUrl ? await lookupCloudflareZoneId(config.siteUrl, apiToken) : null)
-        if (!zoneId) { console.log(`  ${name}: zone not found, set purge.zoneId or siteUrl`); continue }
+        const zoneId =
+          resolveEnvVars(purge.zoneId) ??
+          (config.siteUrl ? await lookupCloudflareZoneId(config.siteUrl, apiToken) : null)
+        if (!zoneId) {
+          console.log(`  ${name}: zone not found, set purge.zoneId or siteUrl`)
+          continue
+        }
         const { createCloudflarePurge } = await import('../publish-rendered.js')
         await createCloudflarePurge(zoneId, apiToken).purgeAll()
         console.log(`  ${name}: cache purged`)
@@ -659,7 +728,8 @@ async function runBuild(siteDir: string) {
           output: {
             manualChunks(id: string) {
               if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'vendor-react'
-              if (id.includes('node_modules/@rjsf/') || id.includes('node_modules/@hello-pangea/dnd')) return 'vendor-editor'
+              if (id.includes('node_modules/@rjsf/') || id.includes('node_modules/@hello-pangea/dnd'))
+                return 'vendor-editor'
               if (id.includes('node_modules/@tiptap/')) return 'vendor-tiptap'
               return undefined
             },
@@ -696,8 +766,12 @@ async function runBuild(siteDir: string) {
   const fieldsDir = join(adminDir, 'fields')
 
   const entryExtensions = ['.ts', '.tsx', '.jsx']
-  const hasEditors = existsSync(editorsDir) && (await import('node:fs')).readdirSync(editorsDir).some(f => entryExtensions.some(ext => f.endsWith(ext)))
-  const hasFields = existsSync(fieldsDir) && (await import('node:fs')).readdirSync(fieldsDir).some(f => entryExtensions.some(ext => f.endsWith(ext)))
+  const hasEditors =
+    existsSync(editorsDir) &&
+    (await import('node:fs')).readdirSync(editorsDir).some(f => entryExtensions.some(ext => f.endsWith(ext)))
+  const hasFields =
+    existsSync(fieldsDir) &&
+    (await import('node:fs')).readdirSync(fieldsDir).some(f => entryExtensions.some(ext => f.endsWith(ext)))
 
   if (hasEditors || hasFields) {
     const { build: esbuild } = await import('esbuild')
@@ -707,7 +781,7 @@ async function runBuild(siteDir: string) {
 
     // Build shared dependency bundles (one copy of React, etc.)
     const sharedDeps: Record<string, string> = {
-      'react': 'export * from "react"; import React from "react"; export default React;',
+      react: 'export * from "react"; import React from "react"; export default React;',
       'react-dom/client': 'export * from "react-dom/client";',
       'react/jsx-runtime': 'export * from "react/jsx-runtime";',
       'gazetta/editor': 'export * from "gazetta/editor";',
@@ -733,7 +807,9 @@ async function runBuild(siteDir: string) {
           logLevel: 'warning',
         })
         importMap[specifier] = `/admin/_shared/${safeName}.js`
-      } catch { /* skip — dep may not be installed */ }
+      } catch {
+        /* skip — dep may not be installed */
+      }
       await import('node:fs/promises').then(fs => fs.rm(stubFile, { force: true }))
     }
 
@@ -743,10 +819,15 @@ async function runBuild(siteDir: string) {
     const externals = Object.keys(importMap)
     let bundledCount = 0
 
-    for (const [kind, srcDir] of [['editors', editorsDir], ['fields', fieldsDir]] as const) {
+    for (const [kind, srcDir] of [
+      ['editors', editorsDir],
+      ['fields', fieldsDir],
+    ] as const) {
       if (!existsSync(srcDir)) continue
       const { readdirSync } = await import('node:fs')
-      const files = readdirSync(srcDir).filter(f => entryExtensions.some(ext => f.endsWith(ext)) && !f.startsWith('.') && !f.startsWith('_'))
+      const files = readdirSync(srcDir).filter(
+        f => entryExtensions.some(ext => f.endsWith(ext)) && !f.startsWith('.') && !f.startsWith('_'),
+      )
 
       for (const file of files) {
         const name = file.replace(/\.(ts|tsx|jsx)$/, '')
@@ -798,14 +879,14 @@ async function runAdmin(siteDir: string, port: number) {
   }
 
   const app = new Hono()
-  app.get('/__reload', (ctx) => ctx.body(null, 204))
+  app.get('/__reload', ctx => ctx.body(null, 204))
 
   const { buildSourceContext } = await import('./bootstrap.js')
   const { source, targetConfigs } = await buildSourceContext({ projectSiteDir: siteDir })
   await setupProductionMode(app, source, siteDir, builtAdminDir, templatesDir, adminDir, targetConfigs)
 
   // SPA fallback for non-API admin routes
-  app.get('*', (ctx) => {
+  app.get('*', ctx => {
     const indexPath = join(builtAdminDir, 'index.html')
     if (existsSync(indexPath)) return ctx.html(readFileSync(indexPath, 'utf-8'))
     return ctx.notFound()
@@ -822,7 +903,10 @@ async function runAdmin(siteDir: string, port: number) {
   })
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.on(signal, () => { console.log(`\n  Shutting down...`); server.close(() => process.exit(0)) })
+    process.on(signal, () => {
+      console.log(`\n  Shutting down...`)
+      server.close(() => process.exit(0))
+    })
   }
 }
 
@@ -893,11 +977,15 @@ async function runDeploy(siteDir: string, targetName?: string) {
     process.exit(1)
   }
   if (!target.worker) {
-    console.error(`\n  Error: Target "${targetName}" has no worker config. Add to site.yaml:\n\n  worker:\n    type: cloudflare\n    name: my-site\n`)
+    console.error(
+      `\n  Error: Target "${targetName}" has no worker config. Add to site.yaml:\n\n  worker:\n    type: cloudflare\n    name: my-site\n`,
+    )
     process.exit(1)
   }
   if (target.worker.type !== 'cloudflare') {
-    console.error(`\n  Error: Unsupported worker type "${target.worker.type}". Currently only "cloudflare" is supported.\n`)
+    console.error(
+      `\n  Error: Unsupported worker type "${target.worker.type}". Currently only "cloudflare" is supported.\n`,
+    )
     process.exit(1)
   }
 
@@ -947,7 +1035,9 @@ async function runDeploy(siteDir: string, targetName?: string) {
     await rm(tmpDir, { recursive: true, force: true })
   }
 
-  console.log(`\n  ${c.green('✓')} Worker deployed. Now publish content:\n    ${c.cyan(`gazetta publish ${targetName}`)}\n`)
+  console.log(
+    `\n  ${c.green('✓')} Worker deployed. Now publish content:\n    ${c.cyan(`gazetta publish ${targetName}`)}\n`,
+  )
 }
 
 async function runValidate(siteDir: string) {
@@ -994,7 +1084,9 @@ async function runValidate(siteDir: string) {
 
       const componentCount = page.components?.length ?? 0
       const fragmentCount = page.components?.filter(cc => typeof cc === 'string' && cc.startsWith('@')).length ?? 0
-      console.log(`  ${c.green('✓')} ${pageName} ${c.dim(`(${componentCount} components, ${fragmentCount} fragments)`)}`)
+      console.log(
+        `  ${c.green('✓')} ${pageName} ${c.dim(`(${componentCount} components, ${fragmentCount} fragments)`)}`,
+      )
     } catch (err) {
       console.error(`  ${c.red('✗')} ${pageName} ${c.dim(`— ${(err as Error).message}`)}`)
       errors++
@@ -1016,18 +1108,27 @@ async function runValidate(siteDir: string) {
   const adminDir = join(projectRoot, 'admin')
   const editorsDir = join(adminDir, 'editors')
   if (existsSync(editorsDir)) {
-    const editorFiles = (await import('node:fs')).readdirSync(editorsDir).filter(f => f.endsWith('.ts') || f.endsWith('.tsx'))
+    const editorFiles = (await import('node:fs'))
+      .readdirSync(editorsDir)
+      .filter(f => f.endsWith('.ts') || f.endsWith('.tsx'))
     for (const file of editorFiles) {
       const editorName = file.replace(/\.(ts|tsx)$/, '')
       if (!templateNames.includes(editorName)) {
-        console.log(`  ${c.yellow('⚠')} orphaned editor: ${c.dim(`admin/editors/${file}`)} ${c.dim('— no matching template')}`)
+        console.log(
+          `  ${c.yellow('⚠')} orphaned editor: ${c.dim(`admin/editors/${file}`)} ${c.dim('— no matching template')}`,
+        )
       }
     }
   }
 
   // 6. Check for missing custom fields (schema references field but file doesn't exist)
   const fieldsDir = join(adminDir, 'fields')
-  const fieldFiles = existsSync(fieldsDir) ? (await import('node:fs')).readdirSync(fieldsDir).filter(f => f.endsWith('.ts') || f.endsWith('.tsx')).map(f => f.replace(/\.(ts|tsx)$/, '')) : []
+  const fieldFiles = existsSync(fieldsDir)
+    ? (await import('node:fs'))
+        .readdirSync(fieldsDir)
+        .filter(f => f.endsWith('.ts') || f.endsWith('.tsx'))
+        .map(f => f.replace(/\.(ts|tsx)$/, ''))
+    : []
   const { loadTemplate } = await import('../template-loader.js')
   const zod = await import('zod')
   for (const tplName of templateNames) {
@@ -1039,11 +1140,15 @@ async function runValidate(siteDir: string) {
       for (const [propName, prop] of Object.entries(props)) {
         const fieldRef = prop.field as string | undefined
         if (fieldRef && !fieldFiles.includes(fieldRef)) {
-          console.error(`  ${c.red('✗')} template ${tplName}.${propName} references field "${fieldRef}" ${c.dim('— not found in admin/fields/')}`)
+          console.error(
+            `  ${c.red('✗')} template ${tplName}.${propName} references field "${fieldRef}" ${c.dim('— not found in admin/fields/')}`,
+          )
           errors++
         }
       }
-    } catch { /* template load errors already caught above */ }
+    } catch {
+      /* template load errors already caught above */
+    }
   }
 
   console.log()
@@ -1120,25 +1225,36 @@ async function runDev(siteDir: string, port: number) {
   // ---- Live reload (SSE) ----
   let reloadId = 0
   const reloadListeners = new Set<() => void>()
-  function notifyReload() { reloadId++; for (const l of reloadListeners) l() }
+  function notifyReload() {
+    reloadId++
+    for (const l of reloadListeners) l()
+  }
 
   const RELOAD_SCRIPT = `<script>new EventSource('/__reload').onmessage = () => location.reload()</script>`
 
-  app.get('/__reload', (c) => {
-    return streamSSE(c, async (stream) => {
+  app.get('/__reload', c => {
+    return streamSSE(c, async stream => {
       let lastId = reloadId
       const check = async () => {
-        if (reloadId !== lastId) { lastId = reloadId; await stream.writeSSE({ data: 'reload', event: 'message' }) }
+        if (reloadId !== lastId) {
+          lastId = reloadId
+          await stream.writeSSE({ data: 'reload', event: 'message' })
+        }
       }
       reloadListeners.add(check)
-      stream.onAbort(() => { reloadListeners.delete(check) })
-      while (true) { await stream.sleep(500); await check() }
+      stream.onAbort(() => {
+        reloadListeners.delete(check)
+      })
+      while (true) {
+        await stream.sleep(500)
+        await check()
+      }
     })
   })
 
   // ---- Site page routes ----
   for (const [pageName, page] of site.pages) {
-    app.get(page.route, async (c) => {
+    app.get(page.route, async c => {
       try {
         const freshSite = await loadSite({ contentRoot: source.contentRoot, templatesDir, manifest })
         const resolved = await resolvePage(pageName, freshSite)
@@ -1157,11 +1273,13 @@ async function runDev(siteDir: string, port: number) {
 
   // Admin Hono instance — captured so the template file watcher can
   // invalidate its memoized template-scan cache on .ts/.tsx changes.
-  let cmsApp: (Hono & {
-    invalidateTemplatesCache(): void
-    invalidateSourceSidecars(): void
-    writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void>
-  }) | null = null
+  let cmsApp:
+    | (Hono & {
+        invalidateTemplatesCache(): void
+        invalidateSourceSidecars(): void
+        writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void>
+      })
+    | null = null
   if (isDevMode) {
     // Dev mode: mount CMS API inline (same process = shared template cache)
     cmsApp = await setupCmsApi(app, source, siteDir, templatesDir, adminDir, targetConfigs)
@@ -1171,9 +1289,12 @@ async function runDev(siteDir: string, port: number) {
   }
 
   // ---- 404 ----
-  app.notFound((c) => {
+  app.notFound(c => {
     const routes = [...site.pages.entries()].map(([n, p]) => `  ${p.route} → ${n}`).join('\n')
-    return c.html(`<pre style="padding:2rem">Page not found: ${c.req.path}\n\nAvailable:\n${routes}\n  /admin → CMS editor</pre>`, 404)
+    return c.html(
+      `<pre style="padding:2rem">Page not found: ${c.req.path}\n\nAvailable:\n${routes}\n  /admin → CMS editor</pre>`,
+      404,
+    )
   })
 
   // ---- Start server ----
@@ -1189,7 +1310,9 @@ async function runDev(siteDir: string, port: number) {
       console.log(`  ${c.dim('┃')} Dev      ${c.cyan(`http://localhost:${port}/admin/dev`)}`)
     }
     console.log()
-    console.log(`  ${c.dim('┃')} Pages    ${[...site.pages.entries()].map(([n, p]) => `${c.dim(p.route)} ${c.dim('→')} ${n}`).join(c.dim(', '))}`)
+    console.log(
+      `  ${c.dim('┃')} Pages    ${[...site.pages.entries()].map(([n, p]) => `${c.dim(p.route)} ${c.dim('→')} ${n}`).join(c.dim(', '))}`,
+    )
     console.log(`  ${c.dim('┃')} Frags    ${c.dim([...site.fragments.keys()].join(', ') || '(none)')}`)
 
     // ---- Settings banner ----
@@ -1212,17 +1335,20 @@ async function runDev(siteDir: string, port: number) {
       console.log(`  ${c.dim('┃')}   Project      ${c.dim(relProject)}`)
       console.log(`  ${c.dim('┃')}   Site         ${c.dim(relSite)}`)
       console.log(`  ${c.dim('┃')}   Templates    ${c.dim(relTemplates)}`)
-      console.log(`  ${c.dim('┃')}   Source       ${sourceName} ${c.dim(`(${sourceEnv}, ${sourceEditable ? 'editable' : 'read-only'}, ${sourceType})`)}`)
+      console.log(
+        `  ${c.dim('┃')}   Source       ${sourceName} ${c.dim(`(${sourceEnv}, ${sourceEditable ? 'editable' : 'read-only'}, ${sourceType})`)}`,
+      )
       console.log(`  ${c.dim('┃')}   Content root ${c.dim(sourceRoot)}`)
       console.log(`  ${c.dim('┃')}   Targets (${targetsCount})`)
       for (const [name, cfg] of Object.entries(targetConfigs)) {
         const env = getEnvironment(cfg)
         const type = getType(cfg)
         const ed = isEditable(cfg) ? 'editable ' : 'read-only'
-        const storagePath = cfg.storage?.type === 'filesystem'
-          ? (cfg.storage.path ?? `targets/${name}`)
-          : `${cfg.storage?.type ?? '?'}`
-        console.log(`  ${c.dim('┃')}     ${c.dim('•')} ${name.padEnd(14)} ${c.dim(env.padEnd(11))} ${c.dim(ed)} ${c.dim(type.padEnd(8))} ${c.dim('→ ' + storagePath)}`)
+        const storagePath =
+          cfg.storage?.type === 'filesystem' ? (cfg.storage.path ?? `targets/${name}`) : `${cfg.storage?.type ?? '?'}`
+        console.log(
+          `  ${c.dim('┃')}     ${c.dim('•')} ${name.padEnd(14)} ${c.dim(env.padEnd(11))} ${c.dim(ed)} ${c.dim(type.padEnd(8))} ${c.dim('→ ' + storagePath)}`,
+        )
       }
     }
 
@@ -1244,7 +1370,11 @@ async function runDev(siteDir: string, port: number) {
           return true
         }
         if (url === '/admin' || url.startsWith('/admin/') || url.startsWith('/@')) {
-          res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Retry-After': '2' })
+          res.writeHead(503, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'Retry-After': '2',
+          })
           res.end(LOADER_HTML)
           return true
         }
@@ -1253,10 +1383,10 @@ async function runDev(siteDir: string, port: number) {
 
       // During startup: route /admin/* to the loader, everything else to Hono
       httpServer.on('request', (req, res) => {
-        if (cmsReady) return  // real handler installed below will run
+        if (cmsReady) return // real handler installed below will run
         if (loaderHandler(req, res)) return
         for (const l of originalListeners) {
-          (l as (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void)(req, res)
+          ;(l as (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void)(req, res)
         }
       })
 
@@ -1282,7 +1412,9 @@ async function runDev(siteDir: string, port: number) {
                   optimizeEntries.push(join(dir, e.name))
                 }
               }
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           }
         }
 
@@ -1313,7 +1445,10 @@ async function runDev(siteDir: string, port: number) {
 
         const honoHandler = (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
           for (const listener of originalListeners) {
-            (listener as (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void)(req, res)
+            ;(listener as (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void)(
+              req,
+              res,
+            )
           }
         }
 
@@ -1327,7 +1462,12 @@ async function runDev(siteDir: string, port: number) {
             res.end(JSON.stringify({ ready: true }))
             return
           }
-          if (url.startsWith('/admin/api') || url.startsWith('/admin/preview') || url === '/admin/theme.css' || url.startsWith('/admin/theme.css?')) {
+          if (
+            url.startsWith('/admin/api') ||
+            url.startsWith('/admin/preview') ||
+            url === '/admin/theme.css' ||
+            url.startsWith('/admin/theme.css?')
+          ) {
             honoHandler(req, res)
           } else if (url.startsWith('/admin') || url.startsWith('/@')) {
             vite.middlewares(req, res, () => honoHandler(req, res))
@@ -1336,7 +1476,6 @@ async function runDev(siteDir: string, port: number) {
           }
         })
         cmsReady = true
-
       } catch (err) {
         console.warn(`  Warning: CMS UI failed to start: ${(err as Error).message}`)
       }
@@ -1372,7 +1511,7 @@ async function runDev(siteDir: string, port: number) {
       notifyReload()
     }
   })
-  siteWatcher.on('error', (err) => console.warn(`  File watcher warning (site): ${(err as Error).message}`))
+  siteWatcher.on('error', err => console.warn(`  File watcher warning (site): ${(err as Error).message}`))
 
   // Watch templates dir for template source changes
   if (existsSync(templatesDir)) {
@@ -1391,7 +1530,7 @@ async function runDev(siteDir: string, port: number) {
         }
       }
     })
-    tplWatcher.on('error', (err) => console.warn(`  File watcher warning (templates): ${(err as Error).message}`))
+    tplWatcher.on('error', err => console.warn(`  File watcher warning (templates): ${(err as Error).message}`))
   }
 }
 
@@ -1404,7 +1543,7 @@ async function runDev(siteDir: string, port: number) {
  * so user declarations win the cascade. See #134 and css-theming.md.
  */
 function mountUserThemeRoute(cmsApp: Hono, adminDir: string) {
-  cmsApp.get('/theme.css', (c) => {
+  cmsApp.get('/theme.css', c => {
     const themePath = join(adminDir, 'theme.css')
     c.header('Content-Type', 'text/css; charset=utf-8')
     c.header('Cache-Control', 'no-cache')
@@ -1424,7 +1563,13 @@ async function setupCmsApi(
   templatesDir: string,
   adminDir: string,
   targetConfigs: Record<string, import('../types.js').TargetConfig> | undefined,
-): Promise<Hono & { invalidateTemplatesCache(): void; invalidateSourceSidecars(): void; writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void> }> {
+): Promise<
+  Hono & {
+    invalidateTemplatesCache(): void
+    invalidateSourceSidecars(): void
+    writeSourceSidecar(kind: 'page' | 'fragment', name: string): Promise<void>
+  }
+> {
   const cmsApp = createAdminApp({ source, siteDir, templatesDir, adminDir, targetConfigs })
   mountUserThemeRoute(cmsApp, adminDir)
   app.route('/admin', cmsApp)
@@ -1447,10 +1592,13 @@ async function setupProductionMode(
   app.route('/admin', cmsApp)
 
   // Serve pre-built CMS static files (includes bundled editors/fields)
-  app.use('/admin/*', serveStatic({
-    root: cmsStaticDir,
-    rewriteRequestPath: (path) => path.replace(/^\/admin/, ''),
-  }))
+  app.use(
+    '/admin/*',
+    serveStatic({
+      root: cmsStaticDir,
+      rewriteRequestPath: path => path.replace(/^\/admin/, ''),
+    }),
+  )
 
   // SPA fallback: serve index.html for /admin and unmatched /admin/* routes
   const serveIndex = (c: import('hono').Context) => {
@@ -1490,7 +1638,6 @@ function findCmsStaticDir(): string | null {
   return null
 }
 
-
 async function main() {
   if (!command || command === 'help' || command === '--help' || command === '-h') {
     printHelp()
@@ -1522,7 +1669,9 @@ async function main() {
     // gazetta rollback <rev> [target] [site]
     const [rev, second, third] = parsed.positional
     if (!rev || !rev.startsWith('rev-')) {
-      console.error(`\n  Error: rollback requires a revision id as the first argument (e.g. gazetta rollback rev-1776337441608 [target])\n`)
+      console.error(
+        `\n  Error: rollback requires a revision id as the first argument (e.g. gazetta rollback rev-1776337441608 [target])\n`,
+      )
       process.exit(1)
       return
     }
@@ -1621,7 +1770,7 @@ async function resolveHistoryContext(siteDir: string, targetName: string) {
   return { siteDir, targetName, config }
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(`\n  Error: ${(err as Error).message}\n`)
   process.exit(1)
 })

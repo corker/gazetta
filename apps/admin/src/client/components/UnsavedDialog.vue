@@ -8,7 +8,10 @@ const guard = useUnsavedGuardStore()
 const selection = useSelectionStore()
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') { e.stopPropagation(); guard.respond('cancel') }
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    guard.respond('cancel')
+  }
 }
 </script>
 

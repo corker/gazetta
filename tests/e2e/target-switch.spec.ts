@@ -32,22 +32,33 @@ test.describe('Target switch preserves preview', () => {
     await page.waitForSelector('iframe[data-testid="preview-iframe"]', { timeout: 10000 })
 
     // Give the iframe time to load its first srcdoc and lay out.
-    await expect.poll(async () => {
-      return page.evaluate(() => {
-        const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
-        return (f?.srcdoc?.length ?? 0) > 500 && !!f?.contentDocument?.body
-      })
-    }, { timeout: 10000 }).toBe(true)
+    await expect
+      .poll(
+        async () => {
+          return page.evaluate(() => {
+            const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
+            return (f?.srcdoc?.length ?? 0) > 500 && !!f?.contentDocument?.body
+          })
+        },
+        { timeout: 10000 },
+      )
+      .toBe(true)
 
     // Scroll the iframe.
     await page.evaluate(() => {
       const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
       f?.contentWindow?.scrollTo(0, 400)
     })
-    await expect.poll(async () => page.evaluate(() => {
-      const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
-      return f?.contentWindow?.scrollY ?? 0
-    }), { timeout: 2000 }).toBeGreaterThan(100)
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
+            return f?.contentWindow?.scrollY ?? 0
+          }),
+        { timeout: 2000 },
+      )
+      .toBeGreaterThan(100)
 
     const scrolled = await page.evaluate(() => {
       const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
@@ -59,10 +70,16 @@ test.describe('Target switch preserves preview', () => {
     await page.locator('[data-testid="active-target-indicator"]').click()
     await page.locator('[data-testid="active-target-menu"]').getByRole('menuitem', { name: 'staging' }).click()
 
-    await expect.poll(async () => page.evaluate(() => {
-      const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
-      return f?.contentWindow?.scrollY ?? 0
-    }), { timeout: 5000 }).toBe(scrolled)
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
+            return f?.contentWindow?.scrollY ?? 0
+          }),
+        { timeout: 5000 },
+      )
+      .toBe(scrolled)
 
     // Sanity: the indicator now reflects staging as active.
     await expect(page.locator('[data-testid="active-target-indicator"]')).toContainText('staging')

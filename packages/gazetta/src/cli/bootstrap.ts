@@ -12,10 +12,7 @@ import { readFileSync } from 'node:fs'
 import yaml from 'js-yaml'
 import { createTargetRegistry, createTargetRegistryView } from '../targets.js'
 import type { SiteManifest, TargetConfig, StorageProvider } from '../types.js'
-import {
-  createSourceContextFromRegistry,
-  type SourceContext,
-} from '../admin-api/source-context.js'
+import { createSourceContextFromRegistry, type SourceContext } from '../admin-api/source-context.js'
 import type { TargetRegistry } from '../targets.js'
 import type { SourceSidecarWriter } from '../source-sidecars.js'
 
@@ -40,7 +37,7 @@ export async function bootstrapFromSiteYaml(projectSiteDir: string): Promise<Boo
   if (Object.keys(targetConfigs).length === 0) {
     throw new Error(
       `No targets declared in ${siteYamlPath}. At least one target is required — ` +
-      `add a local target:\n\ntargets:\n  local:\n    storage:\n      type: filesystem\n`
+        `add a local target:\n\ntargets:\n  local:\n    storage:\n      type: filesystem\n`,
     )
   }
 
@@ -78,17 +75,19 @@ export async function buildSourceContext(opts: BuildSourceContextOptions): Promi
   if (Object.keys(targetConfigs).length === 0) {
     throw new Error(
       `No targets declared in ${siteYamlPath}. At least one target is required — ` +
-      `add a local target:\n\ntargets:\n  local:\n    storage:\n      type: filesystem\n`
+        `add a local target:\n\ntargets:\n  local:\n    storage:\n      type: filesystem\n`,
     )
   }
 
   // Pick the editable target (explicit override or first editable in declaration order).
   const { isEditable } = await import('../types.js')
-  const editableNames = Object.entries(targetConfigs).filter(([, cfg]) => isEditable(cfg)).map(([n]) => n)
+  const editableNames = Object.entries(targetConfigs)
+    .filter(([, cfg]) => isEditable(cfg))
+    .map(([n]) => n)
   if (editableNames.length === 0) {
     throw new Error(
       `No editable target in ${siteYamlPath}. Add one:\n\n` +
-      `targets:\n  local:\n    storage:\n      type: filesystem\n`
+        `targets:\n  local:\n    storage:\n      type: filesystem\n`,
     )
   }
   const targetName = opts.targetName ?? editableNames[0]

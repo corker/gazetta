@@ -39,7 +39,7 @@ server.tool(
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `Navigation failed: ${(err as Error).message}` }] }
     }
-  }
+  },
 )
 
 // ---- Interactions ----
@@ -59,7 +59,7 @@ server.tool(
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `Click failed: ${(err as Error).message}` }] }
     }
-  }
+  },
 )
 
 server.tool(
@@ -79,7 +79,7 @@ server.tool(
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `Type failed: ${(err as Error).message}` }] }
     }
-  }
+  },
 )
 
 server.tool(
@@ -94,7 +94,7 @@ server.tool(
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `Hover failed: ${(err as Error).message}` }] }
     }
-  }
+  },
 )
 
 // ---- Waiting ----
@@ -114,7 +114,7 @@ server.tool(
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `Wait failed: ${(err as Error).message}` }] }
     }
-  }
+  },
 )
 
 // ---- Reading (cheap, no vision cost) ----
@@ -131,7 +131,7 @@ server.tool(
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `get_text failed: ${(err as Error).message}` }] }
     }
-  }
+  },
 )
 
 server.tool(
@@ -149,7 +149,7 @@ server.tool(
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `get_attribute failed: ${(err as Error).message}` }] }
     }
-  }
+  },
 )
 
 server.tool(
@@ -164,7 +164,7 @@ server.tool(
     } catch (err) {
       return { content: [{ type: 'text' as const, text: `get_aria failed: ${(err as Error).message}` }] }
     }
-  }
+  },
 )
 
 // ---- Screenshot (expensive — use sparingly) ----
@@ -203,7 +203,7 @@ server.tool(
         content: [{ type: 'text' as const, text: `Screenshot failed: ${(err as Error).message}` }],
       }
     }
-  }
+  },
 )
 
 // ---- Server ----
@@ -214,7 +214,7 @@ async function main() {
   console.error('Gazetta dev MCP server running (v0.0.2 — with browser interactions)')
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error('MCP server error:', err)
   process.exit(1)
 })

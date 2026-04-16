@@ -11,13 +11,14 @@ export const schema = z.object({
 
 type Content = z.infer<typeof schema>
 
-const QuoteCard = (props: Content) => h('blockquote', { class: 'quote-card' }, [
-  h('p', { class: 'quote-text' }, `"${props.quote}"`),
-  h('footer', { class: 'quote-footer' }, [
-    h('strong', props.author),
-    props.role ? h('span', ` — ${props.role}`) : null,
-  ]),
-])
+const QuoteCard = (props: Content) =>
+  h('blockquote', { class: 'quote-card' }, [
+    h('p', { class: 'quote-text' }, `"${props.quote}"`),
+    h('footer', { class: 'quote-footer' }, [
+      h('strong', props.author),
+      props.role ? h('span', ` — ${props.role}`) : null,
+    ]),
+  ])
 
 const template: TemplateFunction<Content> = async ({ content }) => {
   const app = createSSRApp(QuoteCard, content ?? {})

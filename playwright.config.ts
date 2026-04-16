@@ -64,19 +64,22 @@ export default defineConfig({
     // The dev server for editor.test.ts is no longer global — the testSite
     // fixture spawns one per worker against a temp site copy. See tests/e2e/fixtures.ts.
     {
-      command: 'cd examples/starter && node ../../packages/gazetta/dist/cli/index.js build sites/main && node ../../packages/gazetta/dist/cli/index.js admin sites/main -p 4002',
+      command:
+        'cd examples/starter && node ../../packages/gazetta/dist/cli/index.js build sites/main && node ../../packages/gazetta/dist/cli/index.js admin sites/main -p 4002',
       url: 'http://localhost:4002/admin',
       reuseExistingServer: !process.env.CI,
       timeout: 60000,
     },
     {
-      command: 'cd examples/starter && npx tsx ../../packages/gazetta/src/cli/index.ts publish staging sites/main && node ../../packages/gazetta/dist/cli/index.js serve staging sites/main -p 4003',
+      command:
+        'cd examples/starter && npx tsx ../../packages/gazetta/src/cli/index.ts publish staging sites/main && node ../../packages/gazetta/dist/cli/index.js serve staging sites/main -p 4003',
       url: 'http://localhost:4003/health',
       reuseExistingServer: !process.env.CI,
       timeout: 60000,
     },
     {
-      command: 'cd examples/starter && npx tsx ../../packages/gazetta/src/cli/index.ts publish esi-test sites/main && node ../../packages/gazetta/dist/cli/index.js serve esi-test sites/main -p 4004',
+      command:
+        'cd examples/starter && npx tsx ../../packages/gazetta/src/cli/index.ts publish esi-test sites/main && node ../../packages/gazetta/dist/cli/index.js serve esi-test sites/main -p 4004',
       url: 'http://localhost:4004/health',
       reuseExistingServer: !process.env.CI,
       timeout: 60000,
@@ -85,7 +88,8 @@ export default defineConfig({
       // Matrix fixture site — 8 targets covering env × editable × type.
       // Runs as a dev server (not a prod serve) because matrix tests
       // exercise the admin UI, not the rendered site.
-      command: 'cd tests/fixtures/sites/target-matrix && npx tsx ../../../../packages/gazetta/src/cli/index.ts dev sites/main --port 4005',
+      command:
+        'cd tests/fixtures/sites/target-matrix && npx tsx ../../../../packages/gazetta/src/cli/index.ts dev sites/main --port 4005',
       url: 'http://localhost:4005/admin',
       reuseExistingServer: !process.env.CI,
       timeout: 60000,

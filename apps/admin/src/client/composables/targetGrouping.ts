@@ -43,7 +43,10 @@ export function groupByEnvironment(targets: TargetInfo[]): TargetGroup[] {
   for (const t of targets) {
     const env = t.environment ?? 'local'
     let g = groups.get(env)
-    if (!g) { g = { environment: env, members: [] }; groups.set(env, g) }
+    if (!g) {
+      g = { environment: env, members: [] }
+      groups.set(env, g)
+    }
     g.members.push(t)
   }
   return [...groups.values()]
@@ -58,9 +61,7 @@ export function groupByEnvironment(targets: TargetInfo[]): TargetGroup[] {
  * rule "groups of 1 stay flat" means the author never sees a group
  * affordance for a single-member env.
  */
-export type GroupedEntry =
-  | { kind: 'single'; target: TargetInfo }
-  | { kind: 'group'; group: TargetGroup }
+export type GroupedEntry = { kind: 'single'; target: TargetInfo } | { kind: 'group'; group: TargetGroup }
 
 /**
  * Compute the render shape for a set of targets. When `totalTargetCount`
@@ -68,16 +69,11 @@ export type GroupedEntry =
  * Otherwise targets are grouped by environment, with 1-member groups
  * flattened back to 'single' entries.
  */
-export function groupedEntries(
-  targets: TargetInfo[],
-  totalTargetCount: number,
-): GroupedEntry[] {
+export function groupedEntries(targets: TargetInfo[], totalTargetCount: number): GroupedEntry[] {
   if (!shouldGroup(totalTargetCount)) {
     return targets.map(t => ({ kind: 'single', target: t }))
   }
   return groupByEnvironment(targets).map(g =>
-    g.members.length === 1
-      ? { kind: 'single', target: g.members[0] }
-      : { kind: 'group', group: g },
+    g.members.length === 1 ? { kind: 'single', target: g.members[0] } : { kind: 'group', group: g },
   )
 }

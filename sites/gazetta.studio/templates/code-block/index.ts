@@ -25,8 +25,12 @@ const template: TemplateFunction<Content> = async ({ content }) => {
   const { code = '', language } = content ?? {}
   const hl = await getHighlighter()
 
-  const lang = language?.toLowerCase().replace('plain typescript', 'typescript')
-    .replace('vue 3', 'typescript').replace('react', 'tsx') ?? 'typescript'
+  const lang =
+    language
+      ?.toLowerCase()
+      .replace('plain typescript', 'typescript')
+      .replace('vue 3', 'typescript')
+      .replace('react', 'tsx') ?? 'typescript'
 
   const highlighted = hl.codeToHtml(code, { lang, theme: 'github-dark' })
 

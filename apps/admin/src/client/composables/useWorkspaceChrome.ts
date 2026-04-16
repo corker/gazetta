@@ -30,7 +30,12 @@ export function useWorkspaceChrome() {
 
   // Re-evaluate whenever the active target (or its shape) changes.
   const stop = watch(
-    () => [activeTarget.activeTargetName, activeTarget.activeTarget?.editable, activeTarget.activeTarget?.environment] as const,
+    () =>
+      [
+        activeTarget.activeTargetName,
+        activeTarget.activeTarget?.editable,
+        activeTarget.activeTarget?.environment,
+      ] as const,
     apply,
     { immediate: true },
   )

@@ -11,7 +11,6 @@ function contentHash(content: string): string {
   return createHash('md5').update(content).digest('hex').slice(0, 8)
 }
 
-
 /** List existing hashed files (styles.*.css, script.*.js) in a directory */
 async function listHashedFiles(storage: StorageProvider, dir: string): Promise<string[]> {
   try {
@@ -30,7 +29,12 @@ async function cleanupOldFiles(storage: StorageProvider, oldFiles: string[], new
   let removed = 0
   for (const file of oldFiles) {
     if (!newSet.has(file)) {
-      try { await storage.rm(file); removed++ } catch { /* already gone */ }
+      try {
+        await storage.rm(file)
+        removed++
+      } catch {
+        /* already gone */
+      }
     }
   }
   return removed
@@ -52,7 +56,7 @@ export async function publishPageRendered(
 ): Promise<{ files: number; removed: number }> {
   // Reuse a preloaded site when the caller already has one (runPublish loops
   // over N items; loading per-item was quadratic). loadSite is idempotent.
-  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot, templatesDir })
+  const site = preloadedSite ?? (await loadSite({ contentRoot: sourceRoot, templatesDir }))
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
@@ -131,7 +135,9 @@ export async function publishPageRendered(
     pageCssLink,
     ...esiHeadTags,
     pageJsLink,
-  ].filter(Boolean).join('\n  ')
+  ]
+    .filter(Boolean)
+    .join('\n  ')
 
   const bodyContent = bodyParts.join('\n')
 
@@ -182,7 +188,7 @@ export async function publishPageStatic(
   manifestHash?: string,
   preloadedSite?: Site,
 ): Promise<{ files: number }> {
-  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot, templatesDir })
+  const site = preloadedSite ?? (await loadSite({ contentRoot: sourceRoot, templatesDir }))
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
@@ -223,7 +229,7 @@ export async function publishFragmentRendered(
   manifestHash?: string,
   preloadedSite?: Site,
 ): Promise<{ files: number; removed: number }> {
-  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot, templatesDir })
+  const site = preloadedSite ?? (await loadSite({ contentRoot: sourceRoot, templatesDir }))
   const fragment = site.fragments.get(fragmentName)
   if (!fragment) throw new Error(`Fragment "${fragmentName}" not found`)
 
@@ -296,7 +302,7 @@ export async function publishSiteManifest(
   targetStorage: StorageProvider,
   preloadedSite?: Site,
 ): Promise<void> {
-  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot })
+  const site = preloadedSite ?? (await loadSite({ contentRoot: sourceRoot }))
   const manifest = { name: site.manifest.name, version: site.manifest.version }
   await targetStorage.writeFile('site.json', JSON.stringify(manifest))
 }
@@ -310,7 +316,7 @@ export async function publishFragmentIndex(
   targetStorage: StorageProvider,
   preloadedSite?: Site,
 ): Promise<Record<string, string[]>> {
-  const site = preloadedSite ?? await loadSite({ contentRoot: sourceRoot })
+  const site = preloadedSite ?? (await loadSite({ contentRoot: sourceRoot }))
   const index: Record<string, string[]> = {}
 
   for (const [_pageName, page] of site.pages) {
@@ -331,7 +337,7 @@ export async function publishFragmentIndex(
 /** Purge via Cloudflare zone cache API */
 export function createCloudflarePurge(zoneId: string, apiToken: string): PurgeStrategy {
   const apiBase = `https://api.cloudflare.com/client/v4/zones/${zoneId}/purge_cache`
-  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` }
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` }
 
   return {
     async purgeAll() {
@@ -352,7 +358,7 @@ export async function lookupCloudflareZoneId(siteUrl: string, apiToken: string):
     headers: { Authorization: `Bearer ${apiToken}` },
   })
   if (!res.ok) return null
-  const data = await res.json() as { result: Array<{ id: string }> }
+  const data = (await res.json()) as { result: Array<{ id: string }> }
   return data.result?.[0]?.id ?? null
 }
 
@@ -377,7 +383,9 @@ export async function publishFragmentWithPurge(
   let index: Record<string, string[]> = {}
   try {
     index = JSON.parse(await targetStorage.readFile('index/fragments.json'))
-  } catch { /* no index yet */ }
+  } catch {
+    /* no index yet */
+  }
 
   const urls = index[`@${fragmentName}`] ?? []
   if (urls.length > 0) {

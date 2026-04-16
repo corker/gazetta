@@ -31,7 +31,7 @@ export async function publishItems(
   const { storage: targetStorage, rootPath: targetBase } = targetRoot
 
   // Copy items in parallel (bounded).
-  const counts = await mapLimit(items, async (item) => {
+  const counts = await mapLimit(items, async item => {
     const sourcePath = join(sourceBase, item)
     const targetPath = join(targetBase, item)
     return copyRecursive(sourceStorage, sourcePath, targetStorage, targetPath)
@@ -54,7 +54,7 @@ async function copyRecursive(
   source: StorageProvider,
   sourcePath: string,
   target: StorageProvider,
-  targetPath: string
+  targetPath: string,
 ): Promise<number> {
   // Check if sourcePath is a file
   try {
@@ -67,14 +67,14 @@ async function copyRecursive(
   }
 
   // Try as directory
-  if (!await source.exists(sourcePath)) return 0
+  if (!(await source.exists(sourcePath))) return 0
 
   const entries = await source.readDir(sourcePath)
   await target.mkdir(targetPath)
 
   // Bounded-parallel copy of children. Sequential would be O(n) wall time;
   // at 10k files on cloud storage that's minutes of serial I/O latency.
-  const counts = await mapLimit(entries, async (entry) => {
+  const counts = await mapLimit(entries, async entry => {
     const childSource = join(sourcePath, entry.name)
     const childTarget = join(targetPath, entry.name)
     if (entry.isDirectory) {
@@ -115,7 +115,7 @@ async function collectDependencies(
   siteBase: string,
   item: string,
   allItems: Set<string>,
-  visited: Set<string>
+  visited: Set<string>,
 ): Promise<void> {
   if (visited.has(item)) return
   visited.add(item)
@@ -128,7 +128,9 @@ async function collectDependencies(
     try {
       manifest = JSON.parse(await storage.readFile(join(itemPath, name)))
       break
-    } catch { continue }
+    } catch {
+      continue
+    }
   }
 
   if (!manifest) return
@@ -147,7 +149,7 @@ async function collectComponentDeps(
   storage: StorageProvider,
   siteBase: string,
   allItems: Set<string>,
-  visited: Set<string>
+  visited: Set<string>,
 ): Promise<void> {
   for (const entry of components) {
     if (typeof entry === 'string' && entry.startsWith('@')) {
@@ -198,7 +200,9 @@ async function findFragmentDependentsImpl(
       for (const e of entries) {
         if (e.isDirectory) manifestsToScan.push({ kind: kind === 'pages' ? 'page' : 'fragment', name: e.name })
       }
-    } catch { /* missing dir */ }
+    } catch {
+      /* missing dir */
+    }
   }
 
   function walkComponents(components: unknown[] | undefined, out: string[]) {
@@ -215,7 +219,7 @@ async function findFragmentDependentsImpl(
   // Past this point the BFS is a map lookup, not storage I/O — so it stays
   // fast even at 10k items.
   const directRefs = new Map<string, string[]>()
-  await mapLimit(manifestsToScan, async (item) => {
+  await mapLimit(manifestsToScan, async item => {
     const refs: string[] = []
     const manifestName = item.kind === 'page' ? 'page.json' : 'fragment.json'
     const dir = item.kind === 'page' ? 'pages' : 'fragments'
@@ -223,7 +227,9 @@ async function findFragmentDependentsImpl(
       const raw = await storage.readFile(join(siteBase, dir, item.name, manifestName))
       const manifest = JSON.parse(raw) as { components?: unknown[] }
       walkComponents(manifest.components, refs)
-    } catch { /* skip unreadable */ }
+    } catch {
+      /* skip unreadable */
+    }
     directRefs.set(`${item.kind}:${item.name}`, refs)
   })
 
@@ -239,7 +245,10 @@ async function findFragmentDependentsImpl(
       if (refs.includes(current)) {
         seen.add(key)
         if (item.kind === 'page') pages.add(item.name)
-        else { fragments.add(item.name); queue.push(item.name) }
+        else {
+          fragments.add(item.name)
+          queue.push(item.name)
+        }
       }
     }
   }
@@ -303,7 +312,9 @@ export async function findDependentsFromSidecars(
     }
     for (const [name, info] of fragmentsIndex) {
       if (info.uses.has(current) && !seen.has(name)) {
-        seen.add(name); fragments.add(name); queue.push(name)
+        seen.add(name)
+        fragments.add(name)
+        queue.push(name)
       }
     }
   }

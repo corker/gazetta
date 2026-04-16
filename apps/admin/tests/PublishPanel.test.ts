@@ -18,10 +18,7 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import PublishPanel from '../src/client/components/PublishPanel.vue'
-import {
-  PUBLISH_API, HISTORY_API,
-  type PublishApi, type HistoryApi,
-} from '../src/client/composables/api.js'
+import { PUBLISH_API, HISTORY_API, type PublishApi, type HistoryApi } from '../src/client/composables/api.js'
 import { useActiveTargetStore } from '../src/client/stores/activeTarget.js'
 import { useSyncStatusStore } from '../src/client/stores/syncStatus.js'
 import type { TargetInfo, PublishResult, PublishProgress } from '../src/client/api/client.js'
@@ -30,21 +27,24 @@ import type { TargetInfo, PublishResult, PublishProgress } from '../src/client/a
 // jsdom doesn't implement it. Stub once globally.
 beforeAll(() => {
   if (typeof window.matchMedia !== 'function') {
-    window.matchMedia = (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    }) as MediaQueryList
+    window.matchMedia = (query: string) =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList
   }
 })
 
 function fakePublishApi(partial: Partial<PublishApi> = {}): PublishApi {
-  const notImplemented = (name: string) => () => { throw new Error(`fakePublishApi.${name} not stubbed`) }
+  const notImplemented = (name: string) => () => {
+    throw new Error(`fakePublishApi.${name} not stubbed`)
+  }
   return {
     publish: notImplemented('publish'),
     publishStream: notImplemented('publishStream'),
@@ -55,7 +55,9 @@ function fakePublishApi(partial: Partial<PublishApi> = {}): PublishApi {
 }
 
 function fakeHistoryApi(partial: Partial<HistoryApi> = {}): HistoryApi {
-  const notImplemented = (name: string) => () => { throw new Error(`fakeHistoryApi.${name} not stubbed`) }
+  const notImplemented = (name: string) => () => {
+    throw new Error(`fakeHistoryApi.${name} not stubbed`)
+  }
   return {
     listHistory: notImplemented('listHistory'),
     undoLastWrite: notImplemented('undoLastWrite'),
@@ -72,15 +74,20 @@ function installTargets(targets: TargetInfo[], active: string) {
   sync$.configure({
     listTargets: () => targets,
     activeTarget: () => active,
-    compareFn: async () => ({ added: [], modified: [], deleted: [], unchanged: [], firstPublish: false, invalidTemplates: [] }),
+    compareFn: async () => ({
+      added: [],
+      modified: [],
+      deleted: [],
+      unchanged: [],
+      firstPublish: false,
+      invalidTemplates: [],
+    }),
   })
 }
 
-async function mountPanel(opts: {
-  publishApi?: PublishApi
-  historyApi?: HistoryApi
-  initialDestination?: string
-} = {}): Promise<VueWrapper> {
+async function mountPanel(
+  opts: { publishApi?: PublishApi; historyApi?: HistoryApi; initialDestination?: string } = {},
+): Promise<VueWrapper> {
   const w = mount(PublishPanel, {
     attachTo: document.body,
     // Mount with visible:false and flip to true to trigger the init watcher
@@ -151,10 +158,13 @@ describe('PublishPanel', () => {
 
   describe('source picker', () => {
     it('shows a fixed source chip when only one editable target exists', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'prod', environment: 'production', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'prod', environment: 'production', type: 'static', editable: false },
+        ],
+        'local',
+      )
       await mountPanel()
       await flushMicrotasks()
       expect(qExists('publish-source-fixed')).toBe(true)
@@ -163,11 +173,14 @@ describe('PublishPanel', () => {
     })
 
     it('shows a dropdown when 2+ editable targets exist', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: true },
-        { name: 'prod', environment: 'production', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: true },
+          { name: 'prod', environment: 'production', type: 'static', editable: false },
+        ],
+        'local',
+      )
       await mountPanel()
       await flushMicrotasks()
       expect(qExists('publish-source-select')).toBe(true)
@@ -175,10 +188,13 @@ describe('PublishPanel', () => {
     })
 
     it('defaults source to the active target when it is editable', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: true },
-      ], 'staging')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: true },
+        ],
+        'staging',
+      )
       const w = await mountPanel()
       await flushMicrotasks()
       const select = w.findComponent({ name: 'Select' })
@@ -187,10 +203,13 @@ describe('PublishPanel', () => {
     })
 
     it('defaults source to the first editable when active is read-only', async () => {
-      installTargets([
-        { name: 'staging', environment: 'staging', type: 'static', editable: true },
-        { name: 'prod', environment: 'production', type: 'static', editable: false },
-      ], 'prod')
+      installTargets(
+        [
+          { name: 'staging', environment: 'staging', type: 'static', editable: true },
+          { name: 'prod', environment: 'production', type: 'static', editable: false },
+        ],
+        'prod',
+      )
       await mountPanel()
       await flushMicrotasks()
       // Only one editable target → fixed chip shows 'staging'
@@ -200,11 +219,14 @@ describe('PublishPanel', () => {
 
   describe('destinations', () => {
     it('renders one chip per non-source target (flat ≤3)', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-        { name: 'prod', environment: 'production', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+          { name: 'prod', environment: 'production', type: 'static', editable: false },
+        ],
+        'local',
+      )
       await mountPanel()
       await flushMicrotasks()
       // Source (local) is NOT in the destination list
@@ -214,12 +236,15 @@ describe('PublishPanel', () => {
     })
 
     it('shows a group header for same-environment members at 4+ total', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-        { name: 'prod-us', environment: 'production', type: 'static', editable: false },
-        { name: 'prod-eu', environment: 'production', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+          { name: 'prod-us', environment: 'production', type: 'static', editable: false },
+          { name: 'prod-eu', environment: 'production', type: 'static', editable: false },
+        ],
+        'local',
+      )
       await mountPanel()
       await flushMicrotasks()
       expect(qExists('publish-dest-group-production')).toBe(true)
@@ -228,10 +253,13 @@ describe('PublishPanel', () => {
     })
 
     it('preselects initialDestination when provided', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+        ],
+        'local',
+      )
       const w = await mountPanel({ initialDestination: 'staging' })
       await flushMicrotasks()
       await pickItems(w, ['pages/home'])
@@ -239,10 +267,13 @@ describe('PublishPanel', () => {
     })
 
     it('shows read-only badge on non-editable destinations', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'prod', environment: 'production', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'prod', environment: 'production', type: 'static', editable: false },
+        ],
+        'local',
+      )
       await mountPanel()
       await flushMicrotasks()
       expect(qText('publish-dest-prod')).toContain('read-only')
@@ -251,10 +282,13 @@ describe('PublishPanel', () => {
 
   describe('publish action', () => {
     it('disables the publish button until source + destinations + items are all set', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+        ],
+        'local',
+      )
       await mountPanel()
       await flushMicrotasks()
       const btn = q('[data-testid="publish-panel-confirm"]') as HTMLButtonElement
@@ -262,10 +296,13 @@ describe('PublishPanel', () => {
     })
 
     it('computes label as "Publish N items → M targets"', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+        ],
+        'local',
+      )
       const w = await mountPanel({ initialDestination: 'staging' })
       await flushMicrotasks()
       await pickItems(w, ['pages/home', 'pages/about'])
@@ -273,20 +310,25 @@ describe('PublishPanel', () => {
     })
 
     it('calls publishApi.publishStream on publish, with items + destinations + source', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-      ], 'local')
-      const publishStream = vi.fn(async (
-        _items: string[],
-        _targets: string[],
-        onProgress: (ev: PublishProgress) => void,
-        _opts?: { source?: string },
-      ): Promise<PublishResult[]> => {
-        onProgress({ kind: 'target-start', target: 'staging', total: 2 })
-        onProgress({ kind: 'target-result', result: { target: 'staging', success: true, copiedFiles: 2 } })
-        return [{ target: 'staging', success: true, copiedFiles: 2 }]
-      })
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+        ],
+        'local',
+      )
+      const publishStream = vi.fn(
+        async (
+          _items: string[],
+          _targets: string[],
+          onProgress: (ev: PublishProgress) => void,
+          _opts?: { source?: string },
+        ): Promise<PublishResult[]> => {
+          onProgress({ kind: 'target-start', target: 'staging', total: 2 })
+          onProgress({ kind: 'target-result', result: { target: 'staging', success: true, copiedFiles: 2 } })
+          return [{ target: 'staging', success: true, copiedFiles: 2 }]
+        },
+      )
       const w = await mountPanel({ publishApi: fakePublishApi({ publishStream }), initialDestination: 'staging' })
       await flushMicrotasks()
       await pickItems(w, ['pages/home', 'pages/about'])
@@ -302,12 +344,15 @@ describe('PublishPanel', () => {
     })
 
     it('shows results with per-target success + undo button after a successful publish', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-      ], 'local')
-      const publishStream = vi.fn(async (): Promise<PublishResult[]> =>
-        [{ target: 'staging', success: true, copiedFiles: 3 }]
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+        ],
+        'local',
+      )
+      const publishStream = vi.fn(
+        async (): Promise<PublishResult[]> => [{ target: 'staging', success: true, copiedFiles: 3 }],
       )
       const w = await mountPanel({ publishApi: fakePublishApi({ publishStream }), initialDestination: 'staging' })
       await flushMicrotasks()
@@ -325,10 +370,13 @@ describe('PublishPanel', () => {
 
   describe('production confirmation', () => {
     it('requires explicit confirmation when a production destination is selected', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'prod', environment: 'production', type: 'static', editable: false },
-      ], 'local')
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'prod', environment: 'production', type: 'static', editable: false },
+        ],
+        'local',
+      )
       const publishStream = vi.fn(async (): Promise<PublishResult[]> => [])
       const w = await mountPanel({ publishApi: fakePublishApi({ publishStream }), initialDestination: 'prod' })
       await flushMicrotasks()
@@ -348,12 +396,15 @@ describe('PublishPanel', () => {
     })
 
     it('skips confirmation when no production destination is selected', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-      ], 'local')
-      const publishStream = vi.fn(async (): Promise<PublishResult[]> =>
-        [{ target: 'staging', success: true, copiedFiles: 1 }]
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+        ],
+        'local',
+      )
+      const publishStream = vi.fn(
+        async (): Promise<PublishResult[]> => [{ target: 'staging', success: true, copiedFiles: 1 }],
       )
       const w = await mountPanel({ publishApi: fakePublishApi({ publishStream }), initialDestination: 'staging' })
       await flushMicrotasks()
@@ -367,12 +418,15 @@ describe('PublishPanel', () => {
 
   describe('undo', () => {
     it('calls historyApi.undoLastWrite when result undo is clicked', async () => {
-      installTargets([
-        { name: 'local', environment: 'local', type: 'static', editable: true },
-        { name: 'staging', environment: 'staging', type: 'static', editable: false },
-      ], 'local')
-      const publishStream = vi.fn(async (): Promise<PublishResult[]> =>
-        [{ target: 'staging', success: true, copiedFiles: 1 }]
+      installTargets(
+        [
+          { name: 'local', environment: 'local', type: 'static', editable: true },
+          { name: 'staging', environment: 'staging', type: 'static', editable: false },
+        ],
+        'local',
+      )
+      const publishStream = vi.fn(
+        async (): Promise<PublishResult[]> => [{ target: 'staging', success: true, copiedFiles: 1 }],
       )
       const undoLastWrite = vi.fn(async () => ({
         revision: { id: 'rev-1', timestamp: '2026-04-16T00:00:00Z', operation: 'rollback' as const, items: [] },

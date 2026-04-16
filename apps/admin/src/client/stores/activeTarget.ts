@@ -42,11 +42,19 @@ export interface ActiveTargetPersistence {
 const defaultPersistence: ActiveTargetPersistence = {
   get() {
     if (typeof window === 'undefined') return null
-    try { return window.localStorage.getItem(STORAGE_KEY) } catch { return null }
+    try {
+      return window.localStorage.getItem(STORAGE_KEY)
+    } catch {
+      return null
+    }
   },
   set(name: string) {
     if (typeof window === 'undefined') return
-    try { window.localStorage.setItem(STORAGE_KEY, name) } catch { /* private mode */ }
+    try {
+      window.localStorage.setItem(STORAGE_KEY, name)
+    } catch {
+      /* private mode */
+    }
   },
 }
 

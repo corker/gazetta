@@ -51,64 +51,72 @@ export const test = base.extend<{ page: Page }, { testSite: TestSite; baseURL: s
     const shouldFail = !allowErrors && errors.length > 0 && testInfo.status === testInfo.expectedStatus
     if (testInfo.status !== testInfo.expectedStatus || shouldFail) {
       if (logs.length) {
-        process.stderr.write(`\n===== BROWSER CONSOLE for ${testInfo.title} =====\n${logs.join('\n')}\n===== END =====\n`)
+        process.stderr.write(
+          `\n===== BROWSER CONSOLE for ${testInfo.title} =====\n${logs.join('\n')}\n===== END =====\n`,
+        )
         await testInfo.attach('browser-console.log', { body: logs.join('\n'), contentType: 'text/plain' })
       }
     }
     if (shouldFail) {
       throw new Error(
         `Test passed but emitted ${errors.length} browser console error(s):\n` +
-        errors.slice(0, 5).map(e => '  ' + e).join('\n') +
-        (errors.length > 5 ? `\n  …and ${errors.length - 5} more` : '') +
-        `\n\nAdd test.info().annotations.push({ type: 'allow-console-errors' }) to opt out if intentional.`
+          errors
+            .slice(0, 5)
+            .map(e => '  ' + e)
+            .join('\n') +
+          (errors.length > 5 ? `\n  …and ${errors.length - 5} more` : '') +
+          `\n\nAdd test.info().annotations.push({ type: 'allow-console-errors' }) to opt out if intentional.`,
       )
     }
   },
 
-  testSite: [async ({}, use, workerInfo) => {
-    const workerDir = resolve(repoRoot, '.tmp', `e2e-${workerInfo.workerIndex}`)
-    const projectDir = resolve(workerDir, 'project')
-    const port = 3100 + workerInfo.workerIndex
+  testSite: [
+    async ({}, use, workerInfo) => {
+      const workerDir = resolve(repoRoot, '.tmp', `e2e-${workerInfo.workerIndex}`)
+      const projectDir = resolve(workerDir, 'project')
+      const port = 3100 + workerInfo.workerIndex
 
-    await rm(workerDir, { recursive: true, force: true })
-    await mkdir(workerDir, { recursive: true })
-    await cp(starterDir, projectDir, {
-      recursive: true,
-      filter: (src) => !src.includes('/dist') && !src.includes('/node_modules') && !src.includes('/.tmp'),
-    })
+      await rm(workerDir, { recursive: true, force: true })
+      await mkdir(workerDir, { recursive: true })
+      await cp(starterDir, projectDir, {
+        recursive: true,
+        filter: src => !src.includes('/dist') && !src.includes('/node_modules') && !src.includes('/.tmp'),
+      })
 
-    // Swap the azure-blob 'production' target for a filesystem one with
-    // environment:production. Azurite isn't reachable in CI and takes 10s to
-    // time out, which would drop it from the target registry and break tests
-    // that click [data-testid="publish-target-production"]. Using a local
-    // filesystem target preserves the prod semantics (badge + confirmation
-    // prompt via environment: production) without a network dependency.
-    const { readFile, writeFile: writeFileFs } = await import('node:fs/promises')
-    const siteYamlPath = resolve(projectDir, 'sites/main/site.yaml')
-    const yaml = await readFile(siteYamlPath, 'utf-8')
-    const patched = yaml.replace(
-      /production:\s*\n\s*storage:\s*\n\s*type: azure-blob[\s\S]*?container: "[^"]*"\s*\n\s*environment: production/,
-      'production:\n    environment: production\n    storage:\n      type: filesystem\n      path: ./dist/prod-test',
-    )
-    await writeFileFs(siteYamlPath, patched)
+      // Swap the azure-blob 'production' target for a filesystem one with
+      // environment:production. Azurite isn't reachable in CI and takes 10s to
+      // time out, which would drop it from the target registry and break tests
+      // that click [data-testid="publish-target-production"]. Using a local
+      // filesystem target preserves the prod semantics (badge + confirmation
+      // prompt via environment: production) without a network dependency.
+      const { readFile, writeFile: writeFileFs } = await import('node:fs/promises')
+      const siteYamlPath = resolve(projectDir, 'sites/main/site.yaml')
+      const yaml = await readFile(siteYamlPath, 'utf-8')
+      const patched = yaml.replace(
+        /production:\s*\n\s*storage:\s*\n\s*type: azure-blob[\s\S]*?container: "[^"]*"\s*\n\s*environment: production/,
+        'production:\n    environment: production\n    storage:\n      type: filesystem\n      path: ./dist/prod-test',
+      )
+      await writeFileFs(siteYamlPath, patched)
 
-    const server = spawnDev(projectDir, port)
-    try {
-      await waitForServer(port, server)
-    } catch (err) {
-      server.kill('SIGTERM')
-      throw err
-    }
+      const server = spawnDev(projectDir, port)
+      try {
+        await waitForServer(port, server)
+      } catch (err) {
+        server.kill('SIGTERM')
+        throw err
+      }
 
-    try {
-      await use({ baseURL: `http://localhost:${port}`, projectDir })
-    } finally {
-      server.kill('SIGTERM')
-      await new Promise<void>(resolveP => server.once('exit', () => resolveP()))
-      // Always clean — Playwright preserves test-results/ for debugging separately
-      await rm(workerDir, { recursive: true, force: true }).catch(() => {})
-    }
-  }, { scope: 'worker' }],
+      try {
+        await use({ baseURL: `http://localhost:${port}`, projectDir })
+      } finally {
+        server.kill('SIGTERM')
+        await new Promise<void>(resolveP => server.once('exit', () => resolveP()))
+        // Always clean — Playwright preserves test-results/ for debugging separately
+        await rm(workerDir, { recursive: true, force: true }).catch(() => {})
+      }
+    },
+    { scope: 'worker' },
+  ],
 
   // Override baseURL so every page.goto('/...') lands on the worker's server
   baseURL: async ({ testSite }, use) => {
@@ -129,10 +137,11 @@ function spawnDev(cwd: string, port: number): ChildProcess {
   })
   // Surface Vite optimizer events and warnings — helpful for diagnosing flakes.
   // Request logs are filtered out to keep CI output manageable.
-  server.stdout?.on('data', (d) => {
+  server.stdout?.on('data', d => {
     const text = d.toString()
     // Skip verbose request logs (lines starting with request arrows)
-    const important = text.split('\n')
+    const important = text
+      .split('\n')
       .filter((line: string) => line.trim() && !/^\s*(<--|-->)\s/.test(line))
       .join('\n')
     if (important.trim()) process.stderr.write(`[dev:${port}] ${important}${important.endsWith('\n') ? '' : '\n'}`)
@@ -151,17 +160,14 @@ async function waitForServer(port: number, server: ChildProcess): Promise<void> 
   const started = Date.now()
 
   const exitPromise = new Promise<never>((_, reject) => {
-    server.once('exit', (code) => {
+    server.once('exit', code => {
       reject(new Error(`gazetta dev on port ${port} exited prematurely (code ${code}) before serving /admin`))
     })
   })
 
   while (Date.now() - started < timeoutMs) {
     try {
-      const res = await Promise.race([
-        fetch(`http://localhost:${port}/admin`),
-        exitPromise,
-      ])
+      const res = await Promise.race([fetch(`http://localhost:${port}/admin`), exitPromise])
       if (res && res.status === 200) break
     } catch {
       // still starting — retry

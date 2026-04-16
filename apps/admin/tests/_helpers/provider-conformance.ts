@@ -106,7 +106,7 @@ export function runProviderConformance(factory: ProviderFactory): void {
       // that here (filesystem-provider.test.ts covers the fs-specific
       // behavior). The contract is: mkdir must be idempotent and safe.
       await provider.mkdir('mkdir-safe/a/b/c')
-      await provider.mkdir('mkdir-safe/a/b/c')  // second call, same path
+      await provider.mkdir('mkdir-safe/a/b/c') // second call, same path
     })
   })
 }

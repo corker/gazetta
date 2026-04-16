@@ -6,7 +6,15 @@ import { publishItems, resolveDependencies, findFragmentDependents, findDependen
 import type { SourceContextResolver } from '../source-context.js'
 import { mapLimitStream } from '../../concurrency.js'
 import type { PublishResult } from '../../publish.js'
-import { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex, createCloudflarePurge, lookupCloudflareZoneId } from '../../publish-rendered.js'
+import {
+  publishPageRendered,
+  publishPageStatic,
+  publishFragmentRendered,
+  publishSiteManifest,
+  publishFragmentIndex,
+  createCloudflarePurge,
+  lookupCloudflareZoneId,
+} from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
 import { resolveEnvVars } from '../../targets.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from '../../templates-scan.js'
@@ -60,7 +68,10 @@ export function publishRoutes(
         const t = await createTargetRegistry(targetConfigs, bootstrapSource.projectSiteDir)
         targets = t
         return t
-      })().catch(() => { targets = new Map(); return targets })
+      })().catch(() => {
+        targets = new Map()
+        return targets
+      })
     }
     return initPromise
   }
@@ -69,17 +80,19 @@ export function publishRoutes(
     return targetConfigs?.[name]
   }
 
-  app.get('/api/targets', async (c) => {
+  app.get('/api/targets', async c => {
     const t = await getTargets()
-    return c.json([...t.keys()].map(name => {
-      const cfg = getTargetConfig(name)
-      return {
-        name,
-        environment: cfg ? getEnvironment(cfg) : 'local',
-        type: cfg ? getType(cfg) : 'static',
-        editable: cfg ? isEditable(cfg) : true,
-      }
-    }))
+    return c.json(
+      [...t.keys()].map(name => {
+        const cfg = getTargetConfig(name)
+        return {
+          name,
+          environment: cfg ? getEnvironment(cfg) : 'local',
+          type: cfg ? getType(cfg) : 'static',
+          editable: cfg ? isEditable(cfg) : true,
+        }
+      }),
+    )
   })
 
   /**
@@ -97,7 +110,7 @@ export function publishRoutes(
    * Useful for answering "what pages would need republish if this fragment
    * changed" on large sites.
    */
-  app.get('/api/dependents', async (c) => {
+  app.get('/api/dependents', async c => {
     const item = c.req.query('item')
     if (!item || !item.startsWith('fragments/')) {
       return c.json({ error: 'Missing or invalid "item" query (must be fragments/<name>)' }, 400)
@@ -153,22 +166,36 @@ export function publishRoutes(
    * Pre-flight validation (unknown targets, invalid templates) is reported as
    * 'fatal' before any 'target-start' event so callers can map to a 4xx.
    */
-  async function* runPublish(items: string[], targetNames: string[], sourceName?: string): AsyncGenerator<PublishProgress> {
-    if (!items?.length) { yield { kind: 'fatal', error: 'No items specified' }; return }
-    if (!targetNames?.length) { yield { kind: 'fatal', error: 'No targets specified' }; return }
+  async function* runPublish(
+    items: string[],
+    targetNames: string[],
+    sourceName?: string,
+  ): AsyncGenerator<PublishProgress> {
+    if (!items?.length) {
+      yield { kind: 'fatal', error: 'No items specified' }
+      return
+    }
+    if (!targetNames?.length) {
+      yield { kind: 'fatal', error: 'No targets specified' }
+      return
+    }
 
     // Resolve the source editable target for this publish run.
     let source: Awaited<ReturnType<SourceContextResolver>>
     try {
       source = await resolve(sourceName)
     } catch (err) {
-      yield { kind: 'fatal', error: (err as Error).message }; return
+      yield { kind: 'fatal', error: (err as Error).message }
+      return
     }
     const { projectSiteDir } = source
 
     const t = await getTargets()
     for (const name of targetNames) {
-      if (!t.has(name)) { yield { kind: 'fatal', error: `Unknown target: ${name}` }; return }
+      if (!t.has(name)) {
+        yield { kind: 'fatal', error: `Unknown target: ${name}` }
+        return
+      }
     }
 
     const allItems = await resolveDependencies(source.contentRoot, items)
@@ -238,11 +265,7 @@ export function publishRoutes(
               storage: targetStorage,
               retention: getHistoryRetention(config),
             })
-            const items = await collectPublishedItemsForHistory(
-              source.contentRoot,
-              targetRoot,
-              targetItems,
-            )
+            const items = await collectPublishedItemsForHistory(source.contentRoot, targetRoot, targetItems)
             await recordWrite({
               history,
               contentRoot: targetRoot,
@@ -287,14 +310,29 @@ export function publishRoutes(
             if (isStatic) {
               return publishPageStatic(pageName, source.contentRoot, targetStorage, tdir, manifestHash, site)
             }
-            const { files } = await publishPageRendered(pageName, source.contentRoot, targetStorage, config?.cache, tdir, manifestHash, site)
+            const { files } = await publishPageRendered(
+              pageName,
+              source.contentRoot,
+              targetStorage,
+              config?.cache,
+              tdir,
+              manifestHash,
+              site,
+            )
             return { files }
           }
           if (item.startsWith('fragments/') && !isStatic) {
             const fragName = item.replace('fragments/', '')
             const frag = site.fragments.get(fragName)
             const manifestHash = frag ? hashManifest(frag, { templateHashes }) : undefined
-            const { files } = await publishFragmentRendered(fragName, source.contentRoot, targetStorage, tdir, manifestHash, site)
+            const { files } = await publishFragmentRendered(
+              fragName,
+              source.contentRoot,
+              targetStorage,
+              tdir,
+              manifestHash,
+              site,
+            )
             return { files }
           }
           return { files: 0 } // skipped (e.g. fragment on static target)
@@ -318,7 +356,9 @@ export function publishRoutes(
         // 4. Purge CDN cache
         if (purgeConfig?.type === 'cloudflare') {
           const apiToken = resolveEnvVars(purgeConfig.apiToken)
-          const zoneId = resolveEnvVars(purgeConfig.zoneId) ?? (config?.siteUrl && apiToken ? await lookupCloudflareZoneId(config.siteUrl, apiToken) : null)
+          const zoneId =
+            resolveEnvVars(purgeConfig.zoneId) ??
+            (config?.siteUrl && apiToken ? await lookupCloudflareZoneId(config.siteUrl, apiToken) : null)
           if (apiToken && zoneId) {
             const purge = createCloudflarePurge(zoneId, apiToken)
             const hasFragments = targetItems.some(i => i.startsWith('fragments/'))
@@ -360,8 +400,8 @@ export function publishRoutes(
     yield { kind: 'done', results }
   }
 
-  app.post('/api/publish', async (c) => {
-    const body = await c.req.json() as { items: string[]; targets: string[]; source?: string }
+  app.post('/api/publish', async c => {
+    const body = (await c.req.json()) as { items: string[]; targets: string[]; source?: string }
     let results: PublishResult[] = []
     let fatal: PublishProgress | null = null
     for await (const ev of runPublish(body.items, body.targets, body.source)) {
@@ -370,15 +410,18 @@ export function publishRoutes(
     }
     if (fatal) {
       const status = fatal.error.startsWith('Cannot publish') ? 400 : 400
-      return c.json({ error: fatal.error, ...(fatal.invalidTemplates ? { invalidTemplates: fatal.invalidTemplates } : {}) }, status)
+      return c.json(
+        { error: fatal.error, ...(fatal.invalidTemplates ? { invalidTemplates: fatal.invalidTemplates } : {}) },
+        status,
+      )
     }
     const allSuccess = results.every(r => r.success)
     return c.json({ results }, allSuccess ? 200 : 207)
   })
 
-  app.post('/api/publish/stream', async (c) => {
-    const body = await c.req.json() as { items: string[]; targets: string[]; source?: string }
-    return streamSSE(c, async (stream) => {
+  app.post('/api/publish/stream', async c => {
+    const body = (await c.req.json()) as { items: string[]; targets: string[]; source?: string }
+    return streamSSE(c, async stream => {
       try {
         for await (const ev of runPublish(body.items, body.targets, body.source)) {
           if (stream.aborted) return
@@ -386,17 +429,20 @@ export function publishRoutes(
         }
       } catch (err) {
         if (!stream.aborted) {
-          await stream.writeSSE({ event: 'fatal', data: JSON.stringify({ kind: 'fatal', error: (err as Error).message }) })
+          await stream.writeSSE({
+            event: 'fatal',
+            data: JSON.stringify({ kind: 'fatal', error: (err as Error).message }),
+          })
         }
       }
     })
   })
 
-  app.post('/api/fetch', async (c) => {
+  app.post('/api/fetch', async c => {
     // `source` (body) — target to fetch FROM (a published target)
     // `destination` (body) — optional editable target to write INTO; defaults
     // to the resolver's default editable target (the author's current source)
-    const body = await c.req.json() as { source: string; items?: string[]; destination?: string }
+    const body = (await c.req.json()) as { source: string; items?: string[]; destination?: string }
     if (!body.source) return c.json({ error: 'Missing "source" target name' }, 400)
 
     const t = await getTargets()

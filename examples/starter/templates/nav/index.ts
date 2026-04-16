@@ -2,10 +2,14 @@ import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
-  links: z.array(z.object({
-    label: z.string().describe('Link text'),
-    href: z.string().describe('URL'),
-  })).describe('Navigation links'),
+  links: z
+    .array(
+      z.object({
+        label: z.string().describe('Link text'),
+        href: z.string().describe('URL'),
+      }),
+    )
+    .describe('Navigation links'),
 })
 
 const template: TemplateFunction = ({ content = {} }) => {

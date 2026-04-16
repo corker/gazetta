@@ -14,7 +14,7 @@ function leaf(html: string, css = '', js = '', treePath = ''): ResolvedComponent
 function composite(
   render: (children: RenderOutput[]) => RenderOutput,
   children: ResolvedComponent[],
-  treePath = ''
+  treePath = '',
 ): ResolvedComponent {
   return {
     template: ({ children: c }) => render(c ?? []),
@@ -54,16 +54,13 @@ describe('renderComponent', () => {
 
   it('renders a composite with children', async () => {
     const parent = composite(
-      (children) => ({
+      children => ({
         html: `<div>${children.map(c => c.html).join('')}</div>`,
         css: `.parent {} ${children.map(c => c.css).join(' ')}`,
         js: '',
       }),
-      [
-        leaf('<span>A</span>', '.a {}', '', 'features/a'),
-        leaf('<span>B</span>', '.b {}', '', 'features/b'),
-      ],
-      'features'
+      [leaf('<span>A</span>', '.a {}', '', 'features/a'), leaf('<span>B</span>', '.b {}', '', 'features/b')],
+      'features',
     )
     const result = await renderComponent(parent)
     expect(result.html).toContain('<span>A</span>')
@@ -73,16 +70,13 @@ describe('renderComponent', () => {
 
   it('each component gets a unique scope id based on tree path', async () => {
     const parent = composite(
-      (children) => ({
+      children => ({
         html: children.map(c => c.html).join(''),
         css: children.map(c => c.css).join('\n'),
         js: '',
       }),
-      [
-        leaf('<span>A</span>', '.a {}', '', 'section/a'),
-        leaf('<span>B</span>', '.b {}', '', 'section/b'),
-      ],
-      'section'
+      [leaf('<span>A</span>', '.a {}', '', 'section/a'), leaf('<span>B</span>', '.b {}', '', 'section/b')],
+      'section',
     )
     const result = await renderComponent(parent)
     const idA = hashPath('section/a')
@@ -120,9 +114,9 @@ describe('renderComponent', () => {
       treePath: 'parent/child',
     }
     const parent = composite(
-      (children) => ({ html: children.map(c => c.html).join(''), css: '', js: '' }),
+      children => ({ html: children.map(c => c.html).join(''), css: '', js: '' }),
       [child],
-      'parent'
+      'parent',
     )
     const result = await renderComponent(parent, { id: '42' })
     expect(result.html).toContain('42')
@@ -131,22 +125,22 @@ describe('renderComponent', () => {
   it('renders nested composites (3 levels deep)', async () => {
     const grandchild = leaf('<em>deep</em>', '', '', 'root/mid/deep')
     const child = composite(
-      (children) => ({
+      children => ({
         html: `<section>${children.map(c => c.html).join('')}</section>`,
         css: '',
         js: '',
       }),
       [grandchild],
-      'root/mid'
+      'root/mid',
     )
     const root = composite(
-      (children) => ({
+      children => ({
         html: `<main>${children.map(c => c.html).join('')}</main>`,
         css: '',
         js: '',
       }),
       [child],
-      'root'
+      'root',
     )
     const result = await renderComponent(root)
     expect(result.html).toContain('<em>deep</em>')
@@ -186,19 +180,27 @@ describe('renderComponent', () => {
 
   it('collects head from children and parent', async () => {
     const child: ResolvedComponent = {
-      template: () => ({ html: '<p>child</p>', css: '', js: '', head: '<link rel="preconnect" href="https://fonts.example.com">' }),
+      template: () => ({
+        html: '<p>child</p>',
+        css: '',
+        js: '',
+        head: '<link rel="preconnect" href="https://fonts.example.com">',
+      }),
       children: [],
       treePath: 'layout/child',
     }
     const parent = composite(
-      (children) => ({
+      children => ({
         html: children.map(c => c.html).join(''),
         css: '',
         js: '',
-        head: `<link rel="icon" href="/favicon.svg">\n${children.map(c => c.head).filter(Boolean).join('\n')}`,
+        head: `<link rel="icon" href="/favicon.svg">\n${children
+          .map(c => c.head)
+          .filter(Boolean)
+          .join('\n')}`,
       }),
       [child],
-      'layout'
+      'layout',
     )
     const result = await renderComponent(parent)
     expect(result.head).toContain('favicon.svg')
@@ -217,9 +219,9 @@ describe('renderFragment', () => {
 
   it('includes children', async () => {
     const fragment = composite(
-      (children) => ({ html: `<header>${children.map(c => c.html).join('')}</header>`, css: '', js: '' }),
+      children => ({ html: `<header>${children.map(c => c.html).join('')}</header>`, css: '', js: '' }),
       [leaf('<span>Logo</span>', '', '', 'logo')],
-      ''
+      '',
     )
     const html = await renderFragment(fragment)
     expect(html).toContain('<span>Logo</span>')
@@ -299,9 +301,9 @@ describe('renderPage', () => {
 
   it('scope IDs are deterministic across renders', async () => {
     const page = composite(
-      (children) => ({ html: children.map(c => c.html).join(''), css: children.map(c => c.css).join(''), js: '' }),
+      children => ({ html: children.map(c => c.html).join(''), css: children.map(c => c.css).join(''), js: '' }),
       [leaf('<p>child</p>', '.p {}', '', 'child')],
-      'page'
+      'page',
     )
     const html1 = await renderPage(page)
     const html2 = await renderPage(page)

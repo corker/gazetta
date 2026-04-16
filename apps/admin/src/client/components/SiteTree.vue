@@ -35,13 +35,14 @@ const showCreateFragment = ref(false)
 // Compare against the most-important target so each node can show whether
 // it has unpublished changes. Refreshes on mount and on site reload.
 onMounted(() => publishStatus.refresh())
-watch(() => site.pages.length + site.fragments.length, () => publishStatus.refresh())
+watch(
+  () => site.pages.length + site.fragments.length,
+  () => publishStatus.refresh(),
+)
 
 function isDirty(node: SiteNode): boolean {
   if (publishStatus.isFirstPublish) return true
-  return node.type === 'page'
-    ? publishStatus.isPageDirty(node.name)
-    : publishStatus.isFragmentDirty(node.name)
+  return node.type === 'page' ? publishStatus.isPageDirty(node.name) : publishStatus.isFragmentDirty(node.name)
 }
 function dirtyTitle(): string {
   if (!publishStatus.target) return ''
@@ -50,10 +51,14 @@ function dirtyTitle(): string {
 }
 
 // Sync selection when changed externally (e.g. preview link click)
-watch(() => selection.selection, (sel) => {
-  if (sel) selectedKey.value = `${sel.type}:${sel.name}`
-  else selectedKey.value = null
-}, { immediate: true })
+watch(
+  () => selection.selection,
+  sel => {
+    if (sel) selectedKey.value = `${sel.type}:${sel.name}`
+    else selectedKey.value = null
+  },
+  { immediate: true },
+)
 
 const systemPageNames = computed(() => new Set(site.manifest?.systemPages ?? []))
 
@@ -61,20 +66,26 @@ const contentPages = computed<SiteNode[]>(() =>
   [...site.pages]
     .filter(p => !systemPageNames.value.has(p.name))
     .sort((a, b) => a.route.localeCompare(b.route))
-    .map(p => ({ key: `page:${p.name}`, label: p.name, type: 'page' as const, name: p.name, icon: 'pi pi-file' }))
+    .map(p => ({ key: `page:${p.name}`, label: p.name, type: 'page' as const, name: p.name, icon: 'pi pi-file' })),
 )
 
 const systemPages = computed<SiteNode[]>(() =>
   [...site.pages]
     .filter(p => systemPageNames.value.has(p.name))
     .sort((a, b) => a.route.localeCompare(b.route))
-    .map(p => ({ key: `page:${p.name}`, label: p.name, type: 'page' as const, name: p.name, icon: 'pi pi-file' }))
+    .map(p => ({ key: `page:${p.name}`, label: p.name, type: 'page' as const, name: p.name, icon: 'pi pi-file' })),
 )
 
 const fragments = computed<SiteNode[]>(() =>
   site.fragments
-    .map(f => ({ key: `fragment:${f.name}`, label: f.name, type: 'fragment' as const, name: f.name, icon: 'pi pi-share-alt' }))
-    .sort((a, b) => a.label.localeCompare(b.label))
+    .map(f => ({
+      key: `fragment:${f.name}`,
+      label: f.name,
+      type: 'fragment' as const,
+      name: f.name,
+      icon: 'pi pi-share-alt',
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label)),
 )
 
 function onSelect(node: SiteNode) {

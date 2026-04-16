@@ -58,11 +58,7 @@ const PRISTINE_HOME: Record<string, unknown> = {
 /** Dist dirs every scenario should wipe before running. Matches
  *  site.yaml targets in examples/starter, with `production` swapped to
  *  `prod-test` per the fixtures.ts patch. */
-const TARGET_DIST_DIRS = [
-  'dist/staging',
-  'dist/esi-test',
-  'dist/prod-test',
-] as const
+const TARGET_DIST_DIRS = ['dist/staging', 'dist/esi-test', 'dist/prod-test'] as const
 
 /**
  * Restore local's pages/home/page.json to the pristine starter state.
@@ -80,9 +76,7 @@ export async function restorePristineHome(projectDir: string): Promise<void> {
  */
 export async function wipeAllTargetDists(projectDir: string): Promise<void> {
   const sitesMain = join(projectDir, 'sites/main')
-  await Promise.all(
-    TARGET_DIST_DIRS.map(d => rm(join(sitesMain, d), { recursive: true, force: true })),
-  )
+  await Promise.all(TARGET_DIST_DIRS.map(d => rm(join(sitesMain, d), { recursive: true, force: true })))
   // local's content dir also has a .gazetta/history/ from prior tests — wipe
   // that too so history-touching scenarios start from zero revisions.
   await rm(join(sitesMain, 'targets/local/.gazetta'), { recursive: true, force: true })

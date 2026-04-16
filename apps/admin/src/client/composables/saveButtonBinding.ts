@@ -32,8 +32,6 @@ export function saveButtonLabel(target: TargetInfo | null | undefined): string {
 }
 
 /** PrimeVue severity for the Save button — "danger" for editable-prod. */
-export function saveButtonSeverity(
-  target: TargetInfo | null | undefined,
-): 'primary' | 'danger' {
+export function saveButtonSeverity(target: TargetInfo | null | undefined): 'primary' | 'danger' {
   return isSavingToProd(target) ? 'danger' : 'primary'
 }

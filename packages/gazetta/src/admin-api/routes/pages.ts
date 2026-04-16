@@ -8,7 +8,7 @@ import { CreatePageRequestSchema } from '../schemas/pages.js'
 export function pageRoutes(resolve: SourceContextResolver) {
   const app = new Hono()
 
-  app.get('/api/pages', async (c) => {
+  app.get('/api/pages', async c => {
     const source = await resolve(c.req.query('target'))
     // Empty target (e.g. a publish-target that's never received any
     // content) is valid per the stateless-CMS model — return an empty
@@ -32,7 +32,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     }
   })
 
-  app.post('/api/pages', async (c) => {
+  app.post('/api/pages', async c => {
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
     // Schema-validate the body so drift between client and server
@@ -42,10 +42,13 @@ export function pageRoutes(resolve: SourceContextResolver) {
     const raw = await c.req.json()
     const parsed = CreatePageRequestSchema.safeParse(raw)
     if (!parsed.success) {
-      return c.json({
-        error: 'Invalid request body',
-        issues: parsed.error.issues.map(i => ({ path: i.path.join('.'), message: i.message })),
-      }, 400)
+      return c.json(
+        {
+          error: 'Invalid request body',
+          issues: parsed.error.issues.map(i => ({ path: i.path.join('.'), message: i.message })),
+        },
+        400,
+      )
     }
     const body = parsed.data
 
@@ -67,7 +70,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     return c.json({ ok: true, name: body.name })
   })
 
-  app.get('/api/pages/:name{.+}', async (c) => {
+  app.get('/api/pages/:name{.+}', async c => {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const site = await loadSite({ contentRoot: source.contentRoot })
@@ -83,7 +86,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     })
   })
 
-  app.put('/api/pages/:name{.+}', async (c) => {
+  app.put('/api/pages/:name{.+}', async c => {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
@@ -121,7 +124,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     return c.json({ ok: true })
   })
 
-  app.delete('/api/pages/:name{.+}', async (c) => {
+  app.delete('/api/pages/:name{.+}', async c => {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const { storage } = source

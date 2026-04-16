@@ -29,18 +29,17 @@ export const useSiteStore = defineStore('site', () => {
     try {
       for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-          const [site, pageList, fragmentList] = await Promise.all([
-            api.getSite(),
-            api.getPages(),
-            api.getFragments(),
-          ])
+          const [site, pageList, fragmentList] = await Promise.all([api.getSite(), api.getPages(), api.getFragments()])
           manifest.value = site
           pages.value = pageList
           fragments.value = fragmentList
           return
         } catch (err) {
           const msg = (err as Error).message
-          if (attempt < retries && (msg.includes('502') || msg.includes('Failed to fetch') || msg.includes('not ready'))) {
+          if (
+            attempt < retries &&
+            (msg.includes('502') || msg.includes('Failed to fetch') || msg.includes('not ready'))
+          ) {
             await new Promise(r => setTimeout(r, 1000))
             continue
           }
@@ -50,7 +49,7 @@ export const useSiteStore = defineStore('site', () => {
       }
     } finally {
       loading.value = false
-      loadPromise = null  // Clear so subsequent load() calls actually re-fetch
+      loadPromise = null // Clear so subsequent load() calls actually re-fetch
     }
   }
 

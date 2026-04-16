@@ -112,10 +112,13 @@ test.describe('Publish panel', () => {
     test.info().annotations.push({ type: 'allow-console-errors' })
     // Intercept the compare call and force a 500. The item-list composable
     // reports the error via its own state.
-    await page.route('**/admin/api/compare*', route => route.fulfill({
-      status: 500, contentType: 'application/json',
-      body: JSON.stringify({ error: 'Storage unreachable' }),
-    }))
+    await page.route('**/admin/api/compare*', route =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Storage unreachable' }),
+      }),
+    )
     const panel = new PublishPanelPom(page)
     await panel.open()
     await panel.pickDestination('staging')

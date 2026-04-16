@@ -29,7 +29,12 @@ describe('shouldGroup', () => {
 
 describe('groupByEnvironment', () => {
   it('groups targets sharing an environment, preserving declaration order', () => {
-    const targets = [T('local', 'local'), T('prod-us', 'production'), T('staging', 'staging'), T('prod-eu', 'production')]
+    const targets = [
+      T('local', 'local'),
+      T('prod-us', 'production'),
+      T('staging', 'staging'),
+      T('prod-eu', 'production'),
+    ]
     const groups = groupByEnvironment(targets)
     expect(groups.map(g => g.environment)).toEqual(['local', 'production', 'staging'])
     const prod = groups.find(g => g.environment === 'production')!

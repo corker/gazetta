@@ -24,8 +24,12 @@ function memoryPersistence(initial: string | null = null): ActiveTargetPersisten
   const state = { value: initial }
   return {
     get: () => state.value,
-    set: (name: string) => { state.value = name },
-    get value() { return state.value },
+    set: (name: string) => {
+      state.value = name
+    },
+    get value() {
+      return state.value
+    },
   }
 }
 
@@ -36,7 +40,9 @@ function fixedLoader(list: TargetInfo[]): LoadTargets {
 
 /** Rejected loader for error-path tests. */
 function failingLoader(message: string): LoadTargets {
-  return async () => { throw new Error(message) }
+  return async () => {
+    throw new Error(message)
+  }
 }
 
 beforeEach(() => {

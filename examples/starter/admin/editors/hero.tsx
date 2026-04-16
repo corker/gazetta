@@ -12,7 +12,12 @@ interface HeroContent {
   subtitle?: string
 }
 
-function HeroEditor({ content, schema, onChange, theme }: {
+function HeroEditor({
+  content,
+  schema,
+  onChange,
+  theme,
+}: {
   content: HeroContent
   schema: Record<string, unknown>
   onChange: (content: Record<string, unknown>) => void
@@ -28,22 +33,18 @@ function HeroEditor({ content, schema, onChange, theme }: {
   return (
     <div>
       {/* Live preview */}
-      <div style={{
-        padding: '1.5rem',
-        background: 'linear-gradient(135deg, #667eea, #764ba2)',
-        borderRadius: '8px',
-        marginBottom: '1rem',
-        color: '#fff',
-        textAlign: 'center' as const,
-      }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem' }}>
-          {data.title || 'Untitled'}
-        </h2>
-        {data.subtitle && (
-          <p style={{ fontSize: '1rem', opacity: 0.85, margin: 0 }}>
-            {data.subtitle}
-          </p>
-        )}
+      <div
+        style={{
+          padding: '1.5rem',
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          color: '#fff',
+          textAlign: 'center' as const,
+        }}
+      >
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem' }}>{data.title || 'Untitled'}</h2>
+        {data.subtitle && <p style={{ fontSize: '1rem', opacity: 0.85, margin: 0 }}>{data.subtitle}</p>}
       </div>
 
       {/* Default form below */}
@@ -64,7 +65,7 @@ const editor: EditorMount = {
         schema={props.schema}
         onChange={props.onChange}
         theme={props.theme}
-      />
+      />,
     )
   },
   unmount(el) {

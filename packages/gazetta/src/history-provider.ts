@@ -25,12 +25,7 @@
 
 import { createHash } from 'node:crypto'
 import type { StorageProvider } from './types.js'
-import type {
-  HistoryProvider,
-  Revision,
-  RevisionInput,
-  RevisionManifest,
-} from './history.js'
+import type { HistoryProvider, Revision, RevisionInput, RevisionManifest } from './history.js'
 import { DEFAULT_HISTORY_RETENTION } from './types.js'
 
 export interface CreateHistoryProviderOptions {
@@ -69,9 +64,7 @@ interface HistoryIndex {
  * Build a HistoryProvider backed by the given storage. No I/O happens
  * at construction time — everything is lazy on first call.
  */
-export function createHistoryProvider(
-  opts: CreateHistoryProviderOptions,
-): HistoryProvider {
+export function createHistoryProvider(opts: CreateHistoryProviderOptions): HistoryProvider {
   const { storage } = opts
   const root = opts.rootPath ?? '.gazetta/history'
   const retention = Math.max(1, opts.retention ?? DEFAULT_HISTORY_RETENTION)
@@ -79,7 +72,7 @@ export function createHistoryProvider(
 
   /** Read the index or return an empty one if it doesn't exist yet. */
   async function readIndex(): Promise<HistoryIndex> {
-    if (!await storage.exists(indexPath)) {
+    if (!(await storage.exists(indexPath))) {
       return { revisions: [] }
     }
     const parsed = JSON.parse(await storage.readFile(indexPath)) as HistoryIndex & { nextId?: number }
@@ -162,7 +155,7 @@ export function createHistoryProvider(
   async function writeBlob(content: string): Promise<string> {
     const hash = hashContent(content)
     const path = blobPath(hash)
-    if (!await storage.exists(path)) {
+    if (!(await storage.exists(path))) {
       await writeWithParents(path, content)
     }
     return hash
@@ -232,12 +225,14 @@ export function createHistoryProvider(
     const ids = [...idx.revisions].reverse() // newest first
     const sliced = typeof limit === 'number' ? ids.slice(0, limit) : ids
     // Read manifests in parallel; strip snapshot for the summary list.
-    return Promise.all(sliced.map(async id => {
-      const m = await readManifest(id)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { snapshot: _snapshot, ...rev } = m
-      return rev
-    }))
+    return Promise.all(
+      sliced.map(async id => {
+        const m = await readManifest(id)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { snapshot: _snapshot, ...rev } = m
+        return rev
+      }),
+    )
   }
 
   async function readManifest(id: string): Promise<RevisionManifest> {

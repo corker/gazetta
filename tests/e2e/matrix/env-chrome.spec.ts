@@ -23,14 +23,14 @@ import { test, expect } from '@playwright/test'
  * data-table entry, not a new test.
  */
 const matrix = [
-  { name: 'local-edit',   env: 'local',      editable: true,  chromeClass: 'env-local',      readOnly: false },
-  { name: 'local-ro',     env: 'local',      editable: false, chromeClass: 'env-local',      readOnly: true  },
-  { name: 'local-dyn',    env: 'local',      editable: true,  chromeClass: 'env-local',      readOnly: false },
-  { name: 'staging-ro',   env: 'staging',    editable: false, chromeClass: 'env-staging',    readOnly: true  },
-  { name: 'staging-edit', env: 'staging',    editable: true,  chromeClass: 'env-staging',    readOnly: false },
-  { name: 'prod-ro',      env: 'production', editable: false, chromeClass: 'env-production', readOnly: true  },
-  { name: 'prod-edit',    env: 'production', editable: true,  chromeClass: 'env-production', readOnly: false },
-  { name: 'prod-dyn',     env: 'production', editable: false, chromeClass: 'env-production', readOnly: true  },
+  { name: 'local-edit', env: 'local', editable: true, chromeClass: 'env-local', readOnly: false },
+  { name: 'local-ro', env: 'local', editable: false, chromeClass: 'env-local', readOnly: true },
+  { name: 'local-dyn', env: 'local', editable: true, chromeClass: 'env-local', readOnly: false },
+  { name: 'staging-ro', env: 'staging', editable: false, chromeClass: 'env-staging', readOnly: true },
+  { name: 'staging-edit', env: 'staging', editable: true, chromeClass: 'env-staging', readOnly: false },
+  { name: 'prod-ro', env: 'production', editable: false, chromeClass: 'env-production', readOnly: true },
+  { name: 'prod-edit', env: 'production', editable: true, chromeClass: 'env-production', readOnly: false },
+  { name: 'prod-dyn', env: 'production', editable: false, chromeClass: 'env-production', readOnly: true },
 ] as const
 
 test.describe('Active-target chrome matrix', () => {

@@ -49,8 +49,7 @@ describe('loadTemplate', () => {
   })
 
   it('throws for nonexistent template', async () => {
-    await expect(loadTemplate(storage, templatesDir, 'nonexistent'))
-      .rejects.toThrow('Template "nonexistent" not found')
+    await expect(loadTemplate(storage, templatesDir, 'nonexistent')).rejects.toThrow('Template "nonexistent" not found')
   })
 })
 

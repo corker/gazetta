@@ -9,7 +9,10 @@ import { createContentRoot } from '../src/content-root.js'
 import { createHistoryProvider } from '../src/history-provider.js'
 import { recordWrite } from '../src/history-recorder.js'
 
-function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(entries: Record<string, string>): void } {
+function memoryStorage(): StorageProvider & {
+  dump(): Map<string, string>
+  seed(entries: Record<string, string>): void
+} {
   const files = new Map<string, string>()
   return {
     async readFile(path) {
@@ -17,8 +20,12 @@ function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(
       if (v === undefined) throw new Error(`ENOENT: ${path}`)
       return v
     },
-    async writeFile(path, content) { files.set(path, content) },
-    async exists(path) { return files.has(path) },
+    async writeFile(path, content) {
+      files.set(path, content)
+    },
+    async exists(path) {
+      return files.has(path)
+    },
     async readDir(path) {
       const prefix = path.endsWith('/') ? path : path + '/'
       const dirs = new Set<string>()
@@ -44,7 +51,9 @@ function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(
         if (p.startsWith(prefix)) files.delete(p)
       }
     },
-    dump() { return files },
+    dump() {
+      return files
+    },
     seed(entries) {
       for (const [k, v] of Object.entries(entries)) files.set(k, v)
     },
@@ -53,7 +62,9 @@ function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(
 
 describe('recordWrite', () => {
   let storage: ReturnType<typeof memoryStorage>
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('first recordWrite emits a baseline revision then the delta revision', async () => {
     // Seed some content before the first save.
@@ -72,10 +83,12 @@ describe('recordWrite', () => {
       history,
       contentRoot,
       operation: 'save',
-      items: [{
-        path: 'pages/home/page.json',
-        content: '{"template":"page-default","content":{"title":"Home"}}',
-      }],
+      items: [
+        {
+          path: 'pages/home/page.json',
+          content: '{"template":"page-default","content":{"title":"Home"}}',
+        },
+      ],
     })
 
     // First call produces TWO revisions: a baseline capturing the pre-
@@ -122,11 +135,7 @@ describe('recordWrite', () => {
     })
 
     const m2 = await history.readRevision(rev2.id)
-    expect(Object.keys(m2.snapshot).sort()).toEqual([
-      'pages/about/page.json',
-      'pages/home/page.json',
-      'site.yaml',
-    ])
+    expect(Object.keys(m2.snapshot).sort()).toEqual(['pages/about/page.json', 'pages/home/page.json', 'site.yaml'])
     // pages/about carries forward with an unchanged hash (same blob).
     // Grab the first save's revision (= head-1; the oldest is baseline).
     const list = await history.listRevisions()

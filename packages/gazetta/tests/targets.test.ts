@@ -14,7 +14,9 @@ import { tempDir } from './_helpers/temp.js'
 
 function mockProvider(): StorageProvider {
   return {
-    readFile: async () => { throw new Error('not impl') },
+    readFile: async () => {
+      throw new Error('not impl')
+    },
     writeFile: async () => {},
     readDir: async () => [],
     exists: async () => false,
@@ -85,7 +87,9 @@ describe('createStorageProvider', () => {
 
   it('throws for azure-blob without connectionString', async () => {
     const config: StorageConfig = { type: 'azure-blob', container: 'test' }
-    await expect(createStorageProvider(config, testDir)).rejects.toThrow('Azure Blob storage requires "connectionString"')
+    await expect(createStorageProvider(config, testDir)).rejects.toThrow(
+      'Azure Blob storage requires "connectionString"',
+    )
   })
 
   it('throws for azure-blob without container', async () => {
@@ -109,7 +113,8 @@ describe('createStorageProvider', () => {
   })
 
   it('resolves env vars in connectionString', async () => {
-    process.env.TEST_CONN = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
+    process.env.TEST_CONN =
+      'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
     const config: StorageConfig = { type: 'azure-blob', connectionString: '${TEST_CONN}', container: 'test' }
     const provider = await createStorageProvider(config, testDir)
     expect(provider).toBeDefined()
@@ -156,8 +161,12 @@ describe('createTargetRegistry', () => {
 
 describe('createTargetRegistryView', () => {
   it('resolves known target names to their providers', () => {
-    const localP = mockProvider(), prodP = mockProvider()
-    const providers = new Map<string, StorageProvider>([['local', localP], ['prod', prodP]])
+    const localP = mockProvider(),
+      prodP = mockProvider()
+    const providers = new Map<string, StorageProvider>([
+      ['local', localP],
+      ['prod', prodP],
+    ])
     const configs: Record<string, TargetConfig> = {
       local: { storage: { type: 'filesystem', path: '.' } },
       prod: { storage: { type: 'r2' }, environment: 'production' },
@@ -240,8 +249,10 @@ describe('listEditableTargets', () => {
 
   it('returns empty when none editable', () => {
     expect(listEditableTargets({})).toEqual([])
-    expect(listEditableTargets({
-      staging: { storage: { type: 'r2' }, environment: 'staging' },
-    })).toEqual([])
+    expect(
+      listEditableTargets({
+        staging: { storage: { type: 'r2' }, environment: 'staging' },
+      }),
+    ).toEqual([])
   })
 })

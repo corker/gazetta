@@ -26,7 +26,7 @@ describe('starter site', () => {
   it('resolves and renders the home page', async () => {
     const site = await loadSite({ siteDir, storage, templatesDir })
     const resolved = await resolvePage('home', site)
-    const html = await renderPage(resolved, )
+    const html = await renderPage(resolved)
 
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<title>Home</title>')
@@ -41,7 +41,7 @@ describe('starter site', () => {
   it('resolves and renders the about page', async () => {
     const site = await loadSite({ siteDir, storage, templatesDir })
     const resolved = await resolvePage('about', site)
-    const html = await renderPage(resolved, )
+    const html = await renderPage(resolved)
 
     expect(html).toContain('<title>About</title>')
     expect(html).toContain('About Gazetta')
@@ -61,7 +61,9 @@ describe('starter site', () => {
     expect(homeHeader).toBe(aboutHeader)
 
     const homeFooter = stripScope((await renderComponent(homeResolved.children[homeResolved.children.length - 1])).html)
-    const aboutFooter = stripScope((await renderComponent(aboutResolved.children[aboutResolved.children.length - 1])).html)
+    const aboutFooter = stripScope(
+      (await renderComponent(aboutResolved.children[aboutResolved.children.length - 1])).html,
+    )
     expect(homeFooter).toBe(aboutFooter)
   })
 
@@ -103,7 +105,7 @@ describe('starter site', () => {
   it('renders React SSR templates (feature cards)', async () => {
     const site = await loadSite({ siteDir, storage, templatesDir })
     const resolved = await resolvePage('home', site)
-    const html = await renderPage(resolved, )
+    const html = await renderPage(resolved)
 
     expect(html).toContain('Why Gazetta')
     expect(html).toContain('<div class="feature-card">')
@@ -134,7 +136,7 @@ describe('starter site', () => {
   it('renders valid HTML document with scoped CSS', async () => {
     const site = await loadSite({ siteDir, storage, templatesDir })
     const resolved = await resolvePage('home', site)
-    const html = await renderPage(resolved, )
+    const html = await renderPage(resolved)
 
     expect(html).toMatch(/^<!DOCTYPE html>/)
     expect(html).toContain('<html lang="en">')

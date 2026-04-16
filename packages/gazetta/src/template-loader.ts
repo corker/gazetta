@@ -17,7 +17,12 @@ const TEMPLATE_FILES = ['index.ts', 'index.tsx']
 
 /** Filesystem existence check — templates always live on disk at absolute paths. */
 async function fsExists(path: string): Promise<boolean> {
-  try { await access(path); return true } catch { return false }
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function findTemplateFile(templatesDir: string, templateName: string): Promise<string | null> {
@@ -35,14 +40,18 @@ async function importTemplate(templatePath: string): Promise<Record<string, unkn
       return await import(pathToFileURL(templatePath).href)
     } catch {
       const jiti = createJiti(pathToFileURL(templatePath).href, { jsx: true })
-      return await jiti.import(templatePath) as Record<string, unknown>
+      return (await jiti.import(templatePath)) as Record<string, unknown>
     }
   }
   const freshJiti = createJiti(pathToFileURL(templatePath).href, { jsx: true, moduleCache: false })
-  return await freshJiti.import(templatePath) as Record<string, unknown>
+  return (await freshJiti.import(templatePath)) as Record<string, unknown>
 }
 
-export async function loadTemplate(_storage: StorageProvider | undefined, templatesDir: string, templateName: string): Promise<LoadedTemplate> {
+export async function loadTemplate(
+  _storage: StorageProvider | undefined,
+  templatesDir: string,
+  templateName: string,
+): Promise<LoadedTemplate> {
   const cached = cache.get(templateName)
   if (cached) return cached
 
@@ -50,7 +59,7 @@ export async function loadTemplate(_storage: StorageProvider | undefined, templa
   if (!templatePath) {
     throw new Error(
       `Template "${templateName}" not found. Expected index.ts or index.tsx in ${join(templatesDir, templateName)}\n` +
-      `  Available templates are in ${templatesDir}`
+        `  Available templates are in ${templatesDir}`,
     )
   }
 
@@ -58,23 +67,21 @@ export async function loadTemplate(_storage: StorageProvider | undefined, templa
   try {
     mod = await importTemplate(templatePath)
   } catch (err) {
-    throw new Error(
-      `Failed to import template "${templateName}" from ${templatePath}: ${(err as Error).message}`
-    )
+    throw new Error(`Failed to import template "${templateName}" from ${templatePath}: ${(err as Error).message}`)
   }
 
   const render = mod.default as TemplateFunction
   if (typeof render !== 'function') {
     throw new Error(
       `Template "${templateName}" at ${templatePath} does not export a default function. ` +
-      `Got ${typeof render}. Templates must: export default (params) => ({ html, css, js })`
+        `Got ${typeof render}. Templates must: export default (params) => ({ html, css, js })`,
     )
   }
 
   if (!mod.schema) {
     throw new Error(
       `Template "${templateName}" at ${templatePath} does not export a schema. ` +
-      `Templates must: export const schema = z.object({ ... })`
+        `Templates must: export const schema = z.object({ ... })`,
     )
   }
 
@@ -92,7 +99,11 @@ export async function loadTemplate(_storage: StorageProvider | undefined, templa
  * project level on local filesystem, so this reads via fs.access regardless
  * of what storage the admin app is bound to.
  */
-export async function hasEditorFile(_storage: StorageProvider | undefined, editorsDir: string, templateName: string): Promise<boolean> {
+export async function hasEditorFile(
+  _storage: StorageProvider | undefined,
+  editorsDir: string,
+  templateName: string,
+): Promise<boolean> {
   // Flat: admin/editors/hero.ts(x)
   if (await fsExists(join(editorsDir, `${templateName}.ts`))) return true
   if (await fsExists(join(editorsDir, `${templateName}.tsx`))) return true

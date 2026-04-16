@@ -46,7 +46,9 @@ export interface PagesApi {
   updatePage(name: string, data: Partial<PageDetail>): Promise<{ ok: boolean }>
 }
 export const PAGES_API: InjectionKey<PagesApi> = Symbol('PagesApi')
-export function usePagesApi(): PagesApi { return inject(PAGES_API, api) }
+export function usePagesApi(): PagesApi {
+  return inject(PAGES_API, api)
+}
 
 // ---- Fragments (+ dependents) ---------------------------------------------
 
@@ -59,7 +61,9 @@ export interface FragmentsApi {
   getDependents(item: string, options?: RequestInit): Promise<{ pages: string[]; fragments: string[] }>
 }
 export const FRAGMENTS_API: InjectionKey<FragmentsApi> = Symbol('FragmentsApi')
-export function useFragmentsApi(): FragmentsApi { return inject(FRAGMENTS_API, api) }
+export function useFragmentsApi(): FragmentsApi {
+  return inject(FRAGMENTS_API, api)
+}
 
 // ---- Templates (+ fields) -------------------------------------------------
 
@@ -69,7 +73,9 @@ export interface TemplatesApi {
   getFields(): Promise<FieldSummary[]>
 }
 export const TEMPLATES_API: InjectionKey<TemplatesApi> = Symbol('TemplatesApi')
-export function useTemplatesApi(): TemplatesApi { return inject(TEMPLATES_API, api) }
+export function useTemplatesApi(): TemplatesApi {
+  return inject(TEMPLATES_API, api)
+}
 
 // ---- Targets (+ site) -----------------------------------------------------
 
@@ -78,7 +84,9 @@ export interface TargetsApi {
   getSite(): Promise<SiteManifest>
 }
 export const TARGETS_API: InjectionKey<TargetsApi> = Symbol('TargetsApi')
-export function useTargetsApi(): TargetsApi { return inject(TARGETS_API, api) }
+export function useTargetsApi(): TargetsApi {
+  return inject(TARGETS_API, api)
+}
 
 // ---- Publish --------------------------------------------------------------
 
@@ -94,7 +102,9 @@ export interface PublishApi {
   fetchFromTarget(source: string, items?: string[]): Promise<{ success: boolean; copiedFiles: number; items: string[] }>
 }
 export const PUBLISH_API: InjectionKey<PublishApi> = Symbol('PublishApi')
-export function usePublishApi(): PublishApi { return inject(PUBLISH_API, api) }
+export function usePublishApi(): PublishApi {
+  return inject(PUBLISH_API, api)
+}
 
 // ---- History --------------------------------------------------------------
 
@@ -104,4 +114,6 @@ export interface HistoryApi {
   restoreRevision(target: string, revisionId: string): Promise<{ revision: RevisionSummary; restoredFrom: string }>
 }
 export const HISTORY_API: InjectionKey<HistoryApi> = Symbol('HistoryApi')
-export function useHistoryApi(): HistoryApi { return inject(HISTORY_API, api) }
+export function useHistoryApi(): HistoryApi {
+  return inject(HISTORY_API, api)
+}

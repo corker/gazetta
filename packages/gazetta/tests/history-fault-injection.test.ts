@@ -48,8 +48,12 @@ function memoryStorage(): MemoryStorage {
       if (v === undefined) throw new Error(`ENOENT: ${path}`)
       return v
     },
-    async writeFile(path, content) { files.set(path, content) },
-    async exists(path) { return files.has(path) },
+    async writeFile(path, content) {
+      files.set(path, content)
+    },
+    async exists(path) {
+      return files.has(path)
+    },
     async readDir(path) {
       const prefix = path.endsWith('/') ? path : path + '/'
       let any = false
@@ -78,7 +82,9 @@ function memoryStorage(): MemoryStorage {
         if (p.startsWith(prefix)) files.delete(p)
       }
     },
-    dump() { return files },
+    dump() {
+      return files
+    },
     seed(entries) {
       for (const [k, v] of Object.entries(entries)) files.set(k, v)
     },
@@ -118,7 +124,9 @@ function withFault(inner: MemoryStorage, spec: FaultSpec): MemoryStorage & { tri
       }
       return inner.writeFile(path, content)
     },
-    triggered() { return hasFired },
+    triggered() {
+      return hasFired
+    },
   }
 }
 
@@ -133,8 +141,11 @@ function manifestCount(storage: MemoryStorage): number {
   return [...storage.dump().keys()].filter(p => p.startsWith('.gazetta/history/revisions/')).length
 }
 async function readIndex(storage: MemoryStorage): Promise<{ revisions: string[] } | null> {
-  try { return JSON.parse(await storage.readFile('.gazetta/history/index.json')) }
-  catch { return null }
+  try {
+    return JSON.parse(await storage.readFile('.gazetta/history/index.json'))
+  } catch {
+    return null
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -143,25 +154,29 @@ async function readIndex(storage: MemoryStorage): Promise<{ revisions: string[] 
 
 describe('history fault injection — mid-blob-write failure', () => {
   let storage: MemoryStorage
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('leaves no index update when a blob write fails partway through', async () => {
     const faulted = withFault(storage, {
       match: p => p.startsWith('.gazetta/history/objects/'),
-      skipUntilFail: 2,  // let 2 blobs through, fail the 3rd
+      skipUntilFail: 2, // let 2 blobs through, fail the 3rd
       error: 'storage transient',
     })
     const history = createHistoryProvider({ storage: faulted })
 
-    await expect(history.recordRevision({
-      operation: 'save',
-      items: new Map([
-        ['a.json', '{"a":1}'],
-        ['b.json', '{"b":1}'],
-        ['c.json', '{"c":1}'],
-        ['d.json', '{"d":1}'],
-      ]),
-    })).rejects.toThrow(/storage transient/)
+    await expect(
+      history.recordRevision({
+        operation: 'save',
+        items: new Map([
+          ['a.json', '{"a":1}'],
+          ['b.json', '{"b":1}'],
+          ['c.json', '{"c":1}'],
+          ['d.json', '{"d":1}'],
+        ]),
+      }),
+    ).rejects.toThrow(/storage transient/)
     expect(faulted.triggered()).toBe(true)
 
     // Index was never updated — listRevisions sees nothing.
@@ -180,10 +195,12 @@ describe('history fault injection — mid-blob-write failure', () => {
       error: 'first write fails',
     })
     const history = createHistoryProvider({ storage: faulted })
-    await expect(history.recordRevision({
-      operation: 'save',
-      items: new Map([['a.json', '{"a":1}']]),
-    })).rejects.toThrow()
+    await expect(
+      history.recordRevision({
+        operation: 'save',
+        items: new Map([['a.json', '{"a":1}']]),
+      }),
+    ).rejects.toThrow()
 
     // Second attempt runs against the same storage (fault latch is one-shot).
     const rev = await history.recordRevision({
@@ -205,7 +222,9 @@ describe('history fault injection — mid-blob-write failure', () => {
 
 describe('history fault injection — mid-manifest-write failure', () => {
   let storage: MemoryStorage
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('leaves blobs behind but index unchanged when manifest write fails', async () => {
     const faulted = withFault(storage, {
@@ -215,10 +234,12 @@ describe('history fault injection — mid-manifest-write failure', () => {
     })
     const history = createHistoryProvider({ storage: faulted })
 
-    await expect(history.recordRevision({
-      operation: 'save',
-      items: new Map([['a.json', '{"a":1}']]),
-    })).rejects.toThrow(/manifest write fails/)
+    await expect(
+      history.recordRevision({
+        operation: 'save',
+        items: new Map([['a.json', '{"a":1}']]),
+      }),
+    ).rejects.toThrow(/manifest write fails/)
 
     expect(await history.listRevisions()).toEqual([])
     // Blobs that made it before the manifest-write attempt are allowed
@@ -232,7 +253,9 @@ describe('history fault injection — mid-manifest-write failure', () => {
 
 describe('history fault injection — mid-index-write failure', () => {
   let storage: MemoryStorage
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('does not corrupt the index when the index write fails', async () => {
     // First succeed a revision, then fault the second index write.
@@ -254,10 +277,12 @@ describe('history fault injection — mid-index-write failure', () => {
       error: 'index write fails',
     })
     const history2 = createHistoryProvider({ storage: faulted })
-    await expect(history2.recordRevision({
-      operation: 'save',
-      items: new Map([['b.json', '{"b":1}']]),
-    })).rejects.toThrow(/index write fails/)
+    await expect(
+      history2.recordRevision({
+        operation: 'save',
+        items: new Map([['b.json', '{"b":1}']]),
+      }),
+    ).rejects.toThrow(/index write fails/)
 
     // Index is still the pre-failure snapshot — listRevisions only sees rev 1.
     const indexAfter = await readIndex(storage)
@@ -270,7 +295,9 @@ describe('history fault injection — mid-index-write failure', () => {
 
 describe('history fault injection — retention eviction atomicity', () => {
   let storage: MemoryStorage
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('does not lose the new revision when eviction of the old one fails', async () => {
     const history = createHistoryProvider({ storage, retention: 1 })
@@ -301,10 +328,12 @@ describe('history fault injection — retention eviction atomicity', () => {
     // applyRetention propagates). But the new revision must be observable
     // or NOT observable consistently — no torn state where index says
     // "evicted" but file lingers as phantom.
-    await expect(history.recordRevision({
-      operation: 'save',
-      items: new Map([['a.json', '{"v":2}']]),
-    })).rejects.toThrow(/rm fails/)
+    await expect(
+      history.recordRevision({
+        operation: 'save',
+        items: new Map([['a.json', '{"v":2}']]),
+      }),
+    ).rejects.toThrow(/rm fails/)
 
     // The index was written with both revisions before applyRetention
     // ran, then the rm failed before it could remove rev1's manifest.
@@ -322,7 +351,9 @@ describe('history fault injection — retention eviction atomicity', () => {
 
 describe('history fault injection — recovery invariant', () => {
   let storage: MemoryStorage
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('recovery invariant: after any mid-write failure, the index still points to manifests that exist', async () => {
     // Drive three failure scenarios in sequence against the same storage,
@@ -350,10 +381,12 @@ describe('history fault injection — recovery invariant', () => {
       error: 'blob fail',
     })
     const h1 = createHistoryProvider({ storage: f1 })
-    await expect(h1.recordRevision({
-      operation: 'save',
-      items: new Map([['b.json', '{"b":1}']]),
-    })).rejects.toThrow()
+    await expect(
+      h1.recordRevision({
+        operation: 'save',
+        items: new Map([['b.json', '{"b":1}']]),
+      }),
+    ).rejects.toThrow()
     await assertIndexPointsAtReadableManifests(h1)
 
     // Fault 2: manifest write fails on the next attempt (against the
@@ -364,10 +397,12 @@ describe('history fault injection — recovery invariant', () => {
       error: 'manifest fail',
     })
     const h2 = createHistoryProvider({ storage: f2 })
-    await expect(h2.recordRevision({
-      operation: 'save',
-      items: new Map([['c.json', '{"c":1}']]),
-    })).rejects.toThrow()
+    await expect(
+      h2.recordRevision({
+        operation: 'save',
+        items: new Map([['c.json', '{"c":1}']]),
+      }),
+    ).rejects.toThrow()
     await assertIndexPointsAtReadableManifests(h2)
 
     // Final successful revision — everything should still work.

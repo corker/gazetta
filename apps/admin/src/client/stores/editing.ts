@@ -1,4 +1,6 @@
-function deepClone<T>(obj: T): T { return JSON.parse(JSON.stringify(obj)) }
+function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj))
+}
 
 import { defineStore } from 'pinia'
 import { ref, reactive, computed } from 'vue'
@@ -62,7 +64,10 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   function clearRetry() {
-    if (retryTimer) { clearInterval(retryTimer); retryTimer = null }
+    if (retryTimer) {
+      clearInterval(retryTimer)
+      retryTimer = null
+    }
   }
 
   function stashCurrent() {
@@ -73,7 +78,11 @@ export const useEditingStore = defineStore('editing', () => {
 
   async function fetchSchema(templateName: string) {
     const response = await api.getTemplateSchema(templateName)
-    const { hasEditor, editorUrl, fieldsBaseUrl, ...schema } = response as Record<string, unknown> & { hasEditor?: boolean; editorUrl?: string; fieldsBaseUrl?: string }
+    const { hasEditor, editorUrl, fieldsBaseUrl, ...schema } = response as Record<string, unknown> & {
+      hasEditor?: boolean
+      editorUrl?: string
+      fieldsBaseUrl?: string
+    }
     return { schema, hasEditor: !!hasEditor, editorUrl, fieldsBaseUrl }
   }
 
@@ -110,12 +119,19 @@ export const useEditingStore = defineStore('editing', () => {
       // Deep clone the components array and update the target component's content
       const updatedComponents = deepClone(detail.components ?? [])
       const parts = namePath.split('/')
-      let components = updatedComponents as Array<string | { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }>
+      let components = updatedComponents as Array<
+        string | { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }
+      >
 
       for (let i = 0; i < parts.length; i++) {
         const idx = components.findIndex(c => typeof c === 'object' && c.name === parts[i])
         if (idx === -1) return
-        const comp = components[idx] as { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }
+        const comp = components[idx] as {
+          name: string
+          template: string
+          content?: Record<string, unknown>
+          components?: unknown[]
+        }
         if (i === parts.length - 1) {
           comp.content = newContent
         } else {
@@ -138,12 +154,15 @@ export const useEditingStore = defineStore('editing', () => {
     if (!detail?.components) return null
 
     const parts = namePath.split('/')
-    let components = detail.components as Array<string | { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }>
+    let components = detail.components as Array<
+      string | { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }
+    >
 
     for (let i = 0; i < parts.length; i++) {
       const comp = components.find(c => typeof c === 'object' && c.name === parts[i])
       if (!comp || typeof comp === 'string') return null
-      if (i === parts.length - 1) return { template: comp.template, content: (comp.content as Record<string, unknown>) ?? {} }
+      if (i === parts.length - 1)
+        return { template: comp.template, content: (comp.content as Record<string, unknown>) ?? {} }
       components = (comp.components ?? []) as typeof components
     }
     return null
@@ -162,7 +181,16 @@ export const useEditingStore = defineStore('editing', () => {
       const comp = findComponentByNamePath(namePath)
       if (!comp) throw new Error(`Component "${namePath}" not found in page manifest`)
       const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(templateName)
-      await open({ template: templateName, path: namePath, content: comp.content, schema, hasEditor, editorUrl, fieldsBaseUrl, save: buildSaveFn(namePath) })
+      await open({
+        template: templateName,
+        path: namePath,
+        content: comp.content,
+        schema,
+        hasEditor,
+        editorUrl,
+        fieldsBaseUrl,
+        save: buildSaveFn(namePath),
+      })
     } catch (err) {
       target.value = null
       loadError.value = `Failed to load "${templateName}": ${(err as Error).message}`
@@ -187,10 +215,20 @@ export const useEditingStore = defineStore('editing', () => {
     try {
       const pageContent = (d.content as Record<string, unknown>) ?? {}
       const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(d.template)
-      const saveFn = selection.type === 'page'
-        ? (c: Record<string, unknown>) => api.updatePage(selection.name, { content: c }).then(() => {})
-        : (c: Record<string, unknown>) => api.updateFragment(selection.name, { content: c }).then(() => {})
-      await open({ template: d.template, path: rootPath, content: pageContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: saveFn })
+      const saveFn =
+        selection.type === 'page'
+          ? (c: Record<string, unknown>) => api.updatePage(selection.name, { content: c }).then(() => {})
+          : (c: Record<string, unknown>) => api.updateFragment(selection.name, { content: c }).then(() => {})
+      await open({
+        template: d.template,
+        path: rootPath,
+        content: pageContent,
+        schema,
+        hasEditor,
+        editorUrl,
+        fieldsBaseUrl,
+        save: saveFn,
+      })
     } catch (err) {
       target.value = null
       loadError.value = `Failed to load "${d.template}": ${(err as Error).message}`
@@ -212,7 +250,16 @@ export const useEditingStore = defineStore('editing', () => {
       const frag = await api.getFragment(fragName)
       const fragContent = (frag.content as Record<string, unknown>) ?? {}
       const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(frag.template)
-      await open({ template: frag.template, path: stashKey, content: fragContent, schema, hasEditor, editorUrl, fieldsBaseUrl, save: (c) => api.updateFragment(fragName, { content: c }).then(() => {}) })
+      await open({
+        template: frag.template,
+        path: stashKey,
+        content: fragContent,
+        schema,
+        hasEditor,
+        editorUrl,
+        fieldsBaseUrl,
+        save: c => api.updateFragment(fragName, { content: c }).then(() => {}),
+      })
     } catch (err) {
       target.value = null
       loadError.value = `Failed to load fragment "${fragName}": ${(err as Error).message}`
@@ -232,7 +279,10 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
-    if (hasPendingEdits.value) { e.preventDefault(); e.returnValue = '' }
+    if (hasPendingEdits.value) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
   }
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', beforeUnloadHandler)
@@ -267,9 +317,7 @@ export const useEditingStore = defineStore('editing', () => {
    * the re-open lands on the same component/page/fragment.
    */
   async function refreshAfterRestore(): Promise<void> {
-    const targetSnapshot = target.value
-      ? { template: target.value.template, path: target.value.path }
-      : null
+    const targetSnapshot = target.value ? { template: target.value.template, path: target.value.path } : null
     clear()
     await useSiteStore().reload()
     await useSelectionStore().reload()
@@ -340,11 +388,32 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   return {
-    target, content, saved, saving, lastSaveError, template, path, schema,
-    dirty, loadError, mountVersion, customEditorMount, pendingEdits, pendingCount,
-    hasPendingEdits, allOverrides,
-    open, openComponent, openPageRoot, openFragment,
-    clear, markDirty, discard, revertStashed, save, hasPendingEdit,
+    target,
+    content,
+    saved,
+    saving,
+    lastSaveError,
+    template,
+    path,
+    schema,
+    dirty,
+    loadError,
+    mountVersion,
+    customEditorMount,
+    pendingEdits,
+    pendingCount,
+    hasPendingEdits,
+    allOverrides,
+    open,
+    openComponent,
+    openPageRoot,
+    openFragment,
+    clear,
+    markDirty,
+    discard,
+    revertStashed,
+    save,
+    hasPendingEdit,
     refreshAfterRestore,
   }
 })

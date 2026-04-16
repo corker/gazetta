@@ -14,14 +14,14 @@ export function previewRoutes(resolve: SourceContextResolver, templatesDir?: str
     c.header('Cache-Control', 'no-store')
   })
 
-  app.get('/preview/*', async (c) => {
+  app.get('/preview/*', async c => {
     const source = await resolve(c.req.query('target'))
     return renderPreview(c, source, undefined, templatesDir)
   })
 
-  app.post('/preview/*', async (c) => {
+  app.post('/preview/*', async c => {
     const source = await resolve(c.req.query('target'))
-    const body = await c.req.json() as { overrides?: Record<string, Record<string, unknown>> }
+    const body = (await c.req.json()) as { overrides?: Record<string, Record<string, unknown>> }
     return renderPreview(c, source, body.overrides, templatesDir)
   })
 
@@ -32,7 +32,7 @@ async function renderPreview(
   c: Context,
   source: SourceContext,
   overrides?: Record<string, Record<string, unknown>>,
-  templatesDir?: string
+  templatesDir?: string,
 ) {
   // Empty target (no site.yaml) — preview returns a friendly placeholder
   // so the admin can still show the iframe. Happens when the active
@@ -44,9 +44,9 @@ async function renderPreview(
     if ((err as Error).message.includes('No site.yaml found')) {
       return c.html(
         '<!doctype html><html><body style="font-family:system-ui;padding:2rem;color:#525252">' +
-        '<h2 style="margin:0 0 0.5rem">No content on this target yet</h2>' +
-        '<p style="margin:0;font-size:0.875rem">Publish from an editable target to see a preview here.</p>' +
-        '</body></html>',
+          '<h2 style="margin:0 0 0.5rem">No content on this target yet</h2>' +
+          '<p style="margin:0;font-size:0.875rem">Publish from an editable target to see a preview here.</p>' +
+          '</body></html>',
         404,
       )
     }
@@ -65,7 +65,10 @@ async function renderPreview(
       const e = err as Error
       const msg = e.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const stack = (e.stack ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      return c.html(`<div style="font-family:system-ui;padding:2rem;color:#fca5a5;background:#1a1a2e;min-height:100vh"><h2 style="color:#f87171;margin-bottom:1rem">Template Error</h2><pre style="white-space:pre-wrap;font-size:0.875rem;line-height:1.7">${msg}</pre><details style="margin-top:1rem"><summary style="color:#52525b;cursor:pointer">Stack trace</summary><pre style="color:#52525b;font-size:0.75rem;margin-top:0.5rem">${stack}</pre></details></div>`, 500)
+      return c.html(
+        `<div style="font-family:system-ui;padding:2rem;color:#fca5a5;background:#1a1a2e;min-height:100vh"><h2 style="color:#f87171;margin-bottom:1rem">Template Error</h2><pre style="white-space:pre-wrap;font-size:0.875rem;line-height:1.7">${msg}</pre><details style="margin-top:1rem"><summary style="color:#52525b;cursor:pointer">Stack trace</summary><pre style="color:#52525b;font-size:0.75rem;margin-top:0.5rem">${stack}</pre></details></div>`,
+        500,
+      )
     }
   }
 
@@ -80,7 +83,10 @@ async function renderPreview(
         const e = err as Error
         const msg = e.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
         const stack = (e.stack ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        return c.html(`<div style="font-family:system-ui;padding:2rem;color:#fca5a5;background:#1a1a2e;min-height:100vh"><h2 style="color:#f87171;margin-bottom:1rem">Template Error</h2><pre style="white-space:pre-wrap;font-size:0.875rem;line-height:1.7">${msg}</pre><details style="margin-top:1rem"><summary style="color:#52525b;cursor:pointer">Stack trace</summary><pre style="color:#52525b;font-size:0.75rem;margin-top:0.5rem">${stack}</pre></details></div>`, 500)
+        return c.html(
+          `<div style="font-family:system-ui;padding:2rem;color:#fca5a5;background:#1a1a2e;min-height:100vh"><h2 style="color:#f87171;margin-bottom:1rem">Template Error</h2><pre style="white-space:pre-wrap;font-size:0.875rem;line-height:1.7">${msg}</pre><details style="margin-top:1rem"><summary style="color:#52525b;cursor:pointer">Stack trace</summary><pre style="color:#52525b;font-size:0.75rem;margin-top:0.5rem">${stack}</pre></details></div>`,
+          500,
+        )
       }
     }
   }

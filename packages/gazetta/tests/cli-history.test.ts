@@ -19,7 +19,11 @@ const starterDir = resolve(repoRoot, 'examples/starter')
 const cliPath = resolve(repoRoot, 'packages/gazetta/src/cli/index.ts')
 const tsxBin = resolve(repoRoot, 'node_modules/.bin/tsx')
 
-interface RunResult { stdout: string; stderr: string; code: number }
+interface RunResult {
+  stdout: string
+  stderr: string
+  code: number
+}
 
 /**
  * Run the CLI against `cwd` with the given args. CI=true is set so
@@ -35,8 +39,8 @@ function runCli(cwd: string, args: string[], env: Record<string, string> = {}): 
     })
     let stdout = ''
     let stderr = ''
-    child.stdout?.on('data', d => stdout += d.toString())
-    child.stderr?.on('data', d => stderr += d.toString())
+    child.stdout?.on('data', d => (stdout += d.toString()))
+    child.stderr?.on('data', d => (stderr += d.toString()))
     child.on('close', code => done({ stdout, stderr, code: code ?? 0 }))
   })
 }
@@ -51,13 +55,20 @@ async function seedHistory(projectDir: string, count: number): Promise<void> {
   const contentRoot = gazetta.createContentRoot(storage)
   for (let i = 0; i < count; i++) {
     const path = 'pages/home/page.json'
-    const content = JSON.stringify({
-      template: 'page-default',
-      content: { title: `Edit ${i + 1}` },
-      components: ['@header'],
-    }, null, 2) + '\n'
+    const content =
+      JSON.stringify(
+        {
+          template: 'page-default',
+          content: { title: `Edit ${i + 1}` },
+          components: ['@header'],
+        },
+        null,
+        2,
+      ) + '\n'
     await gazetta.recordWrite({
-      history, contentRoot, operation: 'save',
+      history,
+      contentRoot,
+      operation: 'save',
       items: [{ path, content }],
     })
     await storage.writeFile(path, content)
@@ -182,7 +193,9 @@ describe('gazetta history / undo / rollback', { timeout: 60000 }, () => {
     const contentRoot = gazetta.createContentRoot(storage)
     for (let i = 0; i < 2; i++) {
       await gazetta.recordWrite({
-        history, contentRoot, operation: 'publish',
+        history,
+        contentRoot,
+        operation: 'publish',
         items: [{ path: 'pages/home/page.json', content: `{"t":${i}}` }],
       })
       await new Promise(r => setTimeout(r, 5))

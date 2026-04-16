@@ -46,7 +46,7 @@ test.describe('Unsaved changes dialog', () => {
     await expect(page.locator('[data-testid="editor-container"]')).toBeVisible()
   })
 
-  test('Don\'t Save exits edit mode', async ({ page }) => {
+  test("Don't Save exits edit mode", async ({ page }) => {
     await openEditor(page, 'home')
 
     await page.click('[data-testid="component-hero"]')

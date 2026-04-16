@@ -20,7 +20,10 @@ const template: TemplateFunction = ({ content = {}, children = [] }) => ({
 .section-sub { text-align: center; color: #a1a1aa; margin-bottom: 2rem; }
 .section-content { margin-top: 2rem; display: flex; flex-direction: column; gap: 2rem; }
 ${children.map(c => c.css).join('\n')}`,
-  js: children.map(c => c.js).filter(Boolean).join('\n'),
+  js: children
+    .map(c => c.js)
+    .filter(Boolean)
+    .join('\n'),
 })
 
 export default template

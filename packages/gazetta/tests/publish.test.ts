@@ -48,7 +48,10 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), ['pages/home', 'fragments/header'])
+    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), [
+      'pages/home',
+      'fragments/header',
+    ])
     expect(copiedFiles).toBeGreaterThanOrEqual(3)
     expect(await target.exists('pages/home/page.json')).toBe(true)
     expect(await target.exists('fragments/header/fragment.json')).toBe(true)
@@ -61,7 +64,9 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), ['pages/blog/[slug]'])
+    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), [
+      'pages/blog/[slug]',
+    ])
     expect(copiedFiles).toBeGreaterThanOrEqual(2)
     expect(await target.exists('pages/blog/[slug]/page.json')).toBe(true)
   })
@@ -95,7 +100,9 @@ describe('publishItems', () => {
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
 
-    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), ['pages/nonexistent'])
+    const { copiedFiles } = await publishItems(createContentRoot(source), createContentRoot(target), [
+      'pages/nonexistent',
+    ])
     expect(copiedFiles).toBe(1) // only site.yaml
   })
 
@@ -105,7 +112,6 @@ describe('publishItems', () => {
 
     const source = createFilesystemProvider(sourceDir)
     const target = createFilesystemProvider(targetDir)
-
 
     const sourceRoot = createContentRoot(source)
     const targetRoot = createContentRoot(target)
@@ -127,10 +133,14 @@ describe('resolveDependencies', () => {
   })
 
   it('accepts ContentRoot input (preferred shape)', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({
-      template: 'default',
-      components: ['@header', { name: 'hero', template: 'hero' }],
-    }))
+    await writeTestFile(
+      sourceDir,
+      'pages/home/page.json',
+      JSON.stringify({
+        template: 'default',
+        components: ['@header', { name: 'hero', template: 'hero' }],
+      }),
+    )
 
     const storage = createFilesystemProvider(sourceDir)
 
@@ -151,10 +161,14 @@ describe('resolveDependencies', () => {
   })
 
   it('resolves fragment dependencies', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({
-      template: 'default',
-      components: ['@header', { name: 'hero', template: 'hero' }],
-    }))
+    await writeTestFile(
+      sourceDir,
+      'pages/home/page.json',
+      JSON.stringify({
+        template: 'default',
+        components: ['@header', { name: 'hero', template: 'hero' }],
+      }),
+    )
 
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(createContentRoot(storage), ['pages/home'])
@@ -163,17 +177,25 @@ describe('resolveDependencies', () => {
   })
 
   it('resolves nested fragment dependencies', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({
-      template: 'default',
-      components: ['@header'],
-    }))
-    await writeTestFile(sourceDir, 'fragments/header/fragment.json', JSON.stringify({
-      template: 'header-layout',
-      components: [
-        { name: 'logo', template: 'logo' },
-        { name: 'nav', template: 'nav' },
-      ],
-    }))
+    await writeTestFile(
+      sourceDir,
+      'pages/home/page.json',
+      JSON.stringify({
+        template: 'default',
+        components: ['@header'],
+      }),
+    )
+    await writeTestFile(
+      sourceDir,
+      'fragments/header/fragment.json',
+      JSON.stringify({
+        template: 'header-layout',
+        components: [
+          { name: 'logo', template: 'logo' },
+          { name: 'nav', template: 'nav' },
+        ],
+      }),
+    )
 
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(createContentRoot(storage), ['pages/home'])
@@ -184,8 +206,16 @@ describe('resolveDependencies', () => {
   })
 
   it('deduplicates dependencies', async () => {
-    await writeTestFile(sourceDir, 'pages/home/page.json', JSON.stringify({ template: 'default', components: ['@header', '@footer'] }))
-    await writeTestFile(sourceDir, 'pages/about/page.json', JSON.stringify({ template: 'default', components: ['@header', '@footer'] }))
+    await writeTestFile(
+      sourceDir,
+      'pages/home/page.json',
+      JSON.stringify({ template: 'default', components: ['@header', '@footer'] }),
+    )
+    await writeTestFile(
+      sourceDir,
+      'pages/about/page.json',
+      JSON.stringify({ template: 'default', components: ['@header', '@footer'] }),
+    )
 
     const storage = createFilesystemProvider(sourceDir)
     const deps = await resolveDependencies(createContentRoot(storage), ['pages/home', 'pages/about'])
@@ -217,7 +247,13 @@ describe('publishRendered', () => {
 
   it('publishes a page as HTML with ESI placeholders and hashed CSS', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    const { files } = await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
+    const { files } = await publishPageRendered(
+      'home',
+      createContentRoot(storage, starterDir),
+      target,
+      undefined,
+      templatesDir,
+    )
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     // Check page HTML exists with ESI tags and title from content
@@ -237,7 +273,12 @@ describe('publishRendered', () => {
   it('publishes a fragment as HTML with hashed CSS', async () => {
     const target = createFilesystemProvider(renderTargetDir)
 
-    const { files } = await publishFragmentRendered('header', createContentRoot(storage, starterDir), target, templatesDir)
+    const { files } = await publishFragmentRendered(
+      'header',
+      createContentRoot(storage, starterDir),
+      target,
+      templatesDir,
+    )
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     const html = await target.readFile('fragments/header/index.html')
@@ -304,7 +345,13 @@ describe('publishRendered', () => {
 
   it('bakes target cache config into page HTML', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', createContentRoot(storage, starterDir), target, { browser: 120, edge: 3600 }, templatesDir)
+    await publishPageRendered(
+      'home',
+      createContentRoot(storage, starterDir),
+      target,
+      { browser: 120, edge: 3600 },
+      templatesDir,
+    )
     const html = await target.readFile('pages/home/index.html')
     expect(html).toMatch(/^<!--cache:browser=120,edge=3600-->/)
   })

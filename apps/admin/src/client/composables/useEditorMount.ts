@@ -9,7 +9,7 @@ export function useEditorMount(
   theme: Ref<'dark' | 'light'>,
   onChange: (content: Record<string, unknown>) => void,
   mountVersion?: Ref<number>,
-  fieldsBaseUrl?: Ref<string | undefined>
+  fieldsBaseUrl?: Ref<string | undefined>,
 ) {
   // Track the mount instance AND container that's currently live. Critical:
   // when `editorMount` changes (default form → custom editor) the OLD instance
@@ -35,7 +35,11 @@ export function useEditorMount(
 
   function unmountCurrent() {
     if (!current) return
-    try { current.mount.unmount(current.el) } catch { /* already unmounted */ }
+    try {
+      current.mount.unmount(current.el)
+    } catch {
+      /* already unmounted */
+    }
     current = null
   }
 
@@ -43,13 +47,17 @@ export function useEditorMount(
   // mountVersion bumps on open/discard — not on every keystroke.
   // Content updates from editing flow through React's internal state via onChange.
   const deps = mountVersion
-    ? [containerRef, editorMount, mountVersion] as const
-    : [containerRef, editorMount] as const
+    ? ([containerRef, editorMount, mountVersion] as const)
+    : ([containerRef, editorMount] as const)
 
-  watch(deps, () => {
-    if (containerRef.value && editorMount.value && content.value) mountNew()
-    else unmountCurrent()
-  }, { immediate: true })
+  watch(
+    deps,
+    () => {
+      if (containerRef.value && editorMount.value && content.value) mountNew()
+      else unmountCurrent()
+    },
+    { immediate: true },
+  )
 
   onBeforeUnmount(unmountCurrent)
 }

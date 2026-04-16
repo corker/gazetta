@@ -32,10 +32,13 @@ test.describe('Dev playground', () => {
     await page.waitForSelector('[data-testid="playground-mount"]', { timeout: 10000 })
 
     // Brand-color field should render color input
-    await page.waitForFunction(() => {
-      const mount = document.querySelector('[data-testid="playground-mount"]')
-      return mount?.querySelector('input[type="color"]') !== null
-    }, { timeout: 10000 })
+    await page.waitForFunction(
+      () => {
+        const mount = document.querySelector('[data-testid="playground-mount"]')
+        return mount?.querySelector('input[type="color"]') !== null
+      },
+      { timeout: 10000 },
+    )
   })
 
   test('toolbar has dev playground link', async ({ page }) => {

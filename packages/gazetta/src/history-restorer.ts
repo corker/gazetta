@@ -23,12 +23,7 @@
  */
 
 import type { ContentRoot } from './content-root.js'
-import type {
-  HistoryProvider,
-  Revision,
-  RevisionManifest,
-  RevisionOperation,
-} from './history.js'
+import type { HistoryProvider, Revision, RevisionManifest, RevisionOperation } from './history.js'
 
 export interface RestoreRevisionOptions {
   /** HistoryProvider for the target being restored. */
@@ -65,15 +60,16 @@ export async function restoreRevision(opts: RestoreRevisionOptions): Promise<Rev
   // touch every page + fragment manifest, triggering a storm of file-
   // watch events and SSE reloads in the dev server. Equal hashes →
   // same content → skip the write.
-  const toWrite = Object.entries(target.snapshot)
-    .filter(([path, hash]) => currentSnapshot[path] !== hash)
+  const toWrite = Object.entries(target.snapshot).filter(([path, hash]) => currentSnapshot[path] !== hash)
 
   // Delete first: rolling back a "delete" in the old revision means the
   // item came back; rolling back an "add" means the item goes away.
   // Delete-before-write keeps storage from briefly holding both.
   for (const path of toDelete) {
     const abs = contentRoot.path(path)
-    try { await contentRoot.storage.rm(abs) } catch {
+    try {
+      await contentRoot.storage.rm(abs)
+    } catch {
       // Best-effort: a missing path at rm time is fine (already gone).
     }
   }
@@ -130,4 +126,3 @@ async function loadHeadSnapshot(history: HistoryProvider): Promise<Record<string
   const m = await history.readRevision(head.id)
   return m.snapshot
 }
-

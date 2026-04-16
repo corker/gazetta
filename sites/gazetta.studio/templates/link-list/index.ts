@@ -3,10 +3,14 @@ import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
   title: z.string().describe('List title'),
-  links: z.array(z.object({
-    label: z.string(),
-    href: z.string(),
-  })).describe('Links'),
+  links: z
+    .array(
+      z.object({
+        label: z.string(),
+        href: z.string(),
+      }),
+    )
+    .describe('Links'),
 })
 
 const template: TemplateFunction = ({ content = {} }) => {

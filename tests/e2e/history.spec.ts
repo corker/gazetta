@@ -23,8 +23,7 @@ test.describe('Undo last save', () => {
     // history/undo round-trip + site + selection reload + editor
     // re-mount all settle. At that point the form must show the
     // pre-save value again.
-    await expect(page.locator('[data-testid="global-toast"]'))
-      .toContainText('Undone', { timeout: 10000 })
+    await expect(page.locator('[data-testid="global-toast"]')).toContainText('Undone', { timeout: 10000 })
     // Re-locate the field — the editor was remounted, so the old
     // Playwright locator may point to a detached node.
     const restoredField = page.locator('input[name="root_title"]').first()
@@ -45,16 +44,17 @@ test.describe('History panel', () => {
     await titleField.fill(original + ' — panel edit')
     await page.locator('[data-testid="save-btn"]').click()
     // Wait for save toast to confirm the save landed.
-    await expect(page.locator('[data-testid="global-toast"]'))
-      .toContainText('Saved', { timeout: 5000 })
+    await expect(page.locator('[data-testid="global-toast"]')).toContainText('Saved', { timeout: 5000 })
     // Toast is a transient success — 3s auto-dismiss. Wait for it to
     // clear before opening the menu so it can't visually interfere.
     await page.waitForTimeout(500)
 
     // Open the target switcher → click "View history".
     await page.locator('[data-testid="active-target-indicator"]').click()
-    await page.locator('[data-testid="active-target-menu"]')
-      .getByRole('menuitem', { name: /view history/i }).click()
+    await page
+      .locator('[data-testid="active-target-menu"]')
+      .getByRole('menuitem', { name: /view history/i })
+      .click()
     const panel = page.locator('[data-testid="history-panel"]')
     await expect(panel).toBeVisible()
     const rows = panel.locator('[data-testid^="history-row-"]')
@@ -71,8 +71,7 @@ test.describe('History panel', () => {
     await baselineRow.locator('button', { hasText: 'Restore' }).click()
 
     // Toast confirms; close panel and verify content reverted.
-    await expect(page.locator('[data-testid="global-toast"]'))
-      .toContainText(/Restored/i, { timeout: 10000 })
+    await expect(page.locator('[data-testid="global-toast"]')).toContainText(/Restored/i, { timeout: 10000 })
     await page.locator('[data-testid="history-panel-close"]').click()
     const restoredField = page.locator('input[name="root_title"]').first()
     await expect(restoredField).toHaveValue(original, { timeout: 5000 })
@@ -85,14 +84,14 @@ test.describe('History panel', () => {
     await page.goto('/admin')
     // Switch to staging via the top-bar menu.
     await page.locator('[data-testid="active-target-indicator"]').click()
-    await page.locator('[data-testid="active-target-menu"]')
-      .getByRole('menuitem', { name: 'staging' }).click()
-    await expect(page.locator('[data-testid="active-target-indicator"]'))
-      .toContainText('staging')
+    await page.locator('[data-testid="active-target-menu"]').getByRole('menuitem', { name: 'staging' }).click()
+    await expect(page.locator('[data-testid="active-target-indicator"]')).toContainText('staging')
     // Open history.
     await page.locator('[data-testid="active-target-indicator"]').click()
-    await page.locator('[data-testid="active-target-menu"]')
-      .getByRole('menuitem', { name: /view history/i }).click()
+    await page
+      .locator('[data-testid="active-target-menu"]')
+      .getByRole('menuitem', { name: /view history/i })
+      .click()
     await expect(page.locator('[data-testid="history-empty"]')).toBeVisible()
   })
 })

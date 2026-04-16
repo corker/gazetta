@@ -17,7 +17,7 @@ const containerRef = ref<HTMLElement | null>(null)
 // Show blast radius when the selected root item is a fragment, regardless
 // of which sub-component is currently in the editor. The badge is about
 // the fragment's reach, not the current sub-edit.
-const fragmentName = computed(() => selection.type === 'fragment' ? selection.name : null)
+const fragmentName = computed(() => (selection.type === 'fragment' ? selection.name : null))
 
 const hasProperties = computed(() => {
   const s = editing.schema as Record<string, unknown> | null
@@ -35,7 +35,7 @@ const editorMountRef = computed<EditorMount | null>(() => {
 
 const contentRef = computed(() => editing.content)
 const schemaRef = computed(() => editing.schema as Record<string, unknown> | null)
-const themeRef = computed<'dark' | 'light'>(() => theme.dark ? 'dark' : 'light')
+const themeRef = computed<'dark' | 'light'>(() => (theme.dark ? 'dark' : 'light'))
 const mountVersionRef = computed(() => editing.mountVersion)
 const fieldsBaseUrlRef = computed(() => editing.target?.fieldsBaseUrl)
 
@@ -43,16 +43,24 @@ function handleChange(content: Record<string, unknown>) {
   editing.markDirty(content)
 }
 
-useEditorMount(containerRef, editorMountRef, contentRef, schemaRef, themeRef, handleChange, mountVersionRef, fieldsBaseUrlRef)
+useEditorMount(
+  containerRef,
+  editorMountRef,
+  contentRef,
+  schemaRef,
+  themeRef,
+  handleChange,
+  mountVersionRef,
+  fieldsBaseUrlRef,
+)
 
 // Ctrl+S / Cmd+S to save
-onKeyStroke('s', (e) => {
+onKeyStroke('s', e => {
   if (e.metaKey || e.ctrlKey) {
     e.preventDefault()
     if (editing.dirty) editing.save()
   }
 })
-
 </script>
 
 <template>

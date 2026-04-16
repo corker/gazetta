@@ -15,7 +15,9 @@ async function streamToString(readableStream: NodeJS.ReadableStream): Promise<st
   })
 }
 
-export function createAzureBlobProvider(options: AzureBlobProviderOptions): StorageProvider & { init(): Promise<void> } {
+export function createAzureBlobProvider(
+  options: AzureBlobProviderOptions,
+): StorageProvider & { init(): Promise<void> } {
   const blobServiceClient = BlobServiceClient.fromConnectionString(options.connectionString)
   const containerClient: ContainerClient = blobServiceClient.getContainerClient(options.container)
 

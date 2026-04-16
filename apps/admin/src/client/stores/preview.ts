@@ -7,8 +7,12 @@ export const usePreviewStore = defineStore('preview', () => {
   /** Bumped on content edits — triggers debounced preview refetch with draft overrides */
   const draftVersion = ref(0)
 
-  function invalidate() { version.value++ }
-  function invalidateDraft() { draftVersion.value++ }
+  function invalidate() {
+    version.value++
+  }
+  function invalidateDraft() {
+    draftVersion.value++
+  }
 
   return { version, draftVersion, invalidate, invalidateDraft }
 })

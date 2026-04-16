@@ -8,15 +8,12 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { StorageProvider } from '../src/types.js'
-import {
-  readSidecars,
-  writeSidecars,
-  listSidecars,
-  collectFragmentRefs,
-  type SidecarState,
-} from '../src/sidecars.js'
+import { readSidecars, writeSidecars, listSidecars, collectFragmentRefs, type SidecarState } from '../src/sidecars.js'
 
-function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(entries: Record<string, string>): void } {
+function memoryStorage(): StorageProvider & {
+  dump(): Map<string, string>
+  seed(entries: Record<string, string>): void
+} {
   const files = new Map<string, string>()
   return {
     async readFile(path) {
@@ -24,8 +21,12 @@ function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(
       if (v === undefined) throw new Error(`ENOENT: ${path}`)
       return v
     },
-    async writeFile(path, content) { files.set(path, content) },
-    async exists(path) { return files.has(path) },
+    async writeFile(path, content) {
+      files.set(path, content)
+    },
+    async exists(path) {
+      return files.has(path)
+    },
     async readDir(path) {
       const prefix = path.endsWith('/') ? path : path + '/'
       // Directory is said to exist if at least one file lives under it.
@@ -55,7 +56,9 @@ function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(
         if (p.startsWith(prefix)) files.delete(p)
       }
     },
-    dump() { return files },
+    dump() {
+      return files
+    },
     seed(entries) {
       for (const [k, v] of Object.entries(entries)) files.set(k, v)
     },
@@ -64,7 +67,9 @@ function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(
 
 describe('readSidecars', () => {
   let storage: ReturnType<typeof memoryStorage>
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('returns null for a missing directory', async () => {
     expect(await readSidecars(storage, 'pages/ghost')).toBeNull()
@@ -116,11 +121,11 @@ describe('readSidecars', () => {
     })
   })
 
-  it('decodes subfolder-qualified uses-* names (buttons__primary → buttons/primary)', async () => {
+  it('decodes subfolder-qualified uses-* names (buttons.primary → buttons/primary)', async () => {
     storage.seed({
       'pages/home/page.json': '{}',
       'pages/home/.abcd1234.hash': '',
-      'pages/home/.uses-buttons__primary': '',
+      'pages/home/.uses-buttons.primary': '',
     })
     const state = await readSidecars(storage, 'pages/home')
     expect(state?.uses).toEqual(['buttons/primary'])
@@ -129,7 +134,9 @@ describe('readSidecars', () => {
 
 describe('writeSidecars', () => {
   let storage: ReturnType<typeof memoryStorage>
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('writes all three sidecar kinds for a full state', async () => {
     const state: SidecarState = {
@@ -188,7 +195,7 @@ describe('writeSidecars', () => {
     storage.seed({
       'pages/home/page.json': '{}',
       'pages/home/index.html': '<html>',
-      'pages/home/.01234567.hash': '',  // an old sidecar — this SHOULD be removed
+      'pages/home/.01234567.hash': '', // an old sidecar — this SHOULD be removed
     })
     await writeSidecars(storage, 'pages/home', { hash: 'abcdef01', uses: [], template: null })
     const files = [...storage.dump().keys()].filter(p => p.startsWith('pages/home/'))
@@ -202,7 +209,9 @@ describe('writeSidecars', () => {
 
 describe('listSidecars', () => {
   let storage: ReturnType<typeof memoryStorage>
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   it('returns an empty map when the root directory does not exist', async () => {
     expect(await listSidecars(storage, 'does/not/exist')).toEqual(new Map())
@@ -258,30 +267,24 @@ describe('collectFragmentRefs', () => {
   })
 
   it('ignores non-@ strings and inline components without fragment refs', () => {
-    expect(collectFragmentRefs([
-      '@header',
-      { name: 'hero', template: 'hero' },
-      'not-a-fragment',
-    ])).toEqual(['header'])
+    expect(collectFragmentRefs(['@header', { name: 'hero', template: 'hero' }, 'not-a-fragment'])).toEqual(['header'])
   })
 
-  it('recurses into inline components\' nested components', () => {
-    expect(collectFragmentRefs([
-      {
-        name: 'layout',
-        template: 'layout',
-        components: [
-          '@nav',
-          { name: 'sidebar', template: 'sidebar', components: ['@widgets'] },
-        ],
-      },
-    ]).sort()).toEqual(['nav', 'widgets'])
+  it("recurses into inline components' nested components", () => {
+    expect(
+      collectFragmentRefs([
+        {
+          name: 'layout',
+          template: 'layout',
+          components: ['@nav', { name: 'sidebar', template: 'sidebar', components: ['@widgets'] }],
+        },
+      ]).sort(),
+    ).toEqual(['nav', 'widgets'])
   })
 
   it('deduplicates repeated fragment references', () => {
-    expect(collectFragmentRefs([
-      '@header',
-      { name: 'section', template: 's', components: ['@header', '@footer'] },
-    ]).sort()).toEqual(['footer', 'header'])
+    expect(
+      collectFragmentRefs(['@header', { name: 'section', template: 's', components: ['@header', '@footer'] }]).sort(),
+    ).toEqual(['footer', 'header'])
   })
 })

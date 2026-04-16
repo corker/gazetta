@@ -9,7 +9,13 @@ import { createContentRoot } from '../content-root.js'
 import { createTargetRegistryView } from '../targets.js'
 import { createHistoryProvider } from '../history-provider.js'
 import { isHistoryEnabled, getHistoryRetention } from '../types.js'
-import { createSourceContext, staticSourceResolver, registrySourceResolver, type SourceContext, type SourceContextResolver } from './source-context.js'
+import {
+  createSourceContext,
+  staticSourceResolver,
+  registrySourceResolver,
+  type SourceContext,
+  type SourceContextResolver,
+} from './source-context.js'
 import { authMiddleware } from './middleware/auth.js'
 import { siteRoutes } from './routes/site.js'
 import { pageRoutes } from './routes/pages.js'
@@ -75,9 +81,10 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
   // each get their own cache entry. For now there's only one site per
   // server so a single memoize is enough; swap for a Map<key, Memoized> if
   // we go multi-site per process.
-  const cachedScan = memoizeAsync(async () => scanTemplates(templatesDir, opts.siteDir.replace(/[\\/]sites[\\/][^\\/]+$/, '')))
-  const scan = (tDir: string, root: string) =>
-    tDir === templatesDir ? cachedScan.get() : scanTemplates(tDir, root)
+  const cachedScan = memoizeAsync(async () =>
+    scanTemplates(templatesDir, opts.siteDir.replace(/[\\/]sites[\\/][^\\/]+$/, '')),
+  )
+  const scan = (tDir: string, root: string) => (tDir === templatesDir ? cachedScan.get() : scanTemplates(tDir, root))
 
   // Prefer an externally-provided SourceContext. Fall back to constructing
   // one from opts.storage + opts.siteDir, which is the legacy shape.
@@ -85,11 +92,13 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
   let sidecarWriter: SourceSidecarWriter
   if (opts.source) {
     source = opts.source
-    sidecarWriter = opts.source.sidecarWriter ?? createSourceSidecarWriter({
-      contentRoot: opts.source.contentRoot,
-      scanTemplates: () => cachedScan.get(),
-      templatesDir,
-    })
+    sidecarWriter =
+      opts.source.sidecarWriter ??
+      createSourceSidecarWriter({
+        contentRoot: opts.source.contentRoot,
+        scanTemplates: () => cachedScan.get(),
+        templatesDir,
+      })
     // Backfill history on the source if the caller didn't supply one —
     // dev bootstrap builds a bare SourceContext and relies on admin-api
     // to wire history per the target's config. Skip when the target's
@@ -139,7 +148,7 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
       // The registry's filesystem targets are already content-rooted
       // (path=./targets/<key>); siteDir on the resolved context is empty.
       siteDir: '',
-      lazyInit: async (name) => {
+      lazyInit: async name => {
         const config = opts.targetConfigs![name]
         if (!config) return
         const { createStorageProvider } = await import('../targets.js')

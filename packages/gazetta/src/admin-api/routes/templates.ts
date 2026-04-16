@@ -7,7 +7,12 @@ import type { SourceContextResolver } from '../source-context.js'
 
 const EDITOR_EXTENSIONS = ['.tsx', '.ts']
 
-export function templateRoutes(resolve: SourceContextResolver, templatesDir?: string, adminDir?: string, production?: boolean) {
+export function templateRoutes(
+  resolve: SourceContextResolver,
+  templatesDir?: string,
+  adminDir?: string,
+  production?: boolean,
+) {
   const app = new Hono()
   // Templates and admin live at project level, outside target content storage.
   // Read them via a cwd-rooted filesystem provider and absolute paths.
@@ -25,16 +30,16 @@ export function templateRoutes(resolve: SourceContextResolver, templatesDir?: st
     return { tplDir, editorsDir, fieldsBaseUrl }
   }
 
-  app.get('/api/templates', async (c) => {
+  app.get('/api/templates', async c => {
     const { tplDir } = await dirs(c)
-    if (!await storage.exists(tplDir)) return c.json([])
+    if (!(await storage.exists(tplDir))) return c.json([])
 
     const entries = await storage.readDir(tplDir)
     const templates = entries.filter(e => e.isDirectory).map(e => ({ name: e.name }))
     return c.json(templates)
   })
 
-  app.get('/api/templates/:name/schema', async (c) => {
+  app.get('/api/templates/:name/schema', async c => {
     const name = c.req.param('name')
     const { tplDir, editorsDir, fieldsBaseUrl } = await dirs(c)
 
@@ -60,7 +65,7 @@ export function templateRoutes(resolve: SourceContextResolver, templatesDir?: st
         }
       }
 
-      return c.json({ ...jsonSchema as Record<string, unknown>, hasEditor, editorUrl, fieldsBaseUrl })
+      return c.json({ ...(jsonSchema as Record<string, unknown>), hasEditor, editorUrl, fieldsBaseUrl })
     } catch (err) {
       return c.json({ error: `Failed to load schema for template "${name}": ${(err as Error).message}` }, 500)
     }

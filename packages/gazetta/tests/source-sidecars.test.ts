@@ -14,20 +14,28 @@ const storage = createFilesystemProvider()
 async function reset() {
   await rm(root, { recursive: true, force: true })
   await mkdir(join(siteDir, 'pages/home'), { recursive: true })
-  await writeFile(join(siteDir, 'pages/home/page.json'), JSON.stringify({
-    template: 'page-default',
-    content: { title: 'Hello' },
-    components: ['@header', 'hero'],
-  }))
+  await writeFile(
+    join(siteDir, 'pages/home/page.json'),
+    JSON.stringify({
+      template: 'page-default',
+      content: { title: 'Hello' },
+      components: ['@header', 'hero'],
+    }),
+  )
   await mkdir(join(siteDir, 'fragments/header'), { recursive: true })
-  await writeFile(join(siteDir, 'fragments/header/fragment.json'), JSON.stringify({
-    template: 'header-layout',
-    components: [],
-  }))
+  await writeFile(
+    join(siteDir, 'fragments/header/fragment.json'),
+    JSON.stringify({
+      template: 'header-layout',
+      components: [],
+    }),
+  )
 }
 
 beforeEach(reset)
-afterAll(async () => { await rm(root, { recursive: true, force: true }) })
+afterAll(async () => {
+  await rm(root, { recursive: true, force: true })
+})
 
 const fakeScan = async (): Promise<TemplateInfo[]> => [
   { name: 'page-default', hash: 'aaaaaaaa', valid: true, errors: [], files: [] },
@@ -62,7 +70,10 @@ describe('createSourceSidecarWriter', () => {
 
   it('invalidate() forces a rescan on next write', async () => {
     let calls = 0
-    const scan = async () => { calls++; return fakeScan() }
+    const scan = async () => {
+      calls++
+      return fakeScan()
+    }
     const writer = createSourceSidecarWriter({ storage, siteDir, scanTemplates: scan })
 
     await writer.writeFor('page', 'home')

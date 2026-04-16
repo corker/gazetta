@@ -16,7 +16,11 @@ export const schema = z.object({
   slug: z.string().meta(format.slug()).optional().describe('URL slug'),
 
   // Code editor
-  snippet: z.string().meta(format.code({ language: 'html' })).optional().describe('HTML snippet'),
+  snippet: z
+    .string()
+    .meta(format.code({ language: 'html' }))
+    .optional()
+    .describe('HTML snippet'),
 
   // JSON editor
   metadata: z.string().meta(format.json()).optional().describe('Custom metadata (JSON)'),

@@ -32,11 +32,24 @@ const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
  * the dark-mode token work hasn't reached yet.
  */
 const BASELINE: Array<{ id: string; reason: string }> = [
-  { id: 'color-contrast', reason: 'tinted state colors (muted labels, env badges) below 4.5:1 in dark mode — needs token-layer pass' },
+  {
+    id: 'color-contrast',
+    reason: 'tinted state colors (muted labels, env badges) below 4.5:1 in dark mode — needs token-layer pass',
+  },
   { id: 'button-name', reason: 'icon-only PrimeVue buttons (tree chevrons, dialog close) need title/aria-label audit' },
-  { id: 'label', reason: 'several rjsf form inputs render without associated <label> — needs custom field wrapper fix' },
-  { id: 'frame-title', reason: 'preview <iframe> lacks title attr — trivial add but requires tying into ActiveTargetIndicator\'s dynamic label' },
-  { id: 'nested-interactive', reason: 'PrimeVue Checkbox inside a clickable row label; library-level issue with a clean fix via role=group' },
+  {
+    id: 'label',
+    reason: 'several rjsf form inputs render without associated <label> — needs custom field wrapper fix',
+  },
+  {
+    id: 'frame-title',
+    reason:
+      "preview <iframe> lacks title attr — trivial add but requires tying into ActiveTargetIndicator's dynamic label",
+  },
+  {
+    id: 'nested-interactive',
+    reason: 'PrimeVue Checkbox inside a clickable row label; library-level issue with a clean fix via role=group',
+  },
 ]
 
 type Violation = { id: string; impact?: string | null; help: string; helpUrl: string; nodes: unknown[] }
@@ -47,9 +60,7 @@ function newViolations(all: Violation[]): Violation[] {
 }
 
 async function scan(page: import('@playwright/test').Page) {
-  return new AxeBuilder({ page })
-    .withTags(WCAG_TAGS)
-    .analyze()
+  return new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze()
 }
 
 test.describe('accessibility', () => {
@@ -103,7 +114,11 @@ test.describe('accessibility', () => {
  */
 function formatViolations(violations: Violation[]): string {
   if (violations.length === 0) return 'No violations'
-  return '\n' + violations.map(v =>
-    `  [${v.impact ?? 'unknown'}] ${v.id} — ${v.help}\n    ${v.nodes.length} node(s)\n    ${v.helpUrl}`,
-  ).join('\n') + '\n'
+  return (
+    '\n' +
+    violations
+      .map(v => `  [${v.impact ?? 'unknown'}] ${v.id} — ${v.help}\n    ${v.nodes.length} node(s)\n    ${v.helpUrl}`)
+      .join('\n') +
+    '\n'
+  )
 }

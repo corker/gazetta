@@ -48,9 +48,7 @@ describe('SyncIndicators', () => {
   })
 
   it('renders nothing when there are no non-active targets', () => {
-    const targets: TargetInfo[] = [
-      { name: 'local', environment: 'local', type: 'static', editable: true },
-    ]
+    const targets: TargetInfo[] = [{ name: 'local', environment: 'local', type: 'static', editable: true }]
     setupStores(targets, 'local')
     const w = mount(SyncIndicators)
     expect(w.find('[data-testid="sync-indicators"]').exists()).toBe(false)

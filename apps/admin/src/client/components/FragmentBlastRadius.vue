@@ -38,9 +38,12 @@ async function load(name: string) {
 }
 
 onMounted(() => load(props.fragmentName))
-watch(() => props.fragmentName, (name) => load(name))
+watch(
+  () => props.fragmentName,
+  name => load(name),
+)
 
-const summary = (pages: string[]) => pages.length === 1 ? 'used on 1 page' : `used on ${pages.length} pages`
+const summary = (pages: string[]) => (pages.length === 1 ? 'used on 1 page' : `used on ${pages.length} pages`)
 </script>
 
 <template>

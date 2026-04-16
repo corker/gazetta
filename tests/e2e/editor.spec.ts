@@ -39,10 +39,13 @@ test.describe('Custom editor', () => {
     // Then switch to features (no custom editor)
     await page.click('[data-testid="component-features"]')
     // Wait for the editor to remount with the new content
-    await page.waitForFunction(() => {
-      const panel = document.querySelector('[data-testid="editor-panel"]')
-      return panel?.textContent?.includes('heading')
-    }, { timeout: 5000 })
+    await page.waitForFunction(
+      () => {
+        const panel = document.querySelector('[data-testid="editor-panel"]')
+        return panel?.textContent?.includes('heading')
+      },
+      { timeout: 5000 },
+    )
 
     const editorText = await page.locator('[data-testid="editor-panel"]').textContent()
     expect(editorText).toContain('heading')
@@ -58,10 +61,13 @@ test.describe('Custom field', () => {
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Wait for the custom field to load (async import)
-    await page.waitForFunction(() => {
-      const container = document.querySelector('[data-testid="editor-container"]')
-      return container?.querySelector('input[type="color"]') !== null
-    }, { timeout: 10000 })
+    await page.waitForFunction(
+      () => {
+        const container = document.querySelector('[data-testid="editor-container"]')
+        return container?.querySelector('input[type="color"]') !== null
+      },
+      { timeout: 10000 },
+    )
 
     // Verify preset color buttons exist (brand-color has 6 presets)
     const buttons = await page.locator('[data-testid="editor-container"] button[title]').count()

@@ -11,11 +11,31 @@ export const useComponentFocusStore = defineStore('componentFocus', () => {
   /** gzId buffered during browse→edit transition (before ComponentTree mounts) */
   const pendingGzId = ref<string | null>(null)
 
-  function highlight(gzId: string | null) { highlightGzId.value = gzId }
-  function previewHover(gzId: string | null) { previewHoverGzId.value = gzId }
-  function select(gzId: string | null) { selectedGzId.value = gzId }
-  function setPending(gzId: string) { pendingGzId.value = gzId }
-  function clearPending() { pendingGzId.value = null }
+  function highlight(gzId: string | null) {
+    highlightGzId.value = gzId
+  }
+  function previewHover(gzId: string | null) {
+    previewHoverGzId.value = gzId
+  }
+  function select(gzId: string | null) {
+    selectedGzId.value = gzId
+  }
+  function setPending(gzId: string) {
+    pendingGzId.value = gzId
+  }
+  function clearPending() {
+    pendingGzId.value = null
+  }
 
-  return { highlightGzId, previewHoverGzId, selectedGzId, pendingGzId, highlight, previewHover, select, setPending, clearPending }
+  return {
+    highlightGzId,
+    previewHoverGzId,
+    selectedGzId,
+    pendingGzId,
+    highlight,
+    previewHover,
+    select,
+    setPending,
+    clearPending,
+  }
 })

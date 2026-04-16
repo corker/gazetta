@@ -37,7 +37,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${BASE}${withActiveTarget(path)}`, { ...options, headers: { ...headers, ...options?.headers } })
+  const res = await fetch(`${BASE}${withActiveTarget(path)}`, {
+    ...options,
+    headers: { ...headers, ...options?.headers },
+  })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(body.error ?? `Request failed: ${res.status}`)
@@ -60,13 +63,16 @@ async function publishStream(
   options?: { source?: string; signal?: AbortSignal },
 ): Promise<PublishResult[]> {
   const token = sessionStorage.getItem('gazetta_token')
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'text/event-stream' }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const body: Record<string, unknown> = { items, targets }
   if (options?.source) body.source = options.source
   const res = await fetch(`${BASE}/publish/stream`, {
-    method: 'POST', headers, body: JSON.stringify(body), signal: options?.signal,
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal: options?.signal,
   })
   if (!res.ok || !res.body) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
@@ -120,10 +126,22 @@ export type PageSummary = PageSummaryShape
 export type CreatePageRequest = CreatePageRequestShape
 export type CreatePageResponse = CreatePageResponseShape
 
-export interface FragmentSummary { name: string; template: string }
-export interface TemplateSummary { name: string }
-export interface FieldSummary { name: string; path: string }
-export interface SiteManifest { name: string; version?: string; systemPages?: string[] }
+export interface FragmentSummary {
+  name: string
+  template: string
+}
+export interface TemplateSummary {
+  name: string
+}
+export interface FieldSummary {
+  name: string
+  path: string
+}
+export interface SiteManifest {
+  name: string
+  version?: string
+  systemPages?: string[]
+}
 
 export interface InlineComponent {
   name: string
@@ -154,7 +172,12 @@ export interface TargetInfo {
   editable: boolean
 }
 
-export interface PublishResult { target: string; success: boolean; error?: string; copiedFiles: number }
+export interface PublishResult {
+  target: string
+  success: boolean
+  error?: string
+  copiedFiles: number
+}
 export type PublishProgress =
   | { kind: 'start'; targets: string[]; itemsPerTarget: number }
   | { kind: 'target-start'; target: string; total: number }
@@ -180,41 +203,52 @@ export const api = {
   getPages: (opts?: { target?: string }) =>
     request<PageSummary[]>(opts?.target ? `/pages?target=${encodeURIComponent(opts.target)}` : '/pages'),
   getPage: (name: string, options?: RequestInit) => request<PageDetail>(`/pages/${name}`, options),
-  createPage: (data: CreatePageRequest) => request<CreatePageResponse>('/pages', { method: 'POST', body: JSON.stringify(data) }),
+  createPage: (data: CreatePageRequest) =>
+    request<CreatePageResponse>('/pages', { method: 'POST', body: JSON.stringify(data) }),
   deletePage: (name: string) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'DELETE' }),
-  updatePage: (name: string, data: Partial<PageDetail>) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updatePage: (name: string, data: Partial<PageDetail>) =>
+    request<{ ok: boolean }>(`/pages/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
   /** List fragments. See getPages for the `target` option. */
   getFragments: (opts?: { target?: string }) =>
     request<FragmentSummary[]>(opts?.target ? `/fragments?target=${encodeURIComponent(opts.target)}` : '/fragments'),
   getFragment: (name: string, options?: RequestInit) => request<FragmentDetail>(`/fragments/${name}`, options),
-  createFragment: (data: { name: string; template: string }) => request<{ ok: boolean; name: string }>('/fragments', { method: 'POST', body: JSON.stringify(data) }),
+  createFragment: (data: { name: string; template: string }) =>
+    request<{ ok: boolean; name: string }>('/fragments', { method: 'POST', body: JSON.stringify(data) }),
   deleteFragment: (name: string) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'DELETE' }),
-  updateFragment: (name: string, data: Partial<FragmentDetail>) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateFragment: (name: string, data: Partial<FragmentDetail>) =>
+    request<{ ok: boolean }>(`/fragments/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
   getTemplates: () => request<TemplateSummary[]>('/templates'),
   getTemplateSchema: (name: string) => request<Record<string, unknown>>(`/templates/${name}/schema`),
   getFields: () => request<FieldSummary[]>('/fields'),
   getTargets: () => request<TargetInfo[]>('/targets'),
-  publish: (items: string[], targets: string[]) => request<{ results: PublishResult[] }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
+  publish: (items: string[], targets: string[]) =>
+    request<{ results: PublishResult[] }>('/publish', { method: 'POST', body: JSON.stringify({ items, targets }) }),
   publishStream,
   compare: (target: string, options?: RequestInit & { source?: string }) => {
     // `source` explicit wins. Otherwise fall back to the active-target
     // provider (server resolves its own default if neither is set).
     const src = options?.source ?? activeTargetProvider?.()
-    const qs = src ? `?target=${encodeURIComponent(target)}&source=${encodeURIComponent(src)}` : `?target=${encodeURIComponent(target)}`
+    const qs = src
+      ? `?target=${encodeURIComponent(target)}&source=${encodeURIComponent(src)}`
+      : `?target=${encodeURIComponent(target)}`
     return request<CompareResult>(`/compare${qs}`, options)
   },
-  getDependents: (item: string, options?: RequestInit) => request<{ pages: string[]; fragments: string[] }>(`/dependents?item=${encodeURIComponent(item)}`, options),
-  fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),
+  getDependents: (item: string, options?: RequestInit) =>
+    request<{ pages: string[]; fragments: string[] }>(`/dependents?item=${encodeURIComponent(item)}`, options),
+  fetchFromTarget: (source: string, items?: string[]) =>
+    request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', {
+      method: 'POST',
+      body: JSON.stringify({ source, items }),
+    }),
   /** List revisions on a target, newest first. */
   listHistory: (target: string, limit = 50) =>
     request<{ revisions: RevisionSummary[] }>(`/history?target=${encodeURIComponent(target)}&limit=${limit}`),
   /** Undo the most recent write on a target — restores the previous
    *  revision as a forward 'rollback'. 409 when there's nothing to undo. */
   undoLastWrite: (target: string) =>
-    request<{ revision: RevisionSummary; restoredFrom: string }>(
-      `/history/undo?target=${encodeURIComponent(target)}`,
-      { method: 'POST' },
-    ),
+    request<{ revision: RevisionSummary; restoredFrom: string }>(`/history/undo?target=${encodeURIComponent(target)}`, {
+      method: 'POST',
+    }),
   /** Restore an arbitrary revision on a target. 404 when the id doesn't exist. */
   restoreRevision: (target: string, revisionId: string) =>
     request<{ revision: RevisionSummary; restoredFrom: string }>(

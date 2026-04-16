@@ -28,22 +28,30 @@ async function reset() {
   await writeFile(join(templatesDir, 'page/index.js'), TEMPLATE)
   await writeFile(join(siteDir, 'site.yaml'), 'name: Test')
   await mkdir(join(siteDir, 'pages/home'), { recursive: true })
-  await writeFile(join(siteDir, 'pages/home/page.json'), JSON.stringify({
-    template: 'page',
-    content: { title: 'Hello' },
-  }))
+  await writeFile(
+    join(siteDir, 'pages/home/page.json'),
+    JSON.stringify({
+      template: 'page',
+      content: { title: 'Hello' },
+    }),
+  )
   await mkdir(join(siteDir, 'fragments/header'), { recursive: true })
-  await writeFile(join(siteDir, 'fragments/header/fragment.json'), JSON.stringify({
-    template: 'page',
-    content: { title: 'Header' },
-  }))
+  await writeFile(
+    join(siteDir, 'fragments/header/fragment.json'),
+    JSON.stringify({
+      template: 'page',
+      content: { title: 'Header' },
+    }),
+  )
   await mkdir(targetDir, { recursive: true })
   // Recreate target provider rooted at the (now-existing) targetDir
   target = createFilesystemProvider(targetDir)
 }
 
 beforeEach(reset)
-afterAll(async () => { await rm(root, { recursive: true, force: true }) })
+afterAll(async () => {
+  await rm(root, { recursive: true, force: true })
+})
 
 async function writeSidecar(dir: string, hash: string) {
   await mkdir(dir, { recursive: true })
@@ -107,9 +115,13 @@ describe('compareTargets', () => {
   it('detects added when local has items not on target', async () => {
     // Add a new local page
     await mkdir(join(siteDir, 'pages/about'), { recursive: true })
-    await writeFile(join(siteDir, 'pages/about/page.json'), JSON.stringify({
-      template: 'page', content: { title: 'About' },
-    }))
+    await writeFile(
+      join(siteDir, 'pages/about/page.json'),
+      JSON.stringify({
+        template: 'page',
+        content: { title: 'About' },
+      }),
+    )
     // Old sidecar for home so target isn't empty
     await writeSidecar(join(targetDir, 'pages/home'), '00000000')
 
@@ -143,11 +155,14 @@ describe('compareTargets', () => {
 
   it('static mode: fragment content change invalidates pages that use it', async () => {
     // Page bakes in @header.
-    await writeFile(join(siteDir, 'pages/home/page.json'), JSON.stringify({
-      template: 'page',
-      content: { title: 'Hello' },
-      components: ['@header'],
-    }))
+    await writeFile(
+      join(siteDir, 'pages/home/page.json'),
+      JSON.stringify({
+        template: 'page',
+        content: { title: 'Hello' },
+        components: ['@header'],
+      }),
+    )
 
     // Publish once: record the static-mode page hash on the target.
     const { hashManifest } = await import('../src/hash.js')
@@ -159,7 +174,10 @@ describe('compareTargets', () => {
     const fragHashes = new Map<string, string>()
     for (const [n, f] of site.fragments) fragHashes.set(n, hashManifest(f, { templateHashes: tHashes }))
     for (const [n, p] of site.pages) {
-      await writeSidecar(join(targetDir, 'pages', n), hashManifest(p, { templateHashes: tHashes, fragmentHashes: fragHashes }))
+      await writeSidecar(
+        join(targetDir, 'pages', n),
+        hashManifest(p, { templateHashes: tHashes, fragmentHashes: fragHashes }),
+      )
     }
 
     // Sanity: unchanged before any edit.
@@ -167,10 +185,13 @@ describe('compareTargets', () => {
     expect(r1.unchanged).toContain('pages/home')
 
     // Mutate the fragment's content — page manifest untouched.
-    await writeFile(join(siteDir, 'fragments/header/fragment.json'), JSON.stringify({
-      template: 'page',
-      content: { title: 'Header EDITED' },
-    }))
+    await writeFile(
+      join(siteDir, 'fragments/header/fragment.json'),
+      JSON.stringify({
+        template: 'page',
+        content: { title: 'Header EDITED' },
+      }),
+    )
 
     // Page must show modified — its baked-in output is now stale.
     const r2 = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root, type: 'static' })
@@ -191,5 +212,4 @@ describe('compareTargets', () => {
     const r = await compareTargets({ sourceRoot, target, templatesDir, projectRoot: root })
     expect(r.unchanged.sort()).toEqual(['fragments/header', 'pages/home'])
   })
-
 })
