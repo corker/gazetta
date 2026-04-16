@@ -112,7 +112,7 @@ function handleBack() {
 <style scoped>
 .cms-toolbar { border-radius: 0; border-left: 0; border-right: 0; border-top: 0; }
 .cms-logo { font-weight: 700; font-size: 1.125rem; display: flex; align-items: center; gap: 0.5rem; }
-.cms-site-name { margin-left: 1rem; color: var(--color-muted); font-size: 0.875rem; }
+.cms-site-name { margin-left: 1rem; margin-right: 1rem; color: var(--color-muted); font-size: 0.875rem; }
 .cms-btn { margin-left: 0.5rem; }
 .cms-toast { font-size: 0.8125rem; display: flex; align-items: center; gap: 0.375rem; }
 .cms-toast-error { color: var(--color-danger-fg); }
