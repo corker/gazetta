@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { resolve, join, dirname } from 'node:path'
+import { resolve, join, dirname, relative } from 'node:path'
 import { watch, existsSync, readFileSync } from 'node:fs'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
@@ -14,6 +14,7 @@ import { createFilesystemProvider } from '../providers/filesystem.js'
 import { invalidateTemplate, invalidateAllTemplates } from '../template-loader.js'
 // createTargetRegistry is used lazily by admin-api publish routes
 import type { SiteManifest } from '../types.js'
+import { getEnvironment, getType, isEditable } from '../types.js'
 import { createAdminApp } from '../admin-api/index.js'
 
 // ANSI color helpers — no dependency, suppressed when NO_COLOR or CI
@@ -1190,6 +1191,40 @@ async function runDev(siteDir: string, port: number) {
     console.log()
     console.log(`  ${c.dim('┃')} Pages    ${[...site.pages.entries()].map(([n, p]) => `${c.dim(p.route)} ${c.dim('→')} ${n}`).join(c.dim(', '))}`)
     console.log(`  ${c.dim('┃')} Frags    ${c.dim([...site.fragments.keys()].join(', ') || '(none)')}`)
+
+    // ---- Settings banner ----
+    // Prints resolved configuration at startup so path / target / site
+    // issues are diagnosed immediately instead of via empty API responses.
+    // Opt-in via GAZETTA_QUIET=1 for scripted callers that don't want it.
+    if (!process.env.GAZETTA_QUIET) {
+      const relProject = relative(process.cwd(), projectRoot) || '.'
+      const relSite = relative(projectRoot, siteDir) || '.'
+      const relTemplates = relative(projectRoot, templatesDir) || '.'
+      const sourceName = source.targetName ?? '(none)'
+      const sourceCfg = targetConfigs[sourceName]
+      const sourceEnv = sourceCfg ? getEnvironment(sourceCfg) : 'unknown'
+      const sourceType = sourceCfg ? getType(sourceCfg) : 'unknown'
+      const sourceEditable = sourceCfg ? isEditable(sourceCfg) : false
+      const sourceRoot = source.contentRoot.rootPath || '.'
+      const targetsCount = Object.keys(targetConfigs).length
+      console.log()
+      console.log(`  ${c.dim('┃')} ${c.bold('Settings')}`)
+      console.log(`  ${c.dim('┃')}   Project      ${c.dim(relProject)}`)
+      console.log(`  ${c.dim('┃')}   Site         ${c.dim(relSite)}`)
+      console.log(`  ${c.dim('┃')}   Templates    ${c.dim(relTemplates)}`)
+      console.log(`  ${c.dim('┃')}   Source       ${sourceName} ${c.dim(`(${sourceEnv}, ${sourceEditable ? 'editable' : 'read-only'}, ${sourceType})`)}`)
+      console.log(`  ${c.dim('┃')}   Content root ${c.dim(sourceRoot)}`)
+      console.log(`  ${c.dim('┃')}   Targets (${targetsCount})`)
+      for (const [name, cfg] of Object.entries(targetConfigs)) {
+        const env = getEnvironment(cfg)
+        const type = getType(cfg)
+        const ed = isEditable(cfg) ? 'editable ' : 'read-only'
+        const storagePath = cfg.storage?.type === 'filesystem'
+          ? (cfg.storage.path ?? `targets/${name}`)
+          : `${cfg.storage?.type ?? '?'}`
+        console.log(`  ${c.dim('┃')}     ${c.dim('•')} ${name.padEnd(14)} ${c.dim(env.padEnd(11))} ${c.dim(ed)} ${c.dim(type.padEnd(8))} ${c.dim('→ ' + storagePath)}`)
+      }
+    }
 
     if (isDevMode && cmsWebDir) {
       // While Vite is spinning up (compiling, scanning deps, attaching

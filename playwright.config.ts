@@ -24,12 +24,14 @@ export default defineConfig({
       // Feature suites use `.spec.ts` (see the Phase 1 restructure that
       // split the old editor.test.ts). a11y.test.ts predates the rename
       // and stays on `.test.ts`. Production runs against pre-built admins
-      // on fixed ports in their own projects — exclude them here.
+      // on fixed ports in their own projects — exclude them here. Matrix
+      // runs against its own fixture site (tests/fixtures/sites/target-
+      // matrix) so `matrix/**` is excluded too.
       // testIgnore applies to basenames consistently; a negative-lookahead
       // on testMatch would match the full path and wouldn't catch
       // `tests/e2e/production-esi.test.ts`.
       testMatch: ['**/*.test.ts', '**/*.spec.ts'],
-      testIgnore: ['**/production.test.ts', '**/production-*.test.ts'],
+      testIgnore: ['**/production.test.ts', '**/production-*.test.ts', '**/matrix/**'],
       // baseURL is set per-worker by the testSite fixture in tests/e2e/fixtures.ts
     },
     {
@@ -46,6 +48,16 @@ export default defineConfig({
       name: 'prod-esi',
       testMatch: 'production-esi.test.ts',
       use: { baseURL: 'http://localhost:4004' },
+    },
+    {
+      name: 'matrix',
+      // Parameterized env × editable × type tests against the target-matrix
+      // fixture site. The site under tests/fixtures/sites/target-matrix/
+      // ships 8 targets — one per meaningful axis-value combination — so
+      // matrix tests assert on admin UI chrome reactions to those props
+      // without spinning up a per-row dev server.
+      testMatch: ['**/matrix/**/*.spec.ts'],
+      use: { baseURL: 'http://localhost:4005' },
     },
   ],
   webServer: [
@@ -66,6 +78,15 @@ export default defineConfig({
     {
       command: 'cd examples/starter && npx tsx ../../packages/gazetta/src/cli/index.ts publish esi-test sites/main && node ../../packages/gazetta/dist/cli/index.js serve esi-test sites/main -p 4004',
       url: 'http://localhost:4004/health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60000,
+    },
+    {
+      // Matrix fixture site — 8 targets covering env × editable × type.
+      // Runs as a dev server (not a prod serve) because matrix tests
+      // exercise the admin UI, not the rendered site.
+      command: 'cd tests/fixtures/sites/target-matrix && npx tsx ../../../../packages/gazetta/src/cli/index.ts dev sites/main --port 4005',
+      url: 'http://localhost:4005/admin',
       reuseExistingServer: !process.env.CI,
       timeout: 60000,
     },

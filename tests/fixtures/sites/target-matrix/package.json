@@ -1,0 +1,13 @@
+{
+  "name": "@gazetta/fixture-target-matrix",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx ../../../../packages/gazetta/src/cli/index.ts dev sites/main"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "zod": "^4.3.6",
+    "gazetta": "*"
+  }
+}

@@ -498,12 +498,40 @@ Adding these as scenarios too would duplicate existing coverage without closing 
 
 ---
 
-#### ☐ Phase 4 — Matrix tests
+#### ✓ Phase 4 — Matrix tests
 
-- Env × editable for chrome + confirmation
-- Target-type for save-render vs save-fast
+Landed. Two parameterized specs under
+[tests/e2e/matrix/](../../tests/e2e/matrix/) running against a dedicated fixture site
+(`tests/fixtures/sites/target-matrix/`) with 8 targets covering every
+env × editable × type combo that matters:
 
-**Estimate:** ~1 day.
+- **env-chrome.spec.ts** (8 rows) — active-target chrome class + read-only badge track
+  `environment` + `editable` independently of `type`
+- **prod-confirm.spec.ts** (7 rows) — `environment: production` always gates the Publish
+  button with a confirmation banner; non-prod destinations publish in one click,
+  regardless of editable/type combinations
+
+**Infrastructure added:**
+
+- New workspace glob `tests/fixtures/sites/*` in root package.json — a home for test-only
+  fixture sites that shouldn't pollute `examples/` (user-facing samples) or `sites/`
+  (production dogfood)
+- [tests/fixtures/sites/target-matrix/](../../tests/fixtures/sites/target-matrix/) — 8
+  targets (local-edit, local-ro, local-dyn, staging-ro, staging-edit, prod-ro, prod-edit,
+  prod-dyn) each exercising one meaningful axis combination
+- New Playwright project `matrix` in [playwright.config.ts](../../playwright.config.ts) +
+  matching `webServer` entry on port 4005
+
+**Why fixture site over component-level tests:** env × editable × type gate real admin
+UI paths that go through the targets API, not just Vue props. A component test could mount
+with synthetic configs but wouldn't exercise the `/api/targets` serialization or source-
+context resolution. The dedicated fixture site tests the full integration.
+
+**Dev-server settings banner** added as a side effect — startup now prints resolved
+project/site/templates paths, default source target with its env/editable/type, content
+root, and every configured target's props + storage path. Catches fixture misconfig
+(wrong `storage.path`, missing content root) at the first run instead of via empty API
+responses. Opt out with `GAZETTA_QUIET=1`.
 
 ---
 
