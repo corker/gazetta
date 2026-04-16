@@ -54,11 +54,19 @@ export async function restoreRevision(opts: RestoreRevisionOptions): Promise<Rev
   const { history, contentRoot, revisionId } = opts
   const target = await history.readRevision(revisionId)
   // Current state = the most recent revision's snapshot. If none
-  // exists yet we're restoring onto an empty tree — nothing to delete.
+  // exists yet we're restoring onto an empty tree — nothing to delete
+  // and no "unchanged" entries to skip.
   const currentSnapshot = await loadHeadSnapshot(history)
 
   const toDelete = Object.keys(currentSnapshot).filter(p => !(p in target.snapshot))
-  const toWrite = Object.entries(target.snapshot) // [path, blobHash]
+  // Only write items whose blob hash differs from what's currently on
+  // disk (per head snapshot). Without this, restoring typically rewrites
+  // every item in the snapshot — an undo of a single-page edit would
+  // touch every page + fragment manifest, triggering a storm of file-
+  // watch events and SSE reloads in the dev server. Equal hashes →
+  // same content → skip the write.
+  const toWrite = Object.entries(target.snapshot)
+    .filter(([path, hash]) => currentSnapshot[path] !== hash)
 
   // Delete first: rolling back a "delete" in the old revision means the
   // item came back; rolling back an "add" means the item goes away.

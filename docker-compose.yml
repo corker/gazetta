@@ -1,18 +1,23 @@
 services:
+  # Ports are bound to ephemeral host ports (no "<host>:<container>"
+  # mapping) so running this compose alongside another local Azurite /
+  # MinIO — or repeated test runs that leave containers around — doesn't
+  # hit "port already in use". Tests discover the actual host port via
+  # `DockerComposeEnvironment.getContainer(...).getMappedPort(...)`.
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     command: azurite --skipApiVersionCheck --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
     ports:
-      - "10000:10000"
-      - "10001:10001"
-      - "10002:10002"
+      - "10000"
+      - "10001"
+      - "10002"
 
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9000"
+      - "9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
