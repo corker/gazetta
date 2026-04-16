@@ -64,6 +64,51 @@ function toggleDestination(name: string) {
   selectedDestinations.value = next
 }
 
+/**
+ * Destinations grouped by environment. Groups with 2+ members render a
+ * "select all" header checkbox that toggles every member at once —
+ * design-editor-ux.md "Multi-destination publish (fan-out)": selecting
+ * an environment group selects all its members. Single-member groups
+ * render flat (no header) so the UI stays quiet for simple setups.
+ *
+ * Iteration order is preserved from the target declaration order in
+ * site.yaml, which matches the top-bar switcher and sync indicators.
+ */
+interface DestinationGroup {
+  environment: string
+  members: typeof destinationOptions.value
+}
+const destinationGroups = computed<DestinationGroup[]>(() => {
+  const groups = new Map<string, DestinationGroup>()
+  for (const t of destinationOptions.value) {
+    const env = t.environment ?? 'local'
+    let g = groups.get(env)
+    if (!g) { g = { environment: env, members: [] }; groups.set(env, g) }
+    g.members.push(t)
+  }
+  return [...groups.values()]
+})
+
+/** Tri-state of a group's selection: 'none' | 'some' | 'all'. */
+function groupState(group: DestinationGroup): 'none' | 'some' | 'all' {
+  const selected = group.members.filter(m => selectedDestinations.value.has(m.name)).length
+  if (selected === 0) return 'none'
+  if (selected === group.members.length) return 'all'
+  return 'some'
+}
+
+/** Toggle an entire group: if any member is unselected, select all; else deselect all. */
+function toggleGroup(group: DestinationGroup) {
+  const next = new Set(selectedDestinations.value)
+  const state = groupState(group)
+  if (state === 'all') {
+    for (const m of group.members) next.delete(m.name)
+  } else {
+    for (const m of group.members) next.add(m.name)
+  }
+  selectedDestinations.value = next
+}
+
 // Items selected for publish. Managed via v-model:selected on the list;
 // list auto-populates when source/destinations change.
 const selectedItems = ref<Set<string>>(new Set())
@@ -277,21 +322,41 @@ function envClass(env: string | undefined): string {
           (no other targets configured)
         </div>
         <div v-else class="destinations" data-testid="publish-destinations">
-          <label
-            v-for="t in destinationOptions"
-            :key="t.name"
-            :class="['destination', envClass(t.environment)]"
-            :data-testid="`publish-dest-${t.name}`">
-            <Checkbox
-              :modelValue="selectedDestinations.has(t.name)"
-              @update:modelValue="() => toggleDestination(t.name)"
-              :inputId="`dest-${t.name}`"
-              :binary="true"
-            />
-            <span class="dest-name">{{ t.name }}</span>
-            <span v-if="!t.editable" class="dest-badge">read-only</span>
-            <span class="dest-status">{{ statusLabel(t.name) }}</span>
-          </label>
+          <template v-for="group in destinationGroups" :key="group.environment">
+            <!-- Group header — only when 2+ members. Single-member groups
+                 render flat, matching the design's "Groups of 1 stay flat"
+                 rule. Click anywhere on the header toggles the group. -->
+            <button v-if="group.members.length > 1"
+              type="button"
+              :class="['destination-group-header', envClass(group.environment)]"
+              :data-testid="`publish-dest-group-${group.environment}`"
+              @click="toggleGroup(group)">
+              <Checkbox
+                :modelValue="groupState(group) === 'all'"
+                :indeterminate="groupState(group) === 'some'"
+                :inputId="`dest-group-${group.environment}`"
+                :binary="true"
+                :tabindex="-1"
+              />
+              <span class="group-label">{{ group.environment }}</span>
+              <span class="group-count">{{ group.members.length }} targets</span>
+            </button>
+            <label
+              v-for="t in group.members"
+              :key="t.name"
+              :class="['destination', envClass(t.environment), { grouped: group.members.length > 1 }]"
+              :data-testid="`publish-dest-${t.name}`">
+              <Checkbox
+                :modelValue="selectedDestinations.has(t.name)"
+                @update:modelValue="() => toggleDestination(t.name)"
+                :inputId="`dest-${t.name}`"
+                :binary="true"
+              />
+              <span class="dest-name">{{ t.name }}</span>
+              <span v-if="!t.editable" class="dest-badge">read-only</span>
+              <span class="dest-status">{{ statusLabel(t.name) }}</span>
+            </label>
+          </template>
         </div>
       </div>
 
@@ -505,6 +570,51 @@ function envClass(env: string | undefined): string {
 }
 .destination.env-staging {
   border-left: 3px solid var(--color-env-staging-fg);
+}
+/* Members of a multi-target group — inset slightly and drop the colored
+   left border so the group header carries the environment chrome. */
+.destination.grouped {
+  margin-left: 1.25rem;
+  border-left: 1px solid var(--color-border);
+}
+
+.destination-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--p-border-radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--color-border);
+  margin-bottom: 0.125rem;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+}
+.destination-group-header:hover { opacity: 0.9; }
+.destination-group-header.env-production {
+  background: var(--color-env-prod-bg);
+  color: var(--color-env-prod-fg);
+  border-color: var(--color-env-prod-fg);
+}
+.destination-group-header.env-staging {
+  background: var(--color-env-staging-bg);
+  color: var(--color-env-staging-fg);
+  border-color: var(--color-env-staging-fg);
+}
+.group-label { flex: 1; }
+.group-count {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.75;
 }
 
 .publish-confirm-banner {

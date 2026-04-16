@@ -829,6 +829,26 @@ test.describe('Publish panel', () => {
     await expect(html).not.toHaveClass(/dark/)
   })
 
+  test('environment group header selects all members in the group', async ({ page, testSite }) => {
+    await wipe(testSite.projectDir)
+    await openPublish(page)
+    // Starter has two staging-env targets: staging + esi-test. The group
+    // header appears when a group has 2+ members; single-member groups
+    // (local when source, production) render flat.
+    const groupHeader = page.locator('[data-testid="publish-dest-group-staging"]')
+    await expect(groupHeader).toBeVisible()
+    // Neither member selected initially → clicking the header selects both.
+    // PrimeVue Checkbox exposes state via the .p-checkbox-checked class on
+    // the wrapper rather than the native `checked` attribute.
+    await groupHeader.click()
+    await expect(page.locator('[data-testid="publish-dest-staging"] .p-checkbox-checked')).toHaveCount(1)
+    await expect(page.locator('[data-testid="publish-dest-esi-test"] .p-checkbox-checked')).toHaveCount(1)
+    // Clicking again deselects both.
+    await groupHeader.click()
+    await expect(page.locator('[data-testid="publish-dest-staging"] .p-checkbox-checked')).toHaveCount(0)
+    await expect(page.locator('[data-testid="publish-dest-esi-test"] .p-checkbox-checked')).toHaveCount(0)
+  })
+
   test('select-all and select-none toggle every selectable item', async ({ page, testSite }) => {
     await wipe(testSite.projectDir)
     await openPublish(page)
