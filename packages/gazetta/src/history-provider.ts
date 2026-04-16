@@ -83,8 +83,21 @@ export function createHistoryProvider(
     return JSON.parse(await storage.readFile(indexPath)) as HistoryIndex
   }
 
+  /**
+   * Ensure the parent directory exists before writing. Object-store
+   * providers (R2, S3) ignore mkdir. Filesystem requires it because
+   * `writeFile` fails on missing parents, and our sharded blob paths
+   * (objects/<hh>/<rest>) plus revisions/rev-NNNN.json live in dirs
+   * that don't exist until the first write.
+   */
+  async function writeWithParents(path: string, content: string): Promise<void> {
+    const parent = path.substring(0, path.lastIndexOf('/'))
+    if (parent) await storage.mkdir(parent)
+    await storage.writeFile(path, content)
+  }
+
   async function writeIndex(idx: HistoryIndex): Promise<void> {
-    await storage.writeFile(indexPath, JSON.stringify(idx, null, 2) + '\n')
+    await writeWithParents(indexPath, JSON.stringify(idx, null, 2) + '\n')
   }
 
   function blobPath(hash: string): string {
@@ -118,7 +131,7 @@ export function createHistoryProvider(
     const hash = hashContent(content)
     const path = blobPath(hash)
     if (!await storage.exists(path)) {
-      await storage.writeFile(path, content)
+      await writeWithParents(path, content)
     }
     return hash
   }
@@ -147,7 +160,7 @@ export function createHistoryProvider(
       restoredFrom: input.restoredFrom,
       snapshot,
     }
-    await storage.writeFile(revisionPath(id), JSON.stringify(manifest, null, 2) + '\n')
+    await writeWithParents(revisionPath(id), JSON.stringify(manifest, null, 2) + '\n')
 
     // Update the index (append, bump counter) then apply retention. Do
     // index writes last so a mid-write failure leaves orphan blobs and

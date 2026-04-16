@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { getType, getEnvironment, isEditable } from '../../types.js'
+import { getType, getEnvironment, isEditable, isHistoryEnabled, getHistoryRetention } from '../../types.js'
 import type { StorageProvider, TargetConfig } from '../../types.js'
 import { publishItems, resolveDependencies, findFragmentDependents, findDependentsFromSidecars } from '../../publish.js'
 import type { SourceContextResolver } from '../source-context.js'
@@ -12,6 +12,8 @@ import { resolveEnvVars } from '../../targets.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from '../../templates-scan.js'
 import { hashManifest } from '../../hash.js'
 import { createContentRoot } from '../../content-root.js'
+import { createHistoryProvider } from '../../history-provider.js'
+import { recordWrite, type WrittenItem } from '../../history-recorder.js'
 
 /**
  * Progress events streamed by runPublish. Consumed both by the SSE route
@@ -312,6 +314,35 @@ export function publishRoutes(
           yield { kind: 'progress', target: targetName, current, total, label: 'cache purge' }
         }
 
+        // Record a history revision on the destination target. Design
+        // decision #18: history lives on the destination, not the
+        // source — so undo works after the source has moved on. No-op
+        // when the target's site.yaml disables history.
+        if (config && isHistoryEnabled(config)) {
+          try {
+            const history = createHistoryProvider({
+              storage: targetStorage,
+              retention: getHistoryRetention(config),
+            })
+            const items = await collectPublishedItemsForHistory(
+              source.contentRoot,
+              targetRoot,
+              targetItems,
+            )
+            await recordWrite({
+              history,
+              contentRoot: targetRoot,
+              operation: 'publish',
+              source: sourceName,
+              items,
+            })
+          } catch (err) {
+            // History is a best-effort audit layer — a write failure here
+            // must not break the publish itself. Log and continue.
+            console.warn(`    ${targetName}: history record failed — ${(err as Error).message}`)
+          }
+        }
+
         const result: PublishResult = { target: targetName, success: true, copiedFiles: totalFiles }
         results.push(result)
         console.log(`    ${targetName}: ${totalFiles} files`)
@@ -426,4 +457,37 @@ export function publishRoutes(
   })
 
   return app
+}
+
+/**
+ * Build the history `items` for a publish — one entry per published
+ * item, content = the source-side manifest. Records semantic authored
+ * state (JSON manifests) rather than target-side artifacts (static
+ * HTML, fragment indexes), so Restore is a content-level operation.
+ *
+ * `_targetRoot` is accepted for symmetry with `recordWrite`'s other
+ * path-building needs; it's unused today because we hash source
+ * content directly and let recordWrite overlay paths relative to the
+ * target's rootPath (which is `''` for target-rooted storage, the
+ * common case).
+ */
+async function collectPublishedItemsForHistory(
+  sourceRoot: import('../../content-root.js').ContentRoot,
+  _targetRoot: import('../../content-root.js').ContentRoot,
+  publishedItems: string[],
+): Promise<WrittenItem[]> {
+  const out: WrittenItem[] = []
+  for (const item of publishedItems) {
+    const manifestName = item.startsWith('pages/') ? 'page.json' : 'fragment.json'
+    const key = `${item}/${manifestName}`
+    const sourcePath = sourceRoot.path(key)
+    try {
+      const content = await sourceRoot.storage.readFile(sourcePath)
+      out.push({ path: key, content })
+    } catch {
+      // Item missing on source (unusual — publish normally reads from
+      // source manifests). Skip; snapshot stays as-was for this item.
+    }
+  }
+  return out
 }

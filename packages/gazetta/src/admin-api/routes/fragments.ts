@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import { loadSite } from '../../site-loader.js'
+import { recordWrite } from '../../history-recorder.js'
 import type { SourceContextResolver } from '../source-context.js'
 
 export function fragmentRoutes(resolve: SourceContextResolver) {
@@ -75,8 +76,19 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
       components: body.components ?? fragment.components,
     }
 
-    await storage.writeFile(join(fragment.dir, 'fragment.json'), JSON.stringify(manifest, null, 2) + '\n')
+    const manifestPath = join(fragment.dir, 'fragment.json')
+    const serialized = JSON.stringify(manifest, null, 2) + '\n'
+    await storage.writeFile(manifestPath, serialized)
     await sidecarWriter?.writeFor('fragment', name)
+
+    if (source.history) {
+      await recordWrite({
+        history: source.history,
+        contentRoot: source.contentRoot,
+        operation: 'save',
+        items: [{ path: source.contentRoot.relative(manifestPath), content: serialized }],
+      })
+    }
     return c.json({ ok: true })
   })
 
@@ -88,7 +100,17 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
 
+    const manifestPath = join(fragment.dir, 'fragment.json')
     await storage.rm(fragment.dir)
+
+    if (source.history) {
+      await recordWrite({
+        history: source.history,
+        contentRoot: source.contentRoot,
+        operation: 'save',
+        items: [{ path: source.contentRoot.relative(manifestPath), content: null }],
+      })
+    }
     return c.json({ ok: true })
   })
 

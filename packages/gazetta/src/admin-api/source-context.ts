@@ -13,6 +13,7 @@ import type { StorageProvider } from '../types.js'
 import { createContentRoot, type ContentRoot } from '../content-root.js'
 import type { SourceSidecarWriter } from '../source-sidecars.js'
 import type { TargetRegistry } from '../targets.js'
+import type { HistoryProvider } from '../history.js'
 
 export interface SourceContext {
   /** Storage provider for source reads and writes. */
@@ -44,6 +45,14 @@ export interface SourceContext {
    * source-side read path should be used (it can backfill sidecars).
    */
   readonly targetName?: string
+  /**
+   * Optional history provider for recording revisions on save. Absent
+   * when history is disabled for this target (via
+   * `history.enabled: false` in site.yaml) or when history isn't
+   * wired at the caller (tests, legacy setups). Save routes check for
+   * presence before recording — no-op if absent.
+   */
+  readonly history?: HistoryProvider
 }
 
 export interface CreateSourceContextOptions {
@@ -53,6 +62,7 @@ export interface CreateSourceContextOptions {
   /** Absolute project site directory. Defaults to `siteDir` for backward compat. */
   projectSiteDir?: string
   sidecarWriter?: SourceSidecarWriter
+  history?: HistoryProvider
 }
 
 export function createSourceContext(opts: CreateSourceContextOptions): SourceContext {
@@ -62,8 +72,18 @@ export function createSourceContext(opts: CreateSourceContextOptions): SourceCon
     projectSiteDir: opts.projectSiteDir ?? opts.siteDir,
     contentRoot: createContentRoot(opts.storage, opts.siteDir),
     sidecarWriter: opts.sidecarWriter,
+    history: opts.history,
   }
 }
+
+/**
+ * Build a HistoryProvider for a resolved target. Returns `undefined`
+ * when history is disabled (via site.yaml `history.enabled: false`).
+ * Injected via `SourceContextFromRegistryOptions.buildHistory` so the
+ * source-context module stays agnostic of target-config parsing — the
+ * caller (admin-api boot) owns the enabled/retention decision.
+ */
+export type BuildHistory = (targetName: string, storage: StorageProvider) => HistoryProvider | undefined
 
 export interface SourceContextFromRegistryOptions {
   registry: TargetRegistry
@@ -81,6 +101,8 @@ export interface SourceContextFromRegistryOptions {
    */
   projectSiteDir: string
   sidecarWriter?: SourceSidecarWriter
+  /** See BuildHistory — callable decides per-target history provider. */
+  buildHistory?: BuildHistory
 }
 
 /**
@@ -97,6 +119,7 @@ export function createSourceContextFromRegistry(opts: SourceContextFromRegistryO
       siteDir: opts.siteDir ?? '',
       projectSiteDir: opts.projectSiteDir,
       sidecarWriter: opts.sidecarWriter,
+      history: opts.buildHistory?.(name, storage),
     }),
     targetName: name,
   }
@@ -145,6 +168,8 @@ export interface RegistrySourceResolverOptions {
    * backs the registry view.
    */
   lazyInit?: (targetName: string) => Promise<void>
+  /** See BuildHistory — callable decides per-target history provider. */
+  buildHistory?: BuildHistory
 }
 
 /**
@@ -176,6 +201,7 @@ export function registrySourceResolver(opts: RegistrySourceResolverOptions): Sou
       registry: opts.registry,
       targetName: name,
       projectSiteDir: opts.projectSiteDir,
+      buildHistory: opts.buildHistory,
       siteDir: opts.siteDir,
       sidecarWriter: opts.sidecarWriter,
     })

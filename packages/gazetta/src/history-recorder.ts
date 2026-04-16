@@ -1,0 +1,222 @@
+/**
+ * Higher-level helper for recording revisions on a target.
+ *
+ * The bare `HistoryProvider.recordRevision` takes a full
+ * `items: Map<path, content>` snapshot. That's fine for testing but
+ * wasteful at runtime: every save of one page would re-hash and
+ * re-list every page + fragment on the target. This helper does the
+ * right thing:
+ *
+ *   - First revision on a target: walks the content tree once to
+ *     snapshot every manifest (page.json, fragment.json, site.yaml).
+ *   - Subsequent revisions: reads the previous snapshot and overlays
+ *     the delta (changed items the caller passes in). `readBlob` for
+ *     each carried-over path gives us the content for the new
+ *     revision's items map — at which point `recordRevision` dedupes
+ *     the unchanged blobs via content-addressing, so no new storage.
+ *
+ * SRP: this module owns the "what goes in a revision snapshot"
+ * decision. `HistoryProvider` owns layout. Callers (admin-api save /
+ * admin-api publish / CLI publish) just describe *what they wrote*
+ * and we construct the revision.
+ */
+
+import { join } from 'node:path'
+import type { StorageProvider } from './types.js'
+import type { HistoryProvider, RevisionInput, RevisionOperation } from './history.js'
+import type { ContentRoot } from './content-root.js'
+
+/** A single item that was written in this save/publish. */
+export interface WrittenItem {
+  /** Path relative to the content root, e.g. `pages/home/page.json`. */
+  path: string
+  /** Current content as stored. `null` marks a deletion. */
+  content: string | null
+}
+
+/**
+ * Location to scan when building the first revision's baseline
+ * snapshot. Each entry names a directory under the content root and
+ * the manifest filename to capture from every subdirectory.
+ */
+export interface ScanLocation {
+  /** Directory relative to the content root, e.g. `pages` or `fragments`. */
+  dir: string
+  /** Manifest filename to capture, e.g. `page.json` or `fragment.json`. */
+  manifest: string
+}
+
+/**
+ * Built-in content locations Gazetta knows about today. Callers can
+ * pass a superset (e.g. for future data/*, templates/*) — the list is
+ * part of `RecordWriteOptions` so this module stays open for extension
+ * without changes when new content kinds land.
+ */
+export const DEFAULT_SCAN_LOCATIONS: readonly ScanLocation[] = [
+  { dir: 'pages', manifest: 'page.json' },
+  { dir: 'fragments', manifest: 'fragment.json' },
+]
+
+/**
+ * Flat files at the content root to capture in the baseline snapshot
+ * (no per-subdirectory recursion). `site.yaml` is the only one today.
+ */
+export const DEFAULT_SCAN_ROOT_FILES: readonly string[] = ['site.yaml']
+
+export interface RecordWriteOptions {
+  /** HistoryProvider for the target we're recording on. */
+  history: HistoryProvider
+  /** Content root of the target — used to scan on first revision. */
+  contentRoot: ContentRoot
+  operation: RevisionOperation
+  /** Items the save/publish wrote (and optionally deleted). */
+  items: WrittenItem[]
+  /** Author identifier passed through to the manifest. */
+  author?: string
+  /** Source target name (for publish). */
+  source?: string
+  /** Optional human-readable note. */
+  message?: string
+  /** For rollback/restore: the revision id this one restored from. */
+  restoredFrom?: string
+  /**
+   * Override the directories walked during the first-revision baseline
+   * scan. Defaults to `DEFAULT_SCAN_LOCATIONS` (pages + fragments).
+   * Pass a superset if the site has extra authored content (e.g.
+   * custom `data/*.json` dirs); pass `[]` to skip directory scanning
+   * entirely (only root files + explicit items are captured).
+   */
+  scanLocations?: readonly ScanLocation[]
+  /**
+   * Override the flat files captured from the content root. Defaults
+   * to `DEFAULT_SCAN_ROOT_FILES` (`site.yaml`). Missing files are
+   * silently skipped so empty publish-targets still record cleanly.
+   */
+  scanRootFiles?: readonly string[]
+}
+
+/**
+ * Build + record a revision for the given write. Reads the previous
+ * snapshot (if any), overlays the delta, and calls
+ * `history.recordRevision`. Returns the recorded Revision.
+ *
+ * Callers are expected to have already written the items to the
+ * target's storage before invoking this; the recorder reads back via
+ * the HistoryProvider's dedup path (blobs it has already seen just
+ * `exists()` and skip) so the happy path is cheap on repeated saves
+ * of the same item.
+ */
+export async function recordWrite(opts: RecordWriteOptions) {
+  const prevItems = await loadPreviousSnapshot(
+    opts.history,
+    opts.contentRoot,
+    opts.scanLocations ?? DEFAULT_SCAN_LOCATIONS,
+    opts.scanRootFiles ?? DEFAULT_SCAN_ROOT_FILES,
+  )
+  const nextItems = new Map(prevItems)
+  for (const it of opts.items) {
+    if (it.content === null) nextItems.delete(it.path)
+    else nextItems.set(it.path, it.content)
+  }
+  const input: RevisionInput = {
+    operation: opts.operation,
+    author: opts.author,
+    source: opts.source,
+    message: opts.message,
+    restoredFrom: opts.restoredFrom,
+    items: nextItems,
+  }
+  return opts.history.recordRevision(input)
+}
+
+/**
+ * Materialize the previous revision's full content snapshot as
+ * `path → content`. If there is no previous revision, fall back to a
+ * one-time scan of the target's content tree (pages, fragments,
+ * site.yaml). That makes the first revision a proper baseline even
+ * when history was turned on after content already existed.
+ */
+async function loadPreviousSnapshot(
+  history: HistoryProvider,
+  contentRoot: ContentRoot,
+  scanLocations: readonly ScanLocation[],
+  scanRootFiles: readonly string[],
+): Promise<Map<string, string>> {
+  const [head] = await history.listRevisions(1)
+  if (head) {
+    const manifest = await history.readRevision(head.id)
+    const items = new Map<string, string>()
+    // Read blobs in parallel to avoid a big serial chain on large snapshots.
+    const entries = Object.entries(manifest.snapshot)
+    const contents = await Promise.all(entries.map(([, hash]) => history.readBlob(hash)))
+    entries.forEach(([path], i) => items.set(path, contents[i]))
+    return items
+  }
+  return scanContentTree(contentRoot, scanLocations, scanRootFiles)
+}
+
+/**
+ * One-time walk of a content root, capturing every content-defining
+ * manifest. Used only for the first revision on a target; subsequent
+ * revisions overlay deltas onto the previous snapshot.
+ *
+ * Locations walked come from `scanLocations` and `scanRootFiles` (see
+ * RecordWriteOptions) so this module stays open for extension: adding
+ * a new content kind is a caller-side change, not an edit here.
+ */
+async function scanContentTree(
+  root: ContentRoot,
+  scanLocations: readonly ScanLocation[],
+  scanRootFiles: readonly string[],
+): Promise<Map<string, string>> {
+  const items = new Map<string, string>()
+  const { storage } = root
+
+  for (const rel of scanRootFiles) {
+    const abs = root.path(rel)
+    if (await storage.exists(abs)) {
+      items.set(rel, await storage.readFile(abs))
+    }
+  }
+  for (const loc of scanLocations) {
+    await scanManifestsInto(storage, root.path(loc.dir), loc.dir, loc.manifest, items)
+  }
+
+  return items
+}
+
+/**
+ * Walk a `pages/` or `fragments/` tree, reading every matching manifest
+ * into `items` with relative-path keys. Recurses so nested dynamic
+ * routes (e.g. `blog/[slug]/page.json`) are captured.
+ *
+ * Cloud object stores (R2/S3/Azure Blob) have no "directory" concept —
+ * `exists()` on a prefix-only path returns false. Rely on `readDir`
+ * returning an empty array for missing paths instead of probing via
+ * `exists` first.
+ */
+async function scanManifestsInto(
+  storage: StorageProvider,
+  absDir: string,
+  relPrefix: string,
+  manifestName: string,
+  items: Map<string, string>,
+): Promise<void> {
+  let entries: Awaited<ReturnType<StorageProvider['readDir']>>
+  try {
+    entries = await storage.readDir(absDir)
+  } catch {
+    return // Directory doesn't exist (or provider threw) — nothing to scan.
+  }
+  for (const e of entries) {
+    if (!e.isDirectory) continue
+    const sub = join(absDir, e.name)
+    const relSub = `${relPrefix}/${e.name}`
+    const manifestPath = join(sub, manifestName)
+    if (await storage.exists(manifestPath)) {
+      items.set(`${relSub}/${manifestName}`, await storage.readFile(manifestPath))
+    }
+    // Recurse for nested routes (pages/blog/[slug]/page.json).
+    await scanManifestsInto(storage, sub, relSub, manifestName, items)
+  }
+}

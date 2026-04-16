@@ -25,6 +25,16 @@ export interface ContentRoot {
   readonly rootPath: string
   /** Build a content-relative path, joining the root prefix with the given segments. */
   path(...segments: string[]): string
+  /**
+   * Inverse of `path(...)` — strip the root prefix from an absolute
+   * storage path, yielding the content-relative form. Useful when a
+   * caller has a fully-qualified path (e.g. from a site scan result)
+   * and needs the canonical "pages/home/page.json" shape for a
+   * snapshot key. Paths that don't live under `rootPath` pass through
+   * unchanged — callers should treat that as a programmer error rather
+   * than a runtime concern.
+   */
+  relative(path: string): string
 }
 
 /** Build a ContentRoot from a storage provider and an optional root prefix. */
@@ -34,6 +44,11 @@ export function createContentRoot(storage: StorageProvider, rootPath = ''): Cont
     rootPath,
     path(...segments) {
       return rootPath ? join(rootPath, ...segments) : join(...segments)
+    },
+    relative(path) {
+      if (!rootPath) return path
+      const prefix = rootPath.endsWith('/') ? rootPath : rootPath + '/'
+      return path.startsWith(prefix) ? path.slice(prefix.length) : path
     },
   }
 }
