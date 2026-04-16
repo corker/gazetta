@@ -939,7 +939,7 @@ test.describe('Target switch preserves preview', () => {
     // Open the top-bar target switcher and select staging. The preview
     // should swap content via morphdom, preserving scroll.
     await page.locator('[data-testid="active-target-indicator"]').click()
-    await page.locator('[data-testid="active-target-menu"]').getByText('staging', { exact: true }).click()
+    await page.locator('[data-testid="active-target-menu"]').getByRole('menuitem', { name: 'staging' }).click()
 
     await expect.poll(async () => page.evaluate(() => {
       const f = document.querySelector('iframe[data-testid="preview-iframe"]') as HTMLIFrameElement | null
@@ -962,6 +962,30 @@ test.describe('Save button labeling', () => {
   })
 })
 
+test.describe('Sync indicator grouping', () => {
+  test('collapses 2+ members of an environment into a group chip at 4+ targets', async ({ page }) => {
+    // Starter has 4 targets; staging and esi-test both env=staging.
+    // That triggers grouping (threshold = 4) and collapses the two
+    // staging targets into a single expandable group chip.
+    await page.goto('/admin')
+    const group = page.locator('[data-testid="sync-chip-group-staging"]')
+    await expect(group).toBeVisible()
+    await expect(group).toContainText('staging')
+    await expect(group).toContainText('(2)')
+    // Individual member chips are hidden until the group expands.
+    await expect(page.locator('[data-testid="sync-chip-staging"]')).toHaveCount(0)
+    await expect(page.locator('[data-testid="sync-chip-esi-test"]')).toHaveCount(0)
+    // Click to expand — both member chips appear.
+    await group.click()
+    await expect(page.locator('[data-testid="sync-chip-staging"]')).toBeVisible()
+    await expect(page.locator('[data-testid="sync-chip-esi-test"]')).toBeVisible()
+    // Single-member groups (production) and the active target's
+    // non-group (local when active) don't get a group chip.
+    await expect(page.locator('[data-testid="sync-chip-group-production"]')).toHaveCount(0)
+    await expect(page.locator('[data-testid="sync-chip-production"]')).toBeVisible()
+  })
+})
+
 test.describe('Target switch with missing item', () => {
   async function wipeStaging(projectDir: string) {
     await rm(join(projectDir, 'sites/main/dist/staging'), { recursive: true, force: true })
@@ -979,7 +1003,7 @@ test.describe('Target switch with missing item', () => {
     await page.waitForSelector('[data-testid="site-page-home"]', { timeout: 10000 })
     // Switch to staging — home doesn't exist there.
     await page.locator('[data-testid="active-target-indicator"]').click()
-    await page.locator('[data-testid="active-target-menu"]').getByText('staging', { exact: true }).click()
+    await page.locator('[data-testid="active-target-menu"]').getByRole('menuitem', { name: 'staging' }).click()
     // Toast appears with a "back" action.
     const toast = page.locator('[data-testid="global-toast"]')
     await expect(toast).toBeVisible()
@@ -1007,7 +1031,7 @@ test.describe('Target switch with unsaved edits', () => {
 
     // Try to switch to staging → the unsaved-dialog opens.
     await page.locator('[data-testid="active-target-indicator"]').click()
-    await page.locator('[data-testid="active-target-menu"]').getByText('staging', { exact: true }).click()
+    await page.locator('[data-testid="active-target-menu"]').getByRole('menuitem', { name: 'staging' }).click()
     const dialog = page.getByRole('dialog', { name: /unsaved changes/i })
     await dialog.waitFor({ timeout: 5000 })
     await dialog.getByRole('button', { name: 'Cancel' }).click()

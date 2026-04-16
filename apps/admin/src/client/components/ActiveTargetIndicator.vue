@@ -21,6 +21,7 @@ import { useEditingStore } from '../stores/editing.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useToastStore } from '../stores/toast.js'
+import { groupedEntries } from '../composables/targetGrouping.js'
 import { api, type TargetInfo } from '../api/client.js'
 
 const activeTarget = useActiveTargetStore()
@@ -43,12 +44,34 @@ const environmentClass = computed(() => {
 
 const editableLabel = computed(() => activeTarget.isActiveEditable ? 'editable' : 'read-only')
 
-const menuItems = computed(() => activeTarget.targets.map((t: TargetInfo) => ({
-  label: t.name,
-  icon: iconFor(t),
-  class: t.name === activeTarget.activeTargetName ? 'active' : '',
-  command: () => switchTo(t.name),
-})))
+/**
+ * Switcher menu items. Flat at ≤3 targets; grouped by environment at
+ * 4+ (with single-member groups staying flat) — design-editor-ux.md
+ * "Scaling to 4+ targets". PrimeVue Menu renders nested `items` as
+ * a section header with child entries, which is close to the design's
+ * "sub-menus" rendering.
+ */
+const menuItems = computed(() => {
+  const entries = groupedEntries(activeTarget.targets, activeTarget.targets.length)
+  return entries.map(entry => {
+    if (entry.kind === 'single') return targetItem(entry.target)
+    return {
+      // PrimeVue Menu renders a label + nested items as a section.
+      // Keep the environment name as the header so grouping reads at a glance.
+      label: entry.group.environment,
+      items: entry.group.members.map(targetItem),
+    }
+  })
+})
+
+function targetItem(t: TargetInfo) {
+  return {
+    label: t.name,
+    icon: iconFor(t),
+    class: t.name === activeTarget.activeTargetName ? 'active' : '',
+    command: () => switchTo(t.name),
+  }
+}
 
 /**
  * Switch active target with two guards:

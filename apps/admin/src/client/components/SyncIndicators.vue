@@ -3,24 +3,30 @@
  * Compact sync status chips for non-active targets.
  *
  * One chip per non-active target, showing "name · N behind" or "name · in sync".
+ * At 4+ total targets, members of the same `environment` collapse into a
+ * single group chip (e.g. "production (2) · 7 behind") that expands
+ * inline on click — design-editor-ux.md "Scaling to 4+ targets".
+ *
  * Environment chrome matches the ActiveTargetIndicator so the top bar reads
  * as a single row of related pills.
  *
  * Progressive disclosure: hidden entirely when there are no non-active
- * targets to report on. Each chip is a read-only summary — clicking it
- * (wired later) will jump to the changes drawer or publish panel.
+ * targets to report on.
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useSyncStatusStore } from '../stores/syncStatus.js'
+import { useActiveTargetStore } from '../stores/activeTarget.js'
+import { groupedEntries, type TargetGroup } from '../composables/targetGrouping.js'
 import type { TargetInfo } from '../api/client.js'
 
 const sync = useSyncStatusStore()
+const activeTarget = useActiveTargetStore()
 
 const emit = defineEmits<{ (e: 'select', name: string): void }>()
 
-function environmentClass(t: TargetInfo): string {
-  if (t.environment === 'production') return 'env-production'
-  if (t.environment === 'staging') return 'env-staging'
+function environmentClass(env: string | undefined): string {
+  if (env === 'production') return 'env-production'
+  if (env === 'staging') return 'env-staging'
   return 'env-local'
 }
 
@@ -45,25 +51,111 @@ function statusClass(t: TargetInfo): string {
   return 'state-behind'
 }
 
-const chips = computed(() => sync.nonActiveTargets)
+/**
+ * Aggregate label for a collapsed group — "N behind" sums members,
+ * treating unpublished (firstPublish) members as their full item count.
+ * When every member is in sync, shows "in sync". When any member is
+ * still loading, shows "…".
+ */
+function groupStatusLabel(group: TargetGroup): string {
+  if (group.members.some(m => sync.isLoading(m.name))) return '…'
+  const statuses = group.members.map(m => sync.get(m.name))
+  if (statuses.some(s => !s)) return '—'
+  const total = statuses.reduce((n, s) => n + (s?.changedCount ?? 0), 0)
+  const anyUnpublished = statuses.some(s => s?.firstPublish)
+  if (total === 0 && !anyUnpublished) return 'in sync'
+  if (total === 0 && anyUnpublished) return 'not yet published'
+  return `${total} behind`
+}
+
+/**
+ * Worst-case state class for a group — drives border color and emphasis.
+ * "behind" beats "unpublished" beats "synced" so the chip visually
+ * surfaces anything that needs attention.
+ */
+function groupStatusClass(group: TargetGroup): string {
+  if (group.members.some(m => sync.isLoading(m.name))) return 'state-loading'
+  if (group.members.some(m => sync.errorFor(m.name))) return 'state-error'
+  const statuses = group.members.map(m => sync.get(m.name))
+  const totalChanged = statuses.reduce((n, s) => n + (s?.changedCount ?? 0), 0)
+  if (totalChanged > 0) return 'state-behind'
+  if (statuses.some(s => s?.firstPublish)) return 'state-unpublished'
+  return 'state-synced'
+}
+
+// Render shape: flat singles when the fleet is small, grouped when 4+.
+// Passes the TOTAL target count (not just non-active) so sync chips
+// match the rest of the UI's grouping decision.
+const entries = computed(() =>
+  groupedEntries(sync.nonActiveTargets, activeTarget.targets.length),
+)
+
+const expandedGroups = ref(new Set<string>())
+function toggleGroup(env: string) {
+  const next = new Set(expandedGroups.value)
+  if (next.has(env)) next.delete(env); else next.add(env)
+  expandedGroups.value = next
+}
+
+const hasAnything = computed(() => entries.value.length > 0)
 </script>
 
 <template>
-  <div v-if="chips.length > 0" class="sync-indicators" data-testid="sync-indicators">
-    <button
-      v-for="t in chips"
-      :key="t.name"
-      type="button"
-      class="sync-chip"
-      :class="[environmentClass(t), statusClass(t)]"
-      :data-testid="`sync-chip-${t.name}`"
-      :title="`${t.name}: ${statusLabel(t)} — click to see changes`"
-      @click="emit('select', t.name)">
-      <span class="dot" aria-hidden="true" />
-      <span class="name">{{ t.name }}</span>
-      <span class="sep" aria-hidden="true">·</span>
-      <span class="status">{{ statusLabel(t) }}</span>
-    </button>
+  <div v-if="hasAnything" class="sync-indicators" data-testid="sync-indicators">
+    <template v-for="entry in entries" :key="entry.kind === 'single' ? entry.target.name : entry.group.environment">
+      <!-- Flat single target chip (≤3 targets, OR 1-member groups in 4+) -->
+      <button
+        v-if="entry.kind === 'single'"
+        type="button"
+        class="sync-chip"
+        :class="[environmentClass(entry.target.environment), statusClass(entry.target)]"
+        :data-testid="`sync-chip-${entry.target.name}`"
+        :title="`${entry.target.name}: ${statusLabel(entry.target)} — click to see changes`"
+        @click="emit('select', entry.target.name)">
+        <span class="dot" aria-hidden="true" />
+        <span class="name">{{ entry.target.name }}</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span class="status">{{ statusLabel(entry.target) }}</span>
+      </button>
+
+      <!-- Group chip (4+ total, 2+ members in this env). Click expands
+           inline to show per-member chips underneath. -->
+      <template v-else>
+        <button
+          type="button"
+          class="sync-chip sync-chip-group"
+          :class="[environmentClass(entry.group.environment), groupStatusClass(entry.group), { expanded: expandedGroups.has(entry.group.environment) }]"
+          :data-testid="`sync-chip-group-${entry.group.environment}`"
+          :title="`${entry.group.environment}: ${entry.group.members.length} targets — click to expand`"
+          :aria-expanded="expandedGroups.has(entry.group.environment)"
+          @click="toggleGroup(entry.group.environment)">
+          <span class="dot" aria-hidden="true" />
+          <span class="name">{{ entry.group.environment }}</span>
+          <span class="group-count">({{ entry.group.members.length }})</span>
+          <span class="sep" aria-hidden="true">·</span>
+          <span class="status">{{ groupStatusLabel(entry.group) }}</span>
+          <i class="pi" :class="expandedGroups.has(entry.group.environment) ? 'pi-chevron-down' : 'pi-chevron-right'" aria-hidden="true" />
+        </button>
+        <!-- Expanded member chips. Rendered inline so they share the
+             top-bar row; parent handles overflow. -->
+        <template v-if="expandedGroups.has(entry.group.environment)">
+          <button
+            v-for="m in entry.group.members"
+            :key="m.name"
+            type="button"
+            class="sync-chip sync-chip-member"
+            :class="[environmentClass(m.environment), statusClass(m)]"
+            :data-testid="`sync-chip-${m.name}`"
+            :title="`${m.name}: ${statusLabel(m)} — click to see changes`"
+            @click="emit('select', m.name)">
+            <span class="dot" aria-hidden="true" />
+            <span class="name">{{ m.name }}</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <span class="status">{{ statusLabel(m) }}</span>
+          </button>
+        </template>
+      </template>
+    </template>
   </div>
 </template>
 
@@ -126,4 +218,34 @@ const chips = computed(() => sync.nonActiveTargets)
 .sync-chip.env-production .dot { color: var(--color-env-prod-fg); }
 .sync-chip.env-staging { border-color: var(--color-env-staging-fg); }
 .sync-chip.env-staging .dot { color: var(--color-env-staging-fg); }
+
+/* Group chip — slightly heavier than individual chips, chevron on the end. */
+.sync-chip-group {
+  font-weight: 500;
+}
+.sync-chip-group .pi {
+  font-size: 0.625rem;
+  opacity: 0.7;
+  margin-left: 0.125rem;
+}
+.sync-chip-group .group-count {
+  font-weight: 400;
+  opacity: 0.65;
+  margin-left: -0.125rem;
+}
+.sync-chip-group.expanded {
+  background: var(--color-hover-bg);
+}
+
+/* Member chip — inset and slightly lighter so the group→members
+   relationship reads at a glance. */
+.sync-chip-member {
+  opacity: 0.85;
+  padding-left: 0.625rem;
+}
+.sync-chip-member .name::before {
+  content: '↳ ';
+  opacity: 0.5;
+  font-weight: 400;
+}
 </style>
