@@ -209,7 +209,12 @@ const hasAnything = computed(() => entries.value.length > 0)
 .sync-chip.state-behind { color: var(--color-fg); border-color: var(--color-fg); opacity: 0.9; }
 .sync-chip.state-unpublished { color: var(--color-muted); }
 .sync-chip.state-error { color: var(--color-danger-fg); }
-.sync-chip.state-loading { opacity: 0.55; }
+/* No chip-wide opacity for loading — even at 0.7 it dragged
+   `--color-muted` (the chip's text color) below the 4.5:1 contrast
+   floor against the dark content background. The "…" character in
+   the status field is enough to convey "in progress" without dimming
+   the env name and count alongside it. */
+.sync-chip.state-loading .status { font-style: italic; }
 
 /* Environment tints — only on the border/dot to stay compact. The active
    target (in ActiveTargetIndicator) gets the full color fill. */
@@ -229,17 +234,19 @@ const hasAnything = computed(() => entries.value.length > 0)
 }
 .sync-chip-group .group-count {
   font-weight: 400;
-  opacity: 0.65;
+  /* No opacity on the count — it compounded with the chip's muted text
+     color and pushed contrast below 4.5:1. The lighter font-weight is
+     enough visual hierarchy. */
   margin-left: -0.125rem;
 }
 .sync-chip-group.expanded {
   background: var(--color-hover-bg);
 }
 
-/* Member chip — inset and slightly lighter so the group→members
-   relationship reads at a glance. */
+/* Member chip — inset under the group header. The `↳` prefix on the
+   name carries the "child of group" signal; chip-wide opacity would
+   push contrast under the WCAG floor. */
 .sync-chip-member {
-  opacity: 0.85;
   padding-left: 0.625rem;
 }
 .sync-chip-member .name::before {

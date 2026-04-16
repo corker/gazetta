@@ -176,22 +176,22 @@ async function handleDelete(node: SiteNode, e: Event) {
 
 <style scoped>
 .site-tree { font-size: 13px; line-height: 22px; }
-.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; padding: 4px 8px; font-weight: 600; }
-.section-divider { border-top: 1px solid rgba(128, 128, 128, 0.15); margin: 4px 8px; }
+/* Color via tokens — `--color-muted` resolves to PrimeVue's
+   text-muted-color which auto-flips between light (#64748b) and dark
+   (#a1a1aa). Both pass WCAG AA against their respective content
+   backgrounds, fixing the color-contrast violations the previous
+   hardcoded #9ca3af / #6b7280 produced in dark mode (where the
+   `:global(.dark)` overrides lost specificity to the scoped selectors —
+   see team-preferences.md rule 12). */
+.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); padding: 4px 8px; font-weight: 600; }
+.section-divider { border-top: 1px solid var(--color-border); margin: 4px 8px; }
 .node-item { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; margin: 0 2px; cursor: pointer; border-radius: 3px; }
-.node-item:hover { background: rgba(128, 128, 128, 0.08); }
+.node-item:hover { background: var(--color-hover-bg); }
 .node-item.selected { background: rgba(167, 139, 250, 0.15); box-shadow: inset 2px 0 0 #a78bfa; }
-.node-icon { width: 16px; text-align: center; font-size: 10px; color: #999; flex-shrink: 0; }
-.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6b7280; }
-.node-item.selected .node-label { color: #374151; }
-.node-item:hover .node-label { color: #374151; }
-:global(.dark) .section-label { color: #666; }
-:global(.dark) .section-divider { border-top-color: #27272a; }
-:global(.dark) .node-item:hover { background: rgba(255, 255, 255, 0.05); }
-:global(.dark) .node-icon { color: #666; }
-:global(.dark) .node-label { color: #bbb; }
-:global(.dark) .node-item.selected .node-label { color: #e4e4e7; }
-:global(.dark) .node-item:hover .node-label { color: #e4e4e7; }
+.node-icon { width: 16px; text-align: center; font-size: 10px; color: var(--color-muted); flex-shrink: 0; opacity: 0.85; }
+.node-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-muted); }
+.node-item.selected .node-label,
+.node-item:hover .node-label { color: var(--color-fg); }
 .node-dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning-fg); flex-shrink: 0; margin-right: 2px; }
 .node-delete { opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-delete { opacity: 1; }

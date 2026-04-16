@@ -32,10 +32,7 @@ const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
  * the dark-mode token work hasn't reached yet.
  */
 const BASELINE: Array<{ id: string; reason: string }> = [
-  {
-    id: 'color-contrast',
-    reason: 'tinted state colors (muted labels, env badges) below 4.5:1 in dark mode — needs token-layer pass',
-  },
+  // { id: 'color-contrast', ... } — TEMPORARILY removed to surface offenders
 ]
 
 type Violation = { id: string; impact?: string | null; help: string; helpUrl: string; nodes: unknown[] }

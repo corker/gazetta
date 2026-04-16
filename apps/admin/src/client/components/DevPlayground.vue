@@ -494,28 +494,34 @@ function generateMockContent(schema: Record<string, unknown>): Record<string, un
 
 </style>
 
-<!-- Dark mode — non-scoped to avoid HMR issues with :global() in scoped blocks -->
+<!-- Dark mode — non-scoped (avoids HMR issues with :global() in scoped
+     blocks). Each rule is anchored under `.playground` so the styles
+     only apply on the dev playground page; otherwise generic class
+     names like `.section-label` and `.sidebar-item` would leak into
+     other components that happen to share them (e.g. SiteTree's
+     `.section-label`, which would inherit the playground's `#555`
+     dark color and fail color-contrast). -->
 <style>
-.dark .playground-sidebar { border-right-color: #27272a; }
-.dark .sidebar-header { color: #666; }
-.dark .section-label { color: #555; }
-.dark .section-label-toggle:hover { color: #999; }
-.dark .sidebar-item { color: #bbb; }
-.dark .sidebar-item:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
-.dark .sidebar-item.active { background: rgba(102, 126, 234, 0.15); color: #667eea; }
-.dark .main-toolbar { border-bottom-color: #27272a; }
-.dark .toolbar-label { color: #999; }
-.dark .toolbar-label strong { color: #e4e4e7; }
-.dark .toolbar-hint { color: #555; }
-.dark .toolbar-btn { border-color: #333; color: #999; }
-.dark .toolbar-btn:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
-.dark .mount-error { color: #f87171; background: rgba(248, 113, 113, 0.08); }
-.dark .value-inspector { border-left-color: #27272a; background: #0c0c14; }
-.dark .inspector-header { color: #666; border-bottom-color: #27272a; }
-.dark .inspector-value { color: #e4e4e7; }
-.dark .inspector-value .jv-key { color: #8888a0; }
-.dark .inspector-value .jv-str { color: #4ade80; }
-.dark .inspector-value .jv-num { color: #fbbf24; }
-.dark .inspector-value .jv-bool { color: #a78bfa; }
-.dark .inspector-value .jv-null { color: #52525b; }
+.dark .playground .playground-sidebar { border-right-color: #27272a; }
+.dark .playground .sidebar-header { color: #666; }
+.dark .playground .section-label { color: #555; }
+.dark .playground .section-label-toggle:hover { color: #999; }
+.dark .playground .sidebar-item { color: #bbb; }
+.dark .playground .sidebar-item:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
+.dark .playground .sidebar-item.active { background: rgba(102, 126, 234, 0.15); color: #667eea; }
+.dark .playground .main-toolbar { border-bottom-color: #27272a; }
+.dark .playground .toolbar-label { color: #999; }
+.dark .playground .toolbar-label strong { color: #e4e4e7; }
+.dark .playground .toolbar-hint { color: #555; }
+.dark .playground .toolbar-btn { border-color: #333; color: #999; }
+.dark .playground .toolbar-btn:hover { background: rgba(255, 255, 255, 0.05); color: #e4e4e7; }
+.dark .playground .mount-error { color: #f87171; background: rgba(248, 113, 113, 0.08); }
+.dark .playground .value-inspector { border-left-color: #27272a; background: #0c0c14; }
+.dark .playground .inspector-header { color: #666; border-bottom-color: #27272a; }
+.dark .playground .inspector-value { color: #e4e4e7; }
+.dark .playground .inspector-value .jv-key { color: #8888a0; }
+.dark .playground .inspector-value .jv-str { color: #4ade80; }
+.dark .playground .inspector-value .jv-num { color: #fbbf24; }
+.dark .playground .inspector-value .jv-bool { color: #a78bfa; }
+.dark .playground .inspector-value .jv-null { color: #52525b; }
 </style>
