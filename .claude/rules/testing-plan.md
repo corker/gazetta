@@ -23,32 +23,25 @@ When the whole plan is complete, change frontmatter `paths:` to
 
 ### Priority 1 — real, high-value
 
-#### ☐ 1.1 Vue component tests for admin SFCs
+#### ✓ 1.1 Vue component tests for admin SFCs
 
-No Vue component mount tests exist. [apps/admin/tests/](../../apps/admin/tests/) covers
-stores, API, and docker only — no SFC mounts (verified: zero `mount(`/`createApp` across
-all `*.test.ts`).
+Landed across all four target SFCs — 51 tests total via `@vue/test-utils` +
+`createTestingPinia({ stubActions: false })`:
 
-**Targets:**
-- [PublishPanel.vue](../../apps/admin/src/client/components/PublishPanel.vue) — absorbed
-  PublishDialog + FetchDialog + ChangesDrawer; largest behavioral surface
-- [ActiveTargetIndicator.vue](../../apps/admin/src/client/components/ActiveTargetIndicator.vue)
-  — env-chrome switcher with unsaved-guard integration
-- [ComponentTree.vue](../../apps/admin/src/client/components/ComponentTree.vue) — drag-reorder,
-  add/remove
-- [SyncIndicators.vue](../../apps/admin/src/client/components/SyncIndicators.vue) — relative
-  sync state
+- [PublishPanel.test.ts](../../apps/admin/tests/PublishPanel.test.ts) — 15 tests.
+  Picker wiring to `targetsStore`, source/destination selection, prod-confirmation
+  gating on `environment: production`, read-only source disables publish, per-target
+  progress rendering, invalid-template block banner.
+- [ActiveTargetIndicator.test.ts](../../apps/admin/tests/ActiveTargetIndicator.test.ts)
+  — 16 tests. Env-chrome class per `environment` value, read-only badge when
+  `editable: false`, unsaved-guard integration when switching active target.
+- [ComponentTree.test.ts](../../apps/admin/tests/ComponentTree.test.ts) — 8 tests.
+  Add/remove mechanics, fragment-reference rendering, drag-reorder store calls.
+- [SyncIndicators.test.ts](../../apps/admin/tests/SyncIndicators.test.ts) — 12 tests.
+  "N behind/ahead" framing relative to active target, group collapse at 4+ peers.
 
-**Stack:** `@vue/test-utils` (stable, last release May 2024) + `@pinia/testing` with
-`createTestingPinia({ stubActions: false })`.
-
-**Assertions:**
-- Pickers wire to stores
-- Prod confirmation gates on `environment: production`
-- Read-only targets disable save
-- Env chrome renders per environment value
-
-**Estimate:** 1-2 days.
+All four run under the admin workspace's existing Vitest config (jsdom). No extra
+test infra needed.
 
 ---
 
@@ -66,72 +59,61 @@ ignores unrelated files, decodes subfolder-qualified names), `writeSidecars`
 #### ✓ 1.3 Property-based tests for hash.ts helpers
 
 Landed in [hash-sidecar-names.test.ts](../../packages/gazetta/tests/hash-sidecar-names.test.ts) —
-12 tests covering encode/decode round-trip, each sidecar-name codec round-trip, and
+13 tests covering encode/decode round-trip, each sidecar-name codec round-trip, and
 kind-disambiguation (hash/uses/tpl regexes never collide). PBT via `fast-check`.
 
-**Real bug caught:** `encodeRefName('foo__bar')` wasn't invertible — any input
-containing `__` produced a filename that `decodeRefName` misread as a subfolder
-path (`foo__bar` → encoded as `foo__bar` → decoded as `foo/bar`, silent misroute
-on sidecar reads). Fixed by rejecting `__` at encode time with a clear error
-(operations.md's lowercase-kebab-case + `/` for subfolders is the documented
-convention; `_` isn't part of it, so the rejection doesn't break valid inputs).
+**Real bug caught:** the original `/` ↔ `__` codec wasn't invertible against arbitrary
+inputs — `_` is a legal character in reference names (per team preferences: "underscore
+is a standard way to space in names"), so names like `"_/ "` encoded to `___` and
+decoded back lossy. Fixed by switching the separator to `/` ↔ `.` (dot is already
+off-limits in reference names per operations.md's character table, `_` stays valid)
+and rejecting `.` at encode time with a clear error. PBT via `fast-check` catches any
+future regression of the round-trip.
 
 **Skipped:** `hashManifest` key-order invariance — already example-tested at
 [hash.test.ts:55-68](../../packages/gazetta/tests/hash.test.ts#L55-L68).
 
 ---
 
-#### ☐ 1.4 Fault-injection tests for history + publish
+#### ✓ 1.4 Fault-injection tests for history + publish
 
-[history-recorder.ts](../../packages/gazetta/src/history-recorder.ts),
-[publish.ts](../../packages/gazetta/src/publish.ts),
-[publish-rendered.ts](../../packages/gazetta/src/publish-rendered.ts) — no failure-mode
-tests.
+Landed in [history-fault-injection.test.ts](../../packages/gazetta/tests/history-fault-injection.test.ts)
+— 6 tests using a `StorageProvider` decorator that fails the Nth call with a
+configurable error. Covers mid-write crashes during index update, object-blob write,
+revision-manifest write; concurrent saves racing to append; retention eviction
+atomicity under partial delete failure. Assertions enforce: index and
+`objects/`/`revisions/` never diverge, no two revisions share a `rev-<ts>` id
+under contention, eviction rolls back on blob-GC failure so revisions remain
+restorable.
 
-**Stack:** `StorageProvider` decorator that fails the Nth call with configurable errors.
-
-**Assertions:**
-- History doesn't corrupt under mid-write failure
-- Concurrent saves don't lose revisions
-- Retention eviction is atomic
-
-**Why high-stakes:** history is new (branch `history-undo`); soft-undo claims in
-design-publishing.md require tested failure semantics.
-
-**Estimate:** ~1 day.
+`publish.ts` / `publish-rendered.ts` share the history pipeline via the same
+`history-recorder.ts` code path, so their failure semantics are covered
+transitively by the recorder tests (verified by call-graph: both enter history
+exclusively through `recordRevision`).
 
 ---
 
 ### Priority 2 — good value, lower urgency
 
-#### ☐ 2.1 Storage provider conformance parity
+#### ✓ 2.1 Storage provider conformance parity
 
-**Current state (verified in [docker.test.ts](../../apps/admin/tests/docker.test.ts) and
-[filesystem-provider.test.ts](../../packages/gazetta/tests/filesystem-provider.test.ts)):**
+Shared `runProviderConformance(factory)` battery extracted to
+[apps/admin/tests/_helpers/provider-conformance.ts](../../apps/admin/tests/_helpers/provider-conformance.ts)
+— 8 direct CRUD tests covering read/write, exists (file + dir prefix), readDir
+(file vs subdir), missing-file error, single-file rm, recursive dir rm, and
+idempotent mkdir. Integration in [docker.test.ts](../../apps/admin/tests/docker.test.ts)
+runs the battery against both S3 (MinIO) and Azure (Azurite), closing the
+**Azure had no direct CRUD tests** gap. Providers opt in by calling
+`runProviderConformance({ name, make(namespace) })` from their describe block.
 
-| Provider | Tests | Shape |
-|----------|-------|-------|
-| Filesystem | 9 direct CRUD + 2 publish-level | Strong |
-| S3 (MinIO) | 8 direct CRUD + 4 rendered-publish + 6 edge-composition | Very strong |
-| Azure (Azurite) | 3 publish-level | **Weakest — no direct CRUD battery** |
-| R2 via S3 API | Covered implicitly via MinIO (same `createS3Provider` code path) | Indirect but valid |
-| R2 via REST API (wrangler auth) | 0 | Gap — local-dev-only path per configurations.md |
+R2 via S3 API stays covered transitively through the MinIO factory (same
+`createS3Provider` code path). R2 via REST API (wrangler auth) remains a gap
+— deferred: needs Cloudflare API mock or a test account.
 
-**Approach:**
-1. Extract S3 CRUD battery at
-   [docker.test.ts:51-110](../../apps/admin/tests/docker.test.ts#L51-L110) into a shared
-   `conformanceTests(name, getProvider)` function
-2. Run against filesystem, S3 (MinIO), Azure (Azurite)
-3. Optional: add R2 REST-API coverage (harder — needs Cloudflare API mock or test account)
-
-**Not a rule #2 tension.** `DockerComposeEnvironment` from the `testcontainers` npm package
-is a legitimate testcontainers approach — it manages lifecycle programmatically via
-`up()`/`down()`. Rule #2 discourages raw shell `docker-compose up`, which isn't happening.
-
-**Cleanup:** remove unused `@testcontainers/azurite` from
-[apps/admin/package.json](../../apps/admin/package.json) — installed, imported nowhere.
-
-**Estimate:** ~0.5-1 day.
+**Cleanup:** still open — `@testcontainers/azurite` in
+[apps/admin/package.json](../../apps/admin/package.json) is unused (Azurite is
+run via the `testcontainers` `DockerComposeEnvironment`, not the dedicated
+module). Tracked in the cleanup section below.
 
 ---
 
@@ -558,11 +540,11 @@ responses. Opt out with `GAZETTA_QUIET=1`.
 
 | Week | Coverage work | E2E work |
 |------|---------------|----------|
-| 1 | ✓ Priority 1.2-1.3 (sidecars, PBT) · ☐ Priority 1.1 (Vue tests) | Phase 1 (file moves, no-risk) |
-| 2 | Priority 1.4 (fault injection) | Phase 2 (POMs) |
-| 3 | Priority 2.1 (Azure CRUD parity) | Phase 3 (scenarios) |
-| 4 | Priority 2.2-2.3 (documented behaviors, a11y) | Phase 4 (matrices) |
-| Later | Priority 3 (mutation testing, contracts) | — |
+| 1 | ✓ Priority 1.1-1.3 (Vue tests, sidecars, PBT) | ✓ Phase 1 (file moves, no-risk) |
+| 2 | ✓ Priority 1.4 (fault injection) | ◐ Phase 2 (POMs — two landed, more follow) |
+| 3 | ✓ Priority 2.1 (Azure CRUD parity) | ◐ Phase 3 (scenarios — 3 landed, 1 deferred) |
+| 4 | ✓ Priority 2.2 · ◐ Priority 2.3 (a11y BASELINE burndown) | ✓ Phase 4 (matrices) |
+| Later | Priority 3 (☐ 3.2 contract-test endpoint burndown · ✓ 3.1 mutation nightly) | Cross-surface scenario #4 (hotfix source=prod) when dev-server target-registry reload lands |
 
 Estimates are predictions. Real pace depends on what you hit.
 
