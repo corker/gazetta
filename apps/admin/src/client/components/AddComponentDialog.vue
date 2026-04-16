@@ -4,10 +4,11 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Listbox from 'primevue/listbox'
-import { api } from '../api/client.js'
+import { useTemplatesApi } from '../composables/api.js'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'add', name: string, template: string): void }>()
+const templatesApi = useTemplatesApi()
 const templates = ref<Array<{ name: string }>>([])
 const selectedTemplate = ref<string | null>(null)
 const componentName = ref('')
@@ -15,7 +16,7 @@ const creating = ref(false)
 const error = ref<string | null>(null)
 
 onMounted(async () => {
-  templates.value = await api.getTemplates()
+  templates.value = await templatesApi.getTemplates()
 })
 
 async function handleCreate() {

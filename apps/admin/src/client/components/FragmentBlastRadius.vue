@@ -10,7 +10,9 @@
  * a confusing "?" in the editor header.
  */
 import { ref, watch, onMounted } from 'vue'
-import { api } from '../api/client.js'
+import { useFragmentsApi } from '../composables/api.js'
+
+const fragmentsApi = useFragmentsApi()
 
 const props = defineProps<{
   /** Fragment name (not including the leading @). */
@@ -26,7 +28,7 @@ const loading = ref(false)
 async function load(name: string) {
   loading.value = true
   try {
-    const r = await api.getDependents(`fragments/${name}`)
+    const r = await fragmentsApi.getDependents(`fragments/${name}`)
     pages.value = r.pages
   } catch {
     pages.value = null

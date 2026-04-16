@@ -4,13 +4,15 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Listbox from 'primevue/listbox'
-import { api } from '../api/client.js'
+import { usePagesApi, useTemplatesApi } from '../composables/api.js'
 import { useSiteStore } from '../stores/site.js'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const site = useSiteStore()
+const pagesApi = usePagesApi()
+const templatesApi = useTemplatesApi()
 const templates = ref<Array<{ name: string }>>([])
 const selectedTemplate = ref<string | null>(null)
 const pageName = ref('')
@@ -24,7 +26,7 @@ const derivedRoute = computed(() => {
 })
 
 onMounted(async () => {
-  templates.value = await api.getTemplates()
+  templates.value = await templatesApi.getTemplates()
 })
 
 async function handleCreate() {
@@ -33,7 +35,7 @@ async function handleCreate() {
   error.value = null
   try {
     const name = pageName.value.trim().toLowerCase().replace(/\s+/g, '-').replace(/\/+/g, '/')
-    await api.createPage({ name, template: selectedTemplate.value })
+    await pagesApi.createPage({ name, template: selectedTemplate.value })
     await site.load()
     emit('close')
   } catch (err) {

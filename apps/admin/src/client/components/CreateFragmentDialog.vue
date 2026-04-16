@@ -4,13 +4,15 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Listbox from 'primevue/listbox'
-import { api } from '../api/client.js'
+import { useFragmentsApi, useTemplatesApi } from '../composables/api.js'
 import { useSiteStore } from '../stores/site.js'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const site = useSiteStore()
+const fragmentsApi = useFragmentsApi()
+const templatesApi = useTemplatesApi()
 const templates = ref<Array<{ name: string }>>([])
 const selectedTemplate = ref<string | null>(null)
 const fragmentName = ref('')
@@ -18,7 +20,7 @@ const creating = ref(false)
 const error = ref<string | null>(null)
 
 onMounted(async () => {
-  templates.value = await api.getTemplates()
+  templates.value = await templatesApi.getTemplates()
 })
 
 async function handleCreate() {
@@ -27,7 +29,7 @@ async function handleCreate() {
   error.value = null
   try {
     const name = fragmentName.value.trim().toLowerCase().replace(/\s+/g, '-')
-    await api.createFragment({ name, template: selectedTemplate.value })
+    await fragmentsApi.createFragment({ name, template: selectedTemplate.value })
     await site.load()
     emit('close')
   } catch (err) {

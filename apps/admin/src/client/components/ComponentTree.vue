@@ -6,8 +6,10 @@ import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
-import { api } from '../api/client.js'
+import { useFragmentsApi } from '../composables/api.js'
 import AddComponentDialog from './AddComponentDialog.vue'
+
+const fragmentsApi = useFragmentsApi()
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
 function hashPath(path: string): string {
@@ -63,7 +65,7 @@ async function buildComponentNode(entry: import('../api/client.js').ComponentEnt
     const gzId = hashPath(treePath)
     map.set(gzId, { isFragment: true, fragName })
     try {
-      const frag = await api.getFragment(fragName)
+      const frag = await fragmentsApi.getFragment(fragName)
       const children = frag.components
         ? await Promise.all(frag.components.map((c, i) => buildComponentNode(c, i, treePath, map)))
         : []

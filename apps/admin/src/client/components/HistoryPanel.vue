@@ -18,11 +18,14 @@ import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
-import { api, type RevisionSummary } from '../api/client.js'
+import type { RevisionSummary } from '../api/client.js'
+import { useHistoryApi } from '../composables/api.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useSyncStatusStore } from '../stores/syncStatus.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
+
+const historyApi = useHistoryApi()
 
 const props = defineProps<{
   visible: boolean
@@ -48,7 +51,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const res = await api.listHistory(targetName.value)
+    const res = await historyApi.listHistory(targetName.value)
     revisions.value = res.revisions
   } catch (err) {
     error.value = (err as Error).message
@@ -67,7 +70,7 @@ async function onRestore(id: string) {
   if (!targetName.value || restoringId.value) return
   restoringId.value = id
   try {
-    await api.restoreRevision(targetName.value, id)
+    await historyApi.restoreRevision(targetName.value, id)
     // If we restored the active target, the admin's cached content +
     // editor form are stale — reuse the same refresh the save-toast
     // Undo uses so both entry points behave identically. For other

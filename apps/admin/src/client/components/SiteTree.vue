@@ -7,7 +7,7 @@ import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useToastStore } from '../stores/toast.js'
 import { usePublishStatusStore } from '../stores/publishStatus.js'
-import { api } from '../api/client.js'
+import { usePagesApi, useFragmentsApi } from '../composables/api.js'
 import CreatePageDialog from './CreatePageDialog.vue'
 import CreateFragmentDialog from './CreateFragmentDialog.vue'
 import FragmentBlastRadius from './FragmentBlastRadius.vue'
@@ -26,6 +26,8 @@ const selection = useSelectionStore()
 const editing = useEditingStore()
 const toast = useToastStore()
 const publishStatus = usePublishStatusStore()
+const pagesApi = usePagesApi()
+const fragmentsApi = useFragmentsApi()
 const selectedKey = ref<string | null>(null)
 const showCreatePage = ref(false)
 const showCreateFragment = ref(false)
@@ -84,8 +86,8 @@ async function handleDelete(node: SiteNode, e: Event) {
   e.stopPropagation()
   if (!confirm(`Delete ${node.type} "${node.name}"? This cannot be undone.`)) return
   try {
-    if (node.type === 'page') await api.deletePage(node.name)
-    else await api.deleteFragment(node.name)
+    if (node.type === 'page') await pagesApi.deletePage(node.name)
+    else await fragmentsApi.deleteFragment(node.name)
     const isSelected = selection.type === node.type && selection.name === node.name
     if (isSelected) editing.clear()
     await site.load()
