@@ -70,6 +70,22 @@ const fragmentScopeGzId = computed(() => {
   return hashPath(`@${selection.name}`)
 })
 
+/**
+ * Accessible name for the preview iframe. Axe's frame-title rule
+ * requires a non-empty title; screen readers announce it when users
+ * enter the frame. Compose target + route so the title updates as
+ * either changes (e.g., switching active target or selecting a
+ * different page). Falls back to a static label when nothing is
+ * selected yet — the iframe is briefly present before first load.
+ */
+const previewTitle = computed(() => {
+  const target = activeTarget.activeTargetName
+  const route = previewRoute.value
+  if (target && route) return `Preview of ${route} on ${target}`
+  if (route) return `Preview of ${route}`
+  return 'Site preview'
+})
+
 // Device presets
 const devicePresets = [
   { label: 'Desktop', width: '100%', icon: 'pi pi-desktop' },
@@ -568,6 +584,7 @@ watchDebounced(
       </div>
       <div class="preview-frame-wrapper">
         <iframe ref="iframeRef" class="preview-iframe" data-testid="preview-iframe"
+          :title="previewTitle"
           :style="{ width: previewWidth, maxWidth: '100%' }" />
       </div>
     </template>
