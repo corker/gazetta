@@ -1071,3 +1071,64 @@ test.describe('Undo last save', () => {
     await expect(restoredField).toHaveValue(original, { timeout: 5000 })
   })
 })
+
+test.describe('History panel', () => {
+  test('switcher menu opens history panel; Restore reverts content', async ({ page }) => {
+    await openEditor(page, 'home')
+    // Make a save so there's >= 2 revisions (baseline + save). Without
+    // a save the history panel is "no revisions yet" — not what we
+    // want to test.
+    await page.locator('[data-testid="component-hero"]').click()
+    const titleField = page.locator('input[name="root_title"]').first()
+    await titleField.waitFor({ timeout: 5000 })
+    const original = await titleField.inputValue()
+    await titleField.fill(original + ' — panel edit')
+    await page.locator('[data-testid="save-btn"]').click()
+    // Wait for save toast to confirm the save landed.
+    await expect(page.locator('[data-testid="global-toast"]'))
+      .toContainText('Saved', { timeout: 5000 })
+    // Dismiss toast so it doesn't race the panel.
+    await page.waitForTimeout(500)
+
+    // Open the target switcher → click "View history".
+    await page.locator('[data-testid="active-target-indicator"]').click()
+    await page.locator('[data-testid="active-target-menu"]')
+      .getByRole('menuitem', { name: /view history/i }).click()
+    // Panel opens. Baseline + save = 2 rows; head is the save.
+    const panel = page.locator('[data-testid="history-panel"]')
+    await expect(panel).toBeVisible()
+    const rows = panel.locator('[data-testid^="history-row-"]')
+    await expect(rows).toHaveCount(2)
+    // Head row has 'current' badge and a disabled Restore button.
+    const headRow = rows.first()
+    await expect(headRow).toContainText('current')
+    // Baseline is the second row — restore it.
+    const baselineRow = rows.nth(1)
+    await baselineRow.locator('button', { hasText: 'Restore' }).click()
+
+    // Toast confirms; close panel and verify content reverted.
+    await expect(page.locator('[data-testid="global-toast"]'))
+      .toContainText(/Restored/i, { timeout: 10000 })
+    await page.locator('[data-testid="history-panel-close"]').click()
+    const restoredField = page.locator('input[name="root_title"]').first()
+    await expect(restoredField).toHaveValue(original, { timeout: 5000 })
+  })
+
+  test('history panel shows "no revisions" on a target with no history', async ({ page, testSite }) => {
+    // Staging exists but hasn't been published to — no .gazetta/history/.
+    // Need to wipe first in case earlier tests published.
+    await rm(join(testSite.projectDir, 'sites/main/dist/staging/.gazetta'), { recursive: true, force: true })
+    await page.goto('/admin')
+    // Switch to staging via the top-bar menu.
+    await page.locator('[data-testid="active-target-indicator"]').click()
+    await page.locator('[data-testid="active-target-menu"]')
+      .getByRole('menuitem', { name: 'staging' }).click()
+    await expect(page.locator('[data-testid="active-target-indicator"]'))
+      .toContainText('staging')
+    // Open history.
+    await page.locator('[data-testid="active-target-indicator"]').click()
+    await page.locator('[data-testid="active-target-menu"]')
+      .getByRole('menuitem', { name: /view history/i }).click()
+    await expect(page.locator('[data-testid="history-empty"]')).toBeVisible()
+  })
+})
