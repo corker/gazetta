@@ -378,16 +378,33 @@ Write scenarios as Given/When/Then prose comments over POM method calls — no C
 
 ### Phased migration
 
-#### ☐ Phase 1 — Reorganize (zero behavior change)
+#### ✓ Phase 1 — Reorganize (zero behavior change)
 
-- Create `pages/`, `scenarios/`, `features/`, `matrices/`, `production/` directories
-- Move `production-*.test.ts` into `production/`
-- Split [editor.test.ts](../../tests/e2e/editor.test.ts) by describe block into ~7-10
-  feature files (consolidate related describes — all theme into `theme.spec.ts`, all
-  publish-panel into `publish-panel-ui.spec.ts`, etc.)
-- Pure relocation — zero logic changes
+Landed. Split the old 1,246-line `editor.test.ts` (64 tests, 27 describes) into 12 feature
+files + a shared `helpers.ts` for `openEditor`. Test count preserved exactly: 64 before, 64
+after. All tests pass.
 
-**Estimate:** ~1 day.
+**New layout** (flat under `tests/e2e/`, naming `.spec.ts` for the new files):
+
+- `smoke.spec.ts` — admin loads, toolbar tooltips
+- `theme.spec.ts` — user theme, theme toggle, toast
+- `site-tree.spec.ts` — dirty indicators
+- `editor.spec.ts` — default editor, custom editor, custom field, rapid selection
+- `unsaved-guard.spec.ts` — unsaved dialog, component stashing, escape key
+- `deep-linking.spec.ts` — deep links + dev playground deep links
+- `dev-playground.spec.ts` — dev playground
+- `component-ops.spec.ts` — add/move/remove
+- `publish.spec.ts` — publish panel, fragment blast radius, save labeling, sync grouping
+- `target-switch.spec.ts` — preserves preview / missing item / unsaved edits
+- `history.spec.ts` — undo last save + history panel
+- `keyboard.spec.ts` — keyboard shortcuts
+
+Deferred subdirectory layout (`scenarios/`, `features/`, `matrices/`, `production/`) — flat
+under `tests/e2e/` was simpler for Phase 1. Subdirectories can come in later phases as the
+suite grows; today's 12 files are fine flat.
+
+playwright.config.ts `testMatch` extended to both `.test.ts` and `.spec.ts`. Production
+files stay on `.test.ts` and are excluded via `testIgnore`.
 
 ---
 

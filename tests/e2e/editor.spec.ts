@@ -1,0 +1,93 @@
+import { test, expect } from './fixtures'
+import { openEditor } from './helpers'
+
+test.describe('Default editor', () => {
+  test('loads @rjsf form for template without custom editor', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Click a component without custom editor (features)
+    await page.click('[data-testid="component-features"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Should show the default form with heading field
+    const editorText = await page.locator('[data-testid="editor-panel"]').textContent()
+    expect(editorText).toContain('heading')
+  })
+})
+
+test.describe('Custom editor', () => {
+  test('loads custom editor for hero template', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Click hero component (has custom editor)
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Wait for custom editor to load and render content
+    const editorPanel = page.locator('[data-testid="editor-panel"]')
+    await expect(editorPanel).toContainText('Welcome to Gazetta', { timeout: 20000 })
+  })
+
+  test('falls back to default form when switching to template without editor', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // First load hero (custom editor)
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Then switch to features (no custom editor)
+    await page.click('[data-testid="component-features"]')
+    // Wait for the editor to remount with the new content
+    await page.waitForFunction(() => {
+      const panel = document.querySelector('[data-testid="editor-panel"]')
+      return panel?.textContent?.includes('heading')
+    }, { timeout: 5000 })
+
+    const editorText = await page.locator('[data-testid="editor-panel"]').textContent()
+    expect(editorText).toContain('heading')
+  })
+})
+
+test.describe('Custom field', () => {
+  test('brand-color field renders inside banner editor', async ({ page }) => {
+    await openEditor(page, 'home')
+
+    // Click banner component (uses custom brand-color field)
+    await page.click('[data-testid="component-banner"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+
+    // Wait for the custom field to load (async import)
+    await page.waitForFunction(() => {
+      const container = document.querySelector('[data-testid="editor-container"]')
+      return container?.querySelector('input[type="color"]') !== null
+    }, { timeout: 10000 })
+
+    // Verify preset color buttons exist (brand-color has 6 presets)
+    const buttons = await page.locator('[data-testid="editor-container"] button[title]').count()
+    expect(buttons).toBeGreaterThanOrEqual(6)
+
+    // Verify the hex input has a color value
+    const hexInput = page.locator('[data-testid="editor-container"] input[type="text"]').last()
+    const value = await hexInput.inputValue()
+    expect(value).toMatch(/^#[0-9a-f]{6}$/i)
+  })
+})
+
+test.describe('Rapid selection', () => {
+  test('last click wins when rapidly switching pages', async ({ page }) => {
+    await page.goto('/admin')
+    await expect(page.locator('[data-testid="site-page-home"]')).toBeVisible()
+
+    // Click two pages rapidly without waiting for the first to load
+    page.click('[data-testid="site-page-home"]')
+    await page.click('[data-testid="site-page-about"]')
+
+    // Wait for preview to settle — the about page should win
+    const iframe = page.frameLocator('[data-testid="preview-iframe"]')
+    await iframe.locator('[data-gz]').first().waitFor({ timeout: 10000 })
+
+    // The selected item in the tree should be about, not home
+    await expect(page.locator('[data-testid="site-page-about"].selected')).toBeVisible()
+    await expect(page.locator('[data-testid="site-page-home"].selected')).not.toBeVisible()
+  })
+})
