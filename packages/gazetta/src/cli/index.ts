@@ -1317,13 +1317,19 @@ async function runDev(siteDir: string, port: number) {
   // is enough, the watcher recovers for still-existing paths.
   const siteWatcher = watch(siteDir, { recursive: true }, (_event, filename) => {
     if (!filename) return
+    // .gazetta/ is a reserved namespace (history, source-sidecars, etc.) that
+    // the runtime never reads at request time. Writes there are extremely
+    // frequent (one per save/publish × per-target) — treating them as
+    // content changes would flood SSE reloads and reset preview iframe
+    // scroll state mid-test. Filter them out at the watcher boundary.
+    const norm = filename.replace(/\\/g, '/')
+    if (norm.includes('/.gazetta/') || norm.startsWith('.gazetta/')) return
     if (filename.endsWith('.json') || filename.endsWith('.yaml')) {
       console.log(`  Manifest changed: ${filename}`)
       invalidateAllTemplates()
       // Refresh source sidecars for external edits (git pull, direct file
       // edit). PUT routes already handle their own writes — this catches
       // everything outside the admin UI.
-      const norm = filename.replace(/\\/g, '/')
       const pageMatch = /^pages\/(.+)\/page\.json$/.exec(norm)
       const fragMatch = /^fragments\/(.+)\/fragment\.json$/.exec(norm)
       if (pageMatch) cmsApp?.writeSourceSidecar('page', pageMatch[1]).catch(() => {})
