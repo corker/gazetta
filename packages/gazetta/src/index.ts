@@ -34,10 +34,19 @@ export type { SourceContext } from './admin-api/source-context.js'
 export type {
   HistoryProvider,
   Revision,
+  RevisionInput,
   RevisionManifest,
   RevisionOperation,
   HistoryRetention,
 } from './history.js'
+export { createHistoryProvider } from './history-provider.js'
+export type { CreateHistoryProviderOptions } from './history-provider.js'
+export {
+  isHistoryEnabled,
+  getHistoryRetention,
+  DEFAULT_HISTORY_RETENTION,
+} from './types.js'
+export type { HistoryConfig } from './types.js'
 
 // Renderer
 export { renderComponent, renderFragment, renderPage } from './renderer.js'

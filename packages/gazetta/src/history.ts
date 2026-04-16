@@ -61,36 +61,60 @@ export interface HistoryRetention {
   maxRevisions?: number
 }
 
+/** Input to `recordRevision` — metadata plus the current content tree. */
+export interface RevisionInput {
+  operation: RevisionOperation
+  /** Author identifier (free-form for v1). */
+  author?: string
+  /** Source target, when this revision was produced by a publish. */
+  source?: string
+  /** Optional human-readable note. */
+  message?: string
+  /** For rollback/restore: the revision id this one restored from. */
+  restoredFrom?: string
+  /**
+   * Full content tree snapshot at this revision: `itemPath → content string`.
+   * Content is stored as UTF-8 text — covers every item type Gazetta
+   * tracks today (JSON manifests, YAML, HTML, CSS, JS). Binary assets
+   * (images, fonts) would need a separate mechanism; revisit when those
+   * become first-class.
+   *
+   * Unchanged items should carry identical content across calls so the
+   * provider can dedupe via content-addressing.
+   */
+  items: Map<string, string>
+}
+
 /**
  * Uniform history API. Implemented on top of any StorageProvider — reads
- * and writes bytes under `.gazetta/history/`.
+ * and writes bytes under `.gazetta/history/`. No provider-native
+ * versioning (S3 object versions, git commits) is used.
  */
 export interface HistoryProvider {
   /**
    * Record a new revision on the target.
    *
-   * Implementation: writes any new item blobs to `objects/<hash>`, writes the
-   * revision manifest to `revisions/rev-NNNN.json`, appends to `index.json`,
-   * and applies retention (evicts oldest if over limit).
+   * Writes any new item blobs to `objects/<hash[:2]>/<hash[2:]>`, writes
+   * the revision manifest to `revisions/rev-NNNN.json`, updates
+   * `index.json`, and applies retention (evicts oldest if over limit).
+   *
+   * `items` parameter carries the full content tree; only blobs that
+   * don't already exist are written. Returns the recorded Revision.
    */
-  recordRevision(revision: Omit<Revision, 'id'>): Promise<Revision>
+  recordRevision(input: RevisionInput): Promise<Revision>
 
-  /** List revisions, newest first. */
+  /** List revisions, newest first. `limit` caps the list size. */
   listRevisions(limit?: number): Promise<Revision[]>
 
   /** Read a revision's full manifest (metadata + snapshot). */
   readRevision(id: string): Promise<RevisionManifest>
 
   /** Read a content blob by hash (e.g. to restore an item's state). */
-  readBlob(hash: string): Promise<Uint8Array>
+  readBlob(hash: string): Promise<string>
 
   /**
-   * Delete a revision and its manifest. Orphaned blobs are garbage-collected
-   * by the implementation (lazy or immediate, adapter's choice).
+   * Delete a revision and its manifest. Orphaned blobs are garbage-
+   * collected by the implementation (lazy or immediate, adapter's choice).
    */
   deleteRevision(id: string): Promise<void>
 }
-
-// Implementation (createHistoryProvider) lands in Phase 6. Earlier phases
-// depend only on the HistoryProvider interface above (dependency inversion),
-// so no factory stub is needed here.

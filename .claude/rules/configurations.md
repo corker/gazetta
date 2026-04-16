@@ -241,6 +241,9 @@ targets:                                   # required — at least one target
       purge:                               # CDN cache purge
         type: cloudflare
         apiToken: "${CLOUDFLARE_API_TOKEN}"
+    history:                               # optional — per-target undo / rollback (default: enabled, retain 50)
+      enabled: true                        # set to false to skip .gazetta/history/ writes entirely
+      retention: 50                        # keep at most N most-recent revisions; oldest evicted
 ```
 
 Custom site-level settings can be added as top-level fields — accessible to templates via
