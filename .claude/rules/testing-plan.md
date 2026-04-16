@@ -198,32 +198,55 @@ this is nightly-only for a reason. When raising `thresholds.break`, do it gradua
 
 ---
 
-#### ◐ 3.2 Contract tests via shared Zod schemas
+#### ✓ 3.2 Contract tests via shared Zod schemas
 
-First slice landed: `POST /api/pages` now has a Zod schema in
-[packages/gazetta/src/admin-api/schemas/pages.ts](../../packages/gazetta/src/admin-api/schemas/pages.ts),
-exposed via a new subpath export `gazetta/admin-api/schemas`. Server validates with
-`safeParse()`, client derives request/response types via `z.infer`.
+Landed across five PRs (#151, #168, #169, #170, #171) — 11 admin
+endpoints now share Zod schemas as the single source of truth for
+request/response shapes. 56 contract tests in
+[apps/admin/tests/api-contract.test.ts](../../apps/admin/tests/api-contract.test.ts).
+
+**Covered endpoints** (server validates with `safeParse`, client
+derives types via `z.infer`):
+
+| Endpoint | Shapes |
+|---|---|
+| `POST /api/pages` + list | CreatePageRequest, CreatePageResponse, PageSummary |
+| `POST /api/fragments` + list | CreateFragmentRequest, CreateFragmentResponse, FragmentSummary |
+| `GET /api/templates` | TemplateSummary |
+| `GET /api/fields` | FieldSummary |
+| `GET /api/targets` | TargetInfo + TargetEnvironment / TargetType (z.enum) |
+| `GET /api/site` | SiteManifest (loose so empty-target fallback passes) |
+| `GET /api/dependents` | DependentsResponse |
+| `GET /api/compare` | CompareResult + InvalidTemplate |
+| `POST /api/publish` + `/publish/stream` | PublishResult + PublishProgress (z.discriminatedUnion, 6 variants) |
+| `GET /api/history` + `POST /api/history/{undo,restore}` | RevisionSummary, ListHistoryResponse, RestoreRevisionResponse |
+| `POST /api/fetch` | FetchResponse |
 
 **Pattern established:**
 - Schemas live under `src/admin-api/schemas/{endpoint}.ts`
 - Re-exported from `schemas/index.ts` (barrel)
-- Subpath export keeps Hono + storage providers off the client's type graph
-- Contract test at
-  [apps/admin/tests/api-contract.test.ts](../../apps/admin/tests/api-contract.test.ts)
-  asserts value-level conformance (compile-time drift is already caught by `z.infer`)
+- Subpath export `gazetta/admin-api/schemas` keeps Hono + storage
+  providers off the client's type graph
+- Client drops local interface/type declarations; derives all via
+  `z.infer`
 
-**Drift caught while landing:** The client's `createPage` body type was `{ name, template }`
-but the server already accepted an optional `content` field. The schema made this visible
-and the migration widened the client type to match.
+**Drift caught while landing:**
+- `createPage` body type was `{ name, template }` but the server
+  already accepted an optional `content` field — the schema made this
+  visible and the migration widened the client type
+- `PublishProgress` 6-variant union moved from hand-maintained TS
+  union to `z.discriminatedUnion` — kind-mismatch rejection now has
+  test coverage where before drift would bite silently
 
-**Follow-ups (per-endpoint migration):** The remaining 20+ routes still use hand-rolled
-shape checks. Each migration is mechanical — same pattern, one PR per route group.
-Good starter tickets.
+**Remaining (deferred, not blocking):**
+- `GET /api/preview` — JSON configured-preview-data lookup; not used
+  by the admin SPA
+- `GET /api/templates/:name/schema` — spreads an arbitrary JSON
+  Schema with sibling `hasEditor` / `editorUrl` / `fieldsBaseUrl`
+  fields. Migration is blocked on reshaping the wire format into a
+  proper `{ jsonSchema, ... }` envelope — a separate refactor.
 
 **Skip:** Pact — overkill for single consumer/provider.
-
-**Estimate:** ~1 day, mostly refactoring.
 
 ---
 
@@ -545,7 +568,7 @@ responses. Opt out with `GAZETTA_QUIET=1`.
 | 2 | ✓ Priority 1.4 (fault injection) | ◐ Phase 2 (POMs — two landed, more follow) |
 | 3 | ✓ Priority 2.1 (Azure CRUD parity) | ◐ Phase 3 (scenarios — 3 landed, 1 deferred) |
 | 4 | ✓ Priority 2.2 · ◐ Priority 2.3 (a11y BASELINE burndown) | ✓ Phase 4 (matrices) |
-| Later | Priority 3 (☐ 3.2 contract-test endpoint burndown · ✓ 3.1 mutation nightly) | Cross-surface scenario #4 (hotfix source=prod) when dev-server target-registry reload lands |
+| Later | Priority 3 (✓ 3.1 mutation nightly · ✓ 3.2 contract-test endpoint burndown) | Cross-surface scenario #4 (hotfix source=prod) when dev-server target-registry reload lands |
 
 Estimates are predictions. Real pace depends on what you hit.
 
