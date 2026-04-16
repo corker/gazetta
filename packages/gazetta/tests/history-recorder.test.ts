@@ -1,0 +1,219 @@
+/**
+ * Unit tests for the history-recorder helper. Covers the two-phase
+ * behavior: first revision scans the tree, subsequent revisions
+ * overlay deltas from the previous snapshot.
+ */
+import { describe, it, expect, beforeEach } from 'vitest'
+import type { StorageProvider } from '../src/types.js'
+import { createContentRoot } from '../src/content-root.js'
+import { createHistoryProvider } from '../src/history-provider.js'
+import { recordWrite } from '../src/history-recorder.js'
+
+function memoryStorage(): StorageProvider & { dump(): Map<string, string>; seed(entries: Record<string, string>): void } {
+  const files = new Map<string, string>()
+  return {
+    async readFile(path) {
+      const v = files.get(path)
+      if (v === undefined) throw new Error(`ENOENT: ${path}`)
+      return v
+    },
+    async writeFile(path, content) { files.set(path, content) },
+    async exists(path) { return files.has(path) },
+    async readDir(path) {
+      const prefix = path.endsWith('/') ? path : path + '/'
+      const dirs = new Set<string>()
+      const files_ = new Set<string>()
+      for (const p of files.keys()) {
+        if (!p.startsWith(prefix)) continue
+        const rest = p.slice(prefix.length)
+        const seg = rest.split('/')[0]
+        if (!seg) continue
+        if (rest.includes('/')) dirs.add(seg)
+        else files_.add(seg)
+      }
+      return [
+        ...[...dirs].map(name => ({ name, isDirectory: true, isFile: false })),
+        ...[...files_].filter(n => !dirs.has(n)).map(name => ({ name, isDirectory: false, isFile: true })),
+      ]
+    },
+    async mkdir() {},
+    async rm(path) {
+      files.delete(path)
+      const prefix = path.endsWith('/') ? path : path + '/'
+      for (const p of [...files.keys()]) {
+        if (p.startsWith(prefix)) files.delete(p)
+      }
+    },
+    dump() { return files },
+    seed(entries) {
+      for (const [k, v] of Object.entries(entries)) files.set(k, v)
+    },
+  }
+}
+
+describe('recordWrite', () => {
+  let storage: ReturnType<typeof memoryStorage>
+  beforeEach(() => { storage = memoryStorage() })
+
+  it('first revision snapshots the full content tree', async () => {
+    // Seed some content before the first save.
+    storage.seed({
+      'site.yaml': 'name: demo\n',
+      'pages/home/page.json': '{"template":"page-default"}',
+      'pages/about/page.json': '{"template":"page-default"}',
+      'fragments/header/fragment.json': '{"template":"header-layout"}',
+    })
+    const history = createHistoryProvider({ storage })
+    const contentRoot = createContentRoot(storage)
+
+    // Simulate a save of pages/home: author just edited the manifest.
+    storage.seed({ 'pages/home/page.json': '{"template":"page-default","content":{"title":"Home"}}' })
+    const rev = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{
+        path: 'pages/home/page.json',
+        content: '{"template":"page-default","content":{"title":"Home"}}',
+      }],
+    })
+
+    expect(rev.id).toBe('rev-0001')
+    const manifest = await history.readRevision(rev.id)
+    // Full tree captured — not just the one item that was written.
+    expect(Object.keys(manifest.snapshot).sort()).toEqual([
+      'fragments/header/fragment.json',
+      'pages/about/page.json',
+      'pages/home/page.json',
+      'site.yaml',
+    ])
+  })
+
+  it('second revision overlays the delta onto the previous snapshot', async () => {
+    storage.seed({
+      'site.yaml': 'name: demo\n',
+      'pages/home/page.json': 'v1',
+      'pages/about/page.json': 'unchanged',
+    })
+    const history = createHistoryProvider({ storage })
+    const contentRoot = createContentRoot(storage)
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v1' }],
+    })
+
+    // Second save — only pages/home changes, pages/about carries forward.
+    const rev2 = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v2' }],
+    })
+
+    const m2 = await history.readRevision(rev2.id)
+    expect(Object.keys(m2.snapshot).sort()).toEqual([
+      'pages/about/page.json',
+      'pages/home/page.json',
+      'site.yaml',
+    ])
+    // pages/about carries forward with an unchanged hash (same blob).
+    const m1 = await history.readRevision('rev-0001')
+    expect(m2.snapshot['pages/about/page.json']).toBe(m1.snapshot['pages/about/page.json'])
+    // pages/home has a different hash.
+    expect(m2.snapshot['pages/home/page.json']).not.toBe(m1.snapshot['pages/home/page.json'])
+  })
+
+  it('null content marks a deletion in the next snapshot', async () => {
+    storage.seed({
+      'pages/home/page.json': 'v1',
+      'pages/old-contact/page.json': 'gone',
+    })
+    const history = createHistoryProvider({ storage })
+    const contentRoot = createContentRoot(storage)
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v1' }],
+    })
+
+    const rev2 = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/old-contact/page.json', content: null }],
+    })
+
+    const m = await history.readRevision(rev2.id)
+    expect(m.snapshot).not.toHaveProperty('pages/old-contact/page.json')
+    expect(m.snapshot).toHaveProperty('pages/home/page.json')
+  })
+
+  it('publish revision passes source + operation through to the manifest', async () => {
+    storage.seed({ 'pages/home/page.json': 'local-content' })
+    const history = createHistoryProvider({ storage })
+    const contentRoot = createContentRoot(storage)
+
+    const rev = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'publish',
+      source: 'local',
+      message: 'promote local → prod',
+      items: [{ path: 'pages/home/page.json', content: 'local-content' }],
+    })
+
+    const m = await history.readRevision(rev.id)
+    expect(m.operation).toBe('publish')
+    expect(m.source).toBe('local')
+    expect(m.message).toBe('promote local → prod')
+  })
+
+  it('nested page routes are captured in the initial scan', async () => {
+    storage.seed({
+      'pages/blog/[slug]/page.json': '{"template":"blog-post"}',
+      'pages/blog/hello/page.json': '{"template":"blog-post"}',
+      'pages/home/page.json': '{"template":"page-default"}',
+    })
+    const history = createHistoryProvider({ storage })
+    const contentRoot = createContentRoot(storage)
+    const rev = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: '{"template":"page-default"}' }],
+    })
+    const m = await history.readRevision(rev.id)
+    expect(Object.keys(m.snapshot).sort()).toEqual([
+      'pages/blog/[slug]/page.json',
+      'pages/blog/hello/page.json',
+      'pages/home/page.json',
+    ])
+  })
+
+  it('unchanged content across revisions dedupes via content-addressed blobs', async () => {
+    storage.seed({
+      'pages/home/page.json': 'same',
+      'pages/about/page.json': 'same',
+    })
+    const history = createHistoryProvider({ storage })
+    const contentRoot = createContentRoot(storage)
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'same' }],
+    })
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'same' }],
+    })
+    // Two items with identical content + two revisions, but only one blob.
+    const blobs = [...storage.dump().keys()].filter(k => k.startsWith('.gazetta/history/objects/'))
+    expect(blobs).toHaveLength(1)
+  })
+})

@@ -7,6 +7,8 @@ import { memoizeAsync } from '../concurrency.js'
 import { createSourceSidecarWriter, type SourceSidecarWriter } from '../source-sidecars.js'
 import { createContentRoot } from '../content-root.js'
 import { createTargetRegistryView } from '../targets.js'
+import { createHistoryProvider } from '../history-provider.js'
+import { isHistoryEnabled, getHistoryRetention } from '../types.js'
 import { createSourceContext, staticSourceResolver, registrySourceResolver, type SourceContext, type SourceContextResolver } from './source-context.js'
 import { authMiddleware } from './middleware/auth.js'
 import { siteRoutes } from './routes/site.js'
@@ -137,6 +139,14 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
         const maybeInit = storage as StorageProvider & { init?: () => Promise<void> }
         if (typeof maybeInit.init === 'function') await maybeInit.init()
         providers.set(name, storage)
+      },
+      // Build a HistoryProvider per target, honoring the site.yaml
+      // `history` block (enabled/retention). Returns undefined when the
+      // target has history turned off — routes no-op on absent provider.
+      buildHistory: (name, storage) => {
+        const config = opts.targetConfigs![name]
+        if (!config || !isHistoryEnabled(config)) return undefined
+        return createHistoryProvider({ storage, retention: getHistoryRetention(config) })
       },
     })
   } else {

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
 import { loadSite } from '../../site-loader.js'
+import { recordWrite } from '../../history-recorder.js'
 import type { SourceContextResolver } from '../source-context.js'
 
 export function pageRoutes(resolve: SourceContextResolver) {
@@ -87,8 +88,22 @@ export function pageRoutes(resolve: SourceContextResolver) {
       components: body.components ?? page.components,
     }
 
-    await storage.writeFile(join(page.dir, 'page.json'), JSON.stringify(manifest, null, 2) + '\n')
+    const manifestPath = join(page.dir, 'page.json')
+    const serialized = JSON.stringify(manifest, null, 2) + '\n'
+    await storage.writeFile(manifestPath, serialized)
     await sidecarWriter?.writeFor('page', name)
+
+    // Record a history revision for this save — no-op when history is
+    // disabled for the target (source.history is undefined). Relative
+    // path for the snapshot key so revisions don't leak target-rooting.
+    if (source.history) {
+      await recordWrite({
+        history: source.history,
+        contentRoot: source.contentRoot,
+        operation: 'save',
+        items: [{ path: source.contentRoot.relative(manifestPath), content: serialized }],
+      })
+    }
     return c.json({ ok: true })
   })
 
@@ -100,7 +115,17 @@ export function pageRoutes(resolve: SourceContextResolver) {
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
 
+    const manifestPath = join(page.dir, 'page.json')
     await storage.rm(page.dir)
+
+    if (source.history) {
+      await recordWrite({
+        history: source.history,
+        contentRoot: source.contentRoot,
+        operation: 'save',
+        items: [{ path: source.contentRoot.relative(manifestPath), content: null }],
+      })
+    }
     return c.json({ ok: true })
   })
 

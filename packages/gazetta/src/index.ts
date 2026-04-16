@@ -42,6 +42,16 @@ export type {
 export { createHistoryProvider } from './history-provider.js'
 export type { CreateHistoryProviderOptions } from './history-provider.js'
 export {
+  recordWrite,
+  DEFAULT_SCAN_LOCATIONS,
+  DEFAULT_SCAN_ROOT_FILES,
+} from './history-recorder.js'
+export type {
+  RecordWriteOptions,
+  WrittenItem,
+  ScanLocation,
+} from './history-recorder.js'
+export {
   isHistoryEnabled,
   getHistoryRetention,
   DEFAULT_HISTORY_RETENTION,
