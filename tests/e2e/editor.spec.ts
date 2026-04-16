@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
+import { SiteTreePom } from './pages/SiteTree'
 
 test.describe('Default editor', () => {
   test('loads @rjsf form for template without custom editor', async ({ page }) => {
@@ -76,18 +77,21 @@ test.describe('Custom field', () => {
 test.describe('Rapid selection', () => {
   test('last click wins when rapidly switching pages', async ({ page }) => {
     await page.goto('/admin')
-    await expect(page.locator('[data-testid="site-page-home"]')).toBeVisible()
+    const tree = new SiteTreePom(page)
+    await expect(tree.pageRow('home')).toBeVisible()
 
-    // Click two pages rapidly without waiting for the first to load
-    page.click('[data-testid="site-page-home"]')
-    await page.click('[data-testid="site-page-about"]')
+    // Click two pages rapidly without waiting for the first to load.
+    // Intentionally omit `await` on the first click so the two commands
+    // race — we're testing the "last click wins" invariant.
+    void tree.pageRow('home').click()
+    await tree.openPage('about')
 
     // Wait for preview to settle — the about page should win
     const iframe = page.frameLocator('[data-testid="preview-iframe"]')
     await iframe.locator('[data-gz]').first().waitFor({ timeout: 10000 })
 
     // The selected item in the tree should be about, not home
-    await expect(page.locator('[data-testid="site-page-about"].selected')).toBeVisible()
-    await expect(page.locator('[data-testid="site-page-home"].selected')).not.toBeVisible()
+    await expect(tree.selectedPage('about')).toBeVisible()
+    await expect(tree.selectedPage('home')).not.toBeVisible()
   })
 })

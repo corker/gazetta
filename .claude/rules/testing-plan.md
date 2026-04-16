@@ -410,21 +410,27 @@ files stay on `.test.ts` and are excluded via `testIgnore`.
 
 #### ◐ Phase 2 — Page Objects
 
-First POM landed: [PublishPanelPom](../../tests/e2e/pages/PublishPanel.ts). Covers the
-full Publish-panel surface — opening, source/destinations, items, publish action (with
-prod confirmation variant), status surfaces (confirm banner, invalid-templates, progress,
-per-target results). Migrated the full `Publish panel` describe in
-[publish.spec.ts](../../tests/e2e/publish.spec.ts) — 14 tests, test count unchanged,
-pass rate unchanged.
+Two POMs landed:
+
+**[PublishPanelPom](../../tests/e2e/pages/PublishPanel.ts)** — full Publish-panel surface:
+opening, source/destinations, items, publish action (with prod confirmation variant),
+status surfaces (confirm banner, invalid-templates, progress, per-target results).
+Migrated the `Publish panel` describe in [publish.spec.ts](../../tests/e2e/publish.spec.ts)
+(14 tests).
+
+**[SiteTreePom](../../tests/e2e/pages/SiteTree.ts)** — site tree sidebar: page/fragment
+rows, dirty dots, delete buttons, new-page/new-fragment creation buttons, selected-state
+helpers (`selectedPage` / `selectedFragment`) for the `.selected` class. Migrated 27
+selectors across 7 spec files (smoke, site-tree, editor, deep-linking, publish,
+target-switch, unsaved-guard).
 
 **Pattern:** POMs live under `tests/e2e/pages/`, one file per surface. Composition, no
 inheritance — each POM takes a `page` in the constructor. Methods expose user-level
-actions; getters expose locators; assertions stay in the tests. Matches
+actions; getters/methods return locators; assertions stay in the tests. Matches
 [Playwright POM docs](https://playwright.dev/docs/pom).
 
-**Follow-ups:** SiteTreePom + ComponentTreePom — deferred to PRs that actually migrate
-tests using them. Building POMs without consumers is dead code; adding a POM with its
-first migration keeps the API honest.
+**Follow-ups:** ComponentTreePom — deferred to PR that migrates component-ops.spec and
+similar. Each POM with its first consumer keeps the API honest (avoids dead-code POMs).
 
 ---
 

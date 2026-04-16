@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
+import { SiteTreePom } from './pages/SiteTree'
 
 test.describe('Unsaved changes dialog', () => {
   test('shows styled dialog with Save/Discard/Cancel when leaving with unsaved changes', async ({ page }) => {
@@ -62,7 +63,8 @@ test.describe('Unsaved changes dialog', () => {
 
     // Dialog closes, back to browse mode (SiteTree visible)
     await expect(page.locator('.p-dialog')).not.toBeVisible()
-    await expect(page.locator('[data-testid="site-page-home"]')).toBeVisible()
+    const tree = new SiteTreePom(page)
+    await expect(tree.pageRow('home')).toBeVisible()
   })
 })
 
