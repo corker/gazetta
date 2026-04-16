@@ -147,28 +147,25 @@ three real claims:
 
 ---
 
-#### ◐ 2.3 Accessibility scans in e2e
+#### ✓ 2.3 Accessibility scans in e2e
 
 Landed via `@axe-core/playwright` in [tests/e2e/a11y.test.ts](../../tests/e2e/a11y.test.ts).
 Four surfaces scanned (site tree, editor view, Publish panel, active-target switcher).
+Preview iframe excluded from the scan — it renders the user's site (not Gazetta's
+admin chrome), so its WCAG status is the site author's concern.
 
-**Baseline allowlist pattern:** known violations tracked in the test file's `BASELINE`
+**BASELINE allowlist pattern:** known violations tracked in the test file's `BASELINE`
 array — each entry names a rule id + the reason it's deferred. New violations not in the
-allowlist fail CI; fixes remove entries.
+allowlist fail CI; fixes remove entries. **The array is now empty.**
 
-**BASELINE burndown (2026-04-16):**
+**BASELINE burndown (complete, 2026-04-17):**
 
-| Rule id | Status | Resolution |
-|---------|--------|------------|
-| `button-name` | ✓ landed in #174 | Added `title` + `aria-label` to icon-only Buttons in CmsToolbar (back-to-browse, theme-toggle), SiteTree (delete-{page,fragment}-{name}), and ComponentTree (move-up / move-down / remove). Toolbar buttons get `title` (doubles as tooltip); row-scoped buttons get `aria-label` only (tooltips on every row would be noisy). |
-| `frame-title` | ✓ landed in #175 | Added a `previewTitle` computed to PreviewPanel.vue's `<iframe>` — composes route + active-target name (e.g. "Preview of /home on staging"). |
-| `nested-interactive` + `label` | ✓ landed in #176 | One DOM fix resolved both: PublishPanel's destination-group-header `<button>` containing a Checkbox `<input>` became a `<label for="dest-group-{env}">`. Native HTML semantics — label click toggles the input via `@update:modelValue` → `toggleGroup()`. |
-| `color-contrast` | ◐ deferred | Tinted state colors (muted labels, env badges) below 4.5:1 in dark mode. Needs a token-layer pass per [css-theming.md](./css-theming.md). |
-
-**Remaining:** `color-contrast` only. The deferral is principled — it requires
-design tradeoffs across the entire `--color-*` semantic token layer, and
-`css-theming.md` calls it out as the in-flight token work that supersedes
-piecemeal fixes.
+| Rule id | Resolution |
+|---------|------------|
+| `button-name` | #174 — Added `title` + `aria-label` to icon-only Buttons in CmsToolbar (back-to-browse, theme-toggle), SiteTree (delete-{page,fragment}-{name}), and ComponentTree (move-up / move-down / remove). Toolbar buttons get `title` (doubles as tooltip); row-scoped buttons get `aria-label` only. |
+| `frame-title` | #175 — `previewTitle` computed bound to PreviewPanel.vue's `<iframe>` — composes route + active-target name (e.g. "Preview of /home on staging"). |
+| `nested-interactive` + `label` | #176 — One DOM fix resolved both: PublishPanel's destination-group-header `<button>` containing a Checkbox `<input>` became a `<label for="dest-group-{env}">`. Native HTML semantics — label click toggles the input via `@update:modelValue` → `toggleGroup()`. |
+| `color-contrast` | #180 — Three distinct root causes, all producing axe contrast failures in dark mode: (a) SiteTree's hardcoded grays + broken `:global(.dark)` overrides (specificity loss to scoped `[data-v]` per [team-preferences.md](./team-preferences.md) rule 12) — switched to `--color-*` tokens that auto-flip via PrimeVue's semantic layer; (b) SyncIndicators' `state-loading` / `.group-count` / `.sync-chip-member` opacities dragging contrast under WCAG AA — replaced with non-opacity hierarchy (italic status, font-weight differences, `↳ ` prefix); (c) DevPlayground's unscoped `.dark .X` rules leaking to other components — anchored each under `.playground` to scope cross-component pollution. |
 
 **Skipped:** Vitest-level a11y via `@chialab/vitest-axe` — e2e coverage is sufficient.
 
@@ -573,7 +570,7 @@ responses. Opt out with `GAZETTA_QUIET=1`.
 | 1 | ✓ Priority 1.1-1.3 (Vue tests, sidecars, PBT) | ✓ Phase 1 (file moves, no-risk) |
 | 2 | ✓ Priority 1.4 (fault injection) | ◐ Phase 2 (POMs — two landed, more follow) |
 | 3 | ✓ Priority 2.1 (Azure CRUD parity) | ◐ Phase 3 (scenarios — 3 landed, 1 deferred) |
-| 4 | ✓ Priority 2.2 · ◐ Priority 2.3 (4 of 5 BASELINE entries cleared; color-contrast deferred to css-theming token pass) | ✓ Phase 4 (matrices) |
+| 4 | ✓ Priority 2.2 · ✓ Priority 2.3 (all 5 BASELINE entries cleared; preview iframe excluded — site-author scope) | ✓ Phase 4 (matrices) |
 | Later | Priority 3 (✓ 3.1 mutation nightly · ✓ 3.2 contract-test endpoint burndown) | Cross-surface scenario #4 (hotfix source=prod) when dev-server target-registry reload lands |
 
 Estimates are predictions. Real pace depends on what you hit.
