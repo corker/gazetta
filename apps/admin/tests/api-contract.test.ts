@@ -27,6 +27,9 @@ import {
   TargetTypeSchema,
   SiteManifestSchema,
   DependentsResponseSchema,
+  CompareResultSchema,
+  PublishResultSchema,
+  PublishProgressSchema,
 } from 'gazetta/admin-api/schemas'
 import type {
   CreatePageRequest,
@@ -40,6 +43,9 @@ import type {
   TargetInfo,
   SiteManifest,
   DependentsResponse,
+  CompareResult,
+  PublishResult,
+  PublishProgress,
 } from 'gazetta/admin-api/schemas'
 
 describe('POST /api/pages contract', () => {
@@ -253,5 +259,114 @@ describe('GET /api/dependents contract', () => {
 
   it('rejects non-string entries', () => {
     expect(DependentsResponseSchema.safeParse({ pages: [123], fragments: [] }).success).toBe(false)
+  })
+})
+
+describe('GET /api/compare contract', () => {
+  it('accepts a well-formed first-publish result', () => {
+    const r: CompareResult = {
+      added: ['pages/home', 'pages/about'],
+      modified: [],
+      deleted: [],
+      unchanged: [],
+      firstPublish: true,
+      invalidTemplates: [],
+    }
+    expect(CompareResultSchema.safeParse(r).success).toBe(true)
+  })
+
+  it('accepts a mixed diff with invalid-template entries', () => {
+    const r: CompareResult = {
+      added: ['pages/new'],
+      modified: ['pages/home'],
+      deleted: ['pages/old'],
+      unchanged: ['fragments/header'],
+      firstPublish: false,
+      invalidTemplates: [{ name: 'broken', errors: ['syntax error', 'no default export'] }],
+    }
+    expect(CompareResultSchema.safeParse(r).success).toBe(true)
+  })
+
+  it('rejects results missing any required array', () => {
+    expect(
+      CompareResultSchema.safeParse({
+        added: [],
+        modified: [],
+        deleted: [],
+        firstPublish: false,
+        invalidTemplates: [],
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects invalidTemplate entries with wrong shape', () => {
+    expect(
+      CompareResultSchema.safeParse({
+        added: [],
+        modified: [],
+        deleted: [],
+        unchanged: [],
+        firstPublish: false,
+        invalidTemplates: [{ name: 'broken' }],
+      }).success,
+    ).toBe(false)
+  })
+})
+
+describe('POST /api/publish + /api/publish/stream contract', () => {
+  describe('PublishResult', () => {
+    it('accepts a successful per-target result', () => {
+      const r: PublishResult = { target: 'staging', success: true, copiedFiles: 12 }
+      expect(PublishResultSchema.safeParse(r).success).toBe(true)
+    })
+
+    it('accepts a failed per-target result with error message', () => {
+      const r: PublishResult = { target: 'prod', success: false, error: 'network', copiedFiles: 0 }
+      expect(PublishResultSchema.safeParse(r).success).toBe(true)
+    })
+
+    it('rejects missing required fields', () => {
+      expect(PublishResultSchema.safeParse({ target: 'x', success: true }).success).toBe(false)
+      expect(PublishResultSchema.safeParse({ success: true, copiedFiles: 0 }).success).toBe(false)
+    })
+  })
+
+  describe('PublishProgress (SSE event union)', () => {
+    it('accepts each of the six discriminator variants', () => {
+      const events: PublishProgress[] = [
+        { kind: 'start', targets: ['staging', 'prod'], itemsPerTarget: 5 },
+        { kind: 'target-start', target: 'staging', total: 5 },
+        { kind: 'progress', target: 'staging', current: 2, total: 5, label: 'pages/home' },
+        {
+          kind: 'target-result',
+          result: { target: 'staging', success: true, copiedFiles: 5 },
+        },
+        {
+          kind: 'done',
+          results: [{ target: 'staging', success: true, copiedFiles: 5 }],
+        },
+        { kind: 'fatal', error: 'template scan failed', invalidTemplates: [{ name: 'x', errors: ['e'] }] },
+      ]
+      for (const ev of events) {
+        expect(PublishProgressSchema.safeParse(ev).success).toBe(true)
+      }
+    })
+
+    it('accepts fatal without invalidTemplates (field is optional)', () => {
+      expect(PublishProgressSchema.safeParse({ kind: 'fatal', error: 'boom' }).success).toBe(true)
+    })
+
+    it('rejects events with an unknown kind', () => {
+      expect(PublishProgressSchema.safeParse({ kind: 'banana', foo: 1 }).success).toBe(false)
+    })
+
+    it('rejects events with a wrong payload for their kind', () => {
+      // `progress` without `current`
+      expect(PublishProgressSchema.safeParse({ kind: 'progress', target: 'x', total: 5, label: 'y' }).success).toBe(
+        false,
+      )
+      // `target-result` with a non-PublishResult result
+      expect(PublishProgressSchema.safeParse({ kind: 'target-result', result: { target: 'x' } }).success).toBe(false)
+    })
   })
 })

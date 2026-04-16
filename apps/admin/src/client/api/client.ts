@@ -131,6 +131,9 @@ import type {
   TargetType as TargetTypeShape,
   SiteManifest as SiteManifestShape,
   DependentsResponse as DependentsResponseShape,
+  CompareResult as CompareResultShape,
+  PublishResult as PublishResultShape,
+  PublishProgress as PublishProgressShape,
 } from 'gazetta/admin-api/schemas'
 export type PageSummary = PageSummaryShape
 export type CreatePageRequest = CreatePageRequestShape
@@ -145,6 +148,9 @@ export type TargetEnvironment = TargetEnvironmentShape
 export type TargetType = TargetTypeShape
 export type SiteManifest = SiteManifestShape
 export type DependentsResponse = DependentsResponseShape
+export type CompareResult = CompareResultShape
+export type PublishResult = PublishResultShape
+export type PublishProgress = PublishProgressShape
 
 export interface InlineComponent {
   name: string
@@ -164,29 +170,6 @@ export interface FragmentDetail extends FragmentSummary {
   content?: Record<string, unknown>
   components?: ComponentEntry[]
   dir: string
-}
-
-export interface PublishResult {
-  target: string
-  success: boolean
-  error?: string
-  copiedFiles: number
-}
-export type PublishProgress =
-  | { kind: 'start'; targets: string[]; itemsPerTarget: number }
-  | { kind: 'target-start'; target: string; total: number }
-  | { kind: 'progress'; target: string; current: number; total: number; label: string }
-  | { kind: 'target-result'; result: PublishResult }
-  | { kind: 'done'; results: PublishResult[] }
-  | { kind: 'fatal'; error: string; invalidTemplates?: { name: string; errors: string[] }[] }
-
-export interface CompareResult {
-  added: string[]
-  modified: string[]
-  deleted: string[]
-  unchanged: string[]
-  firstPublish: boolean
-  invalidTemplates: { name: string; errors: string[] }[]
 }
 
 export const api = {
