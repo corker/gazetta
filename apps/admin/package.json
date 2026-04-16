@@ -27,7 +27,6 @@
   },
   "devDependencies": {
     "@hono/vite-dev-server": "^0.25.1",
-    "@testcontainers/azurite": "^11.13.0",
     "@types/js-yaml": "^4.0.0",
     "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^6.0.6",
