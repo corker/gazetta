@@ -1042,3 +1042,32 @@ test.describe('Target switch with unsaved edits', () => {
     await expect(titleField).toHaveValue(original + ' — dirty')
   })
 })
+
+test.describe('Undo last save', () => {
+  test('save toast offers Undo; clicking it reverts the content', async ({ page }) => {
+    await openEditor(page, 'home')
+    await page.locator('[data-testid="component-hero"]').click()
+    const titleField = page.locator('input[name="root_title"]').first()
+    await titleField.waitFor({ timeout: 5000 })
+    const original = await titleField.inputValue()
+    await titleField.fill(original + ' — undo me')
+    // Save.
+    await page.locator('[data-testid="save-btn"]').click()
+    // Toast appears with an Undo action button.
+    const toast = page.locator('[data-testid="global-toast"]')
+    await expect(toast).toBeVisible()
+    const undo = page.locator('[data-testid="toast-action"]', { hasText: /Undo/i })
+    await expect(undo).toBeVisible()
+    await undo.click()
+    // Wait for the "Undone" confirmation toast — fires after the
+    // history/undo round-trip + site + selection reload + editor
+    // re-mount all settle. At that point the form must show the
+    // pre-save value again.
+    await expect(page.locator('[data-testid="global-toast"]'))
+      .toContainText('Undone', { timeout: 10000 })
+    // Re-locate the field — the editor was remounted, so the old
+    // Playwright locator may point to a detached node.
+    const restoredField = page.locator('input[name="root_title"]').first()
+    await expect(restoredField).toHaveValue(original, { timeout: 5000 })
+  })
+})

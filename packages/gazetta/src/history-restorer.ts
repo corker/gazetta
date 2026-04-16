@@ -1,0 +1,125 @@
+/**
+ * Apply a past revision's snapshot to a target's content tree.
+ *
+ * This is the write side of undo / rollback. Design-publishing.md:
+ *   "Undo and rollback restore a prior revision — both are soft
+ *    (forward-only; create a new revision reverting to the past state,
+ *    never destroy history)."
+ *
+ * Algorithm:
+ *   1. Load the target revision's snapshot (itemPath → blob hash).
+ *   2. Diff against the current on-disk content (via the HistoryProvider's
+ *      most-recent revision). Anything present now but absent from the
+ *      target snapshot is deleted; everything in the snapshot is written
+ *      from its blob.
+ *   3. Record a new revision with operation='rollback' and
+ *      restoredFrom=<targetRevId>, so the audit trail shows where the
+ *      state came from and history stays forward-only.
+ *
+ * The caller (admin-api / CLI) owns orchestration — picking which
+ * revision to restore (head-1 for undo, arbitrary for rollback) and
+ * any side effects beyond the content tree (e.g., sidecar writer
+ * invalidation).
+ */
+
+import type { ContentRoot } from './content-root.js'
+import type {
+  HistoryProvider,
+  Revision,
+  RevisionManifest,
+  RevisionOperation,
+} from './history.js'
+
+export interface RestoreRevisionOptions {
+  /** HistoryProvider for the target being restored. */
+  history: HistoryProvider
+  /** Content root of the target — destination for the restore writes. */
+  contentRoot: ContentRoot
+  /** Id of the revision to restore to (rev-NNNN). */
+  revisionId: string
+  /** Free-form author identifier passed to the forward revision. */
+  author?: string
+  /** Human-readable note ("Undo publish from local"). */
+  message?: string
+}
+
+/**
+ * Restore `revisionId`'s content onto the target. Writes any items
+ * present in the snapshot (content fetched via `readBlob`); deletes
+ * items that exist today but aren't in the restored snapshot. Returns
+ * the new forward revision — always operation='rollback' so audit
+ * consumers can distinguish restores from normal saves/publishes.
+ */
+export async function restoreRevision(opts: RestoreRevisionOptions): Promise<Revision> {
+  const { history, contentRoot, revisionId } = opts
+  const target = await history.readRevision(revisionId)
+  // Current state = the most recent revision's snapshot. If none
+  // exists yet we're restoring onto an empty tree — nothing to delete.
+  const currentSnapshot = await loadHeadSnapshot(history)
+
+  const toDelete = Object.keys(currentSnapshot).filter(p => !(p in target.snapshot))
+  const toWrite = Object.entries(target.snapshot) // [path, blobHash]
+
+  // Delete first: rolling back a "delete" in the old revision means the
+  // item came back; rolling back an "add" means the item goes away.
+  // Delete-before-write keeps storage from briefly holding both.
+  for (const path of toDelete) {
+    const abs = contentRoot.path(path)
+    try { await contentRoot.storage.rm(abs) } catch {
+      // Best-effort: a missing path at rm time is fine (already gone).
+    }
+  }
+
+  for (const [path, hash] of toWrite) {
+    const content = await history.readBlob(hash)
+    const abs = contentRoot.path(path)
+    const parent = abs.substring(0, abs.lastIndexOf('/'))
+    if (parent) await contentRoot.storage.mkdir(parent)
+    await contentRoot.storage.writeFile(abs, content)
+  }
+
+  // Record a new forward revision capturing the restored state. Uses
+  // the same snapshot we just wrote — no need to re-read from disk.
+  return recordFromSnapshot(history, target, {
+    operation: 'rollback',
+    restoredFrom: revisionId,
+    author: opts.author,
+    message: opts.message,
+  })
+}
+
+/**
+ * Re-record an existing snapshot as a forward revision. Blobs already
+ * exist (they're the same content), so the HistoryProvider's exists()
+ * check skips the writes — cheap.
+ */
+async function recordFromSnapshot(
+  history: HistoryProvider,
+  target: RevisionManifest,
+  meta: { operation: RevisionOperation; restoredFrom?: string; author?: string; message?: string },
+): Promise<Revision> {
+  const items = new Map<string, string>()
+  for (const [path, hash] of Object.entries(target.snapshot)) {
+    items.set(path, await history.readBlob(hash))
+  }
+  return history.recordRevision({
+    operation: meta.operation,
+    author: meta.author,
+    message: meta.message,
+    restoredFrom: meta.restoredFrom,
+    items,
+  })
+}
+
+/**
+ * Head revision's snapshot, or `{}` if there are no revisions yet.
+ * Used by restore to figure out what's currently on-disk and needs
+ * deleting when the restored revision doesn't include it.
+ */
+async function loadHeadSnapshot(history: HistoryProvider): Promise<Record<string, string>> {
+  const [head] = await history.listRevisions(1)
+  if (!head) return {}
+  const m = await history.readRevision(head.id)
+  return m.snapshot
+}
+

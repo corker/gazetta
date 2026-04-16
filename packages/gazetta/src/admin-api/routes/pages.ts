@@ -90,12 +90,14 @@ export function pageRoutes(resolve: SourceContextResolver) {
 
     const manifestPath = join(page.dir, 'page.json')
     const serialized = JSON.stringify(manifest, null, 2) + '\n'
-    await storage.writeFile(manifestPath, serialized)
-    await sidecarWriter?.writeFor('page', name)
 
-    // Record a history revision for this save — no-op when history is
-    // disabled for the target (source.history is undefined). Relative
-    // path for the snapshot key so revisions don't leak target-rooting.
+    // Record the history revision BEFORE the disk write. recordWrite's
+    // first call scans the content tree to produce a pre-save baseline
+    // — if we wrote to disk first, the baseline would capture the
+    // post-save state and "undo my first save" would be a no-op.
+    // The baseline scan reads current disk state (pre-save); then
+    // recordWrite overlays the incoming delta (the post-save content)
+    // to build the save revision's snapshot.
     if (source.history) {
       await recordWrite({
         history: source.history,
@@ -104,6 +106,8 @@ export function pageRoutes(resolve: SourceContextResolver) {
         items: [{ path: source.contentRoot.relative(manifestPath), content: serialized }],
       })
     }
+    await storage.writeFile(manifestPath, serialized)
+    await sidecarWriter?.writeFor('page', name)
     return c.json({ ok: true })
   })
 
@@ -116,8 +120,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
 
     const manifestPath = join(page.dir, 'page.json')
-    await storage.rm(page.dir)
-
+    // History first — see PUT handler rationale.
     if (source.history) {
       await recordWrite({
         history: source.history,
@@ -126,6 +129,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
         items: [{ path: source.contentRoot.relative(manifestPath), content: null }],
       })
     }
+    await storage.rm(page.dir)
     return c.json({ ok: true })
   })
 

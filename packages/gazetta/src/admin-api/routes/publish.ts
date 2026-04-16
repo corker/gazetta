@@ -225,9 +225,39 @@ export function publishRoutes(
       let current = 0
       try {
         let totalFiles = 0
+        const targetRoot = createContentRoot(targetStorage)
+
+        // History must record BEFORE the writes so the baseline
+        // revision (emitted automatically by recordWrite on the first
+        // call against this target) captures pre-publish state.
+        // Otherwise "undo this publish" would restore the post-
+        // publish state and no-op. See pages.ts save handler.
+        if (config && isHistoryEnabled(config)) {
+          try {
+            const history = createHistoryProvider({
+              storage: targetStorage,
+              retention: getHistoryRetention(config),
+            })
+            const items = await collectPublishedItemsForHistory(
+              source.contentRoot,
+              targetRoot,
+              targetItems,
+            )
+            await recordWrite({
+              history,
+              contentRoot: targetRoot,
+              operation: 'publish',
+              source: sourceName,
+              items,
+            })
+          } catch (err) {
+            // History is a best-effort audit layer — a write failure
+            // here must not break the publish itself.
+            console.warn(`    ${targetName}: history record failed — ${(err as Error).message}`)
+          }
+        }
 
         // 1. Source copy
-        const targetRoot = createContentRoot(targetStorage)
         const { copiedFiles } = await publishItems(source.contentRoot, targetRoot, targetItems)
         totalFiles += copiedFiles
         current++
@@ -312,35 +342,6 @@ export function publishRoutes(
           }
           current++
           yield { kind: 'progress', target: targetName, current, total, label: 'cache purge' }
-        }
-
-        // Record a history revision on the destination target. Design
-        // decision #18: history lives on the destination, not the
-        // source — so undo works after the source has moved on. No-op
-        // when the target's site.yaml disables history.
-        if (config && isHistoryEnabled(config)) {
-          try {
-            const history = createHistoryProvider({
-              storage: targetStorage,
-              retention: getHistoryRetention(config),
-            })
-            const items = await collectPublishedItemsForHistory(
-              source.contentRoot,
-              targetRoot,
-              targetItems,
-            )
-            await recordWrite({
-              history,
-              contentRoot: targetRoot,
-              operation: 'publish',
-              source: sourceName,
-              items,
-            })
-          } catch (err) {
-            // History is a best-effort audit layer — a write failure here
-            // must not break the publish itself. Log and continue.
-            console.warn(`    ${targetName}: history record failed — ${(err as Error).message}`)
-          }
         }
 
         const result: PublishResult = { target: targetName, success: true, copiedFiles: totalFiles }

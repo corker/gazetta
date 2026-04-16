@@ -55,7 +55,7 @@ describe('recordWrite', () => {
   let storage: ReturnType<typeof memoryStorage>
   beforeEach(() => { storage = memoryStorage() })
 
-  it('first revision snapshots the full content tree', async () => {
+  it('first recordWrite emits a baseline revision then the delta revision', async () => {
     // Seed some content before the first save.
     storage.seed({
       'site.yaml': 'name: demo\n',
@@ -78,7 +78,16 @@ describe('recordWrite', () => {
       }],
     })
 
-    expect(rev.id).toBe('rev-0001')
+    // First call produces TWO revisions: a baseline capturing the pre-
+    // save scan, then the delta revision for the save itself. This
+    // makes "undo my first save" a well-defined operation (there's an
+    // earlier revision to restore to).
+    const list = await history.listRevisions()
+    expect(list).toHaveLength(2)
+    // listRevisions returns newest-first — the returned rev matches the head.
+    expect(list[0].id).toBe(rev.id)
+    const baseline = await history.readRevision(list[1].id)
+    expect(baseline.message).toBe('Initial baseline')
     const manifest = await history.readRevision(rev.id)
     // Full tree captured — not just the one item that was written.
     expect(Object.keys(manifest.snapshot).sort()).toEqual([
@@ -119,7 +128,10 @@ describe('recordWrite', () => {
       'site.yaml',
     ])
     // pages/about carries forward with an unchanged hash (same blob).
-    const m1 = await history.readRevision('rev-0001')
+    // Grab the first save's revision (= head-1; the oldest is baseline).
+    const list = await history.listRevisions()
+    const firstSaveId = list[1].id
+    const m1 = await history.readRevision(firstSaveId)
     expect(m2.snapshot['pages/about/page.json']).toBe(m1.snapshot['pages/about/page.json'])
     // pages/home has a different hash.
     expect(m2.snapshot['pages/home/page.json']).not.toBe(m1.snapshot['pages/home/page.json'])

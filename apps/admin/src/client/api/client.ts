@@ -193,4 +193,32 @@ export const api = {
   },
   getDependents: (item: string, options?: RequestInit) => request<{ pages: string[]; fragments: string[] }>(`/dependents?item=${encodeURIComponent(item)}`, options),
   fetchFromTarget: (source: string, items?: string[]) => request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', { method: 'POST', body: JSON.stringify({ source, items }) }),
+  /** List revisions on a target, newest first. */
+  listHistory: (target: string, limit = 50) =>
+    request<{ revisions: RevisionSummary[] }>(`/history?target=${encodeURIComponent(target)}&limit=${limit}`),
+  /** Undo the most recent write on a target — restores the previous
+   *  revision as a forward 'rollback'. 409 when there's nothing to undo. */
+  undoLastWrite: (target: string) =>
+    request<{ revision: RevisionSummary; restoredFrom: string }>(
+      `/history/undo?target=${encodeURIComponent(target)}`,
+      { method: 'POST' },
+    ),
+  /** Restore an arbitrary revision on a target. 404 when the id doesn't exist. */
+  restoreRevision: (target: string, revisionId: string) =>
+    request<{ revision: RevisionSummary; restoredFrom: string }>(
+      `/history/restore?target=${encodeURIComponent(target)}&id=${encodeURIComponent(revisionId)}`,
+      { method: 'POST' },
+    ),
+}
+
+/** Summary shape returned by history endpoints (no snapshot). */
+export interface RevisionSummary {
+  id: string
+  timestamp: string
+  operation: 'save' | 'publish' | 'rollback'
+  author?: string
+  source?: string
+  items: string[]
+  message?: string
+  restoredFrom?: string
 }

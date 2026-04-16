@@ -41,7 +41,13 @@ describe('History on save', () => {
     const storage = createFilesystemProvider(contentDir)
     const history = createHistoryProvider({ storage })
     source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history })
-    app = createAdminApp({ source, siteDir: starterSiteDir, templatesDir })
+    app = createAdminApp({
+      source,
+      siteDir: starterSiteDir,
+      templatesDir,
+      targets: new Map([['local', storage]]),
+      targetConfigs: { local: { storage: { type: 'filesystem' }, environment: 'local', editable: true } },
+    })
   })
 
   afterAll(async () => {
@@ -57,14 +63,21 @@ describe('History on save', () => {
     })
     expect(res.status).toBe(200)
 
+    // First recordWrite emits a baseline revision (the scan) plus the
+    // delta revision — so "undo my first save" has a prior state to
+    // roll back to. IDs are timestamp-based (rev-<unixMillis>) so we
+    // read them from the index rather than hard-coding.
     const indexPath = resolve(contentDir, '.gazetta/history/index.json')
     const index = JSON.parse(await readFile(indexPath, 'utf-8'))
-    expect(index.revisions).toEqual(['rev-0001'])
+    expect(index.revisions).toHaveLength(2)
+    const [baselineId, firstSaveId] = index.revisions
 
-    const manifestPath = resolve(contentDir, '.gazetta/history/revisions/rev-0001.json')
-    const manifest = JSON.parse(await readFile(manifestPath, 'utf-8'))
+    const baseline = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', `${baselineId}.json`), 'utf-8'))
+    expect(baseline.message).toBe('Initial baseline')
+
+    const manifest = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', `${firstSaveId}.json`), 'utf-8'))
     expect(manifest.operation).toBe('save')
-    // Full-tree baseline: every page + fragment manifest is captured,
+    // Full-tree snapshot: every page + fragment manifest is captured,
     // not just the one that was saved.
     expect(Object.keys(manifest.snapshot).sort()).toEqual(expect.arrayContaining([
       'pages/home/page.json',
@@ -83,13 +96,15 @@ describe('History on save', () => {
     expect(res.status).toBe(200)
 
     const index = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/index.json'), 'utf-8'))
-    expect(index.revisions).toEqual(['rev-0001', 'rev-0002'])
-    const rev1 = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions/rev-0001.json'), 'utf-8'))
-    const rev2 = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions/rev-0002.json'), 'utf-8'))
+    // baseline + first save + second save = 3 revisions.
+    expect(index.revisions).toHaveLength(3)
+    const [, firstSaveId, secondSaveId] = index.revisions
+    const firstSave = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', `${firstSaveId}.json`), 'utf-8'))
+    const secondSave = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', `${secondSaveId}.json`), 'utf-8'))
     // Unchanged items share blobs (same hash) across revisions.
-    expect(rev2.snapshot['pages/home/page.json']).toBe(rev1.snapshot['pages/home/page.json'])
+    expect(secondSave.snapshot['pages/home/page.json']).toBe(firstSave.snapshot['pages/home/page.json'])
     // pages/about changed — different blob.
-    expect(rev2.snapshot['pages/about/page.json']).not.toBe(rev1.snapshot['pages/about/page.json'])
+    expect(secondSave.snapshot['pages/about/page.json']).not.toBe(firstSave.snapshot['pages/about/page.json'])
   })
 
   it('records a revision on DELETE /api/pages/:name with the item removed from the snapshot', async () => {
@@ -168,13 +183,136 @@ describe('Retention', () => {
       expect(res.status).toBe(200)
     }
     const index = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/index.json'), 'utf-8'))
-    // Only the two most recent ids remain in the index; older manifests
-    // are deleted. nextId keeps climbing so restored ids never collide.
-    expect(index.revisions).toEqual(['rev-0004', 'rev-0005'])
-    expect(index.nextId).toBe(6)
-    await expect(
-      readFile(resolve(contentDir, '.gazetta/history/revisions/rev-0001.json'), 'utf-8'),
-    ).rejects.toThrow()
+    // 5 PUTs = 1 baseline + 5 save revisions = 6 entries; retention (2)
+    // keeps the 2 most recent.
+    expect(index.revisions).toHaveLength(2)
+    // Retention preserves chrono order — lex sort matches index order
+    // (since ids are unix-millis-based and filling in a loop is strictly
+    // increasing per-call).
+    expect(index.revisions).toEqual([...index.revisions].sort())
+  })
+})
+
+describe('History HTTP endpoints', () => {
+  let contentDir: string
+  let app: Hono
+
+  beforeAll(async () => {
+    contentDir = await setupWorkingCopy('history-http-test')
+    const storage = createFilesystemProvider(contentDir)
+    const history = createHistoryProvider({ storage })
+    const source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history })
+    app = createAdminApp({
+      source,
+      siteDir: starterSiteDir,
+      templatesDir,
+      targets: new Map([['local', storage]]),
+      targetConfigs: { local: { storage: { type: 'filesystem' }, environment: 'local', editable: true } },
+    })
+  })
+
+  afterAll(async () => {
+    await rm(contentDir, { recursive: true, force: true })
+  })
+
+  async function save(title: string) {
+    const res = await app.request('/api/pages/home', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: { title } }),
+    })
+    expect(res.status).toBe(200)
+  }
+
+  it('GET /api/history lists revisions newest first', async () => {
+    await save('one')
+    await save('two')
+    await save('three')
+    const res = await app.request('/api/history?target=local')
+    expect(res.status).toBe(200)
+    const body = await res.json() as { revisions: { id: string; operation: string; message?: string }[] }
+    // Baseline + 3 saves = 4 revisions, newest first.
+    expect(body.revisions).toHaveLength(4)
+    // All ids follow the rev-<unixMillis>[-seq] shape.
+    for (const r of body.revisions) expect(r.id).toMatch(/^rev-\d{10,}(?:-\d+)?$/)
+    // Newest-first ordering: id list in reverse-chrono (lex-desc).
+    expect(body.revisions.map(r => r.id)).toEqual([...body.revisions.map(r => r.id)].sort().reverse())
+    // Oldest entry is the baseline with its sentinel message.
+    expect(body.revisions.at(-1)?.message).toBe('Initial baseline')
+  })
+
+  it('GET /api/history 400 without ?target=', async () => {
+    const res = await app.request('/api/history')
+    expect(res.status).toBe(400)
+  })
+
+  it('POST /api/history/undo restores previous revision with operation=rollback', async () => {
+    // Read current content — should be "three" from the prior test.
+    const before = await app.request('/api/pages/home')
+    const beforeBody = await before.json() as { content: { title: string } }
+    expect(beforeBody.content.title).toBe('three')
+
+    // Capture the expected restoredFrom: it's head-1 in newest-first order.
+    const listRes = await app.request('/api/history?target=local')
+    const listBody = await listRes.json() as { revisions: { id: string }[] }
+    const expectedRestoredFrom = listBody.revisions[1].id
+
+    const res = await app.request('/api/history/undo?target=local', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { revision: { operation: string }; restoredFrom: string }
+    expect(body.revision.operation).toBe('rollback')
+    expect(body.restoredFrom).toBe(expectedRestoredFrom)
+
+    // Content now reflects the previous save's state ("two").
+    const after = await app.request('/api/pages/home')
+    const afterBody = await after.json() as { content: { title: string } }
+    expect(afterBody.content.title).toBe('two')
+  })
+
+  it('POST /api/history/restore restores an arbitrary revision', async () => {
+    // Current state is now "two" from the undo above; find the id of the
+    // earliest save (title="one") — it's the second-oldest revision
+    // (baseline is oldest). Use newest-first list: the oldest non-
+    // baseline save is at list.length-2.
+    const listRes = await app.request('/api/history?target=local')
+    const listBody = await listRes.json() as { revisions: { id: string; message?: string }[] }
+    const firstSaveId = listBody.revisions[listBody.revisions.length - 2].id
+
+    const res = await app.request(`/api/history/restore?target=local&id=${firstSaveId}`, { method: 'POST' })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { revision: { operation: string }; restoredFrom: string }
+    expect(body.revision.operation).toBe('rollback')
+    expect(body.restoredFrom).toBe(firstSaveId)
+
+    const after = await app.request('/api/pages/home')
+    const afterBody = await after.json() as { content: { title: string } }
+    expect(afterBody.content.title).toBe('one')
+  })
+
+  it('POST /api/history/undo 409 when there is nothing to undo', async () => {
+    // Fresh working copy, no prior revision.
+    const fresh = await setupWorkingCopy('history-http-no-undo-test')
+    try {
+      const storage = createFilesystemProvider(fresh)
+      const history = createHistoryProvider({ storage })
+      const source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history })
+      const freshApp = createAdminApp({
+        source,
+        siteDir: starterSiteDir,
+        templatesDir,
+        targets: new Map([['local', storage]]),
+        targetConfigs: { local: { storage: { type: 'filesystem' }, environment: 'local', editable: true } },
+      })
+      const res = await freshApp.request('/api/history/undo?target=local', { method: 'POST' })
+      expect(res.status).toBe(409)
+    } finally {
+      await rm(fresh, { recursive: true, force: true })
+    }
+  })
+
+  it('POST /api/history/restore 404 for unknown revision id', async () => {
+    const res = await app.request('/api/history/restore?target=local&id=rev-9999', { method: 'POST' })
+    expect(res.status).toBe(404)
   })
 })
 
