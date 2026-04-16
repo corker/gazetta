@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing for high-stakes modules — history + admin-api + publish. See testing-plan.md Priority 3.1.",
+  "packageManager": "npm",
+  "reporters": ["html", "clear-text", "progress"],
+  "testRunner": "vitest",
+  "checkers": ["typescript"],
+  "tsconfigFile": "tsconfig.json",
+  "coverageAnalysis": "perTest",
+  "_comment_inPlace": "inPlace:true skips the sandbox copy. Several tests reference ../../examples/starter and ../../../apps — sandbox would orphan those paths. Stryker keeps originals in .stryker-tmp and restores them on exit.",
+  "inPlace": true,
+  "mutate": [
+    "src/history-provider.ts",
+    "src/history-recorder.ts",
+    "src/history-restorer.ts",
+    "src/publish.ts",
+    "src/publish-rendered.ts",
+    "src/admin-api/**/*.ts"
+  ],
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": 0
+  },
+  "_comment_thresholds": "break:0 means no threshold enforcement yet — need to see the baseline score first. Raise once stable.",
+  "timeoutMS": 60000,
+  "tempDirName": ".stryker-tmp"
+}

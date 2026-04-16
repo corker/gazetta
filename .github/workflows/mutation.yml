@@ -1,0 +1,43 @@
+name: Mutation
+
+# Runs Stryker mutation testing against high-stakes modules on a nightly
+# schedule. Not on PRs — Stryker on the full target set takes ~hours,
+# which is too slow for merge blocking.
+#
+# Result is the report artifact, viewable as HTML. Failure does NOT
+# block anything (continue-on-error) — mutation score is signal, not
+# gate. When the baseline stabilises, consider raising
+# stryker.config.json's `thresholds.break` to enforce a floor.
+on:
+  schedule:
+    # 03:00 UTC nightly. Off-hours for most contributors.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Manual trigger — for running against a branch before merging a
+    # big change to the targeted modules.
+
+jobs:
+  stryker:
+    runs-on: ubuntu-latest
+    # Never block the scheduler. The summary step below surfaces the
+    # score; humans read the artifact.
+    continue-on-error: true
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w packages/gazetta
+      - name: Run Stryker
+        working-directory: packages/gazetta
+        run: npm run test:mutation
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report
+          path: packages/gazetta/reports/mutation
+          retention-days: 30
