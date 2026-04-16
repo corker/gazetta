@@ -5,11 +5,16 @@
  * dialog. Matches design-editor-ux.md gap: "Fragment blast radius in tree
  * and editor header — currently only in PublishDialog."
  *
+ * State machine: 'loading' | 'loaded' | 'error'. The badge is always
+ * rendered — earlier "hidden on error" silently dropped genuine
+ * failures (slow `/api/dependents` on cold dev start, intermittent
+ * network), leaving the user staring at empty space with no signal.
+ * A visible state lets the user (or a test) tell the difference
+ * between "still loading", "no dependents yet", and "load failed".
+ *
  * Fetches source-side dependents (authoritative for the draft state).
- * Quiet while loading, hidden on error — we'd rather show nothing than
- * a confusing "?" in the editor header.
  */
-import { ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useFragmentsApi } from '../composables/api.js'
 
 const fragmentsApi = useFragmentsApi()
@@ -22,18 +27,16 @@ const props = defineProps<{
   compact?: boolean
 }>()
 
-const pages = ref<string[] | null>(null)
-const loading = ref(false)
+type State = { kind: 'loading' } | { kind: 'loaded'; pages: string[] } | { kind: 'error'; message: string }
+const state = ref<State>({ kind: 'loading' })
 
 async function load(name: string) {
-  loading.value = true
+  state.value = { kind: 'loading' }
   try {
     const r = await fragmentsApi.getDependents(`fragments/${name}`)
-    pages.value = r.pages
-  } catch {
-    pages.value = null
-  } finally {
-    loading.value = false
+    state.value = { kind: 'loaded', pages: r.pages }
+  } catch (err) {
+    state.value = { kind: 'error', message: (err as Error).message }
   }
 }
 
@@ -43,19 +46,44 @@ watch(
   name => load(name),
 )
 
+const tooltip = computed(() => {
+  switch (state.value.kind) {
+    case 'loading':
+      return 'Loading dependent pages…'
+    case 'error':
+      return `Failed to load dependents: ${state.value.message}`
+    case 'loaded':
+      return state.value.pages.length > 0 ? `Used on: ${state.value.pages.join(', ')}` : 'Not used on any page yet'
+  }
+})
+
 const summary = (pages: string[]) => (pages.length === 1 ? 'used on 1 page' : `used on ${pages.length} pages`)
 </script>
 
 <template>
-  <span v-if="pages" :class="['blast-radius', { compact }]" data-testid="fragment-blast-radius"
-    :title="pages.length > 0 ? `Used on: ${pages.join(', ')}` : 'Not used on any page yet'">
+  <span :class="['blast-radius', { compact }, `state-${state.kind}`]"
+    data-testid="fragment-blast-radius"
+    :data-state="state.kind"
+    :title="tooltip">
     <i class="pi pi-sitemap" aria-hidden="true" />
-    <template v-if="compact">
-      <span class="count">{{ pages.length }}</span>
+    <template v-if="state.kind === 'loaded'">
+      <template v-if="compact">
+        <span class="count">{{ state.pages.length }}</span>
+      </template>
+      <template v-else>
+        <span v-if="state.pages.length > 0">{{ summary(state.pages) }}</span>
+        <span v-else class="unused">not used yet</span>
+      </template>
+    </template>
+    <template v-else-if="state.kind === 'loading'">
+      <span v-if="compact" class="count" aria-hidden="true">…</span>
+      <span v-else class="unused">loading…</span>
     </template>
     <template v-else>
-      <span v-if="pages.length > 0">{{ summary(pages) }}</span>
-      <span v-else class="unused">not used yet</span>
+      <!-- error: show a `!` (compact) or "load failed" (full) — the title
+           attribute carries the actual message for hover details. -->
+      <span v-if="compact" class="count error-mark" aria-hidden="true">!</span>
+      <span v-else class="unused">load failed</span>
     </template>
   </span>
 </template>
