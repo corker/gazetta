@@ -22,6 +22,7 @@ Stateless CMS that structures websites as composable fragments. All state lives 
 - `.claude/rules/design-decisions.md` — Key decisions and rationale
 - `.claude/rules/design-editor-ux.md` — Active target UX spine, switching, progressive disclosure
 - `.claude/rules/architecture.md` — System architecture and package layout
+- `.claude/rules/testing-plan.md` — Active testing coverage + e2e restructure plan (auto-loads when editing tests)
 
 ## Build & Test
 
