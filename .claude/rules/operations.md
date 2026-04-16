@@ -209,10 +209,11 @@ This is a Node.js concern, not Gazetta-specific.
 Used for pure layout templates (header-layout, footer-layout) that only arrange children.
 The editor shows "No editable content. Edit its children instead."
 
-**Render timeouts:** Templates that fetch external data during SSR may be slow. Per-page
-render timeout: `gazetta dev` 10 seconds (then error overlay), `gazetta publish` 30 seconds
-(then page skipped with error). Pre-fetch data and pass it as content, or use dynamic
-components (SSR at request time, not publish time).
+**Render timeouts (not implemented):** Templates that fetch external data during SSR can
+be slow. There is **no per-page render timeout today** — a hung template hangs the dev
+server or publish run until the process is killed. Future: configurable timeouts (e.g.
+10s dev / 30s publish) with error-overlay / skip-with-error behavior. For now, pre-fetch
+data and pass it as content, or use dynamic components (SSR at request time, not publish time).
 
 ## Content Operations
 
@@ -269,7 +270,8 @@ content should use markdown or rich text fields, not inline YAML blocks.
 
 **Component nesting depth:** No hard limit on nesting. The renderer is recursive. Extremely
 deep nesting (100+ levels) may overflow Node's call stack. In practice, sites rarely exceed
-5-10 levels. `gazetta validate` warns if nesting exceeds 20 levels.
+5-10 levels. **No nesting-depth warning is implemented today** — future: `gazetta validate`
+warns if nesting exceeds 20 levels.
 
 ## Publishing Details
 
@@ -311,9 +313,12 @@ CLI publish does not currently prompt. CI (`CI=true`) is unaffected.
 | S3 | Parallel | 10 | Yes (3 retries) | 3500 PUT/s |
 | Azure Blob | Parallel | 10 | Yes (3 retries) | 20000 req/s |
 
-**Storage connectivity check before publish:** `gazetta publish` checks storage connectivity
-before rendering (lightweight read on target storage). If it fails, errors with a clear
-message. This prevents wasting time rendering pages only to fail on upload.
+**Storage connectivity check before publish (not implemented):** Future: `gazetta publish`
+should check storage connectivity before rendering (lightweight read on target storage) so
+authors don't waste time rendering pages only to fail on upload. Today, connectivity is
+validated implicitly — the first write or list fails with the underlying SDK's error.
+`TARGET_INIT_TIMEOUT_MS` (see `targets.ts`) guards against hangs during provider init,
+which is the closest existing behavior.
 
 **Storage quota errors:** When target storage quota is exceeded, `gazetta publish` shows
 the error and stops — remaining pages are not uploaded.
@@ -331,12 +336,16 @@ invalid, or missing.
 
 **Keyboard shortcuts:**
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl/Cmd + S` | Save current component |
-| `Ctrl/Cmd + Z` | Undo last edit |
-| `Ctrl/Cmd + Shift + Z` | Redo |
-| `Escape` | Close dialog / exit edit mode |
+| Shortcut | Action | Where |
+|----------|--------|-------|
+| `Ctrl/Cmd + S` | Save current component | EditorPanel.vue |
+| `Ctrl/Cmd + Z` | Undo last field edit (form-scoped, 50-entry stack) | packages/gazetta/src/editor/mount.tsx |
+| `Ctrl/Cmd + Shift + Z` | Redo field edit | packages/gazetta/src/editor/mount.tsx |
+| `Escape` | Close dialog / exit edit mode | UnsavedDialog, EditorView, DevPlayground |
+
+Undo/redo is scoped to the active form's field edits (the default `@rjsf` editor). It
+does not undo target-level writes — that's the save-toast Undo affordance or the history
+panel. Stack is reset when the editor remounts (e.g. switching to a different component).
 
 **Server disconnect:** If `gazetta dev` crashes while the admin UI is open, API calls fail
 and admin shows "Server disconnected. Waiting for reconnect..." SSE auto-reconnect attempts
@@ -411,7 +420,7 @@ all pages. Keep templates lightweight. Future: parallel rendering with worker th
 | Sites | 10+ | No hard limit — independent |
 | Components per page | 50+ | Deep nesting (100+) may stack overflow |
 | Custom editors | 20+ | No hard limit — loaded on demand |
-| Fragment nesting depth | 10+ | Circular detection, warn at 20 |
+| Fragment nesting depth | 10+ | Circular detection (implemented); depth warning at 20 is future |
 
 ## Dev Server
 
