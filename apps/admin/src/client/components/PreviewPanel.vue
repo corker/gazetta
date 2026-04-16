@@ -386,7 +386,12 @@ async function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:navigate' && e.data.route) {
     const page = site.pages.find(p => p.route === e.data.route)
     if (page) {
-      router.push(`/pages/${page.name}`)
+      // Preserve the current ui mode — clicking a link in preview while
+      // editing should land on the destination page in edit mode, not
+      // drop the author into browse. Router guard reads `-edit` route
+      // suffix to set mode (router.ts), so we choose the matching path.
+      const suffix = uiMode.mode === 'edit' ? '/edit' : ''
+      router.push(`/pages/${page.name}${suffix}`)
     } else {
       toast.show(`No page found for route ${e.data.route}`, { type: 'error' })
     }
