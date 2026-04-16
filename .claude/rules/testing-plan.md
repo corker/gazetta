@@ -530,9 +530,10 @@ responses. Opt out with `GAZETTA_QUIET=1`.
 
 ## Cleanup items (orthogonal)
 
-- ☐ Remove dead `@testcontainers/azurite` dep from
-  [apps/admin/package.json](../../apps/admin/package.json) — installed, imported nowhere
-- ☐ Fill formatter/linter placeholders in [node/conventions.md](./node/conventions.md)
+- ✓ Dead `@testcontainers/azurite` dep removed from
+  [apps/admin/package.json](../../apps/admin/package.json)
+- ✓ Formatter/linter placeholders in [node/conventions.md](./node/conventions.md) filled
+  in against actual tooling (Biome format, linter disabled, Vitest + Playwright)
 
 ---
 
