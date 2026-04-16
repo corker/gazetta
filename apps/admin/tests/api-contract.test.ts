@@ -20,6 +20,11 @@ import {
   CreateFragmentRequestSchema,
   CreateFragmentResponseSchema,
   FragmentSummarySchema,
+  TemplateSummarySchema,
+  FieldSummarySchema,
+  TargetInfoSchema,
+  TargetEnvironmentSchema,
+  TargetTypeSchema,
 } from 'gazetta/admin-api/schemas'
 import type {
   CreatePageRequest,
@@ -28,6 +33,9 @@ import type {
   CreateFragmentRequest,
   CreateFragmentResponse,
   FragmentSummary,
+  TemplateSummary,
+  FieldSummary,
+  TargetInfo,
 } from 'gazetta/admin-api/schemas'
 
 describe('POST /api/pages contract', () => {
@@ -132,6 +140,62 @@ describe('POST /api/fragments contract', () => {
     it('rejects entries missing required fields', () => {
       expect(FragmentSummarySchema.safeParse({ name: 'header' }).success).toBe(false)
       expect(FragmentSummarySchema.safeParse({ template: 'header-layout' }).success).toBe(false)
+    })
+  })
+})
+
+describe('GET /api/templates contract', () => {
+  it('accepts a well-formed summary', () => {
+    const entry: TemplateSummary = { name: 'hero' }
+    expect(TemplateSummarySchema.safeParse(entry).success).toBe(true)
+  })
+
+  it('rejects entries missing name', () => {
+    expect(TemplateSummarySchema.safeParse({}).success).toBe(false)
+  })
+})
+
+describe('GET /api/fields contract', () => {
+  it('accepts a well-formed summary', () => {
+    const entry: FieldSummary = { name: 'brand-color', path: '/abs/path/admin/fields/brand-color.tsx' }
+    expect(FieldSummarySchema.safeParse(entry).success).toBe(true)
+  })
+
+  it('rejects entries missing required fields', () => {
+    expect(FieldSummarySchema.safeParse({ name: 'brand-color' }).success).toBe(false)
+    expect(FieldSummarySchema.safeParse({ path: '/abs/path' }).success).toBe(false)
+  })
+})
+
+describe('GET /api/targets contract', () => {
+  describe('TargetInfo', () => {
+    it('accepts a well-formed entry', () => {
+      const entry: TargetInfo = { name: 'local', environment: 'local', type: 'static', editable: true }
+      expect(TargetInfoSchema.safeParse(entry).success).toBe(true)
+    })
+
+    it('rejects entries missing required fields', () => {
+      expect(TargetInfoSchema.safeParse({ name: 'local', environment: 'local', type: 'static' }).success).toBe(false)
+      expect(TargetInfoSchema.safeParse({ environment: 'local', type: 'static', editable: true }).success).toBe(false)
+    })
+  })
+
+  describe('TargetEnvironment / TargetType enums', () => {
+    it('TargetEnvironment accepts local, staging, production — rejects others', () => {
+      expect(TargetEnvironmentSchema.safeParse('local').success).toBe(true)
+      expect(TargetEnvironmentSchema.safeParse('staging').success).toBe(true)
+      expect(TargetEnvironmentSchema.safeParse('production').success).toBe(true)
+      // No custom environment names — this is a design-decisions.md
+      // property, not a schema accident. If the server ever emits a
+      // custom env value, it must widen the schema first.
+      expect(TargetEnvironmentSchema.safeParse('dev').success).toBe(false)
+      expect(TargetEnvironmentSchema.safeParse('prod').success).toBe(false)
+    })
+
+    it('TargetType accepts static and dynamic only', () => {
+      expect(TargetTypeSchema.safeParse('static').success).toBe(true)
+      expect(TargetTypeSchema.safeParse('dynamic').success).toBe(true)
+      expect(TargetTypeSchema.safeParse('esi').success).toBe(false)
     })
   })
 })
