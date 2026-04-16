@@ -1,13 +1,15 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
 import { SiteTreePom } from './pages/SiteTree'
+import { ComponentTreePom } from './pages/ComponentTree'
 
 test.describe('Default editor', () => {
   test('loads @rjsf form for template without custom editor', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
     // Click a component without custom editor (features)
-    await page.click('[data-testid="component-features"]')
+    await tree.open('features')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Should show the default form with heading field
@@ -19,9 +21,10 @@ test.describe('Default editor', () => {
 test.describe('Custom editor', () => {
   test('loads custom editor for hero template', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
     // Click hero component (has custom editor)
-    await page.click('[data-testid="component-hero"]')
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Wait for custom editor to load and render content
@@ -31,13 +34,14 @@ test.describe('Custom editor', () => {
 
   test('falls back to default form when switching to template without editor', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
     // First load hero (custom editor)
-    await page.click('[data-testid="component-hero"]')
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Then switch to features (no custom editor)
-    await page.click('[data-testid="component-features"]')
+    await tree.open('features')
     // Wait for the editor to remount with the new content
     await page.waitForFunction(
       () => {
@@ -55,9 +59,10 @@ test.describe('Custom editor', () => {
 test.describe('Custom field', () => {
   test('brand-color field renders inside banner editor', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
     // Click banner component (uses custom brand-color field)
-    await page.click('[data-testid="component-banner"]')
+    await tree.open('banner')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Wait for the custom field to load (async import)

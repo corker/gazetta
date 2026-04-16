@@ -1,10 +1,11 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
+import { ComponentTreePom } from './pages/ComponentTree'
 
 test.describe('Keyboard shortcuts', () => {
   test('Control+S saves a dirty form without clicking the save button', async ({ page }) => {
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    await new ComponentTreePom(page).open('hero')
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
     const original = await titleField.inputValue()
@@ -27,7 +28,7 @@ test.describe('Keyboard shortcuts', () => {
     // Same handler path (metaKey||ctrlKey) — verifies the Mac-style
     // modifier is honored, not just the Linux/Windows Control.
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    await new ComponentTreePom(page).open('hero')
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
     const original = await titleField.inputValue()
@@ -43,7 +44,7 @@ test.describe('Keyboard shortcuts', () => {
     // The handler guards with `if (editing.dirty)` — a save shortcut
     // on an unmodified form should not fire the save pipeline.
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    await new ComponentTreePom(page).open('hero')
     await page.locator('input[name="root_title"]').first().waitFor({ timeout: 5000 })
 
     // Form is clean at this point — save button should be disabled.
@@ -61,7 +62,7 @@ test.describe('Keyboard shortcuts', () => {
     // maintains a 50-entry undo stack per form. Ctrl/Cmd+Z reverts the
     // most recent change without hitting the save pipeline.
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    await new ComponentTreePom(page).open('hero')
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
     const original = await titleField.inputValue()
@@ -84,7 +85,7 @@ test.describe('Keyboard shortcuts', () => {
 
   test('Control+Shift+Z redoes an undone field edit', async ({ page }) => {
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    await new ComponentTreePom(page).open('hero')
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
     const original = await titleField.inputValue()

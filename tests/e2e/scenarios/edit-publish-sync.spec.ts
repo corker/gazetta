@@ -17,6 +17,7 @@
 import { test, expect } from '../fixtures'
 import { openEditor } from '../helpers'
 import { PublishPanelPom } from '../pages/PublishPanel'
+import { ComponentTreePom } from '../pages/ComponentTree'
 import { resetScenarioState } from './_isolation'
 
 test.describe('Scenario — edit → save → publish → sync', () => {
@@ -27,7 +28,7 @@ test.describe('Scenario — edit → save → publish → sync', () => {
   test('happy path: edit title, save, publish to staging, confirm sync chip updates', async ({ page }) => {
     // --- Edit ---
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    await new ComponentTreePom(page).open('hero')
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
     const original = await titleField.inputValue()

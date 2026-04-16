@@ -1,12 +1,14 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
+import { ComponentTreePom } from './pages/ComponentTree'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 test.describe('Undo last save', () => {
   test('save toast offers Undo; clicking it reverts the content', async ({ page }) => {
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    const tree = new ComponentTreePom(page)
+    await tree.open('hero')
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
     const original = await titleField.inputValue()
@@ -34,10 +36,11 @@ test.describe('Undo last save', () => {
 test.describe('History panel', () => {
   test('switcher menu opens history panel; Restore reverts content', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
     // Open the hero component and edit its title. The test is
     // count-agnostic — earlier tests in the same worker may have
     // produced revisions, so we don't assert an exact row count.
-    await page.locator('[data-testid="component-hero"]').click()
+    await tree.open('hero')
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
     const original = await titleField.inputValue()

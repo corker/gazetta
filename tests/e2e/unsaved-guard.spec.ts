@@ -1,13 +1,15 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
 import { SiteTreePom } from './pages/SiteTree'
+import { ComponentTreePom } from './pages/ComponentTree'
 
 test.describe('Unsaved changes dialog', () => {
   test('shows styled dialog with Save/Discard/Cancel when leaving with unsaved changes', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
     // Click hero component to start editing
-    await page.click('[data-testid="component-hero"]')
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Type into a field to make it dirty
@@ -28,8 +30,9 @@ test.describe('Unsaved changes dialog', () => {
 
   test('Cancel keeps the editor open', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
-    await page.click('[data-testid="component-hero"]')
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     const input = page.locator('[data-testid="editor-container"] input').first()
@@ -48,8 +51,9 @@ test.describe('Unsaved changes dialog', () => {
 
   test("Don't Save exits edit mode", async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
-    await page.click('[data-testid="component-hero"]')
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     const input = page.locator('[data-testid="editor-container"] input').first()
@@ -63,73 +67,79 @@ test.describe('Unsaved changes dialog', () => {
 
     // Dialog closes, back to browse mode (SiteTree visible)
     await expect(page.locator('.p-dialog')).not.toBeVisible()
-    const tree = new SiteTreePom(page)
-    await expect(tree.pageRow('home')).toBeVisible()
+    const siteTree = new SiteTreePom(page)
+    await expect(siteTree.pageRow('home')).toBeVisible()
   })
 })
 
 test.describe('Component stashing', () => {
   test('switching components stashes edits and shows dot', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
     // Edit hero
-    await page.click('[data-testid="component-hero"]')
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
     const input = page.locator('[data-testid="editor-container"] input').first()
     await input.fill('stashed edit')
 
     // Switch to features — no dialog, hero should show dot
-    await page.click('[data-testid="component-features"]')
+    await tree.open('features')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Hero should have a dirty dot
-    const heroDot = page.locator('[data-testid="component-hero"] .node-dirty-dot')
-    await expect(heroDot).toBeVisible()
+    await expect(tree.dirtyDot('hero')).toBeVisible()
   })
 
   test('switching back restores stashed edits', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
     // Edit hero
-    await page.click('[data-testid="component-hero"]')
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
     const input = page.locator('[data-testid="editor-container"] input').first()
     await input.fill('restored edit')
 
     // Switch to features
-    await page.click('[data-testid="component-features"]')
+    await tree.open('features')
     await page.waitForSelector('[data-testid="editor-container"]')
 
-    // Switch back to hero — click the label to avoid hitting the revert button
-    await page.locator('[data-testid="component-hero"] .node-label').click()
+    // Switch back to hero — click the label directly to avoid the revert
+    // button. The row's `.node-label` is the click-safe target when the
+    // row has a dirty state; `tree.open()` would hit whichever child the
+    // row's `.click()` resolves to and can land on the hover-revealed
+    // revert button in CI timing.
+    await tree.row('hero').locator('.node-label').click()
     const restoredInput = page.locator('[data-testid="editor-container"] input').first()
     await expect(restoredInput).toHaveValue('restored edit', { timeout: 10000 })
   })
 
   test('discard clears current dot, stashed dots remain', async ({ page }) => {
     await openEditor(page, 'home')
+    const tree = new ComponentTreePom(page)
 
     // Edit hero
-    await page.click('[data-testid="component-hero"]')
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
     await page.locator('[data-testid="editor-container"] input').first().fill('hero pending')
 
     // Switch to features — hero stashed with dot
-    await page.click('[data-testid="component-features"]')
+    await tree.open('features')
     await page.waitForSelector('[data-testid="editor-container"]')
 
     // Hero should have stashed dot
-    const heroDot = page.locator('[data-testid="component-hero"] .node-dirty-dot')
+    const heroDot = tree.dirtyDot('hero')
     await expect(heroDot).toBeVisible({ timeout: 5000 })
 
     // Edit features to make it dirty
     await page.locator('[data-testid="editor-container"] input').first().fill('features pending')
 
     // Hover hero to reveal revert button, click it
-    await page.hover('[data-testid="component-hero"]')
-    const revertBtn = page.locator('[data-testid="component-hero"] .node-revert')
-    await expect(revertBtn).toBeVisible({ timeout: 3000 })
-    await revertBtn.click()
+    const heroRevert = tree.revertButton('hero')
+    await tree.row('hero').hover()
+    await expect(heroRevert).toBeVisible({ timeout: 3000 })
+    await heroRevert.click()
 
     // Hero dot gone, features still dirty (current editor)
     await expect(heroDot).not.toBeVisible()
@@ -139,7 +149,8 @@ test.describe('Component stashing', () => {
 test.describe('Escape key behavior', () => {
   test('Escape from unsaved dialog does not reopen it', async ({ page }) => {
     await openEditor(page, 'home')
-    await page.click('[data-testid="component-hero"]')
+    const tree = new ComponentTreePom(page)
+    await tree.open('hero')
     await page.waitForSelector('[data-testid="editor-container"]')
     await page.locator('[data-testid="editor-container"] input').first().fill('escape test')
 
