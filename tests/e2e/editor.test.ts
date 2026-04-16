@@ -1075,9 +1075,9 @@ test.describe('Undo last save', () => {
 test.describe('History panel', () => {
   test('switcher menu opens history panel; Restore reverts content', async ({ page }) => {
     await openEditor(page, 'home')
-    // Make a save so there's >= 2 revisions (baseline + save). Without
-    // a save the history panel is "no revisions yet" — not what we
-    // want to test.
+    // Open the hero component and edit its title. The test is
+    // count-agnostic — earlier tests in the same worker may have
+    // produced revisions, so we don't assert an exact row count.
     await page.locator('[data-testid="component-hero"]').click()
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
@@ -1087,23 +1087,27 @@ test.describe('History panel', () => {
     // Wait for save toast to confirm the save landed.
     await expect(page.locator('[data-testid="global-toast"]'))
       .toContainText('Saved', { timeout: 5000 })
-    // Dismiss toast so it doesn't race the panel.
+    // Toast is a transient success — 3s auto-dismiss. Wait for it to
+    // clear before opening the menu so it can't visually interfere.
     await page.waitForTimeout(500)
 
     // Open the target switcher → click "View history".
     await page.locator('[data-testid="active-target-indicator"]').click()
     await page.locator('[data-testid="active-target-menu"]')
       .getByRole('menuitem', { name: /view history/i }).click()
-    // Panel opens. Baseline + save = 2 rows; head is the save.
     const panel = page.locator('[data-testid="history-panel"]')
     await expect(panel).toBeVisible()
     const rows = panel.locator('[data-testid^="history-row-"]')
-    await expect(rows).toHaveCount(2)
-    // Head row has 'current' badge and a disabled Restore button.
+    // At minimum there's baseline + the save we just did.
+    await expect(rows.first()).toBeVisible()
     const headRow = rows.first()
     await expect(headRow).toContainText('current')
-    // Baseline is the second row — restore it.
-    const baselineRow = rows.nth(1)
+
+    // Restore the baseline (oldest row) — that always predates
+    // whatever earlier tests produced and is the safe "back to
+    // original" target. Use `.last()` since rows are newest-first.
+    const baselineRow = rows.last()
+    await expect(baselineRow).toContainText('Initial baseline')
     await baselineRow.locator('button', { hasText: 'Restore' }).click()
 
     // Toast confirms; close panel and verify content reverted.
