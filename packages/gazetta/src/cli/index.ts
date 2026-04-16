@@ -1475,6 +1475,26 @@ async function runDev(siteDir: string, port: number) {
             honoHandler(req, res)
           }
         })
+        // Force Vite to scan deps + complete initial optimization BEFORE we
+        // mark the CMS ready. Without this, `cmsReady = true` fires the
+        // moment Vite is created — loader page reloads, browser starts
+        // fetching the SPA, and Vite's still building the dep bundle in the
+        // background. The first round of imports arrives, Vite finds new
+        // transitive deps, and fires `optimized dependencies changed.
+        // reloading` mid-page-load. That reload cancels in-flight
+        // `/admin/api/*` requests — silently breaking any component that
+        // doesn't retry (FragmentBlastRadius, for one).
+        //
+        // Warm the SPA's main entry module (not index.html — Vite's
+        // import-analysis plugin treats warmupRequest urls as JS modules
+        // and chokes on HTML). The entry's transitive imports are exactly
+        // what the browser will request on first load, so settling them
+        // here means the browser gets a stable bundle. waitForRequestsIdle
+        // blocks until Vite finishes processing the static-import chain,
+        // which includes dep optimization.
+        const ENTRY = '/src/client/main.ts'
+        await vite.warmupRequest(ENTRY)
+        await vite.waitForRequestsIdle(ENTRY)
         cmsReady = true
       } catch (err) {
         console.warn(`  Warning: CMS UI failed to start: ${(err as Error).message}`)
