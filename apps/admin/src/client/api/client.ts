@@ -113,23 +113,24 @@ async function publishStream(
   return results
 }
 
-// PageSummary / CreatePageRequest / CreatePageResponse come from the
-// shared schema source-of-truth in gazetta/admin-api/schemas. Any
-// drift between these and the server's Zod schema is a compile error
-// at build time — enforced here rather than at runtime.
+// Summary + create request/response types come from the shared schema
+// source-of-truth in gazetta/admin-api/schemas. Any drift between these
+// and the server's Zod schema is a compile error at build time —
+// enforced here rather than at runtime.
 import type {
   PageSummary as PageSummaryShape,
   CreatePageRequest as CreatePageRequestShape,
   CreatePageResponse as CreatePageResponseShape,
+  FragmentSummary as FragmentSummaryShape,
+  CreateFragmentRequest as CreateFragmentRequestShape,
+  CreateFragmentResponse as CreateFragmentResponseShape,
 } from 'gazetta/admin-api/schemas'
 export type PageSummary = PageSummaryShape
 export type CreatePageRequest = CreatePageRequestShape
 export type CreatePageResponse = CreatePageResponseShape
-
-export interface FragmentSummary {
-  name: string
-  template: string
-}
+export type FragmentSummary = FragmentSummaryShape
+export type CreateFragmentRequest = CreateFragmentRequestShape
+export type CreateFragmentResponse = CreateFragmentResponseShape
 export interface TemplateSummary {
   name: string
 }
@@ -212,8 +213,8 @@ export const api = {
   getFragments: (opts?: { target?: string }) =>
     request<FragmentSummary[]>(opts?.target ? `/fragments?target=${encodeURIComponent(opts.target)}` : '/fragments'),
   getFragment: (name: string, options?: RequestInit) => request<FragmentDetail>(`/fragments/${name}`, options),
-  createFragment: (data: { name: string; template: string }) =>
-    request<{ ok: boolean; name: string }>('/fragments', { method: 'POST', body: JSON.stringify(data) }),
+  createFragment: (data: CreateFragmentRequest) =>
+    request<CreateFragmentResponse>('/fragments', { method: 'POST', body: JSON.stringify(data) }),
   deleteFragment: (name: string) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'DELETE' }),
   updateFragment: (name: string, data: Partial<FragmentDetail>) =>
     request<{ ok: boolean }>(`/fragments/${name}`, { method: 'PUT', body: JSON.stringify(data) }),

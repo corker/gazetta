@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { loadSite } from '../../site-loader.js'
 import { recordWrite } from '../../history-recorder.js'
 import type { SourceContextResolver } from '../source-context.js'
+import { CreateFragmentRequestSchema } from '../schemas/fragments.js'
 
 export function fragmentRoutes(resolve: SourceContextResolver) {
   const app = new Hono()
@@ -27,10 +28,19 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
   app.post('/api/fragments', async c => {
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
-    const body = (await c.req.json()) as { name: string; template: string }
-    if (!body.name || !body.template) {
-      return c.json({ error: 'Missing required fields: name, template' }, 400)
+    // Schema-validate the body — same rationale as pages.ts.
+    const raw = await c.req.json()
+    const parsed = CreateFragmentRequestSchema.safeParse(raw)
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: 'Invalid request body',
+          issues: parsed.error.issues.map(i => ({ path: i.path.join('.'), message: i.message })),
+        },
+        400,
+      )
     }
+    const body = parsed.data
 
     const fragDir = source.contentRoot.path('fragments', body.name)
     const manifestPath = join(fragDir, 'fragment.json')
