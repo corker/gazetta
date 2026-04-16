@@ -36,7 +36,6 @@ const BASELINE: Array<{ id: string; reason: string }> = [
     id: 'color-contrast',
     reason: 'tinted state colors (muted labels, env badges) below 4.5:1 in dark mode — needs token-layer pass',
   },
-  { id: 'button-name', reason: 'icon-only PrimeVue buttons (tree chevrons, dialog close) need title/aria-label audit' },
   {
     id: 'label',
     reason: 'several rjsf form inputs render without associated <label> — needs custom field wrapper fix',

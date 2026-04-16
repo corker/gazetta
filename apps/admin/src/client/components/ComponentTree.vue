@@ -335,14 +335,17 @@ async function addComponent(name: string, template: string) {
         <span v-if="node.data?.isTopLevel && depth !== -1" class="node-actions">
           <Button icon="pi pi-arrow-up" text rounded size="small"
             :data-testid="`move-up-${node.label}`"
+            :aria-label="`Move ${node.label} up`"
             :disabled="(node.data.index as number) === 0"
             @click.stop="moveComponent(node.data.index as number, -1)" />
           <Button icon="pi pi-arrow-down" text rounded size="small"
             :data-testid="`move-down-${node.label}`"
+            :aria-label="`Move ${node.label} down`"
             :disabled="(node.data.index as number) === componentCount - 1"
             @click.stop="moveComponent(node.data.index as number, 1)" />
           <Button icon="pi pi-trash" text rounded size="small" severity="danger"
             :data-testid="`remove-${node.label}`"
+            :aria-label="`Remove ${node.label}`"
             @click.stop="removeComponent(node.data.index as number)" />
         </span>
       </div>
