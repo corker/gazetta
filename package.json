@@ -10,7 +10,8 @@
     "apps/*",
     "tools/*",
     "examples/*",
-    "sites/*"
+    "sites/*",
+    "tests/fixtures/sites/*"
   ],
   "scripts": {
     "build": "npm run build -w packages/gazetta",

@@ -1,0 +1,25 @@
+{
+  "template": "page-default",
+  "content": {
+    "title": "Editor Showcase",
+    "description": "Demonstrates all editor input types"
+  },
+  "components": [
+    "@header",
+    {
+      "name": "showcase-demo",
+      "template": "showcase",
+      "content": {
+        "body": "<p>This is a <strong>rich text</strong> field with <em>formatting</em> support.</p>",
+        "image": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800",
+        "website": "https://gazetta.studio",
+        "slug": "editor-showcase",
+        "snippet": "<div class=\"hero\">\n  <h1>Hello World</h1>\n</div>",
+        "metadata": "{ \"version\": 1, \"draft\": true }",
+        "accentColor": "#667eea",
+        "layout": "centered"
+      }
+    },
+    "@footer"
+  ]
+}
