@@ -147,19 +147,33 @@ is a legitimate testcontainers approach — it manages lifecycle programmaticall
 
 ---
 
-#### ☐ 2.2 Documented-behavior tests from operations.md
+#### ✓ 2.2 Documented-behavior tests from operations.md
 
-[operations.md](./operations.md) documents testable claims with no tests:
-- Circular fragment reference detection
-- Render timeouts (10s dev / 30s publish)
-- 20-level nesting-depth warning
-- Connectivity precheck before publish
-- Explicit `environment: production` confirmation
-- Keyboard shortcuts (Ctrl+S save, Ctrl+Z undo, Esc close)
+Audited the "testable claims" list against the source. Three of six were
+**aspirational entries in operations.md** — documented as current but unimplemented.
+Those have been corrected in operations.md rather than tested. Landed tests for the
+three real claims:
 
-**Approach:** one integration test per claim; tests double as executable docs.
+**Tested (real):**
+- Circular fragment reference detection — [resolver.test.ts](../../packages/gazetta/tests/resolver.test.ts)
+  added 4 tests: self-reference, 2-hop cycle, 3-hop cycle, diamond-without-cycle (no false positive)
+- Keyboard shortcut `Ctrl/Cmd+S` saves — [editor.test.ts](../../tests/e2e/editor.test.ts)
+  added 3 e2e tests: Control+S, Meta+S, clean-form no-op
+- Keyboard shortcut `Ctrl/Cmd+Z` undo / `Shift+Z` redo — added e2e tests against
+  the default `@rjsf` form editor (implementation lives at
+  [packages/gazetta/src/editor/mount.tsx](../../packages/gazetta/src/editor/mount.tsx)
+  lines 869-914, scoped to field-level edit history with a 50-entry stack)
+- `Escape` closes dialogs — already covered by the existing `Escape key behavior`
+  describe block in editor.test.ts
+- Explicit `environment: production` confirmation — already covered by
+  [PublishPanel.test.ts](../../apps/admin/tests/PublishPanel.test.ts) (PR #151)
 
-**Estimate:** ~2-3 days, incremental.
+**Corrected in operations.md (not implemented — documentation was aspirational):**
+- Render timeouts (10s dev / 30s publish) — marked as future work; today a hung
+  template hangs the process
+- 20-level nesting-depth warning — marked as future `gazetta validate` work
+- Connectivity precheck before publish — marked as future; today failures surface
+  through the underlying SDK error when the first write or list fails
 
 ---
 

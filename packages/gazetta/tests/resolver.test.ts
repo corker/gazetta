@@ -290,3 +290,132 @@ describe('resolveFragment', () => {
     }
   })
 })
+
+/**
+ * Circular-reference detection — documented in operations.md
+ * ("Fragment nesting: Circular references are detected and reported").
+ * Runtime uses resolver.ts:33-38 + 72-76 to throw before an infinite
+ * recursion can land. These tests cover the three shapes a cycle can
+ * take in authored content.
+ */
+describe('circular reference detection', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  it('detects a direct self-reference (A → A)', async () => {
+    // Fragment A lists itself — smallest possible cycle. Resolver must
+    // bail at the second visit, not crash the process.
+    await writeSite({
+      'site.yaml': 'name: "Test"',
+      'fragments/a/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@a'],
+      }),
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['@a'],
+      }),
+    })
+    await writeTemplate('echo')
+
+    const site = await loadSite({ siteDir: testDir, storage })
+    await expect(resolvePage('home', site)).rejects.toThrow(/[Cc]ircular reference/)
+  })
+
+  it('detects a two-fragment cycle (A → B → A)', async () => {
+    // A references B, B references back to A. Resolver tracks visited
+    // refs across recursion depth — both fragments are valid in isolation
+    // but together form a cycle.
+    await writeSite({
+      'site.yaml': 'name: "Test"',
+      'fragments/a/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@b'],
+      }),
+      'fragments/b/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@a'],
+      }),
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['@a'],
+      }),
+    })
+    await writeTemplate('echo')
+
+    const site = await loadSite({ siteDir: testDir, storage })
+    const err = await resolvePage('home', site).catch(e => e as Error)
+    expect(err).toBeInstanceOf(Error)
+    expect(err.message).toContain('Circular reference')
+    // The error message shows the resolution path so the author can
+    // trace the cycle (resolver.ts:35-36).
+    expect(err.message).toContain('@a')
+    expect(err.message).toContain('@b')
+  })
+
+  it('detects a three-fragment cycle (A → B → C → A)', async () => {
+    // Three-hop cycle — ensures the detector isn't just catching
+    // depth-2 loops.
+    await writeSite({
+      'site.yaml': 'name: "Test"',
+      'fragments/a/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@b'],
+      }),
+      'fragments/b/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@c'],
+      }),
+      'fragments/c/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@a'],
+      }),
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['@a'],
+      }),
+    })
+    await writeTemplate('echo')
+
+    const site = await loadSite({ siteDir: testDir, storage })
+    await expect(resolvePage('home', site)).rejects.toThrow(/[Cc]ircular reference/)
+  })
+
+  it('allows a diamond (A → B, A → C, both B and C → D) without false positives', async () => {
+    // Diamond-shape dependency: D is referenced twice on independent
+    // branches, but there is NO cycle. The visited-set is popped when
+    // a branch completes (resolver.ts:45-46, 63-64, 89-90) — this test
+    // ensures we don't regress to a broken visited-set that would
+    // flag D as already-visited on the second branch.
+    await writeSite({
+      'site.yaml': 'name: "Test"',
+      'fragments/a/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@b', '@c'],
+      }),
+      'fragments/b/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@d'],
+      }),
+      'fragments/c/fragment.json': JSON.stringify({
+        template: 'echo',
+        components: ['@d'],
+      }),
+      'fragments/d/fragment.json': JSON.stringify({
+        template: 'echo',
+        content: { text: 'leaf' },
+      }),
+      'pages/home/page.json': JSON.stringify({
+        template: 'echo',
+        components: ['@a'],
+      }),
+    })
+    await writeTemplate('echo')
+
+    const site = await loadSite({ siteDir: testDir, storage })
+    // Should NOT throw — a diamond is not a cycle.
+    const resolved = await resolvePage('home', site)
+    expect(resolved.children).toHaveLength(1)  // @a at the root
+  })
+})
