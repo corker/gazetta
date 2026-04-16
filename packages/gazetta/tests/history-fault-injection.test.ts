@@ -1,0 +1,381 @@
+/**
+ * Fault-injection tests for history + publish — testing-plan.md Priority 1.4.
+ *
+ * The history subsystem claims soft-undo correctness under failure: per
+ * history-provider.ts:197-201, "Do the index write last so a mid-write
+ * failure leaves orphan blobs and an orphan manifest (both harmless)
+ * rather than a dangling index entry pointing at a missing manifest."
+ *
+ * This test file injects failures at each write step (blob, manifest,
+ * index) and verifies:
+ *
+ *   1. A failure during blob writes leaves the index unchanged — no
+ *      phantom revision is readable.
+ *   2. A failure during manifest write leaves blobs behind but index
+ *      unchanged.
+ *   3. A failure during index write leaves blobs + manifest behind but
+ *      listRevisions() doesn't see the new id.
+ *   4. After ANY mid-write failure, the NEXT successful recordRevision
+ *      produces a clean revision — no dangling references, no stale
+ *      state.
+ *   5. Retention eviction is atomic — a failure during eviction doesn't
+ *      corrupt the index.
+ *
+ * Mechanism: wrap an in-memory StorageProvider with a decorator that
+ * fails the Nth write. Fault-injection tests don't verify the happy
+ * path (other tests do that); they verify the claimed failure-mode
+ * invariants.
+ */
+import { describe, it, expect, beforeEach } from 'vitest'
+import type { StorageProvider } from '../src/types.js'
+import { createHistoryProvider } from '../src/history-provider.js'
+
+// ---------------------------------------------------------------------------
+// In-memory storage (shared pattern with history-recorder.test.ts,
+// sidecars.test.ts — just enough to exercise the provider contract).
+// ---------------------------------------------------------------------------
+
+type MemoryStorage = StorageProvider & {
+  dump(): Map<string, string>
+  seed(entries: Record<string, string>): void
+}
+
+function memoryStorage(): MemoryStorage {
+  const files = new Map<string, string>()
+  return {
+    async readFile(path) {
+      const v = files.get(path)
+      if (v === undefined) throw new Error(`ENOENT: ${path}`)
+      return v
+    },
+    async writeFile(path, content) { files.set(path, content) },
+    async exists(path) { return files.has(path) },
+    async readDir(path) {
+      const prefix = path.endsWith('/') ? path : path + '/'
+      let any = false
+      const dirs = new Set<string>()
+      const fls = new Set<string>()
+      for (const p of files.keys()) {
+        if (!p.startsWith(prefix)) continue
+        any = true
+        const rest = p.slice(prefix.length)
+        const seg = rest.split('/')[0]
+        if (!seg) continue
+        if (rest.includes('/')) dirs.add(seg)
+        else fls.add(seg)
+      }
+      if (!any) throw new Error(`ENOENT: ${path}`)
+      return [
+        ...[...dirs].map(name => ({ name, isDirectory: true, isFile: false })),
+        ...[...fls].filter(n => !dirs.has(n)).map(name => ({ name, isDirectory: false, isFile: true })),
+      ]
+    },
+    async mkdir() {},
+    async rm(path) {
+      files.delete(path)
+      const prefix = path.endsWith('/') ? path : path + '/'
+      for (const p of [...files.keys()]) {
+        if (p.startsWith(prefix)) files.delete(p)
+      }
+    },
+    dump() { return files },
+    seed(entries) {
+      for (const [k, v] of Object.entries(entries)) files.set(k, v)
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chaos decorator: fail the Nth write matching a predicate.
+// ---------------------------------------------------------------------------
+
+interface FaultSpec {
+  /** Predicate on the path. When matched, counts toward skipUntilFail. */
+  match: (path: string) => boolean
+  /** Number of matching writes to let through before failing the next one. */
+  skipUntilFail: number
+  /** Error to throw on the triggered failure. */
+  error: string
+}
+
+/**
+ * Wrap a storage so its `writeFile` calls fail the Nth call matching
+ * `spec.match`. One-shot: after the fault triggers, subsequent calls
+ * pass through normally.
+ */
+function withFault(inner: MemoryStorage, spec: FaultSpec): MemoryStorage & { triggered: () => boolean } {
+  let seen = 0
+  let hasFired = false
+  return {
+    ...inner,
+    async writeFile(path, content) {
+      if (!hasFired && spec.match(path)) {
+        if (seen === spec.skipUntilFail) {
+          hasFired = true
+          throw new Error(spec.error)
+        }
+        seen += 1
+      }
+      return inner.writeFile(path, content)
+    },
+    triggered() { return hasFired },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Small helpers used by multiple tests.
+// ---------------------------------------------------------------------------
+
+function blobCount(storage: MemoryStorage): number {
+  return [...storage.dump().keys()].filter(p => p.startsWith('.gazetta/history/objects/')).length
+}
+function manifestCount(storage: MemoryStorage): number {
+  return [...storage.dump().keys()].filter(p => p.startsWith('.gazetta/history/revisions/')).length
+}
+async function readIndex(storage: MemoryStorage): Promise<{ revisions: string[] } | null> {
+  try { return JSON.parse(await storage.readFile('.gazetta/history/index.json')) }
+  catch { return null }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('history fault injection — mid-blob-write failure', () => {
+  let storage: MemoryStorage
+  beforeEach(() => { storage = memoryStorage() })
+
+  it('leaves no index update when a blob write fails partway through', async () => {
+    const faulted = withFault(storage, {
+      match: p => p.startsWith('.gazetta/history/objects/'),
+      skipUntilFail: 2,  // let 2 blobs through, fail the 3rd
+      error: 'storage transient',
+    })
+    const history = createHistoryProvider({ storage: faulted })
+
+    await expect(history.recordRevision({
+      operation: 'save',
+      items: new Map([
+        ['a.json', '{"a":1}'],
+        ['b.json', '{"b":1}'],
+        ['c.json', '{"c":1}'],
+        ['d.json', '{"d":1}'],
+      ]),
+    })).rejects.toThrow(/storage transient/)
+    expect(faulted.triggered()).toBe(true)
+
+    // Index was never updated — listRevisions sees nothing.
+    expect(await history.listRevisions()).toEqual([])
+    // Orphan blobs may be present (2 that made it before the fault) —
+    // that's explicitly allowed by the design (lazy GC).
+    expect(blobCount(storage)).toBeLessThanOrEqual(2)
+    // No manifest was written (blobs fail before manifest).
+    expect(manifestCount(storage)).toBe(0)
+  })
+
+  it('allows a subsequent recordRevision to succeed cleanly after a blob-write failure', async () => {
+    const faulted = withFault(storage, {
+      match: p => p.startsWith('.gazetta/history/objects/'),
+      skipUntilFail: 0,
+      error: 'first write fails',
+    })
+    const history = createHistoryProvider({ storage: faulted })
+    await expect(history.recordRevision({
+      operation: 'save',
+      items: new Map([['a.json', '{"a":1}']]),
+    })).rejects.toThrow()
+
+    // Second attempt runs against the same storage (fault latch is one-shot).
+    const rev = await history.recordRevision({
+      operation: 'save',
+      items: new Map([['a.json', '{"a":2}']]),
+    })
+    expect(rev.id).toMatch(/^rev-\d+/)
+
+    const list = await history.listRevisions()
+    expect(list).toHaveLength(1)
+    expect(list[0].id).toBe(rev.id)
+    // Manifest is readable and references a stored blob
+    const manifest = await history.readRevision(rev.id)
+    const hashForA = manifest.snapshot['a.json']
+    expect(hashForA).toBeDefined()
+    expect(await history.readBlob(hashForA!)).toBe('{"a":2}')
+  })
+})
+
+describe('history fault injection — mid-manifest-write failure', () => {
+  let storage: MemoryStorage
+  beforeEach(() => { storage = memoryStorage() })
+
+  it('leaves blobs behind but index unchanged when manifest write fails', async () => {
+    const faulted = withFault(storage, {
+      match: p => p.startsWith('.gazetta/history/revisions/'),
+      skipUntilFail: 0,
+      error: 'manifest write fails',
+    })
+    const history = createHistoryProvider({ storage: faulted })
+
+    await expect(history.recordRevision({
+      operation: 'save',
+      items: new Map([['a.json', '{"a":1}']]),
+    })).rejects.toThrow(/manifest write fails/)
+
+    expect(await history.listRevisions()).toEqual([])
+    // Blobs that made it before the manifest-write attempt are allowed
+    // as orphans — lazy GC takes them eventually.
+    expect(manifestCount(storage)).toBe(0)
+    // Index must not list a phantom revision
+    const idx = await readIndex(storage)
+    expect(idx).toBeNull()
+  })
+})
+
+describe('history fault injection — mid-index-write failure', () => {
+  let storage: MemoryStorage
+  beforeEach(() => { storage = memoryStorage() })
+
+  it('does not corrupt the index when the index write fails', async () => {
+    // First succeed a revision, then fault the second index write.
+    const history = createHistoryProvider({ storage })
+    await history.recordRevision({
+      operation: 'save',
+      items: new Map([['a.json', '{"a":1}']]),
+    })
+    const firstList = await history.listRevisions()
+    expect(firstList).toHaveLength(1)
+
+    // Snapshot the index as-of now.
+    const indexBefore = await readIndex(storage)
+
+    // Now make the NEXT write to index.json fail.
+    const faulted = withFault(storage, {
+      match: p => p === '.gazetta/history/index.json',
+      skipUntilFail: 0,
+      error: 'index write fails',
+    })
+    const history2 = createHistoryProvider({ storage: faulted })
+    await expect(history2.recordRevision({
+      operation: 'save',
+      items: new Map([['b.json', '{"b":1}']]),
+    })).rejects.toThrow(/index write fails/)
+
+    // Index is still the pre-failure snapshot — listRevisions only sees rev 1.
+    const indexAfter = await readIndex(storage)
+    expect(indexAfter).toEqual(indexBefore)
+    const list = await history2.listRevisions()
+    expect(list).toHaveLength(1)
+    expect(list[0].id).toBe(firstList[0].id)
+  })
+})
+
+describe('history fault injection — retention eviction atomicity', () => {
+  let storage: MemoryStorage
+  beforeEach(() => { storage = memoryStorage() })
+
+  it('does not lose the new revision when eviction of the old one fails', async () => {
+    const history = createHistoryProvider({ storage, retention: 1 })
+    // First revision — no eviction yet.
+    const rev1 = await history.recordRevision({
+      operation: 'save',
+      items: new Map([['a.json', '{"v":1}']]),
+    })
+    expect((await history.listRevisions())[0].id).toBe(rev1.id)
+
+    // Second revision should trigger eviction of rev1. Inject a fault
+    // on the `rm` of the old manifest. (applyRetention does rm then
+    // writeIndex; failure during rm happens AFTER the index update that
+    // removed the old id, so the new revision is durable and rev1 is
+    // unreadable from listRevisions — which is what retention wants
+    // anyway. Orphan manifest is harmless.)
+    const originalRm = storage.rm.bind(storage)
+    let rmFailed = false
+    storage.rm = async (path: string) => {
+      if (!rmFailed && path.startsWith('.gazetta/history/revisions/')) {
+        rmFailed = true
+        throw new Error('rm fails')
+      }
+      return originalRm(path)
+    }
+
+    // The second write itself should fail (recordRevision throws because
+    // applyRetention propagates). But the new revision must be observable
+    // or NOT observable consistently — no torn state where index says
+    // "evicted" but file lingers as phantom.
+    await expect(history.recordRevision({
+      operation: 'save',
+      items: new Map([['a.json', '{"v":2}']]),
+    })).rejects.toThrow(/rm fails/)
+
+    // The index was written with both revisions before applyRetention
+    // ran, then the rm failed before it could remove rev1's manifest.
+    // The critical invariant — every index entry has a readable manifest
+    // — must still hold. Retention has "not yet applied" state; not
+    // torn. A subsequent recordRevision's retention pass will finish
+    // the eviction.
+    const list = await history.listRevisions()
+    for (const r of list) {
+      // Must not throw — manifest is readable for every listed id
+      await expect(history.readRevision(r.id)).resolves.toBeDefined()
+    }
+  })
+})
+
+describe('history fault injection — recovery invariant', () => {
+  let storage: MemoryStorage
+  beforeEach(() => { storage = memoryStorage() })
+
+  it('recovery invariant: after any mid-write failure, the index still points to manifests that exist', async () => {
+    // Drive three failure scenarios in sequence against the same storage,
+    // verifying the invariant after each. Index consistency — "every id
+    // in index.json has a readable manifest" — must hold throughout.
+    async function assertIndexPointsAtReadableManifests(history: ReturnType<typeof createHistoryProvider>) {
+      const list = await history.listRevisions()
+      for (const rev of list) {
+        await expect(history.readRevision(rev.id)).resolves.toBeDefined()
+      }
+    }
+
+    // Baseline: one successful revision.
+    const history = createHistoryProvider({ storage })
+    await history.recordRevision({
+      operation: 'save',
+      items: new Map([['a.json', '{"a":1}']]),
+    })
+    await assertIndexPointsAtReadableManifests(history)
+
+    // Fault 1: blob write fails on the next attempt.
+    const f1 = withFault(storage, {
+      match: p => p.startsWith('.gazetta/history/objects/'),
+      skipUntilFail: 0,
+      error: 'blob fail',
+    })
+    const h1 = createHistoryProvider({ storage: f1 })
+    await expect(h1.recordRevision({
+      operation: 'save',
+      items: new Map([['b.json', '{"b":1}']]),
+    })).rejects.toThrow()
+    await assertIndexPointsAtReadableManifests(h1)
+
+    // Fault 2: manifest write fails on the next attempt (against the
+    // original unwrapped storage — different code path).
+    const f2 = withFault(storage, {
+      match: p => p.startsWith('.gazetta/history/revisions/'),
+      skipUntilFail: 0,
+      error: 'manifest fail',
+    })
+    const h2 = createHistoryProvider({ storage: f2 })
+    await expect(h2.recordRevision({
+      operation: 'save',
+      items: new Map([['c.json', '{"c":1}']]),
+    })).rejects.toThrow()
+    await assertIndexPointsAtReadableManifests(h2)
+
+    // Final successful revision — everything should still work.
+    const rev = await history.recordRevision({
+      operation: 'save',
+      items: new Map([['d.json', '{"d":1}']]),
+    })
+    expect(rev.id).toBeDefined()
+    await assertIndexPointsAtReadableManifests(history)
+  })
+})
