@@ -26,6 +26,7 @@ import Select from 'primevue/select'
 import { api, type PublishResult } from '../api/client.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useSyncStatusStore } from '../stores/syncStatus.js'
+import { groupedEntries, type TargetGroup } from '../composables/targetGrouping.js'
 import PublishItemList from './PublishItemList.vue'
 
 const props = defineProps<{
@@ -65,32 +66,23 @@ function toggleDestination(name: string) {
 }
 
 /**
- * Destinations grouped by environment. Groups with 2+ members render a
+ * Destinations as grouped render entries. At ≤3 total targets the
+ * picker stays flat (one row per destination, no group headers). At
+ * 4+ it groups by environment, and multi-member groups render a
  * "select all" header checkbox that toggles every member at once —
- * design-editor-ux.md "Multi-destination publish (fan-out)": selecting
- * an environment group selects all its members. Single-member groups
- * render flat (no header) so the UI stays quiet for simple setups.
+ * design-editor-ux.md "Scaling to 4+ targets" + "Multi-destination
+ * publish (fan-out)". The threshold lives in targetGrouping.ts so
+ * every target-referencing surface renders consistently.
  *
- * Iteration order is preserved from the target declaration order in
- * site.yaml, which matches the top-bar switcher and sync indicators.
+ * Iteration order is preserved from target declaration order in
+ * site.yaml, matching the top-bar switcher and sync indicators.
  */
-interface DestinationGroup {
-  environment: string
-  members: typeof destinationOptions.value
-}
-const destinationGroups = computed<DestinationGroup[]>(() => {
-  const groups = new Map<string, DestinationGroup>()
-  for (const t of destinationOptions.value) {
-    const env = t.environment ?? 'local'
-    let g = groups.get(env)
-    if (!g) { g = { environment: env, members: [] }; groups.set(env, g) }
-    g.members.push(t)
-  }
-  return [...groups.values()]
-})
+const destinationEntries = computed(() =>
+  groupedEntries(destinationOptions.value, activeTarget.targets.length),
+)
 
 /** Tri-state of a group's selection: 'none' | 'some' | 'all'. */
-function groupState(group: DestinationGroup): 'none' | 'some' | 'all' {
+function groupState(group: TargetGroup): 'none' | 'some' | 'all' {
   const selected = group.members.filter(m => selectedDestinations.value.has(m.name)).length
   if (selected === 0) return 'none'
   if (selected === group.members.length) return 'all'
@@ -98,7 +90,7 @@ function groupState(group: DestinationGroup): 'none' | 'some' | 'all' {
 }
 
 /** Toggle an entire group: if any member is unselected, select all; else deselect all. */
-function toggleGroup(group: DestinationGroup) {
+function toggleGroup(group: TargetGroup) {
   const next = new Set(selectedDestinations.value)
   const state = groupState(group)
   if (state === 'all') {
@@ -322,40 +314,56 @@ function envClass(env: string | undefined): string {
           (no other targets configured)
         </div>
         <div v-else class="destinations" data-testid="publish-destinations">
-          <template v-for="group in destinationGroups" :key="group.environment">
-            <!-- Group header — only when 2+ members. Single-member groups
-                 render flat, matching the design's "Groups of 1 stay flat"
-                 rule. Click anywhere on the header toggles the group. -->
-            <button v-if="group.members.length > 1"
-              type="button"
-              :class="['destination-group-header', envClass(group.environment)]"
-              :data-testid="`publish-dest-group-${group.environment}`"
-              @click="toggleGroup(group)">
-              <Checkbox
-                :modelValue="groupState(group) === 'all'"
-                :indeterminate="groupState(group) === 'some'"
-                :inputId="`dest-group-${group.environment}`"
-                :binary="true"
-                :tabindex="-1"
-              />
-              <span class="group-label">{{ group.environment }}</span>
-              <span class="group-count">{{ group.members.length }} targets</span>
-            </button>
+          <template v-for="entry in destinationEntries" :key="entry.kind === 'single' ? entry.target.name : entry.group.environment">
+            <!-- Flat single destination (≤3 targets, OR 1-member groups
+                 at 4+). No header. -->
             <label
-              v-for="t in group.members"
-              :key="t.name"
-              :class="['destination', envClass(t.environment), { grouped: group.members.length > 1 }]"
-              :data-testid="`publish-dest-${t.name}`">
+              v-if="entry.kind === 'single'"
+              :class="['destination', envClass(entry.target.environment)]"
+              :data-testid="`publish-dest-${entry.target.name}`">
               <Checkbox
-                :modelValue="selectedDestinations.has(t.name)"
-                @update:modelValue="() => toggleDestination(t.name)"
-                :inputId="`dest-${t.name}`"
+                :modelValue="selectedDestinations.has(entry.target.name)"
+                @update:modelValue="() => toggleDestination(entry.target.name)"
+                :inputId="`dest-${entry.target.name}`"
                 :binary="true"
               />
-              <span class="dest-name">{{ t.name }}</span>
-              <span v-if="!t.editable" class="dest-badge">read-only</span>
-              <span class="dest-status">{{ statusLabel(t.name) }}</span>
+              <span class="dest-name">{{ entry.target.name }}</span>
+              <span v-if="!entry.target.editable" class="dest-badge">read-only</span>
+              <span class="dest-status">{{ statusLabel(entry.target.name) }}</span>
             </label>
+            <!-- Group header + indented members (4+ targets, 2+ in env) -->
+            <template v-else>
+              <button
+                type="button"
+                :class="['destination-group-header', envClass(entry.group.environment)]"
+                :data-testid="`publish-dest-group-${entry.group.environment}`"
+                @click="toggleGroup(entry.group)">
+                <Checkbox
+                  :modelValue="groupState(entry.group) === 'all'"
+                  :indeterminate="groupState(entry.group) === 'some'"
+                  :inputId="`dest-group-${entry.group.environment}`"
+                  :binary="true"
+                  :tabindex="-1"
+                />
+                <span class="group-label">{{ entry.group.environment }}</span>
+                <span class="group-count">{{ entry.group.members.length }} targets</span>
+              </button>
+              <label
+                v-for="t in entry.group.members"
+                :key="t.name"
+                :class="['destination', envClass(t.environment), 'grouped']"
+                :data-testid="`publish-dest-${t.name}`">
+                <Checkbox
+                  :modelValue="selectedDestinations.has(t.name)"
+                  @update:modelValue="() => toggleDestination(t.name)"
+                  :inputId="`dest-${t.name}`"
+                  :binary="true"
+                />
+                <span class="dest-name">{{ t.name }}</span>
+                <span v-if="!t.editable" class="dest-badge">read-only</span>
+                <span class="dest-status">{{ statusLabel(t.name) }}</span>
+              </label>
+            </template>
           </template>
         </div>
       </div>
