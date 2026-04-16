@@ -8,13 +8,26 @@ export function pageRoutes(resolve: SourceContextResolver) {
 
   app.get('/api/pages', async (c) => {
     const source = await resolve(c.req.query('target'))
-    const site = await loadSite({ contentRoot: source.contentRoot })
-    const pages = [...site.pages.entries()].map(([name, page]) => ({
-      name,
-      route: page.route,
-      template: page.template,
-    }))
-    return c.json(pages)
+    // Empty target (e.g. a publish-target that's never received any
+    // content) is valid per the stateless-CMS model — return an empty
+    // list rather than erroring. Callers checking item availability
+    // across targets (e.g. the target-switch missing-item banner) rely
+    // on this: a 404/500 would force them to choose between "fail
+    // open" (wrong, reports items as present) and "fail closed" (wrong,
+    // hides legitimate targets the user might want to switch to).
+    try {
+      const site = await loadSite({ contentRoot: source.contentRoot })
+      const pages = [...site.pages.entries()].map(([name, page]) => ({
+        name,
+        route: page.route,
+        template: page.template,
+      }))
+      return c.json(pages)
+    } catch (err) {
+      const msg = (err as Error).message
+      if (msg.includes('No site.yaml found')) return c.json([])
+      throw err
+    }
   })
 
   app.post('/api/pages', async (c) => {

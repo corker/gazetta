@@ -66,7 +66,30 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   // Source-side sidecars (written on save) let us skip re-hashing for items
   // whose manifest + templates haven't changed since the last save. Fall
   // back to hashManifest for items without a source sidecar.
-  const site = await loadSite({ contentRoot: sourceRoot, templatesDir: opts.templatesDir })
+  //
+  // Empty source (no site.yaml) is a valid state when the "active" target
+  // is a publish-target that's never received content — e.g., the author
+  // just switched to an empty staging for a peek. Treat as zero items;
+  // everything on the destination target becomes "deleted" (present on
+  // target, absent from source), matching the logical diff semantics.
+  let site: Awaited<ReturnType<typeof loadSite>>
+  try {
+    site = await loadSite({ contentRoot: sourceRoot, templatesDir: opts.templatesDir })
+  } catch (err) {
+    if ((err as Error).message.includes('No site.yaml found')) {
+      site = {
+        manifest: { name: '(empty)', targets: {} },
+        pages: new Map(),
+        fragments: new Map(),
+        contentRoot: sourceRoot,
+        storage: sourceRoot.storage,
+        siteDir: sourceRoot.rootPath,
+        templatesDir: opts.templatesDir,
+      }
+    } else {
+      throw err
+    }
+  }
   const [sourcePagesSidecars, sourceFragmentsSidecars] = await Promise.all([
     listSidecars(sourceRoot.storage, sourceRoot.path('pages')),
     listSidecars(sourceRoot.storage, sourceRoot.path('fragments')),

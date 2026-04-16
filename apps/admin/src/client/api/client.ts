@@ -162,12 +162,18 @@ export interface CompareResult {
 
 export const api = {
   getSite: () => request<SiteManifest>('/site'),
-  getPages: () => request<PageSummary[]>('/pages'),
+  /** List pages. Without `target`, uses the active target (auto-appended).
+   *  Pass `target` to list from a specific target — used when pre-checking
+   *  item availability before switching the active target. */
+  getPages: (opts?: { target?: string }) =>
+    request<PageSummary[]>(opts?.target ? `/pages?target=${encodeURIComponent(opts.target)}` : '/pages'),
   getPage: (name: string, options?: RequestInit) => request<PageDetail>(`/pages/${name}`, options),
   createPage: (data: { name: string; template: string }) => request<{ ok: boolean; name: string }>('/pages', { method: 'POST', body: JSON.stringify(data) }),
   deletePage: (name: string) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'DELETE' }),
   updatePage: (name: string, data: Partial<PageDetail>) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
-  getFragments: () => request<FragmentSummary[]>('/fragments'),
+  /** List fragments. See getPages for the `target` option. */
+  getFragments: (opts?: { target?: string }) =>
+    request<FragmentSummary[]>(opts?.target ? `/fragments?target=${encodeURIComponent(opts.target)}` : '/fragments'),
   getFragment: (name: string, options?: RequestInit) => request<FragmentDetail>(`/fragments/${name}`, options),
   createFragment: (data: { name: string; template: string }) => request<{ ok: boolean; name: string }>('/fragments', { method: 'POST', body: JSON.stringify(data) }),
   deleteFragment: (name: string) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'DELETE' }),

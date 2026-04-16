@@ -135,6 +135,16 @@ export interface RegistrySourceResolverOptions {
    * registry-sourced storage is already target-rooted.
    */
   siteDir?: string
+  /**
+   * Optional lazy-init hook. When the registry doesn't already have a
+   * provider for the requested target, the resolver calls this to build
+   * one (e.g., the dev bootstrap only pre-initializes the editable local
+   * target for speed; cross-target reads like `?target=staging` arrive
+   * lazily). The built provider is then retrieved via `registry.get` —
+   * implementations should insert it into the same provider map that
+   * backs the registry view.
+   */
+  lazyInit?: (targetName: string) => Promise<void>
 }
 
 /**
@@ -145,10 +155,23 @@ export interface RegistrySourceResolverOptions {
  */
 export function registrySourceResolver(opts: RegistrySourceResolverOptions): SourceContextResolver {
   const cache = new Map<string, SourceContext>()
-  return (targetName: string | undefined) => {
+  return async (targetName: string | undefined) => {
     const name = targetName ?? opts.registry.defaultEditable()
     const cached = cache.get(name)
     if (cached) return cached
+    // Cross-target reads may hit targets that weren't pre-initialized by
+    // the bootstrap (dev only inits the editable local target by default).
+    // If the target is configured but its provider hasn't been built yet,
+    // let the caller lazy-init. Unknown targets (not in site.yaml at all)
+    // fall through so registry.get throws a clean UnknownTargetError.
+    const isConfigured = opts.registry.list().includes(name)
+    if (opts.lazyInit && isConfigured) {
+      try {
+        opts.registry.get(name)
+      } catch {
+        await opts.lazyInit(name)
+      }
+    }
     const ctx = createSourceContextFromRegistry({
       registry: opts.registry,
       targetName: name,

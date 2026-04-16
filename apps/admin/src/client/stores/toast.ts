@@ -1,8 +1,25 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+/**
+ * Inline action attached to a toast — rendered as a button next to the
+ * message. Used for e.g. "back to pages/pricing on local" when an item-
+ * missing banner fires during target switch. Keep the handler side-effect-
+ * free from the toast's POV: the toast auto-dismisses after the handler
+ * runs (unless it throws).
+ */
+export interface ToastAction {
+  label: string
+  handler: () => void | Promise<void>
+}
+
 export const useToastStore = defineStore('toast', () => {
-  const current = ref<{ message: string; type: 'success' | 'error'; link?: string } | null>(null)
+  const current = ref<{
+    message: string
+    type: 'success' | 'error' | 'info'
+    link?: string
+    action?: ToastAction
+  } | null>(null)
   // Track the active timer so dismiss() can cancel it cleanly
   let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -11,14 +28,21 @@ export const useToastStore = defineStore('toast', () => {
     current.value = null
   }
 
-  function show(message: string, opts?: { type?: 'success' | 'error'; link?: string; duration?: number }) {
+  function show(message: string, opts?: {
+    type?: 'success' | 'error' | 'info'
+    link?: string
+    action?: ToastAction
+    duration?: number
+  }) {
     const type = opts?.type ?? 'success'
     if (timer) { clearTimeout(timer); timer = null }
-    current.value = { message, type, link: opts?.link }
+    current.value = { message, type, link: opts?.link, action: opts?.action }
     // Errors stay until the user dismisses them — they need to be readable
-    // long enough to act on. Successes auto-dismiss.
+    // long enough to act on. Successes auto-dismiss. Info is transient but
+    // longer than success so the user has time to act on any attached action.
     const explicit = opts?.duration
-    const duration = explicit ?? (type === 'error' ? 0 : 3000)
+    const defaultDuration = type === 'error' ? 0 : type === 'info' ? 6000 : 3000
+    const duration = explicit ?? defaultDuration
     if (duration > 0) timer = setTimeout(() => { current.value = null; timer = null }, duration)
   }
 
@@ -30,5 +54,16 @@ export const useToastStore = defineStore('toast', () => {
     show(friendly, { type: 'error' })
   }
 
-  return { current, show, showError, dismiss }
+  /** Run the action (if any) and auto-dismiss on completion. */
+  async function runAction() {
+    const action = current.value?.action
+    if (!action) return
+    try {
+      await action.handler()
+    } finally {
+      dismiss()
+    }
+  }
+
+  return { current, show, showError, dismiss, runAction }
 })

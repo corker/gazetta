@@ -73,10 +73,16 @@ onMounted(() => {
 
     <!-- Global toast — visible over everything including fullscreen -->
     <Transition name="toast">
-      <div v-if="toast.current" class="global-toast" :class="toast.current.type === 'error' ? 'toast-error' : 'toast-success'" data-testid="global-toast">
-        <i :class="toast.current.type === 'error' ? 'pi pi-exclamation-circle' : 'pi pi-check-circle'" />
+      <div v-if="toast.current" class="global-toast"
+        :class="`toast-${toast.current.type}`" data-testid="global-toast">
+        <i :class="toast.current.type === 'error' ? 'pi pi-exclamation-circle'
+          : toast.current.type === 'info' ? 'pi pi-info-circle' : 'pi pi-check-circle'" />
         <a v-if="toast.current.link" :href="toast.current.link" target="_blank" rel="noopener" class="toast-link">{{ toast.current.message }}</a>
         <template v-else>{{ toast.current.message }}</template>
+        <button v-if="toast.current.action" type="button" class="toast-action"
+          data-testid="toast-action" @click="toast.runAction()">
+          {{ toast.current.action.label }}
+        </button>
         <button v-if="toast.current.type === 'error'" type="button" class="toast-dismiss" data-testid="toast-dismiss"
           aria-label="Dismiss" @click="toast.dismiss()">
           <i class="pi pi-times" />
@@ -95,7 +101,10 @@ body { font-family: system-ui, -apple-system, sans-serif; color: var(--color-fg)
 .global-toast { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 1001; background: var(--color-bg); color: var(--color-fg); border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 8px 8px; padding: 8px 20px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; }
 .toast-success { color: var(--color-success-fg); }
 .toast-error { color: var(--color-danger-fg); }
+.toast-info { color: var(--color-info-fg); }
 .toast-link { color: inherit; text-decoration: underline; }
+.toast-action { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 2px 6px; margin-left: 4px; font: inherit; font-weight: 600; text-decoration: underline; }
+.toast-action:hover { opacity: 0.8; }
 .toast-dismiss { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 2px 4px; margin-left: 4px; opacity: 0.7; display: flex; align-items: center; }
 .toast-dismiss:hover { opacity: 1; }
 .toast-dismiss .pi { font-size: 11px; }

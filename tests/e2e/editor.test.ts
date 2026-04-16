@@ -942,6 +942,36 @@ test.describe('Save button labeling', () => {
   })
 })
 
+test.describe('Target switch with missing item', () => {
+  async function wipeStaging(projectDir: string) {
+    await rm(join(projectDir, 'sites/main/dist/staging'), { recursive: true, force: true })
+  }
+
+  test('item missing on destination drops focus to root with a back-toast', async ({ page, testSite }) => {
+    // Preview on an empty target responds 404 with a friendly "No content
+    // on this target yet" placeholder — deliberate, but the browser logs
+    // it as a console error which the fixture's guard would otherwise
+    // fail the test on.
+    test.info().annotations.push({ type: 'allow-console-errors' })
+    await wipeStaging(testSite.projectDir)
+    // Select home on local.
+    await page.goto('/admin/pages/home')
+    await page.waitForSelector('[data-testid="site-page-home"]', { timeout: 10000 })
+    // Switch to staging — home doesn't exist there.
+    await page.locator('[data-testid="active-target-indicator"]').click()
+    await page.locator('[data-testid="active-target-menu"]').getByText('staging', { exact: true }).click()
+    // Toast appears with a "back" action.
+    const toast = page.locator('[data-testid="global-toast"]')
+    await expect(toast).toBeVisible()
+    await expect(toast).toContainText("pages/home isn't on staging")
+    await expect(toast).toContainText('showing site root')
+    // Clicking the action restores the previous target + selection.
+    await page.locator('[data-testid="toast-action"]').click()
+    await expect(page).toHaveURL(/\/admin\/pages\/home/)
+    await expect(page.locator('[data-testid="active-target-indicator"]')).toContainText('local')
+  })
+})
+
 test.describe('Target switch with unsaved edits', () => {
   test('Cancel keeps the user on the current target with edits intact', async ({ page }) => {
     // Enter edit mode and make a change to mark the editor dirty.
