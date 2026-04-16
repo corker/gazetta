@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
 import { SiteTreePom } from './pages/SiteTree'
+import { ComponentTreePom } from './pages/ComponentTree'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -121,7 +122,7 @@ test.describe('Target switch with unsaved edits', () => {
   test('Cancel keeps the user on the current target with edits intact', async ({ page }) => {
     // Enter edit mode and make a change to mark the editor dirty.
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    await new ComponentTreePom(page).open('hero')
     await page.waitForTimeout(300)
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })

@@ -16,6 +16,7 @@
  */
 import { test, expect } from '../fixtures'
 import { openEditor } from '../helpers'
+import { ComponentTreePom } from '../pages/ComponentTree'
 import { resetScenarioState } from './_isolation'
 
 test.describe('Scenario — rollback refreshes site tree + sync indicators', () => {
@@ -26,7 +27,7 @@ test.describe('Scenario — rollback refreshes site tree + sync indicators', () 
   test('save → rollback via history panel → content reverts and site tree reflects the change', async ({ page }) => {
     // --- Initial save, so history has a non-baseline revision ---
     await openEditor(page, 'home')
-    await page.locator('[data-testid="component-hero"]').click()
+    await new ComponentTreePom(page).open('hero')
     const titleField = page.locator('input[name="root_title"]').first()
     await titleField.waitFor({ timeout: 5000 })
     const original = await titleField.inputValue()
