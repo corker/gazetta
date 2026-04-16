@@ -55,7 +55,8 @@
     "build": "tsc",
     "build:admin": "vite build -c ../../apps/admin/vite.config.ts --base /admin/ --outDir ../../packages/gazetta/admin-dist --emptyOutDir ../../apps/admin",
     "prepublishOnly": "npm run build && npm run build:admin",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:mutation": "stryker run"
   },
   "dependencies": {
     "@clack/prompts": "^1.2.0",
@@ -96,6 +97,9 @@
     "@aws-sdk/client-s3": "^3.1030.0",
     "@azure/storage-blob": "^12.31.0",
     "@cloudflare/workers-types": "^4.20260413.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/typescript-checker": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@types/js-yaml": "^4.0.0",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.0",

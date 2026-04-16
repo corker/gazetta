@@ -200,16 +200,31 @@ allowlist fail CI; fixes remove entries. Known debt at introduction (2026-04-16)
 
 ### Priority 3 — optional
 
-#### ☐ 3.1 Mutation testing (nightly, not per-commit)
+#### ✓ 3.1 Mutation testing (nightly, not per-commit)
 
-**Scope:** `packages/gazetta/src/{history-*,admin-api,publish*}`.
+Landed via StrykerJS v9.6.1 + `@stryker-mutator/vitest-runner` + `@stryker-mutator/typescript-checker`.
 
-**Stack:** `@stryker-mutator/vitest-runner` v9.1.1 + Stryker core v9.6.1.
+**Scope:** `packages/gazetta/src/{history-*,admin-api/**,publish*}` — see
+[stryker.config.json](../../packages/gazetta/stryker.config.json).
 
-**Known caveat:** Vitest runner can fail to find tests for mutated files — requires config
-tuning. See [StrykerJS troubleshooting](https://stryker-mutator.io/docs/stryker-js/troubleshooting/).
+**Config:**
+- `inPlace: true` — tests reference `../../examples/starter` and other cross-workspace
+  paths; Stryker's default sandbox orphans those. In-place mode mutates the real files
+  and restores them from `.stryker-tmp/` on exit.
+- `thresholds.break: 0` — no enforcement yet. Baseline needs to stabilise first.
+- `reporters`: html + clear-text + progress
 
-**Estimate:** ~1 day setup, runs unattended thereafter.
+**Nightly workflow:** [.github/workflows/mutation.yml](../../.github/workflows/mutation.yml)
+runs at 03:00 UTC on `schedule` + `workflow_dispatch` (for branch runs). `continue-on-error`
+means mutation results are signal, not gate. Report uploaded as artifact (30-day retention).
+
+**Smoke baseline:** `hash.ts` alone scored **70.27%** in the initial run — surfaced one
+real survived mutant (removing `.sort()` on [hash.ts:111](../../packages/gazetta/src/hash.ts#L111)
+went undetected by existing example tests). Worth investigating in a follow-up.
+
+**Runtime:** ~7 min for `hash.ts` alone (65 mutants). Full target set likely hours —
+this is nightly-only for a reason. When raising `thresholds.break`, do it gradually:
+60 → 70 → 80 as real coverage gaps get fixed.
 
 ---
 

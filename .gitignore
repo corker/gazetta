@@ -11,3 +11,5 @@ admin-dist/
 .claude/scheduled_tasks.lock
 CLAUDE.local.md
 test-results/
+.stryker-tmp/
+reports/
