@@ -25,6 +25,8 @@ import {
   TargetInfoSchema,
   TargetEnvironmentSchema,
   TargetTypeSchema,
+  SiteManifestSchema,
+  DependentsResponseSchema,
 } from 'gazetta/admin-api/schemas'
 import type {
   CreatePageRequest,
@@ -36,6 +38,8 @@ import type {
   TemplateSummary,
   FieldSummary,
   TargetInfo,
+  SiteManifest,
+  DependentsResponse,
 } from 'gazetta/admin-api/schemas'
 
 describe('POST /api/pages contract', () => {
@@ -197,5 +201,57 @@ describe('GET /api/targets contract', () => {
       expect(TargetTypeSchema.safeParse('dynamic').success).toBe(true)
       expect(TargetTypeSchema.safeParse('esi').success).toBe(false)
     })
+  })
+})
+
+describe('GET /api/site contract', () => {
+  it('accepts the minimal manifest the server emits', () => {
+    const manifest: SiteManifest = { name: 'My Site' }
+    expect(SiteManifestSchema.safeParse(manifest).success).toBe(true)
+  })
+
+  it('accepts a fully populated manifest', () => {
+    const manifest: SiteManifest = {
+      name: 'My Site',
+      version: '1.0.0',
+      locale: 'en',
+      baseUrl: 'https://example.com',
+      systemPages: ['404'],
+    }
+    expect(SiteManifestSchema.safeParse(manifest).success).toBe(true)
+  })
+
+  it('accepts the empty-target fallback shape (includes targets:{})', () => {
+    // The /api/site handler returns { name: '(empty)', targets: {} }
+    // when the target has no site.yaml yet. The schema is loose so
+    // the extra field passes through.
+    const r = SiteManifestSchema.safeParse({ name: '(empty)', targets: {} })
+    expect(r.success).toBe(true)
+  })
+
+  it('rejects manifests missing name', () => {
+    expect(SiteManifestSchema.safeParse({ version: '1.0.0' }).success).toBe(false)
+  })
+})
+
+describe('GET /api/dependents contract', () => {
+  it('accepts a well-formed response', () => {
+    const resp: DependentsResponse = { pages: ['home', 'about'], fragments: ['nav'] }
+    expect(DependentsResponseSchema.safeParse(resp).success).toBe(true)
+  })
+
+  it('accepts empty arrays', () => {
+    const resp: DependentsResponse = { pages: [], fragments: [] }
+    expect(DependentsResponseSchema.safeParse(resp).success).toBe(true)
+  })
+
+  it('rejects responses missing required fields', () => {
+    expect(DependentsResponseSchema.safeParse({ pages: [] }).success).toBe(false)
+    expect(DependentsResponseSchema.safeParse({ fragments: [] }).success).toBe(false)
+    expect(DependentsResponseSchema.safeParse({}).success).toBe(false)
+  })
+
+  it('rejects non-string entries', () => {
+    expect(DependentsResponseSchema.safeParse({ pages: [123], fragments: [] }).success).toBe(false)
   })
 })
