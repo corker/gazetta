@@ -122,6 +122,7 @@ async function handleDelete(node: SiteNode, e: Event) {
         :data-testid="`dirty-${node.type}-${node.name}`" />
       <Button icon="pi pi-trash" text rounded size="small" severity="danger"
         class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
+        :aria-label="`Delete ${node.type} ${node.name}`"
         @click="handleDelete(node, $event)" />
     </div>
 
@@ -138,6 +139,7 @@ async function handleDelete(node: SiteNode, e: Event) {
           :data-testid="`dirty-${node.type}-${node.name}`" />
         <Button icon="pi pi-trash" text rounded size="small" severity="danger"
           class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
+          :aria-label="`Delete ${node.type} ${node.name}`"
           @click="handleDelete(node, $event)" />
       </div>
     </template>
@@ -155,6 +157,7 @@ async function handleDelete(node: SiteNode, e: Event) {
         :data-testid="`dirty-${node.type}-${node.name}`" />
       <Button icon="pi pi-trash" text rounded size="small" severity="danger"
         class="node-delete" :data-testid="`delete-${node.type}-${node.name}`"
+        :aria-label="`Delete ${node.type} ${node.name}`"
         @click="handleDelete(node, $event)" />
     </div>
 

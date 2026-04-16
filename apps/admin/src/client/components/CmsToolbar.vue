@@ -72,8 +72,10 @@ function handleBack() {
   <Toolbar class="cms-toolbar">
     <template #start>
       <Button v-if="uiMode.mode === 'edit' && !isDevPage" icon="pi pi-arrow-left" text rounded
+        title="Back to browse" aria-label="Back to browse"
         data-testid="back-to-browse" @click="handleBack" size="small" class="cms-btn" />
       <Button v-if="isDevPage" icon="pi pi-arrow-left" text rounded
+        title="Back to editor" aria-label="Back to editor"
         data-testid="back-to-editor" @click="router.back()" size="small" class="cms-btn" />
       <span class="cms-logo">
         <i class="pi pi-objects-column" />
@@ -94,6 +96,8 @@ function handleBack() {
       <Button v-if="!isDevPage" icon="pi pi-code" text rounded title="Dev Playground"
         data-testid="dev-playground-link" @click="router.push('/dev')" size="small" class="cms-btn" />
       <Button :icon="theme.dark ? 'pi pi-sun' : 'pi pi-moon'" text rounded
+        :title="theme.dark ? 'Switch to light mode' : 'Switch to dark mode'"
+        :aria-label="theme.dark ? 'Switch to light mode' : 'Switch to dark mode'"
         data-testid="theme-toggle" @click="theme.toggle()" size="small" class="cms-btn" />
       <Button v-if="uiMode.mode === 'edit'" :label="saveLabel" icon="pi pi-save" :severity="saveSeverity" :loading="editing.saving"
         data-testid="save-btn" :title="saveTitle" :disabled="!editing.hasPendingEdits" @click="editing.save()" size="small" class="cms-btn" />
