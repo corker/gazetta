@@ -14,15 +14,21 @@
  * Editable vs read-only shows as a sub-badge on the pill.
  */
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Menu from 'primevue/menu'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useEditingStore } from '../stores/editing.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
-import type { TargetInfo } from '../api/client.js'
+import { useSelectionStore } from '../stores/selection.js'
+import { useToastStore } from '../stores/toast.js'
+import { api, type TargetInfo } from '../api/client.js'
 
 const activeTarget = useActiveTargetStore()
 const editing = useEditingStore()
 const unsavedGuard = useUnsavedGuardStore()
+const selection = useSelectionStore()
+const toast = useToastStore()
+const router = useRouter()
 const menu = ref<InstanceType<typeof Menu> | null>(null)
 
 const visible = computed(() => activeTarget.targets.length > 0 && activeTarget.activeTarget !== null)
@@ -45,12 +51,15 @@ const menuItems = computed(() => activeTarget.targets.map((t: TargetInfo) => ({
 })))
 
 /**
- * Switch active target with an unsaved-changes guard — same pattern as
- * the router's route-leave hook. Without this, switching to another
- * target while the editor has pending edits would either silently drop
- * them (clear on switch) or save them against the new target (the save
- * closure resolves `?target=<active>` at call time). Forcing a Save /
- * Don't Save / Cancel decision keeps the author in control.
+ * Switch active target with two guards:
+ *
+ * 1. Unsaved edits → show the unsaved-changes dialog (Save / Don't Save
+ *    / Cancel), same pattern as the router's route-leave hook. Silent
+ *    drops and cross-target saves are both worse than friction here.
+ * 2. Focused item missing on destination → drop focus to site root and
+ *    surface an info toast with a one-click "back to X on <previous>"
+ *    action. Design-editor-ux.md "Switching active target". Keeps
+ *    rapid A/B from stranding the author on an empty workspace.
  */
 async function switchTo(name: string) {
   if (name === activeTarget.activeTargetName) return
@@ -60,7 +69,61 @@ async function switchTo(name: string) {
     if (result === 'save') await editing.save()
     editing.clear()
   }
+  const prevName = activeTarget.activeTargetName
+  const focused = selection.selection
+  // Pre-check item availability only when we have something selected —
+  // no selection means no focus to preserve, so skip the extra round-trip.
+  const missingCheck = focused
+    ? await checkItemOnTarget(name, focused.type, focused.name)
+    : 'ok' as const
   activeTarget.setActiveTarget(name)
+  if (missingCheck === 'missing' && focused && prevName) {
+    // Navigate to the site root on the new target and let the author
+    // one-click back if this wasn't what they meant.
+    router.push('/admin')
+    const itemLabel = focused.type === 'page'
+      ? `pages/${focused.name}`
+      : `@${focused.name}`
+    toast.show(
+      `${itemLabel} isn't on ${name} — showing site root`,
+      {
+        type: 'info',
+        action: {
+          label: `back to ${itemLabel} on ${prevName}`,
+          handler: async () => {
+            activeTarget.setActiveTarget(prevName)
+            const prefix = focused.type === 'page' ? '/pages' : '/fragments'
+            router.push(`${prefix}/${focused.name}`)
+          },
+        },
+      },
+    )
+  }
+}
+
+/**
+ * Check if an item exists on the destination target before switching to it.
+ * Returns 'ok' on success, 'missing' if the item isn't there, and 'ok' on
+ * any unexpected error (fail open — a false negative would block
+ * legitimate switches; the missing-item banner is purely a quality-of-
+ * -life nudge, not a correctness gate).
+ */
+async function checkItemOnTarget(
+  target: string,
+  type: 'page' | 'fragment',
+  itemName: string,
+): Promise<'ok' | 'missing'> {
+  try {
+    if (type === 'page') {
+      const list = await api.getPages({ target })
+      return list.some(p => p.name === itemName) ? 'ok' : 'missing'
+    } else {
+      const list = await api.getFragments({ target })
+      return list.some(f => f.name === itemName) ? 'ok' : 'missing'
+    }
+  } catch {
+    return 'ok'
+  }
 }
 
 function iconFor(t: TargetInfo): string {

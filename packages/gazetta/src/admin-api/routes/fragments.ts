@@ -8,12 +8,19 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
 
   app.get('/api/fragments', async (c) => {
     const source = await resolve(c.req.query('target'))
-    const site = await loadSite({ contentRoot: source.contentRoot })
-    const fragments = [...site.fragments.entries()].map(([name, frag]) => ({
-      name,
-      template: frag.template,
-    }))
-    return c.json(fragments)
+    // Empty target → empty list. See pages.ts for rationale.
+    try {
+      const site = await loadSite({ contentRoot: source.contentRoot })
+      const fragments = [...site.fragments.entries()].map(([name, frag]) => ({
+        name,
+        template: frag.template,
+      }))
+      return c.json(fragments)
+    } catch (err) {
+      const msg = (err as Error).message
+      if (msg.includes('No site.yaml found')) return c.json([])
+      throw err
+    }
   })
 
   app.post('/api/fragments', async (c) => {

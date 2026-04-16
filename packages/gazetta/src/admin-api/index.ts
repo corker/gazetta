@@ -107,18 +107,21 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
     })
   }
 
-  // Build the per-request source resolver. When a target registry is
-  // available, routes can honor `?target=<name>` to read from any known
-  // target. Without a registry, the resolver is static — always returns
-  // the bootstrap source (legacy behavior).
+  // Build the per-request source resolver. When target configs are
+  // declared, routes honor `?target=<name>` to read from any known
+  // target. Providers are initialized lazily so dev startup doesn't
+  // pay the cost of connecting every cloud target just to serve the
+  // editable local one.
   //
-  // The static resolver is used when only `opts.source` or `opts.storage`
-  // is supplied (tests, single-target setups). The registry resolver is
-  // used when `opts.targets` + `opts.targetConfigs` are present (the
-  // production dev/admin path).
+  // Without target configs (tests, single-target setups), the resolver
+  // is static — always returns the bootstrap source.
   let resolveSource: SourceContextResolver
-  if (opts.targets && opts.targetConfigs && Object.keys(opts.targetConfigs).length > 0) {
-    const registry = createTargetRegistryView(opts.targets, opts.targetConfigs)
+  if (opts.targetConfigs && Object.keys(opts.targetConfigs).length > 0) {
+    // Start with whatever pre-initialized providers the caller supplied
+    // (typically the editable source target from bootstrap). Missing
+    // providers are built on demand via lazyInit below.
+    const providers = new Map(opts.targets ?? [])
+    const registry = createTargetRegistryView(providers, opts.targetConfigs)
     resolveSource = registrySourceResolver({
       registry,
       projectSiteDir: source.projectSiteDir,
@@ -126,6 +129,15 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
       // The registry's filesystem targets are already content-rooted
       // (path=./targets/<key>); siteDir on the resolved context is empty.
       siteDir: '',
+      lazyInit: async (name) => {
+        const config = opts.targetConfigs![name]
+        if (!config) return
+        const { createStorageProvider } = await import('../targets.js')
+        const storage = await createStorageProvider(config.storage, source.projectSiteDir, name)
+        const maybeInit = storage as StorageProvider & { init?: () => Promise<void> }
+        if (typeof maybeInit.init === 'function') await maybeInit.init()
+        providers.set(name, storage)
+      },
     })
   } else {
     resolveSource = staticSourceResolver(source)

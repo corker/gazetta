@@ -34,7 +34,24 @@ async function renderPreview(
   overrides?: Record<string, Record<string, unknown>>,
   templatesDir?: string
 ) {
-  const site = await loadSite({ contentRoot: source.contentRoot, templatesDir })
+  // Empty target (no site.yaml) — preview returns a friendly placeholder
+  // so the admin can still show the iframe. Happens when the active
+  // target is a never-published publish-target.
+  let site: Awaited<ReturnType<typeof loadSite>>
+  try {
+    site = await loadSite({ contentRoot: source.contentRoot, templatesDir })
+  } catch (err) {
+    if ((err as Error).message.includes('No site.yaml found')) {
+      return c.html(
+        '<!doctype html><html><body style="font-family:system-ui;padding:2rem;color:#525252">' +
+        '<h2 style="margin:0 0 0.5rem">No content on this target yet</h2>' +
+        '<p style="margin:0;font-size:0.875rem">Publish from an editable target to see a preview here.</p>' +
+        '</body></html>',
+        404,
+      )
+    }
+    throw err
+  }
   const requestPath = c.req.path.replace(/^.*\/preview/, '') || '/'
 
   // Fragment preview: /preview/@fragmentName
