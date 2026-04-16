@@ -24,8 +24,11 @@ export default defineConfig({
       // editor.test.ts is the big feature suite; additional dev-admin spec
       // files (e.g. a11y.test.ts) opt in by matching this glob. Excludes
       // the production-* files which run against pre-built admins on fixed
-      // ports in their own projects.
-      testMatch: /^(?!production(?:-|\.)).*\.test\.ts$/,
+      // ports in their own projects. testIgnore applies to the basename
+      // consistently; a negative-lookahead on testMatch matches the full
+      // path and wouldn't catch `tests/e2e/production-esi.test.ts`.
+      testMatch: '**/*.test.ts',
+      testIgnore: ['**/production.test.ts', '**/production-*.test.ts'],
       // baseURL is set per-worker by the testSite fixture in tests/e2e/fixtures.ts
     },
     {
