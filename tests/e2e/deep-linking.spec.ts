@@ -52,6 +52,60 @@ test.describe('Deep linking', () => {
     await expect(page).toHaveURL(/\/pages\/about/)
     await expect(tree.selectedPage('about')).toBeVisible()
   })
+
+  test('clicking a link in preview while editing keeps the user in edit mode on the destination', async ({ page }) => {
+    // Regression: clicking a preview link used to drop the user back to
+    // browse mode by pushing /pages/{name} (no /edit suffix), even
+    // though they were actively editing. The fix preserves the current
+    // ui mode in the gazetta:navigate handler.
+    await page.goto('/admin/pages/home/edit')
+    await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
+    await expect(page).toHaveURL(/\/pages\/home\/edit$/)
+
+    // The starter site's header fragment includes a /about nav link.
+    const iframe = page.frameLocator('[data-testid="preview-iframe"]')
+    const aboutLink = iframe.locator('a[href="/about"]').first()
+    await aboutLink.waitFor({ timeout: 10000 })
+    await aboutLink.click()
+
+    // After navigation we should be on the about page AND still in edit
+    // mode — the URL must end with /edit, and the component tree (only
+    // rendered in edit mode) must be visible.
+    await expect(page).toHaveURL(/\/pages\/about\/edit$/, { timeout: 5000 })
+    await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
+  })
+
+  test('clicking a preview link with unsaved edits fires the guard dialog', async ({ page }) => {
+    // The preview link triggers a regular `router.push`, so the
+    // existing unsaved-changes guard (router.ts beforeEach) must fire
+    // before navigating away from a dirty editor — same as clicking a
+    // tree row or the toolbar back button.
+    await page.goto('/admin/pages/home/edit')
+    await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
+
+    // Open hero editor and dirty the form.
+    await page.click('[data-testid="component-hero"]')
+    await page.waitForSelector('[data-testid="editor-container"]')
+    const input = page.locator('[data-testid="editor-container"] input').first()
+    await input.fill('preview-link-dirty edit')
+    await expect(page.locator('[data-testid="save-btn"]')).toBeEnabled()
+
+    // Click the /about preview link — should NOT navigate immediately.
+    const iframe = page.frameLocator('[data-testid="preview-iframe"]')
+    const aboutLink = iframe.locator('a[href="/about"]').first()
+    await aboutLink.click()
+
+    // Unsaved-changes dialog appears.
+    const dialog = page.locator('.p-dialog')
+    await expect(dialog).toBeVisible({ timeout: 5000 })
+    await expect(dialog).toContainText('Unsaved Changes')
+
+    // Cancel keeps us on /home/edit with the dirty value intact.
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).not.toBeVisible()
+    await expect(page).toHaveURL(/\/pages\/home\/edit$/)
+    await expect(page.locator('[data-testid="save-btn"]')).toBeEnabled()
+  })
 })
 
 test.describe('Deep linking - dev playground', () => {
