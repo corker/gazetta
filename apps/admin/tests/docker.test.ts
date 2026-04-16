@@ -13,6 +13,7 @@ import {
   publishSiteManifest,
   publishFragmentIndex,
 } from 'gazetta'
+import { runProviderConformance } from './_helpers/provider-conformance.js'
 
 const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
 // Content lives under the local target (post-transformation layout).
@@ -66,67 +67,30 @@ function s3(bucket: string) {
   return provider
 }
 
-// ---- S3 Storage Provider ----
+// ---- StorageProvider conformance (shared battery) ----
+// S3 (MinIO) and Azure Blob (Azurite) both satisfy the StorageProvider
+// contract — same 8-test CRUD battery runs against both, so parity gaps
+// get caught at test time, not in production.
 
-describe('S3 storage provider (MinIO)', () => {
-  let provider: ReturnType<typeof createS3Provider>
+runProviderConformance({
+  name: 'S3 (MinIO)',
+  make: async () => {
+    const p = s3('conformance-s3')
+    await p.init()
+    return p
+  },
+})
 
-  beforeAll(async () => {
-    provider = s3('s3-provider-test')
-    await provider.init()
-  })
-
-  it('writes and reads a file', async () => {
-    await provider.writeFile('test.txt', 'hello world')
-    expect(await provider.readFile('test.txt')).toBe('hello world')
-  })
-
-  it('checks file exists', async () => {
-    await provider.writeFile('exists.txt', 'yes')
-    expect(await provider.exists('exists.txt')).toBe(true)
-    expect(await provider.exists('nope.txt')).toBe(false)
-  })
-
-  it('reads directory entries', async () => {
-    await provider.writeFile('dir/a.txt', 'a')
-    await provider.writeFile('dir/b.txt', 'b')
-    await provider.writeFile('dir/sub/c.txt', 'c')
-
-    const entries = await provider.readDir('dir')
-    const names = entries.map(e => e.name)
-    expect(names).toContain('a.txt')
-    expect(names).toContain('b.txt')
-    expect(names).toContain('sub')
-    expect(entries.find(e => e.name === 'sub')?.isDirectory).toBe(true)
-    expect(entries.find(e => e.name === 'a.txt')?.isDirectory).toBe(false)
-  })
-
-  it('checks directory exists', async () => {
-    await provider.writeFile('mydir/file.txt', 'content')
-    expect(await provider.exists('mydir')).toBe(true)
-    expect(await provider.exists('nonexistent-dir')).toBe(false)
-  })
-
-  it('throws on reading nonexistent file', async () => {
-    await expect(provider.readFile('missing.txt')).rejects.toThrow()
-  })
-
-  it('deletes files', async () => {
-    await provider.writeFile('to-delete.txt', 'bye')
-    await provider.rm('to-delete.txt')
-    expect(await provider.exists('to-delete.txt')).toBe(false)
-  })
-
-  it('deletes directory recursively', async () => {
-    await provider.writeFile('rmdir/a.txt', 'a')
-    await provider.writeFile('rmdir/b.txt', 'b')
-    await provider.rm('rmdir')
-    expect(await provider.exists('rmdir/a.txt')).toBe(false)
-  })
-
-  it('mkdir is a no-op', async () => {
-    await provider.mkdir('some/nested/dir')
-  })
+runProviderConformance({
+  name: 'Azure Blob (Azurite)',
+  make: async () => {
+    const p = createAzureBlobProvider({
+      connectionString: azuriteConnectionString,
+      container: 'conformance-azure',
+    })
+    await p.init()
+    return p
+  },
 })
 
 // ---- Azure Blob (Azurite) ----
