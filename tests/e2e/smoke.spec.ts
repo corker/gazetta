@@ -1,12 +1,14 @@
 import { test, expect } from './fixtures'
+import { SiteTreePom } from './pages/SiteTree'
 
 test.describe('Admin loads', () => {
   test('site tree shows pages and fragments', async ({ page }) => {
     await page.goto('/admin')
-    await expect(page.locator('[data-testid="site-page-home"]')).toBeVisible()
-    await expect(page.locator('[data-testid="site-page-about"]')).toBeVisible()
-    await expect(page.locator('[data-testid="site-fragment-header"]')).toBeVisible()
-    await expect(page.locator('[data-testid="site-fragment-footer"]')).toBeVisible()
+    const tree = new SiteTreePom(page)
+    await expect(tree.pageRow('home')).toBeVisible()
+    await expect(tree.pageRow('about')).toBeVisible()
+    await expect(tree.fragmentRow('header')).toBeVisible()
+    await expect(tree.fragmentRow('footer')).toBeVisible()
   })
 })
 

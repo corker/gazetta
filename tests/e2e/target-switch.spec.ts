@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
+import { SiteTreePom } from './pages/SiteTree'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -82,7 +83,8 @@ test.describe('Target switch with missing item', () => {
     await wipeStaging(testSite.projectDir)
     // Select home on local.
     await page.goto('/admin/pages/home')
-    await page.waitForSelector('[data-testid="site-page-home"]', { timeout: 10000 })
+    const tree = new SiteTreePom(page)
+    await tree.pageRow('home').waitFor({ timeout: 10000 })
     // Switch to staging — home doesn't exist there.
     await page.locator('[data-testid="active-target-indicator"]').click()
     await page.locator('[data-testid="active-target-menu"]').getByRole('menuitem', { name: 'staging' }).click()

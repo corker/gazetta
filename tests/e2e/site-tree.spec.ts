@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures'
+import { SiteTreePom } from './pages/SiteTree'
 import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -20,14 +21,15 @@ test.describe('SiteTree dirty indicators', () => {
     // simpler: just leave as wrong hash → modified. Both home and about will show dots.
 
     await page.goto('/admin')
+    const tree = new SiteTreePom(page)
     // Wait for compare cycle
     // Long timeout — on CI the picker tries production first (azurite refused,
     // ~10s timeout) before falling back to staging, so first dots take longer.
-    await page.locator('[data-testid="dirty-page-home"]').waitFor({ timeout: 30000 })
-    await expect(page.locator('[data-testid="dirty-page-home"]')).toBeVisible()
-    await expect(page.locator('[data-testid="dirty-page-about"]')).toBeVisible()
+    await tree.dirtyDotPage('home').waitFor({ timeout: 30000 })
+    await expect(tree.dirtyDotPage('home')).toBeVisible()
+    await expect(tree.dirtyDotPage('about')).toBeVisible()
     // showcase has no sidecar → added → dirty
-    await expect(page.locator('[data-testid="dirty-page-showcase"]')).toBeVisible()
+    await expect(tree.dirtyDotPage('showcase')).toBeVisible()
   })
 
   test('no dots when filesystem target is fully in sync', async ({ page, testSite }) => {
@@ -39,12 +41,13 @@ test.describe('SiteTree dirty indicators', () => {
     const stagingDir = join(testSite.projectDir, 'sites/main/dist/staging')
     await rm(stagingDir, { recursive: true, force: true })
     await page.goto('/admin')
+    const tree = new SiteTreePom(page)
     // First-publish path → every page dirty
     // Long timeout — on CI the picker tries production first (azurite refused,
     // ~10s timeout) before falling back to staging, so first dots take longer.
-    await page.locator('[data-testid="dirty-page-home"]').waitFor({ timeout: 30000 })
-    await expect(page.locator('[data-testid="dirty-page-home"]')).toBeVisible()
-    await expect(page.locator('[data-testid="dirty-page-about"]')).toBeVisible()
-    await expect(page.locator('[data-testid="dirty-page-showcase"]')).toBeVisible()
+    await tree.dirtyDotPage('home').waitFor({ timeout: 30000 })
+    await expect(tree.dirtyDotPage('home')).toBeVisible()
+    await expect(tree.dirtyDotPage('about')).toBeVisible()
+    await expect(tree.dirtyDotPage('showcase')).toBeVisible()
   })
 })

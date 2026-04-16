@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures'
 import { openEditor } from './helpers'
 import { PublishPanelPom } from './pages/PublishPanel'
+import { SiteTreePom } from './pages/SiteTree'
 import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -250,7 +251,8 @@ test.describe('Fragment blast radius', () => {
     // an empty index and the badge would render count=0. This test
     // covers both the UI layer and that invariant.
     await page.goto('/admin')
-    const row = page.locator('[data-testid="site-fragment-header"]')
+    const tree = new SiteTreePom(page)
+    const row = tree.fragmentRow('header')
     await row.waitFor({ timeout: 10000 })
     const badge = row.locator('[data-testid="fragment-blast-radius"]')
     await badge.waitFor({ timeout: 5000 })

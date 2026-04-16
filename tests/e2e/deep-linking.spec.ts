@@ -1,9 +1,11 @@
 import { test, expect } from './fixtures'
+import { SiteTreePom } from './pages/SiteTree'
 
 test.describe('Deep linking', () => {
   test('direct URL to page selects it in browse mode', async ({ page }) => {
     await page.goto('/admin/pages/about')
-    await expect(page.locator('[data-testid="site-page-about"].selected')).toBeVisible({ timeout: 10000 })
+    const tree = new SiteTreePom(page)
+    await expect(tree.selectedPage('about')).toBeVisible({ timeout: 10000 })
     // Preview should show about page
     const iframe = page.frameLocator('[data-testid="preview-iframe"]')
     await iframe.locator('[data-gz]').first().waitFor({ timeout: 10000 })
@@ -17,12 +19,14 @@ test.describe('Deep linking', () => {
 
   test('direct URL to fragment selects it', async ({ page }) => {
     await page.goto('/admin/fragments/header')
-    await expect(page.locator('[data-testid="site-fragment-header"].selected')).toBeVisible({ timeout: 10000 })
+    const tree = new SiteTreePom(page)
+    await expect(tree.selectedFragment('header')).toBeVisible({ timeout: 10000 })
   })
 
   test('back button navigates from edit to browse', async ({ page }) => {
     await page.goto('/admin/pages/home')
-    await page.locator('[data-testid="site-page-home"].selected').waitFor({ timeout: 10000 })
+    const tree = new SiteTreePom(page)
+    await tree.selectedPage('home').waitFor({ timeout: 10000 })
 
     // Enter edit mode via preview click
     const iframe = page.frameLocator('[data-testid="preview-iframe"]')
@@ -36,16 +40,17 @@ test.describe('Deep linking', () => {
     // Browser back should return to browse mode
     await page.goBack()
     await expect(page).toHaveURL(/\/pages\/home$/)
-    await expect(page.locator('[data-testid="site-page-home"]')).toBeVisible()
+    await expect(tree.pageRow('home')).toBeVisible()
   })
 
   test('URL updates when switching pages', async ({ page }) => {
     await page.goto('/admin/pages/home')
-    await page.locator('[data-testid="site-page-home"].selected').waitFor({ timeout: 10000 })
+    const tree = new SiteTreePom(page)
+    await tree.selectedPage('home').waitFor({ timeout: 10000 })
 
-    await page.click('[data-testid="site-page-about"]')
+    await tree.openPage('about')
     await expect(page).toHaveURL(/\/pages\/about/)
-    await expect(page.locator('[data-testid="site-page-about"].selected')).toBeVisible()
+    await expect(tree.selectedPage('about')).toBeVisible()
   })
 })
 
