@@ -141,11 +141,18 @@ function printHelp() {
     gazetta serve [target] [site]   Serve published pages from target storage
     gazetta deploy [target] [site]  Deploy worker to hosting (one-time setup)
     gazetta validate [site]         Check site for broken references
+    gazetta history [target] [site] List revisions on a target
+    gazetta undo [target] [site]    Restore the previous revision (soft undo)
+    gazetta rollback <rev> [target] [site]
+                                    Restore an arbitrary revision by id
     gazetta help                    Show this help message
 
   Options:
     --port, -p <port>               Server port (default: 3000)
     --force, -f                     Publish all items (skip unchanged check)
+    --yes, -y                       Skip confirmation prompt (required in CI
+                                    for undo/rollback on production targets)
+    --limit <n>                     Max revisions to list (default: 50)
 
   Auto-detection:
     Site is auto-detected from sites/ directory. If multiple sites exist,
@@ -162,25 +169,34 @@ function printHelp() {
     gazetta publish production my-site  # publish specific site to production
     gazetta serve production -p 8080    # serve production on port 8080
     gazetta validate                    # check site for errors
+    gazetta history                     # list revisions on default target
+    gazetta undo production --yes       # undo last write on production (CI-safe)
+    gazetta rollback rev-1776337441608  # roll back to a specific revision
 `)
 }
 
-interface ParsedArgs { positional: string[]; port?: number; force?: boolean }
+interface ParsedArgs { positional: string[]; port?: number; force?: boolean; yes?: boolean; limit?: number }
 
 function parseArgs(input: string[]): ParsedArgs {
   const positional: string[] = []
   let port: number | undefined
   let force = false
+  let yes = false
+  let limit: number | undefined
   for (let i = 0; i < input.length; i++) {
     if (input[i] === '--port' || input[i] === '-p') {
       port = parseInt(input[++i], 10)
     } else if (input[i] === '--force' || input[i] === '-f') {
       force = true
+    } else if (input[i] === '--yes' || input[i] === '-y') {
+      yes = true
+    } else if (input[i] === '--limit') {
+      limit = parseInt(input[++i], 10)
     } else if (!input[i].startsWith('-')) {
       positional.push(input[i])
     }
   }
-  return { positional, port, force }
+  return { positional, port, force, yes, limit }
 }
 
 /**
@@ -1443,12 +1459,16 @@ async function main() {
   const parsed = parseArgs(args.slice(1))
 
   // Commands that take [target] [site] positional args
-  const targetFirstCommands = new Set(['publish', 'serve', 'deploy'])
+  const targetFirstCommands = new Set(['publish', 'serve', 'deploy', 'history', 'undo'])
   // Commands that take [site] positional arg
   const siteOnlyCommands = new Set(['dev', 'validate', 'admin'])
 
   let siteDir: string
   let targetName: string | undefined
+  // rollback: positional layout is `<rev> [target] [site]`. We stash
+  // the revision id here because the shared positional parser uses
+  // index 0 for target/site; rollback just consumes index 0 first.
+  let rollbackRevisionId: string | undefined
 
   if (command === 'init') {
     await runInit(parsed.positional[0] ?? '.')
@@ -1457,6 +1477,23 @@ async function main() {
     const siteDir = await resolveSiteDir(parsed.positional[0])
     await runBuild(siteDir)
     return
+  } else if (command === 'rollback') {
+    // gazetta rollback <rev> [target] [site]
+    const [rev, second, third] = parsed.positional
+    if (!rev || !rev.startsWith('rev-')) {
+      console.error(`\n  Error: rollback requires a revision id as the first argument (e.g. gazetta rollback rev-1776337441608 [target])\n`)
+      process.exit(1)
+      return
+    }
+    rollbackRevisionId = rev
+    const secondIsSite = second && (second.includes('/') || existsSync(join(resolve(second), 'site.yaml')))
+    if (secondIsSite) {
+      siteDir = await resolveSiteDir(second)
+      targetName = await resolveTarget(undefined, siteDir)
+    } else {
+      siteDir = await resolveSiteDir(third)
+      targetName = await resolveTarget(second, siteDir)
+    }
   } else if (targetFirstCommands.has(command)) {
     // gazetta publish [target] [site]
     const [first, second] = parsed.positional
@@ -1514,7 +1551,33 @@ async function main() {
     case 'admin':
       await runAdmin(siteDir, parsed.port ?? 3000)
       break
+    case 'history':
+    case 'undo':
+    case 'rollback': {
+      const { runHistoryList, runHistoryUndo, runHistoryRollback } = await import('./history.js')
+      const ctx = await resolveHistoryContext(siteDir, targetName!)
+      if (command === 'history') await runHistoryList(ctx, { limit: parsed.limit })
+      else if (command === 'undo') await runHistoryUndo(ctx, { yes: parsed.yes })
+      else await runHistoryRollback(ctx, rollbackRevisionId!, { yes: parsed.yes })
+      break
+    }
   }
+}
+
+/**
+ * Resolve site + target + config into the shape HistoryCommandContext
+ * expects. Lives here rather than in cli/history.ts so the target-
+ * resolution logic (site.yaml parsing, CI env handling) stays with
+ * the other CLI commands that already do it the same way.
+ */
+async function resolveHistoryContext(siteDir: string, targetName: string) {
+  const { bootstrapFromSiteYaml } = await import('./bootstrap.js')
+  const { targetConfigs } = await bootstrapFromSiteYaml(siteDir)
+  const config = targetConfigs[targetName]
+  if (!config) {
+    throw new Error(`Unknown target "${targetName}". Available: ${Object.keys(targetConfigs).join(', ')}`)
+  }
+  return { siteDir, targetName, config }
 }
 
 main().catch((err) => {
