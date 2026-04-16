@@ -59,15 +59,14 @@ function pickDefaultSource(): string | null {
 const sourceName = ref<string | null>(null)
 
 // Destinations: anything that isn't the source
-const destinationOptions = computed(() =>
-  activeTarget.targets.filter(t => t.name !== sourceName.value)
-)
+const destinationOptions = computed(() => activeTarget.targets.filter(t => t.name !== sourceName.value))
 
 const selectedDestinations = ref<Set<string>>(new Set())
 
 function toggleDestination(name: string) {
   const next = new Set(selectedDestinations.value)
-  if (next.has(name)) next.delete(name); else next.add(name)
+  if (next.has(name)) next.delete(name)
+  else next.add(name)
   selectedDestinations.value = next
 }
 
@@ -83,9 +82,7 @@ function toggleDestination(name: string) {
  * Iteration order is preserved from target declaration order in
  * site.yaml, matching the top-bar switcher and sync indicators.
  */
-const destinationEntries = computed(() =>
-  groupedEntries(destinationOptions.value, activeTarget.targets.length),
-)
+const destinationEntries = computed(() => groupedEntries(destinationOptions.value, activeTarget.targets.length))
 
 /** Tri-state of a group's selection: 'none' | 'some' | 'all'. */
 function groupState(group: TargetGroup): 'none' | 'some' | 'all' {
@@ -135,9 +132,7 @@ const undoneTargets = ref(new Set<string>())
 // Production destinations require explicit confirmation to avoid accidental
 // pushes to live content — same pattern as the old PublishDialog.
 const productionDestinations = computed(() =>
-  activeTarget.targets.filter(t =>
-    t.environment === 'production' && selectedDestinations.value.has(t.name),
-  ),
+  activeTarget.targets.filter(t => t.environment === 'production' && selectedDestinations.value.has(t.name)),
 )
 const needsConfirm = computed(() => productionDestinations.value.length > 0)
 
@@ -192,29 +187,39 @@ async function runPublish() {
   invalidTemplates.value = []
   progress.value = new Map(dests.map(d => [d, { current: 0, total: 0, label: 'pending…', status: 'pending' as const }]))
   try {
-    const finalResults = await publishApi.publishStream(items, dests, (ev) => {
-      if (ev.kind === 'target-start') {
-        const m = new Map(progress.value)
-        m.set(ev.target, { current: 0, total: ev.total, label: 'starting…', status: 'in-progress' })
-        progress.value = m
-      } else if (ev.kind === 'progress') {
-        const m = new Map(progress.value)
-        const existing = m.get(ev.target) ?? { current: 0, total: ev.total, label: '', status: 'in-progress' as const }
-        m.set(ev.target, { ...existing, current: ev.current, total: ev.total, label: ev.label })
-        progress.value = m
-      } else if (ev.kind === 'target-result') {
-        const m = new Map(progress.value)
-        const existing = m.get(ev.result.target)
-        if (existing) {
-          m.set(ev.result.target, {
-            ...existing,
-            status: ev.result.success ? 'done' : 'error',
-            label: ev.result.success ? `done · ${ev.result.copiedFiles} files` : (ev.result.error ?? 'failed'),
-          })
+    const finalResults = await publishApi.publishStream(
+      items,
+      dests,
+      ev => {
+        if (ev.kind === 'target-start') {
+          const m = new Map(progress.value)
+          m.set(ev.target, { current: 0, total: ev.total, label: 'starting…', status: 'in-progress' })
+          progress.value = m
+        } else if (ev.kind === 'progress') {
+          const m = new Map(progress.value)
+          const existing = m.get(ev.target) ?? {
+            current: 0,
+            total: ev.total,
+            label: '',
+            status: 'in-progress' as const,
+          }
+          m.set(ev.target, { ...existing, current: ev.current, total: ev.total, label: ev.label })
+          progress.value = m
+        } else if (ev.kind === 'target-result') {
+          const m = new Map(progress.value)
+          const existing = m.get(ev.result.target)
+          if (existing) {
+            m.set(ev.result.target, {
+              ...existing,
+              status: ev.result.success ? 'done' : 'error',
+              label: ev.result.success ? `done · ${ev.result.copiedFiles} files` : (ev.result.error ?? 'failed'),
+            })
+          }
+          progress.value = m
         }
-        progress.value = m
-      }
-    }, { source: src })
+      },
+      { source: src },
+    )
     results.value = finalResults
     // Any target that was published is now potentially in a new state —
     // refresh its sync status so chips / item list reflect it.
@@ -231,30 +236,33 @@ async function runPublish() {
 
 // --- Panel lifecycle --------------------------------------------------
 
-watch(() => props.visible, (v) => {
-  if (!v) {
-    // Clear selection on close so stale state doesn't leak between
-    // invocations (e.g., different source next time).
-    selectedItems.value = new Set()
+watch(
+  () => props.visible,
+  v => {
+    if (!v) {
+      // Clear selection on close so stale state doesn't leak between
+      // invocations (e.g., different source next time).
+      selectedItems.value = new Set()
+      resetPublishState()
+      return
+    }
     resetPublishState()
-    return
-  }
-  resetPublishState()
-  sourceName.value = pickDefaultSource()
-  const preselect = new Set<string>()
-  if (props.initialDestination && destinationOptions.value.some(t => t.name === props.initialDestination)) {
-    preselect.add(props.initialDestination)
-  }
-  selectedDestinations.value = preselect
-  selectedItems.value = new Set()
-  // Kick off sync-status refresh so the destination list shows accurate
-  // change counts. syncStatus caches per-target; this is cheap on reopen.
-  if (activeTarget.targets.length > 1) syncStatus.refreshAll()
-})
+    sourceName.value = pickDefaultSource()
+    const preselect = new Set<string>()
+    if (props.initialDestination && destinationOptions.value.some(t => t.name === props.initialDestination)) {
+      preselect.add(props.initialDestination)
+    }
+    selectedDestinations.value = preselect
+    selectedItems.value = new Set()
+    // Kick off sync-status refresh so the destination list shows accurate
+    // change counts. syncStatus caches per-target; this is cheap on reopen.
+    if (activeTarget.targets.length > 1) syncStatus.refreshAll()
+  },
+)
 
 // When the source changes, any previously-selected destinations that
 // happen to now BE the source get dropped automatically.
-watch(sourceName, (name) => {
+watch(sourceName, name => {
   if (!name) return
   if (selectedDestinations.value.has(name)) {
     const next = new Set(selectedDestinations.value)
@@ -266,16 +274,18 @@ watch(sourceName, (name) => {
 // Any change to destinations or items invalidates a pending confirmation —
 // otherwise the user could flip selections after clicking once and push
 // somewhere they didn't review.
-watch([selectedDestinations, selectedItems], () => { confirming.value = false })
+watch([selectedDestinations, selectedItems], () => {
+  confirming.value = false
+})
 
-function close() { emit('update:visible', false) }
+function close() {
+  emit('update:visible', false)
+}
 
 // --- Action (stubbed in R38a; wired in R38c) -------------------------
 
-const canPublish = computed(() =>
-  !!sourceName.value
-    && selectedDestinations.value.size > 0
-    && selectedItems.value.size > 0
+const canPublish = computed(
+  () => !!sourceName.value && selectedDestinations.value.size > 0 && selectedItems.value.size > 0,
 )
 
 const publishLabel = computed(() => {

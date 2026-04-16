@@ -9,7 +9,9 @@ test.describe('Production admin (gazetta admin)', () => {
 
   test('no 404 errors on admin load', async ({ page }) => {
     const errors: string[] = []
-    page.on('response', resp => { if (resp.status() >= 400) errors.push(`${resp.status()} ${resp.url()}`) })
+    page.on('response', resp => {
+      if (resp.status() >= 400) errors.push(`${resp.status()} ${resp.url()}`)
+    })
     await page.goto('/admin')
     await page.waitForTimeout(2000)
     expect(errors).toEqual([])

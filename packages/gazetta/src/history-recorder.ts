@@ -126,12 +126,7 @@ export async function recordWrite(opts: RecordWriteOptions) {
     })
   }
 
-  const prevItems = await loadPreviousSnapshot(
-    opts.history,
-    opts.contentRoot,
-    scanLocations,
-    scanRootFiles,
-  )
+  const prevItems = await loadPreviousSnapshot(opts.history, opts.contentRoot, scanLocations, scanRootFiles)
   const nextItems = new Map(prevItems)
   for (const it of opts.items) {
     if (it.content === null) nextItems.delete(it.path)

@@ -20,13 +20,13 @@ import { test, expect } from '@playwright/test'
  * immediate publish. editable and type don't affect this.
  */
 const destinations = [
-  { name: 'local-ro',     env: 'local',      editable: false, type: 'static',  requiresConfirm: false },
-  { name: 'local-dyn',    env: 'local',      editable: true,  type: 'dynamic', requiresConfirm: false },
-  { name: 'staging-ro',   env: 'staging',    editable: false, type: 'static',  requiresConfirm: false },
-  { name: 'staging-edit', env: 'staging',    editable: true,  type: 'static',  requiresConfirm: false },
-  { name: 'prod-ro',      env: 'production', editable: false, type: 'static',  requiresConfirm: true  },
-  { name: 'prod-edit',    env: 'production', editable: true,  type: 'static',  requiresConfirm: true  },
-  { name: 'prod-dyn',     env: 'production', editable: false, type: 'dynamic', requiresConfirm: true  },
+  { name: 'local-ro', env: 'local', editable: false, type: 'static', requiresConfirm: false },
+  { name: 'local-dyn', env: 'local', editable: true, type: 'dynamic', requiresConfirm: false },
+  { name: 'staging-ro', env: 'staging', editable: false, type: 'static', requiresConfirm: false },
+  { name: 'staging-edit', env: 'staging', editable: true, type: 'static', requiresConfirm: false },
+  { name: 'prod-ro', env: 'production', editable: false, type: 'static', requiresConfirm: true },
+  { name: 'prod-edit', env: 'production', editable: true, type: 'static', requiresConfirm: true },
+  { name: 'prod-dyn', env: 'production', editable: false, type: 'dynamic', requiresConfirm: true },
 ] as const
 
 test.describe('Publish confirmation matrix', () => {

@@ -21,7 +21,9 @@ async function writeSite(files: Record<string, string>) {
 async function writeTemplate(name: string) {
   const dir = join(testDir, 'templates', name)
   await mkdir(dir, { recursive: true })
-  await writeFile(join(dir, 'index.ts'), `
+  await writeFile(
+    join(dir, 'index.ts'),
+    `
 import { z } from 'zod'
 export const schema = z.object({ text: z.string().optional() })
 export default ({ content, children }) => ({
@@ -29,7 +31,8 @@ export default ({ content, children }) => ({
   css: '',
   js: '',
 })
-`)
+`,
+  )
 }
 
 afterEach(async () => {
@@ -47,9 +50,7 @@ describe('resolvePage', () => {
       'site.yaml': 'name: "Test"',
       'pages/home/page.json': JSON.stringify({
         template: 'echo',
-        components: [
-          { name: 'hero', template: 'echo', content: { text: 'Hello' } },
-        ],
+        components: [{ name: 'hero', template: 'echo', content: { text: 'Hello' } }],
       }),
     })
     await writeTemplate('echo')
@@ -84,9 +85,7 @@ describe('resolvePage', () => {
       'site.yaml': 'name: "Test"',
       'fragments/header/fragment.json': JSON.stringify({
         template: 'echo',
-        components: [
-          { name: 'logo', template: 'echo', content: { text: 'Logo' } },
-        ],
+        components: [{ name: 'logo', template: 'echo', content: { text: 'Logo' } }],
       }),
       'pages/home/page.json': JSON.stringify({
         template: 'echo',
@@ -208,9 +207,7 @@ describe('resolvePage', () => {
           {
             name: 'features',
             template: 'echo',
-            components: [
-              { name: 'fast', template: 'echo', content: { text: 'Fast' } },
-            ],
+            components: [{ name: 'fast', template: 'echo', content: { text: 'Fast' } }],
           },
         ],
       }),
@@ -250,9 +247,7 @@ describe('resolveFragment', () => {
       'site.yaml': 'name: "Test"',
       'fragments/header/fragment.json': JSON.stringify({
         template: 'echo',
-        components: [
-          { name: 'logo', template: 'echo', content: { text: 'Logo' } },
-        ],
+        components: [{ name: 'logo', template: 'echo', content: { text: 'Logo' } }],
       }),
     })
     await writeTemplate('echo')
@@ -416,6 +411,6 @@ describe('circular reference detection', () => {
     const site = await loadSite({ siteDir: testDir, storage })
     // Should NOT throw — a diamond is not a cycle.
     const resolved = await resolvePage('home', site)
-    expect(resolved.children).toHaveLength(1)  // @a at the root
+    expect(resolved.children).toHaveLength(1) // @a at the root
   })
 })

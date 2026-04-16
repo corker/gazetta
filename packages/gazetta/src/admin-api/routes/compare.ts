@@ -27,13 +27,19 @@ export function compareRoutes(
     if (!targetsInitPromise) {
       const { createTargetRegistry } = await import('../../targets.js')
       targetsInitPromise = createTargetRegistry(targetConfigs, projectSiteDir)
-        .then(t => { targets = t; return t })
-        .catch(() => { targets = new Map(); return new Map() })
+        .then(t => {
+          targets = t
+          return t
+        })
+        .catch(() => {
+          targets = new Map()
+          return new Map()
+        })
     }
     return targetsInitPromise
   }
 
-  app.get('/api/compare', async (c) => {
+  app.get('/api/compare', async c => {
     // `target` = compare destination (what we're diffing against)
     // `source` = source of the compare (which editable target to read from);
     //           defaults to the resolver's default editable target

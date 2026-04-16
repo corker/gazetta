@@ -17,7 +17,7 @@ describe('authMiddleware', () => {
     delete process.env.GAZETTA_TOKEN
     const app = new Hono()
     app.use('/api/*', authMiddleware())
-    app.get('/api/test', (c) => c.json({ ok: true }))
+    app.get('/api/test', c => c.json({ ok: true }))
 
     const res = await app.request('/api/test')
     expect(res.status).toBe(200)
@@ -28,7 +28,7 @@ describe('authMiddleware', () => {
     process.env.GAZETTA_TOKEN = 'secret123'
     const app = new Hono()
     app.use('/api/*', authMiddleware())
-    app.get('/api/test', (c) => c.json({ ok: true }))
+    app.get('/api/test', c => c.json({ ok: true }))
 
     const res = await app.request('/api/test')
     expect(res.status).toBe(401)
@@ -40,7 +40,7 @@ describe('authMiddleware', () => {
     process.env.GAZETTA_TOKEN = 'secret123'
     const app = new Hono()
     app.use('/api/*', authMiddleware())
-    app.get('/api/test', (c) => c.json({ ok: true }))
+    app.get('/api/test', c => c.json({ ok: true }))
 
     const res = await app.request('/api/test', {
       headers: { Authorization: 'Bearer wrong-token' },
@@ -52,7 +52,7 @@ describe('authMiddleware', () => {
     process.env.GAZETTA_TOKEN = 'secret123'
     const app = new Hono()
     app.use('/api/*', authMiddleware())
-    app.get('/api/test', (c) => c.json({ ok: true }))
+    app.get('/api/test', c => c.json({ ok: true }))
 
     const res = await app.request('/api/test', {
       headers: { Authorization: 'Bearer secret123' },
@@ -65,7 +65,7 @@ describe('authMiddleware', () => {
     process.env.GAZETTA_TOKEN = 'secret123'
     const app = new Hono()
     app.use('/api/*', authMiddleware())
-    app.get('/public', (c) => c.json({ ok: true }))
+    app.get('/public', c => c.json({ ok: true }))
 
     const res = await app.request('/public')
     expect(res.status).toBe(200)

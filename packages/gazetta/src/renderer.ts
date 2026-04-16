@@ -1,16 +1,16 @@
 import type { RenderOutput, ResolvedComponent } from './types.js'
 import { hashPath, scopeHtml, scopeCss } from './scope.js'
 
-export async function renderComponent(component: ResolvedComponent, routeParams?: Record<string, string>): Promise<RenderOutput> {
+export async function renderComponent(
+  component: ResolvedComponent,
+  routeParams?: Record<string, string>,
+): Promise<RenderOutput> {
   const children = await Promise.all(component.children.map(c => renderComponent(c, routeParams)))
   const output = await component.template({ content: component.content, children, params: routeParams })
 
   const scopeId = hashPath(component.treePath ?? '')
 
-  const headParts = [
-    ...children.map(c => c.head).filter(Boolean),
-    output.head,
-  ].filter(Boolean)
+  const headParts = [...children.map(c => c.head).filter(Boolean), output.head].filter(Boolean)
 
   return {
     html: scopeHtml(output.html, scopeId),
@@ -24,10 +24,7 @@ export async function renderFragment(component: ResolvedComponent): Promise<stri
   const children = await Promise.all(component.children.map(c => renderComponent(c)))
   const output = await component.template({ content: component.content, children })
 
-  const headContent = [
-    ...children.map(c => c.head).filter(Boolean),
-    output.head,
-  ].filter(Boolean).join('\n  ')
+  const headContent = [...children.map(c => c.head).filter(Boolean), output.head].filter(Boolean).join('\n  ')
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -43,17 +40,11 @@ ${output.html}${output.js ? `\n<script type="module">${output.js}</script>` : ''
 </html>`
 }
 
-export async function renderPage(
-  component: ResolvedComponent,
-  routeParams?: Record<string, string>
-): Promise<string> {
+export async function renderPage(component: ResolvedComponent, routeParams?: Record<string, string>): Promise<string> {
   const children = await Promise.all(component.children.map(c => renderComponent(c, routeParams)))
   const output = await component.template({ content: component.content, children, params: routeParams })
 
-  const headContent = [
-    ...children.map(c => c.head).filter(Boolean),
-    output.head,
-  ].filter(Boolean).join('\n  ')
+  const headContent = [...children.map(c => c.head).filter(Boolean), output.head].filter(Boolean).join('\n  ')
 
   return `<!DOCTYPE html>
 <html lang="en">

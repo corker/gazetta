@@ -19,9 +19,15 @@ beforeAll(() => {
 
 afterAll(async () => {
   const dirs = [
-    'pages/.test-put-page', 'pages/.test-put-comp', 'pages/.test-page',
-    'pages/.test-nested', 'pages/.test-comp-parent', 'pages/.test-to-delete',
-    'fragments/.test-put-frag', 'fragments/.test-frag', 'fragments/.test-to-delete',
+    'pages/.test-put-page',
+    'pages/.test-put-comp',
+    'pages/.test-page',
+    'pages/.test-nested',
+    'pages/.test-comp-parent',
+    'pages/.test-to-delete',
+    'fragments/.test-put-frag',
+    'fragments/.test-frag',
+    'fragments/.test-to-delete',
   ]
   await Promise.all(dirs.map(d => rm(resolve(contentDir, d), { recursive: true, force: true })))
 })
@@ -175,7 +181,7 @@ describe('POST /preview/*', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        overrides: { 'hero': { title: 'Draft Title', subtitle: 'Draft Subtitle' } },
+        overrides: { hero: { title: 'Draft Title', subtitle: 'Draft Subtitle' } },
       }),
     })
     expect(res.status).toBe(200)
@@ -266,7 +272,7 @@ describe('POST /api/pages (create)', () => {
       body: JSON.stringify({ name: '.test-page', route: '/.test-page', template: 'page-default' }),
     })
     expect(res.status).toBe(200)
-    const body = await res.json() as { ok: boolean }
+    const body = (await res.json()) as { ok: boolean }
     expect(body.ok).toBe(true)
 
     // Verify it appears in the list
@@ -333,7 +339,7 @@ describe('POST /api/fragments (create)', () => {
       body: JSON.stringify({ name: '.test-frag', template: 'footer-layout' }),
     })
     expect(res.status).toBe(200)
-    const body = await res.json() as { ok: boolean }
+    const body = (await res.json()) as { ok: boolean }
     expect(body.ok).toBe(true)
 
     const { body: frags } = await get('/api/fragments')

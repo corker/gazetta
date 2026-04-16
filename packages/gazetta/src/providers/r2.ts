@@ -32,7 +32,7 @@ export function createR2RestProvider(options: R2RestProviderOptions): StoragePro
       const url = `${CF_API}/accounts/${accountId}/r2/buckets/${bucket}/objects?prefix=${encodeURIComponent(prefixWithSlash)}`
       const res = await fetch(url, { headers: headers() })
       if (!res.ok) throw new Error(`Cannot list ${path}: ${res.status}`)
-      const data = await res.json() as { result: Array<{ key: string }> }
+      const data = (await res.json()) as { result: Array<{ key: string }> }
       const entries = new Map<string, boolean>()
       for (const obj of data.result ?? []) {
         const relativeName = obj.key.slice(prefixWithSlash.length)
@@ -46,13 +46,16 @@ export function createR2RestProvider(options: R2RestProviderOptions): StoragePro
     },
 
     async exists(path: string): Promise<boolean> {
-      const res = await fetch(`${base}/${encodeURIComponent(normalizePath(path))}`, { method: 'HEAD', headers: headers() })
+      const res = await fetch(`${base}/${encodeURIComponent(normalizePath(path))}`, {
+        method: 'HEAD',
+        headers: headers(),
+      })
       if (res.ok) return true
       // Check as directory prefix
       const url = `${CF_API}/accounts/${accountId}/r2/buckets/${bucket}/objects?prefix=${encodeURIComponent(normalizePath(path) + '/')}&per_page=1`
       const listRes = await fetch(url, { headers: headers() })
       if (!listRes.ok) return false
-      const data = await listRes.json() as { result: unknown[] }
+      const data = (await listRes.json()) as { result: unknown[] }
       return (data.result?.length ?? 0) > 0
     },
 
@@ -78,7 +81,7 @@ export function createR2RestProvider(options: R2RestProviderOptions): StoragePro
       const url = `${CF_API}/accounts/${accountId}/r2/buckets/${bucket}/objects?prefix=${encodeURIComponent(key)}`
       const listRes = await fetch(url, { headers: headers() })
       if (listRes.ok) {
-        const data = await listRes.json() as { result: Array<{ key: string }> }
+        const data = (await listRes.json()) as { result: Array<{ key: string }> }
         for (const obj of data.result ?? []) {
           await fetch(`${base}/${encodeURIComponent(obj.key)}`, { method: 'DELETE', headers: headers() })
         }

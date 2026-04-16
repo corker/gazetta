@@ -8,12 +8,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { cp, rm, readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Hono } from 'hono'
-import {
-  createFilesystemProvider,
-  createSourceContext,
-  createHistoryProvider,
-  type SourceContext,
-} from 'gazetta'
+import { createFilesystemProvider, createSourceContext, createHistoryProvider, type SourceContext } from 'gazetta'
 import { createAdminApp } from '../src/server/index.js'
 
 const starterSiteDir = resolve(import.meta.dirname, '../../../examples/starter/sites/main')
@@ -72,19 +67,25 @@ describe('History on save', () => {
     expect(index.revisions).toHaveLength(2)
     const [baselineId, firstSaveId] = index.revisions
 
-    const baseline = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', `${baselineId}.json`), 'utf-8'))
+    const baseline = JSON.parse(
+      await readFile(resolve(contentDir, '.gazetta/history/revisions', `${baselineId}.json`), 'utf-8'),
+    )
     expect(baseline.message).toBe('Initial baseline')
 
-    const manifest = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', `${firstSaveId}.json`), 'utf-8'))
+    const manifest = JSON.parse(
+      await readFile(resolve(contentDir, '.gazetta/history/revisions', `${firstSaveId}.json`), 'utf-8'),
+    )
     expect(manifest.operation).toBe('save')
     // Full-tree snapshot: every page + fragment manifest is captured,
     // not just the one that was saved.
-    expect(Object.keys(manifest.snapshot).sort()).toEqual(expect.arrayContaining([
-      'pages/home/page.json',
-      'pages/about/page.json',
-      'fragments/header/fragment.json',
-      'fragments/footer/fragment.json',
-    ]))
+    expect(Object.keys(manifest.snapshot).sort()).toEqual(
+      expect.arrayContaining([
+        'pages/home/page.json',
+        'pages/about/page.json',
+        'fragments/header/fragment.json',
+        'fragments/footer/fragment.json',
+      ]),
+    )
   })
 
   it('second save writes delta onto the previous snapshot', async () => {
@@ -99,8 +100,12 @@ describe('History on save', () => {
     // baseline + first save + second save = 3 revisions.
     expect(index.revisions).toHaveLength(3)
     const [, firstSaveId, secondSaveId] = index.revisions
-    const firstSave = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', `${firstSaveId}.json`), 'utf-8'))
-    const secondSave = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', `${secondSaveId}.json`), 'utf-8'))
+    const firstSave = JSON.parse(
+      await readFile(resolve(contentDir, '.gazetta/history/revisions', `${firstSaveId}.json`), 'utf-8'),
+    )
+    const secondSave = JSON.parse(
+      await readFile(resolve(contentDir, '.gazetta/history/revisions', `${secondSaveId}.json`), 'utf-8'),
+    )
     // Unchanged items share blobs (same hash) across revisions.
     expect(secondSave.snapshot['pages/home/page.json']).toBe(firstSave.snapshot['pages/home/page.json'])
     // pages/about changed — different blob.
@@ -119,9 +124,7 @@ describe('History on save', () => {
 
     const entries = await readdir(resolve(contentDir, '.gazetta/history/revisions'))
     const latest = entries.sort().at(-1)!
-    const manifest = JSON.parse(
-      await readFile(resolve(contentDir, '.gazetta/history/revisions', latest), 'utf-8'),
-    )
+    const manifest = JSON.parse(await readFile(resolve(contentDir, '.gazetta/history/revisions', latest), 'utf-8'))
     expect(manifest.snapshot).not.toHaveProperty('pages/.history-delete-test/page.json')
   })
 })
@@ -151,9 +154,7 @@ describe('History disabled on save', () => {
     expect(res.status).toBe(200)
 
     // Happy path — the history directory should not exist.
-    await expect(
-      readFile(resolve(contentDir, '.gazetta/history/index.json'), 'utf-8'),
-    ).rejects.toThrow()
+    await expect(readFile(resolve(contentDir, '.gazetta/history/index.json'), 'utf-8')).rejects.toThrow()
   })
 })
 
@@ -230,7 +231,7 @@ describe('History HTTP endpoints', () => {
     await save('three')
     const res = await app.request('/api/history?target=local')
     expect(res.status).toBe(200)
-    const body = await res.json() as { revisions: { id: string; operation: string; message?: string }[] }
+    const body = (await res.json()) as { revisions: { id: string; operation: string; message?: string }[] }
     // Baseline + 3 saves = 4 revisions, newest first.
     expect(body.revisions).toHaveLength(4)
     // All ids follow the rev-<unixMillis>[-seq] shape.
@@ -249,23 +250,23 @@ describe('History HTTP endpoints', () => {
   it('POST /api/history/undo restores previous revision with operation=rollback', async () => {
     // Read current content — should be "three" from the prior test.
     const before = await app.request('/api/pages/home')
-    const beforeBody = await before.json() as { content: { title: string } }
+    const beforeBody = (await before.json()) as { content: { title: string } }
     expect(beforeBody.content.title).toBe('three')
 
     // Capture the expected restoredFrom: it's head-1 in newest-first order.
     const listRes = await app.request('/api/history?target=local')
-    const listBody = await listRes.json() as { revisions: { id: string }[] }
+    const listBody = (await listRes.json()) as { revisions: { id: string }[] }
     const expectedRestoredFrom = listBody.revisions[1].id
 
     const res = await app.request('/api/history/undo?target=local', { method: 'POST' })
     expect(res.status).toBe(200)
-    const body = await res.json() as { revision: { operation: string }; restoredFrom: string }
+    const body = (await res.json()) as { revision: { operation: string }; restoredFrom: string }
     expect(body.revision.operation).toBe('rollback')
     expect(body.restoredFrom).toBe(expectedRestoredFrom)
 
     // Content now reflects the previous save's state ("two").
     const after = await app.request('/api/pages/home')
-    const afterBody = await after.json() as { content: { title: string } }
+    const afterBody = (await after.json()) as { content: { title: string } }
     expect(afterBody.content.title).toBe('two')
   })
 
@@ -275,17 +276,17 @@ describe('History HTTP endpoints', () => {
     // (baseline is oldest). Use newest-first list: the oldest non-
     // baseline save is at list.length-2.
     const listRes = await app.request('/api/history?target=local')
-    const listBody = await listRes.json() as { revisions: { id: string; message?: string }[] }
+    const listBody = (await listRes.json()) as { revisions: { id: string; message?: string }[] }
     const firstSaveId = listBody.revisions[listBody.revisions.length - 2].id
 
     const res = await app.request(`/api/history/restore?target=local&id=${firstSaveId}`, { method: 'POST' })
     expect(res.status).toBe(200)
-    const body = await res.json() as { revision: { operation: string }; restoredFrom: string }
+    const body = (await res.json()) as { revision: { operation: string }; restoredFrom: string }
     expect(body.revision.operation).toBe('rollback')
     expect(body.restoredFrom).toBe(firstSaveId)
 
     const after = await app.request('/api/pages/home')
-    const afterBody = await after.json() as { content: { title: string } }
+    const afterBody = (await after.json()) as { content: { title: string } }
     expect(afterBody.content.title).toBe('one')
   })
 
@@ -315,4 +316,3 @@ describe('History HTTP endpoints', () => {
     expect(res.status).toBe(404)
   })
 })
-

@@ -32,10 +32,16 @@ export interface HistoryCommandContext {
 /** Format an ISO timestamp as "Apr 16, 2026 · 11:05" for humans. */
 function formatTimestamp(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).replace(',', ' ·')
+  return d
+    .toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    .replace(',', ' ·')
 }
 
 /** Abbreviate an items list for single-line display. */
@@ -105,9 +111,7 @@ async function confirmDestructive(ctx: HistoryCommandContext, action: string, fl
   if (!isProd) return true
   if (flagYes) return true
   if (process.env.CI) {
-    throw new Error(
-      `${action} on production target "${ctx.targetName}" in CI requires --yes to proceed`
-    )
+    throw new Error(`${action} on production target "${ctx.targetName}" in CI requires --yes to proceed`)
   }
   return confirm(`  ${action} on production target "${ctx.targetName}" — continue?`)
 }
@@ -135,7 +139,9 @@ export async function runHistoryUndo(ctx: HistoryCommandContext, opts: { yes?: b
     revisionId: prior.id,
     message: `Undo ${head.operation} (rev ${head.id})`,
   })
-  console.log(`\n  ✓ Undone. ${ctx.targetName} is now at ${prior.id} (${prior.operation} @ ${formatTimestamp(prior.timestamp)})`)
+  console.log(
+    `\n  ✓ Undone. ${ctx.targetName} is now at ${prior.id} (${prior.operation} @ ${formatTimestamp(prior.timestamp)})`,
+  )
   console.log(`    Forward revision: ${restored.id}\n`)
 }
 
@@ -148,7 +154,8 @@ export async function runHistoryRollback(
   revisionId: string,
   opts: { yes?: boolean } = {},
 ): Promise<void> {
-  if (!revisionId) throw new Error('rollback: missing revision id (pass as positional, e.g. gazetta rollback rev-1776337441608)')
+  if (!revisionId)
+    throw new Error('rollback: missing revision id (pass as positional, e.g. gazetta rollback rev-1776337441608)')
   const { history, contentRoot } = await buildHistory(ctx)
   // Fail early if the revision doesn't exist — readRevision gives a
   // clear ENOENT-style error otherwise, but we can frame it better here.
@@ -169,6 +176,8 @@ export async function runHistoryRollback(
     revisionId,
     message: `Rollback to ${revisionId}`,
   })
-  console.log(`\n  ✓ Rolled back. ${ctx.targetName} is now at ${revisionId} (${target.operation} @ ${formatTimestamp(target.timestamp)})`)
+  console.log(
+    `\n  ✓ Rolled back. ${ctx.targetName} is now at ${revisionId} (${target.operation} @ ${formatTimestamp(target.timestamp)})`,
+  )
   console.log(`    Forward revision: ${restored.id}\n`)
 }

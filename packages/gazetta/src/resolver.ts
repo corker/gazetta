@@ -10,15 +10,12 @@ interface ResolveContext {
   path: string[]
 }
 
-export async function resolveComponent(
-  entry: ComponentEntry,
-  ctx: ResolveContext
-): Promise<ResolvedComponent> {
+export async function resolveComponent(entry: ComponentEntry, ctx: ResolveContext): Promise<ResolvedComponent> {
   if (typeof entry === 'string') {
     if (!entry.startsWith('@')) {
       throw new Error(
         `Invalid component entry "${entry}" — string entries must be fragment references starting with @.\n` +
-        `  Referenced in: ${ctx.path.join(' → ') || 'page root'}`
+          `  Referenced in: ${ctx.path.join(' → ') || 'page root'}`,
       )
     }
     const fragmentName = entry.slice(1)
@@ -31,10 +28,7 @@ export async function resolveComponent(
 async function resolveFragmentRef(fragmentName: string, ctx: ResolveContext): Promise<ResolvedComponent> {
   const key = `@${fragmentName}`
   if (ctx.visited.has(key)) {
-    throw new Error(
-      `Circular reference detected: ${key}\n` +
-      `  Resolution path: ${ctx.path.join(' → ')} → ${key}`
-    )
+    throw new Error(`Circular reference detected: ${key}\n` + `  Resolution path: ${ctx.path.join(' → ')} → ${key}`)
   }
   ctx.visited.add(key)
   ctx.path.push(key)
@@ -46,8 +40,8 @@ async function resolveFragmentRef(fragmentName: string, ctx: ResolveContext): Pr
     ctx.visited.delete(key)
     throw new Error(
       `Fragment "@${fragmentName}" not found.\n` +
-      `  Referenced in: ${ctx.path.join(' → ') || 'page root'}\n` +
-      `  Available fragments: ${available.length > 0 ? available.join(', ') : '(none)'}`
+        `  Referenced in: ${ctx.path.join(' → ') || 'page root'}\n` +
+        `  Available fragments: ${available.length > 0 ? available.join(', ') : '(none)'}`,
     )
   }
 
@@ -63,16 +57,19 @@ async function resolveFragmentRef(fragmentName: string, ctx: ResolveContext): Pr
   ctx.path.pop()
   ctx.visited.delete(key)
 
-  return { template: loaded.render, content: processContent(fragment.content, loaded.schema), children, path: fragment.dir, treePath }
+  return {
+    template: loaded.render,
+    content: processContent(fragment.content, loaded.schema),
+    children,
+    path: fragment.dir,
+    treePath,
+  }
 }
 
 async function resolveInlineComponent(comp: InlineComponent, ctx: ResolveContext): Promise<ResolvedComponent> {
   const key = comp.name
   if (ctx.visited.has(key)) {
-    throw new Error(
-      `Circular reference detected: ${key}\n` +
-      `  Resolution path: ${ctx.path.join(' → ')} → ${key}`
-    )
+    throw new Error(`Circular reference detected: ${key}\n` + `  Resolution path: ${ctx.path.join(' → ')} → ${key}`)
   }
   ctx.visited.add(key)
   ctx.path.push(comp.name)
@@ -98,7 +95,7 @@ export async function resolveFragment(fragmentName: string, site: Site): Promise
     const available = [...site.fragments.keys()]
     throw new Error(
       `Fragment "${fragmentName}" not found.\n` +
-      `  Available fragments: ${available.length > 0 ? available.join(', ') : '(none)'}`
+        `  Available fragments: ${available.length > 0 ? available.join(', ') : '(none)'}`,
     )
   }
 
@@ -113,7 +110,13 @@ export async function resolveFragment(fragmentName: string, site: Site): Promise
     }
   }
 
-  return { template: loaded.render, content: processContent(fragment.content, loaded.schema), children, path: fragment.dir, treePath: '' }
+  return {
+    template: loaded.render,
+    content: processContent(fragment.content, loaded.schema),
+    children,
+    path: fragment.dir,
+    treePath: '',
+  }
 }
 
 export async function resolvePage(pageName: string, site: Site): Promise<ResolvedComponent> {
@@ -122,7 +125,7 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
     const available = [...site.pages.keys()]
     throw new Error(
       `Page "${pageName}" not found.\n` +
-      `  Available pages: ${available.length > 0 ? available.join(', ') : '(none)'}`
+        `  Available pages: ${available.length > 0 ? available.join(', ') : '(none)'}`,
     )
   }
 
@@ -137,5 +140,11 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
     }
   }
 
-  return { template: loaded.render, content: processContent(page.content, loaded.schema), children, path: page.dir, treePath: '' }
+  return {
+    template: loaded.render,
+    content: processContent(page.content, loaded.schema),
+    children,
+    path: page.dir,
+    treePath: '',
+  }
 }

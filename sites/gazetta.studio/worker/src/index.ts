@@ -1,7 +1,7 @@
 import { createWorker } from 'gazetta/workers/cloudflare-r2'
 
 const app = createWorker({
-  middleware: (app) => {
+  middleware: app => {
     // www redirect
     app.use('*', async (c, next) => {
       const url = new URL(c.req.url)

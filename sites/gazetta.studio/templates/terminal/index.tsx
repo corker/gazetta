@@ -4,11 +4,15 @@ import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
-  lines: z.array(z.object({
-    command: z.string().optional().describe('Command to type'),
-    output: z.string().optional().describe('Output (appears instantly)'),
-    delay: z.number().optional().describe('Delay before this line in ms'),
-  })).describe('Terminal lines'),
+  lines: z
+    .array(
+      z.object({
+        command: z.string().optional().describe('Command to type'),
+        output: z.string().optional().describe('Output (appears instantly)'),
+        delay: z.number().optional().describe('Delay before this line in ms'),
+      }),
+    )
+    .describe('Terminal lines'),
   title: z.string().optional().describe('Window title'),
 })
 
@@ -29,8 +33,7 @@ function TerminalLine({ line, idx }: { line: Content['lines'][number]; idx: numb
   if (line.command) {
     return (
       <div className="term-line" data-idx={idx} data-type="command" style={{ opacity: 0 }}>
-        <span className="term-prompt">$</span>{' '}
-        <span className="term-cmd" />
+        <span className="term-prompt">$</span> <span className="term-cmd" />
         <span className="term-cursor">▋</span>
       </div>
     )
@@ -47,7 +50,9 @@ function Terminal({ id, title, lines }: { id: string; title: string; lines: Cont
     <div className="terminal" id={id}>
       <TerminalBar title={title} />
       <div className="term-body">
-        {lines.map((line, i) => <TerminalLine key={i} line={line} idx={i} />)}
+        {lines.map((line, i) => (
+          <TerminalLine key={i} line={line} idx={i} />
+        ))}
       </div>
     </div>
   )

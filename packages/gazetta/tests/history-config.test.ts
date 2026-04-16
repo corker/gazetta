@@ -3,11 +3,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { TargetConfig } from '../src/types.js'
-import {
-  isHistoryEnabled,
-  getHistoryRetention,
-  DEFAULT_HISTORY_RETENTION,
-} from '../src/types.js'
+import { isHistoryEnabled, getHistoryRetention, DEFAULT_HISTORY_RETENTION } from '../src/types.js'
 
 function T(history?: TargetConfig['history']): TargetConfig {
   return { storage: { type: 'filesystem' }, history }

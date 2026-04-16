@@ -50,7 +50,7 @@ const environmentClass = computed(() => {
   return 'env-local'
 })
 
-const editableLabel = computed(() => activeTarget.isActiveEditable ? 'editable' : 'read-only')
+const editableLabel = computed(() => (activeTarget.isActiveEditable ? 'editable' : 'read-only'))
 
 /**
  * Switcher menu items. Flat at ≤3 targets; grouped by environment at
@@ -79,7 +79,9 @@ const menuItems = computed(() => {
     {
       label: 'View history',
       icon: 'pi pi-history',
-      command: () => { showHistory.value = true },
+      command: () => {
+        showHistory.value = true
+      },
     },
   ]
 })
@@ -118,31 +120,24 @@ async function switchTo(name: string) {
   const focused = selection.selection
   // Pre-check item availability only when we have something selected —
   // no selection means no focus to preserve, so skip the extra round-trip.
-  const missingCheck = focused
-    ? await checkItemOnTarget(name, focused.type, focused.name)
-    : 'ok' as const
+  const missingCheck = focused ? await checkItemOnTarget(name, focused.type, focused.name) : ('ok' as const)
   activeTarget.setActiveTarget(name)
   if (missingCheck === 'missing' && focused && prevName) {
     // Navigate to the site root on the new target and let the author
     // one-click back if this wasn't what they meant.
     router.push('/admin')
-    const itemLabel = focused.type === 'page'
-      ? `pages/${focused.name}`
-      : `@${focused.name}`
-    toast.show(
-      `${itemLabel} isn't on ${name} — showing site root`,
-      {
-        type: 'info',
-        action: {
-          label: `back to ${itemLabel} on ${prevName}`,
-          handler: async () => {
-            activeTarget.setActiveTarget(prevName)
-            const prefix = focused.type === 'page' ? '/pages' : '/fragments'
-            router.push(`${prefix}/${focused.name}`)
-          },
+    const itemLabel = focused.type === 'page' ? `pages/${focused.name}` : `@${focused.name}`
+    toast.show(`${itemLabel} isn't on ${name} — showing site root`, {
+      type: 'info',
+      action: {
+        label: `back to ${itemLabel} on ${prevName}`,
+        handler: async () => {
+          activeTarget.setActiveTarget(prevName)
+          const prefix = focused.type === 'page' ? '/pages' : '/fragments'
+          router.push(`${prefix}/${focused.name}`)
         },
       },
-    )
+    })
   }
 }
 

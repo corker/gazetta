@@ -155,7 +155,10 @@ describe('runBuild', () => {
     const { execSync } = await import('node:child_process')
     // Clean and rebuild
     await rm(outDir, { recursive: true, force: true })
-    execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} build sites/main`, { cwd: starterDir, stdio: 'pipe' })
+    execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} build sites/main`, {
+      cwd: starterDir,
+      stdio: 'pipe',
+    })
 
     // Admin SPA built
     expect(existsSync(join(outDir, 'index.html'))).toBe(true)
@@ -172,7 +175,9 @@ describe('runBuild', () => {
 
     // Custom field bundled
     expect(existsSync(join(outDir, 'fields', 'brand-color.js'))).toBe(true)
-    const fieldJs = await import('node:fs').then(fs => fs.readFileSync(join(outDir, 'fields', 'brand-color.js'), 'utf-8'))
+    const fieldJs = await import('node:fs').then(fs =>
+      fs.readFileSync(join(outDir, 'fields', 'brand-color.js'), 'utf-8'),
+    )
     expect(fieldJs.length).toBeGreaterThan(100)
     expect(fieldJs.length).toBeLessThan(10000)
 
@@ -194,7 +199,10 @@ describe('runValidate', () => {
 
   it('passes on valid project', async () => {
     const { execSync } = await import('node:child_process')
-    const output = execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, { cwd: starterDir, stdio: 'pipe' }).toString()
+    const output = execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, {
+      cwd: starterDir,
+      stdio: 'pipe',
+    }).toString()
     expect(output).toContain('All good')
     expect(output).toContain('site.yaml')
     expect(output).toContain('@header')
@@ -208,7 +216,10 @@ describe('runValidate', () => {
     const orphanPath = join(starterDir, 'admin/editors/nonexistent.tsx')
     await writeFile(orphanPath, 'export default {}')
     try {
-      const output = execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, { cwd: starterDir, stdio: 'pipe' }).toString()
+      const output = execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, {
+        cwd: starterDir,
+        stdio: 'pipe',
+      }).toString()
       expect(output).toContain('orphaned editor')
       expect(output).toContain('nonexistent.tsx')
     } finally {
@@ -223,7 +234,10 @@ describe('runValidate', () => {
     const backupPath = fieldPath + '.bak'
     await rename(fieldPath, backupPath)
     try {
-      execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, { cwd: starterDir, stdio: 'pipe' })
+      execSync(`npx tsx ${resolve(import.meta.dirname, '../src/cli/index.ts')} validate sites/main`, {
+        cwd: starterDir,
+        stdio: 'pipe',
+      })
       // Should not reach here — validate exits with code 1
       expect.unreachable()
     } catch (err: unknown) {

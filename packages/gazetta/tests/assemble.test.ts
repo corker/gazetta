@@ -64,7 +64,8 @@ describe('assembleEsi', () => {
   }
 
   it('replaces ESI body tags with fragment body', () => {
-    const html = '<body><!--esi:/fragments/header/index.html--><main>content</main><!--esi:/fragments/footer/index.html--></body>'
+    const html =
+      '<body><!--esi:/fragments/header/index.html--><main>content</main><!--esi:/fragments/footer/index.html--></body>'
     const fragments = new Map([
       ['/fragments/header/index.html', headerFragment],
       ['/fragments/footer/index.html', footerFragment],
@@ -76,7 +77,8 @@ describe('assembleEsi', () => {
   })
 
   it('collects fragment CSS in head', () => {
-    const html = '<head><!--esi-head:/fragments/header/index.html--><!--esi-head:/fragments/footer/index.html--></head><body><!--esi:/fragments/header/index.html--></body>'
+    const html =
+      '<head><!--esi-head:/fragments/header/index.html--><!--esi-head:/fragments/footer/index.html--></head><body><!--esi:/fragments/header/index.html--></body>'
     const fragments = new Map([
       ['/fragments/header/index.html', headerFragment],
       ['/fragments/footer/index.html', footerFragment],
@@ -89,7 +91,8 @@ describe('assembleEsi', () => {
 
   it('deduplicates identical head lines', () => {
     const sharedCss = { head: '<link rel="stylesheet" href="/shared.css">', body: '<div>A</div>' }
-    const html = '<head><!--esi-head:/a.html--><!--esi-head:/b.html--></head><body><!--esi:/a.html--><!--esi:/b.html--></body>'
+    const html =
+      '<head><!--esi-head:/a.html--><!--esi-head:/b.html--></head><body><!--esi:/a.html--><!--esi:/b.html--></body>'
     const fragments = new Map([
       ['/a.html', sharedCss],
       ['/b.html', sharedCss],
@@ -119,7 +122,8 @@ describe('assembleEsi', () => {
   })
 
   it('preserves fragment order', () => {
-    const html = '<head><!--esi-head:/a.html--><!--esi-head:/b.html--></head><body><!--esi:/a.html--><!--esi:/b.html--></body>'
+    const html =
+      '<head><!--esi-head:/a.html--><!--esi-head:/b.html--></head><body><!--esi:/a.html--><!--esi:/b.html--></body>'
     const fragments = new Map([
       ['/a.html', { head: '<link rel="stylesheet" href="/a.css">', body: '<div>A</div>' }],
       ['/b.html', { head: '<link rel="stylesheet" href="/b.css">', body: '<div>B</div>' }],

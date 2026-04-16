@@ -54,10 +54,7 @@ function classifyInResult(item: string, r: CompareResult): ItemChangeKind {
  * re-runs compare whenever either changes. Returns items + loading +
  * error state for the UI.
  */
-export function usePublishItems(
-  source: () => string | null,
-  destinations: () => string[],
-) {
+export function usePublishItems(source: () => string | null, destinations: () => string[]) {
   /** One CompareResult per destination name. */
   const results = ref(new Map<string, CompareResult>())
   const loading = ref(false)
@@ -77,10 +74,12 @@ export function usePublishItems(
     loading.value = true
     error.value = null
     try {
-      const entries = await Promise.all(dests.map(async (name) => {
-        const r = await api.compare(name, { source: src, signal: ac.signal })
-        return [name, r] as const
-      }))
+      const entries = await Promise.all(
+        dests.map(async name => {
+          const r = await api.compare(name, { source: src, signal: ac.signal })
+          return [name, r] as const
+        }),
+      )
       if (ac.signal.aborted) return
       const next = new Map<string, CompareResult>()
       for (const [name, r] of entries) next.set(name, r)

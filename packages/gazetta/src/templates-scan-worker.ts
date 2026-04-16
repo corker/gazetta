@@ -23,7 +23,7 @@ async function scan(input: WorkerInput): Promise<WorkerOutput> {
 
   let mod: Record<string, unknown>
   try {
-    mod = await jiti.import(entry) as Record<string, unknown>
+    mod = (await jiti.import(entry)) as Record<string, unknown>
   } catch (err) {
     return { valid: false, hash: '', errors: [`import failed: ${(err as Error).message}`], files: [] }
   }

@@ -84,21 +84,27 @@ const highlightEnabled = ref(true)
 
 // Send bridge mode + highlight state to iframe
 function sendBridgeMode() {
-  iframeRef.value?.contentWindow?.postMessage({
-    type: 'gazetta:mode',
-    mode: uiMode.mode,
-    highlight: highlightEnabled.value,
-  }, '*')
+  iframeRef.value?.contentWindow?.postMessage(
+    {
+      type: 'gazetta:mode',
+      mode: uiMode.mode,
+      highlight: highlightEnabled.value,
+    },
+    '*',
+  )
 }
 watch(() => uiMode.mode, sendBridgeMode)
 watch(highlightEnabled, sendBridgeMode)
 
 // Send fragment scope to bridge for dimming
 function sendScope() {
-  iframeRef.value?.contentWindow?.postMessage({
-    type: 'gazetta:scope',
-    gzId: fragmentScopeGzId.value,
-  }, '*')
+  iframeRef.value?.contentWindow?.postMessage(
+    {
+      type: 'gazetta:scope',
+      gzId: fragmentScopeGzId.value,
+    },
+    '*',
+  )
 }
 watch(fragmentScopeGzId, sendScope)
 
@@ -372,7 +378,10 @@ async function handleMessage(e: MessageEvent) {
   if (e.data?.type === 'gazetta:hover') {
     focus.previewHover(e.data.gzId ?? null)
     // When preview hover ends, scroll back to selected component after delay
-    if (previewHoverTimer) { clearTimeout(previewHoverTimer); previewHoverTimer = null }
+    if (previewHoverTimer) {
+      clearTimeout(previewHoverTimer)
+      previewHoverTimer = null
+    }
     if (!e.data.gzId) {
       previewHoverTimer = setTimeout(() => {
         iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:scrollTo', gzId: focus.selectedGzId ?? null }, '*')
@@ -394,13 +403,23 @@ onMounted(() => {
   try {
     sse = new EventSource('/__reload')
     sse.onmessage = () => fetchPreview(true)
-    sse.onerror = () => { sse?.close(); sse = null }
-  } catch { /* SSE not available */ }
+    sse.onerror = () => {
+      sse?.close()
+      sse = null
+    }
+  } catch {
+    /* SSE not available */
+  }
 })
-onUnmounted(() => { sse?.close() })
+onUnmounted(() => {
+  sse?.close()
+})
 
 async function fetchPreview(morph = true) {
-  if (!previewPath.value) { currentHtml = ''; return }
+  if (!previewPath.value) {
+    currentHtml = ''
+    return
+  }
   loading.value = true
   try {
     const overrides = editing.allOverrides
@@ -418,7 +437,10 @@ async function fetchPreview(morph = true) {
     const html = injectBridge(await res.text())
     applyHtml(html, morph)
     // Send initial bridge mode + scope after iframe loads
-    setTimeout(() => { sendBridgeMode(); sendScope() }, 100)
+    setTimeout(() => {
+      sendBridgeMode()
+      sendScope()
+    }, 100)
   } catch {
     applyHtml('<pre style="color:red;padding:2rem">Failed to load preview</pre>', false)
   } finally {
@@ -438,14 +460,19 @@ function applyHtml(html: string, morph: boolean) {
 
   try {
     const doc = iframe.contentDocument
-    if (!doc) { iframe.srcdoc = html; currentHtml = html; return }
+    if (!doc) {
+      iframe.srcdoc = html
+      currentHtml = html
+      return
+    }
 
     const parser = new DOMParser()
     const newDoc = parser.parseFromString(html, 'text/html')
 
     morphdom(doc.body, newDoc.body, {
       onBeforeNodeDiscarded(node) {
-        const id = (node as Element).id; if (id === 'gz-hover' || id === 'gz-select' || id === 'gz-dim') return false
+        const id = (node as Element).id
+        if (id === 'gz-hover' || id === 'gz-select' || id === 'gz-dim') return false
         return true
       },
       onBeforeElUpdated(fromEl, toEl) {
@@ -470,17 +497,27 @@ function applyHtml(html: string, morph: boolean) {
   }
 }
 
-watch(() => preview.version, () => fetchPreview(true))
+watch(
+  () => preview.version,
+  () => fetchPreview(true),
+)
 // Route change = fresh iframe load (srcdoc replaced). Scroll position
 // resets — the author navigated to a different page, so that's expected.
 watch(previewRoute, () => fetchPreview(false), { immediate: true })
 // Target change on the same route = morphed swap. Preserves scroll,
 // zoom, and iframe focus — that's the point of preview tabs per
 // design-editor-ux.md ("feels like flipping tabs, not navigating").
-watch(() => activeTarget.activeTargetName, (name, prev) => {
-  if (name && prev && name !== prev && previewRoute.value) fetchPreview(true)
-})
-watchDebounced(() => preview.draftVersion, () => fetchPreview(true), { debounce: 300 })
+watch(
+  () => activeTarget.activeTargetName,
+  (name, prev) => {
+    if (name && prev && name !== prev && previewRoute.value) fetchPreview(true)
+  },
+)
+watchDebounced(
+  () => preview.draftVersion,
+  () => fetchPreview(true),
+  { debounce: 300 },
+)
 </script>
 
 <template>

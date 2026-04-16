@@ -3,10 +3,14 @@ import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
   brand: z.string().describe('Brand name'),
-  links: z.array(z.object({
-    label: z.string(),
-    href: z.string(),
-  })).describe('Navigation links'),
+  links: z
+    .array(
+      z.object({
+        label: z.string(),
+        href: z.string(),
+      }),
+    )
+    .describe('Navigation links'),
   cta: z.string().optional().describe('CTA button text'),
   ctaHref: z.string().optional().describe('CTA button URL'),
 })

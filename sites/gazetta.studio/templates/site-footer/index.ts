@@ -32,7 +32,10 @@ const template: TemplateFunction = ({ children = [] }) => ({
 .footer-claude:hover { color: #D97757; }
 .footer-copy { color: #3f3f46; }
 ${children.map(c => c.css).join('\n')}`,
-  js: children.map(c => c.js).filter(Boolean).join('\n'),
+  js: children
+    .map(c => c.js)
+    .filter(Boolean)
+    .join('\n'),
 })
 
 export default template

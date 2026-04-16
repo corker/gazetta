@@ -23,8 +23,12 @@ function memoryStorage(): StorageProvider & {
       if (v === undefined) throw new Error(`ENOENT: ${path}`)
       return v
     },
-    async writeFile(path, content) { files.set(path, content) },
-    async exists(path) { return files.has(path) },
+    async writeFile(path, content) {
+      files.set(path, content)
+    },
+    async exists(path) {
+      return files.has(path)
+    },
     async readDir(path) {
       const prefix = path.endsWith('/') ? path : path + '/'
       const dirs = new Set<string>()
@@ -50,19 +54,25 @@ function memoryStorage(): StorageProvider & {
         if (p.startsWith(prefix)) files.delete(p)
       }
     },
-    dump() { return files },
-    seed(entries) { for (const [k, v] of Object.entries(entries)) files.set(k, v) },
+    dump() {
+      return files
+    },
+    seed(entries) {
+      for (const [k, v] of Object.entries(entries)) files.set(k, v)
+    },
   }
 }
 
 describe('restoreRevision', () => {
   let storage: ReturnType<typeof memoryStorage>
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   // recordWrite emits a baseline on the first call, so the ordering is:
   //   baseline (pre-write scan), first save, second save, ...
   // "Restore the first save" = "undo the second save".
-  it('writes the target revision\'s snapshot back to the content tree', async () => {
+  it("writes the target revision's snapshot back to the content tree", async () => {
     storage.seed({
       'pages/home/page.json': 'v1',
       'pages/about/page.json': 'unchanged',
@@ -70,11 +80,19 @@ describe('restoreRevision', () => {
     const history = createHistoryProvider({ storage })
     const contentRoot = createContentRoot(storage)
 
-    const firstSave = await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'v1' }] })
+    const firstSave = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v1' }],
+    })
     storage.seed({ 'pages/home/page.json': 'v2' })
-    await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'v2' }] })
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v2' }],
+    })
 
     // Restore to the first-save revision — back to v1.
     const restored = await restoreRevision({ history, contentRoot, revisionId: firstSave.id })
@@ -94,12 +112,20 @@ describe('restoreRevision', () => {
 
     // First recordWrite emits baseline + first save. pages/new doesn't
     // exist yet, so the first save's snapshot contains only pages/home.
-    const firstSave = await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'v1' }] })
+    const firstSave = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v1' }],
+    })
     // Author adds pages/new — next save captures both.
     storage.seed({ 'pages/new/page.json': 'new-content' })
-    await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/new/page.json', content: 'new-content' }] })
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/new/page.json', content: 'new-content' }],
+    })
 
     // Restore the first-save revision → pages/new should be removed.
     await restoreRevision({ history, contentRoot, revisionId: firstSave.id })
@@ -112,11 +138,19 @@ describe('restoreRevision', () => {
     storage.seed({ 'pages/home/page.json': 'v1' })
     const history = createHistoryProvider({ storage })
     const contentRoot = createContentRoot(storage)
-    const firstSave = await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'v1' }] })
+    const firstSave = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v1' }],
+    })
     storage.seed({ 'pages/home/page.json': 'v2' })
-    await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'v2' }] })
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v2' }],
+    })
 
     const restored = await restoreRevision({ history, contentRoot, revisionId: firstSave.id })
     expect(restored.operation).toBe('rollback')
@@ -131,18 +165,29 @@ describe('restoreRevision', () => {
     storage.seed({ 'pages/home/page.json': 'v1' })
     const history = createHistoryProvider({ storage })
     const contentRoot = createContentRoot(storage)
-    await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'v1' }] })
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v1' }],
+    })
     storage.seed({ 'pages/home/page.json': 'v2' })
-    await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'v2' }] })
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v2' }],
+    })
 
     // Restore the baseline (oldest) with custom author + message.
     const list = await history.listRevisions()
     const baselineId = list[list.length - 1].id
     const restored = await restoreRevision({
-      history, contentRoot, revisionId: baselineId,
-      author: 'alice', message: 'Undo typo fix',
+      history,
+      contentRoot,
+      revisionId: baselineId,
+      author: 'alice',
+      message: 'Undo typo fix',
     })
     expect(restored.author).toBe('alice')
     expect(restored.message).toBe('Undo typo fix')
@@ -158,11 +203,19 @@ describe('restoreRevision', () => {
     const history = createHistoryProvider({ storage })
     const contentRoot = createContentRoot(storage)
 
-    const firstSave = await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'home-v1' }] })
+    const firstSave = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'home-v1' }],
+    })
     storage.seed({ 'pages/home/page.json': 'home-v2' })
-    await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'home-v2' }] })
+    await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'home-v2' }],
+    })
 
     // Instrument writeFile to count invocations during restore.
     const origWrite = storage.writeFile
@@ -188,8 +241,12 @@ describe('restoreRevision', () => {
     storage.seed({ 'pages/home/page.json': 'v1' })
     const history = createHistoryProvider({ storage })
     const contentRoot = createContentRoot(storage)
-    const head = await recordWrite({ history, contentRoot, operation: 'save',
-      items: [{ path: 'pages/home/page.json', content: 'v1' }] })
+    const head = await recordWrite({
+      history,
+      contentRoot,
+      operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'v1' }],
+    })
 
     // Restoring the current head is a valid no-op — content stays put
     // but history still appends a rollback revision (forward-only).

@@ -7,12 +7,7 @@ import { resolve } from 'node:path'
 import { DockerComposeEnvironment, type StartedDockerComposeEnvironment } from 'testcontainers'
 import { createFilesystemProvider, createS3Provider, createAzureBlobProvider, createContentRoot } from 'gazetta'
 import { publishItems, resolveDependencies } from 'gazetta'
-import {
-  publishPageRendered,
-  publishFragmentRendered,
-  publishSiteManifest,
-  publishFragmentIndex,
-} from 'gazetta'
+import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } from 'gazetta'
 import { runProviderConformance } from './_helpers/provider-conformance.js'
 
 const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
@@ -117,7 +112,7 @@ describe('Azure Blob publish (Azurite)', () => {
 
   it('reads back published content', async () => {
     const content = await blobProvider.readFile('pages/home/page.json')
-    expect(content).toContain('"template"')  // JSON manifest
+    expect(content).toContain('"template"') // JSON manifest
   })
 
   it('lists published files', async () => {
@@ -154,7 +149,13 @@ describe('Rendered publish (MinIO)', () => {
 
   it('publishes a page as HTML with ESI placeholders', async () => {
     await publishFragmentRendered('footer', createContentRoot(source, starterDir), target, templatesDir)
-    const result = await publishPageRendered('home', createContentRoot(source, starterDir), target, undefined, templatesDir)
+    const result = await publishPageRendered(
+      'home',
+      createContentRoot(source, starterDir),
+      target,
+      undefined,
+      templatesDir,
+    )
     expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
     const html = await target.readFile('pages/home/index.html')
@@ -198,15 +199,20 @@ describe('Edge composition caching (MinIO)', () => {
 
     app = new Hono()
 
-    app.post('/purge/all', () => { cache.clear(); return new Response(JSON.stringify({ purged: 'all' })) })
-    app.post('/purge/urls', async (c) => {
-      const { urls } = await c.req.json() as { urls: string[] }
+    app.post('/purge/all', () => {
+      cache.clear()
+      return new Response(JSON.stringify({ purged: 'all' }))
+    })
+    app.post('/purge/urls', async c => {
+      const { urls } = (await c.req.json()) as { urls: string[] }
       let purged = 0
-      for (const url of urls) { if (cache.delete(url)) purged++ }
+      for (const url of urls) {
+        if (cache.delete(url)) purged++
+      }
       return c.json({ purged })
     })
 
-    app.get('*', async (c) => {
+    app.get('*', async c => {
       const path = new URL(c.req.url).pathname
       const hit = cache.get(path)
       if (hit && Date.now() - hit.at < TTL) {
@@ -216,7 +222,11 @@ describe('Edge composition caching (MinIO)', () => {
       // Find page by URL convention
       const pagePath = path === '/' ? 'pages/home/index.html' : `pages${path}/index.html`
       let pageHtml: string
-      try { pageHtml = await storage.readFile(pagePath) } catch { return c.html('404', 404) }
+      try {
+        pageHtml = await storage.readFile(pagePath)
+      } catch {
+        return c.html('404', 404)
+      }
 
       // ESI assembly: collect esi-head tags, read fragments, replace
       const esiHeadRegex = /<!--esi-head:(\/[^>]+)-->/g
@@ -230,19 +240,30 @@ describe('Edge composition caching (MinIO)', () => {
       for (const fp of fragmentPaths) {
         try {
           const fragHtml = await storage.readFile(fp.slice(1))
-          const hs = fragHtml.indexOf('<head>'), he = fragHtml.indexOf('</head>')
+          const hs = fragHtml.indexOf('<head>'),
+            he = fragHtml.indexOf('</head>')
           if (hs !== -1 && he !== -1) {
-            fragments.set(fp, { head: fragHtml.slice(hs + 6, he).trim(), body: (fragHtml.slice(0, hs) + fragHtml.slice(he + 7)).trim() })
+            fragments.set(fp, {
+              head: fragHtml.slice(hs + 6, he).trim(),
+              body: (fragHtml.slice(0, hs) + fragHtml.slice(he + 7)).trim(),
+            })
           } else {
             fragments.set(fp, { head: '', body: fragHtml })
           }
-        } catch { fragments.set(fp, { head: '', body: `<!-- not found: ${fp} -->` }) }
+        } catch {
+          fragments.set(fp, { head: '', body: `<!-- not found: ${fp} -->` })
+        }
       }
 
       const headLines = new Set<string>()
       let html = pageHtml.replace(/<!--esi-head:(\/[^>]+)-->/g, (_m, p: string) => {
         const frag = fragments.get(p)
-        if (frag?.head) for (const line of frag.head.split('\n').map((l: string) => l.trim()).filter(Boolean)) headLines.add(line)
+        if (frag?.head)
+          for (const line of frag.head
+            .split('\n')
+            .map((l: string) => l.trim())
+            .filter(Boolean))
+            headLines.add(line)
         return ''
       })
       if (headLines.size > 0) html = html.replace('</head>', `  ${[...headLines].join('\n  ')}\n</head>`)

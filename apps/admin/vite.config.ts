@@ -12,11 +12,21 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/vue/') || id.includes('node_modules/vue-router/') || id.includes('node_modules/pinia/')) return 'vendor-vue'
+          if (
+            id.includes('node_modules/vue/') ||
+            id.includes('node_modules/vue-router/') ||
+            id.includes('node_modules/pinia/')
+          )
+            return 'vendor-vue'
           if (id.includes('node_modules/primevue/') || id.includes('node_modules/@primevue/')) return 'vendor-primevue'
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'vendor-react'
           if (id.includes('node_modules/@rjsf/') || id.includes('node_modules/ajv')) return 'vendor-rjsf'
-          if (id.includes('node_modules/@tiptap/') || id.includes('node_modules/prosemirror') || id.includes('node_modules/@prosemirror/')) return 'vendor-tiptap'
+          if (
+            id.includes('node_modules/@tiptap/') ||
+            id.includes('node_modules/prosemirror') ||
+            id.includes('node_modules/@prosemirror/')
+          )
+            return 'vendor-tiptap'
         },
       },
     },

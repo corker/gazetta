@@ -5,7 +5,7 @@ import type { SourceContextResolver } from '../source-context.js'
 export function siteRoutes(resolve: SourceContextResolver) {
   const app = new Hono()
 
-  app.get('/api/site', async (c) => {
+  app.get('/api/site', async c => {
     const source = await resolve(c.req.query('target'))
     // Empty target (no site.yaml yet — e.g. a never-published staging
     // browsed via ?target=staging) returns a minimal manifest so the

@@ -19,8 +19,14 @@ const template: TemplateFunction<Content> = ({ content, children = [] }) => {
 .card-grid-heading { font-size: 1.75rem; text-align: center; margin-bottom: 2rem; }
 .card-grid-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(${minWidth}px, 1fr)); gap: 1.5rem; }
 ${children.map(c => c.css).join('\n')}`,
-    js: children.map(c => c.js).filter(Boolean).join('\n'),
-    head: children.map(c => c.head).filter(Boolean).join('\n'),
+    js: children
+      .map(c => c.js)
+      .filter(Boolean)
+      .join('\n'),
+    head: children
+      .map(c => c.head)
+      .filter(Boolean)
+      .join('\n'),
   }
 }
 

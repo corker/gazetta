@@ -108,5 +108,18 @@ export const useSelectionStore = defineStore('selection', () => {
     }
   }
 
-  return { selection, type, name, detail, previewRoute, fragmentHostPage, staticPages, selectPage, selectFragment, setFragmentHostPage, reload, updateComponents }
+  return {
+    selection,
+    type,
+    name,
+    detail,
+    previewRoute,
+    fragmentHostPage,
+    staticPages,
+    selectPage,
+    selectFragment,
+    setFragmentHostPage,
+    reload,
+    updateComponents,
+  }
 })

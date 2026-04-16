@@ -23,8 +23,14 @@ const template: TemplateFunction<Content> = ({ content, children = [] }) => {
 .two-col-main { flex: 1; min-width: 0; }
 @media (max-width: 768px) { .two-col { flex-direction: column !important; } .two-col-sidebar { flex: none; } }
 ${children.map(c => c.css).join('\n')}`,
-    js: children.map(c => c.js).filter(Boolean).join('\n'),
-    head: children.map(c => c.head).filter(Boolean).join('\n'),
+    js: children
+      .map(c => c.js)
+      .filter(Boolean)
+      .join('\n'),
+    head: children
+      .map(c => c.head)
+      .filter(Boolean)
+      .join('\n'),
   }
 }
 

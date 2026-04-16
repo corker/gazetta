@@ -18,9 +18,12 @@
 
 import type { StorageProvider } from './types.js'
 import {
-  parseSidecarName, sidecarNameFor,
-  parseUsesSidecarName, usesSidecarNameFor,
-  parseTemplateSidecarName, templateSidecarNameFor,
+  parseSidecarName,
+  sidecarNameFor,
+  parseUsesSidecarName,
+  usesSidecarNameFor,
+  parseTemplateSidecarName,
+  templateSidecarNameFor,
 } from './hash.js'
 import { mapLimit } from './concurrency.js'
 
@@ -40,16 +43,26 @@ export interface SidecarState {
  */
 export async function readSidecars(storage: StorageProvider, dir: string): Promise<SidecarState | null> {
   let entries
-  try { entries = await storage.readDir(dir) } catch { return null }
+  try {
+    entries = await storage.readDir(dir)
+  } catch {
+    return null
+  }
   let hash: string | null = null
   const uses: string[] = []
   let template: string | null = null
   for (const e of entries) {
     if (e.isDirectory) continue
     const h = parseSidecarName(e.name)
-    if (h) { hash = h; continue }
+    if (h) {
+      hash = h
+      continue
+    }
     const u = parseUsesSidecarName(e.name)
-    if (u) { uses.push(u); continue }
+    if (u) {
+      uses.push(u)
+      continue
+    }
     const t = parseTemplateSidecarName(e.name)
     if (t) template = t
   }
@@ -63,11 +76,7 @@ export async function readSidecars(storage: StorageProvider, dir: string): Promi
  * fragment-references removed from a page's components don't linger as
  * .uses-*.
  */
-export async function writeSidecars(
-  storage: StorageProvider,
-  dir: string,
-  state: SidecarState,
-): Promise<void> {
+export async function writeSidecars(storage: StorageProvider, dir: string, state: SidecarState): Promise<void> {
   const want = new Set<string>([sidecarNameFor(state.hash)])
   for (const frag of state.uses) want.add(usesSidecarNameFor(frag))
   if (state.template) want.add(templateSidecarNameFor(state.template))
@@ -78,10 +87,16 @@ export async function writeSidecars(
     for (const e of entries) {
       if (want.has(e.name)) continue
       if (parseSidecarName(e.name) || parseUsesSidecarName(e.name) || parseTemplateSidecarName(e.name)) {
-        try { await storage.rm(`${dir}/${e.name}`) } catch { /* already gone */ }
+        try {
+          await storage.rm(`${dir}/${e.name}`)
+        } catch {
+          /* already gone */
+        }
       }
     }
-  } catch { /* dir doesn't exist yet — mkdir below */ }
+  } catch {
+    /* dir doesn't exist yet — mkdir below */
+  }
   await storage.mkdir(dir)
   // Parallel tiny writes; each is a zero-byte file.
   await Promise.all([...want].map(name => storage.writeFile(`${dir}/${name}`, '')))
@@ -96,20 +111,21 @@ export async function writeSidecars(
  * without a .hash sidecar are skipped. `writeSidecars` always writes all
  * three kinds together, so partial state doesn't occur in real operation.
  */
-export async function listSidecars(
-  storage: StorageProvider,
-  rootDir: string,
-): Promise<Map<string, SidecarState>> {
+export async function listSidecars(storage: StorageProvider, rootDir: string): Promise<Map<string, SidecarState>> {
   const out = new Map<string, SidecarState>()
   async function walk(dir: string, relative: string): Promise<void> {
     let entries
-    try { entries = await storage.readDir(dir) } catch { return }
+    try {
+      entries = await storage.readDir(dir)
+    } catch {
+      return
+    }
     if (relative) {
       const state = await readSidecars(storage, dir).catch(() => null)
       if (state) out.set(relative, state)
     }
     const subdirs = entries.filter(e => e.isDirectory)
-    await mapLimit(subdirs, (e) => walk(`${dir}/${e.name}`, relative ? `${relative}/${e.name}` : e.name))
+    await mapLimit(subdirs, e => walk(`${dir}/${e.name}`, relative ? `${relative}/${e.name}` : e.name))
   }
   await walk(rootDir, '')
   return out

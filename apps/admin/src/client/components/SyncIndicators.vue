@@ -86,14 +86,13 @@ function groupStatusClass(group: TargetGroup): string {
 // Render shape: flat singles when the fleet is small, grouped when 4+.
 // Passes the TOTAL target count (not just non-active) so sync chips
 // match the rest of the UI's grouping decision.
-const entries = computed(() =>
-  groupedEntries(sync.nonActiveTargets, activeTarget.targets.length),
-)
+const entries = computed(() => groupedEntries(sync.nonActiveTargets, activeTarget.targets.length))
 
 const expandedGroups = ref(new Set<string>())
 function toggleGroup(env: string) {
   const next = new Set(expandedGroups.value)
-  if (next.has(env)) next.delete(env); else next.add(env)
+  if (next.has(env)) next.delete(env)
+  else next.add(env)
   expandedGroups.value = next
 }
 

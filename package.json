@@ -20,10 +20,13 @@
     "deploy:site": "npm run build && cd sites/gazetta.studio/worker && npm run seed && npm run deploy",
     "dev:admin": "npm run build && npm run dev:api -w @gazetta/admin & npm run dev:ui -w @gazetta/admin",
     "test": "npm run test --workspaces --if-present",
-    "smoke": "bash scripts/smoke-publish.sh"
+    "smoke": "bash scripts/smoke-publish.sh",
+    "format": "biome format --write .",
+    "format:check": "biome format ."
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
+    "@biomejs/biome": "^2.4.12",
     "@playwright/test": "^1.59.1",
     "playwright": "^1.59.1",
     "react": "^19.2.0",

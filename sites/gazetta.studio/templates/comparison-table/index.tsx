@@ -4,11 +4,15 @@ import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
 
 export const schema = z.object({
-  rows: z.array(z.object({
-    label: z.string(),
-    traditional: z.string(),
-    gazetta: z.string(),
-  })).describe('Comparison rows'),
+  rows: z
+    .array(
+      z.object({
+        label: z.string(),
+        traditional: z.string(),
+        gazetta: z.string(),
+      }),
+    )
+    .describe('Comparison rows'),
 })
 
 type Content = z.infer<typeof schema>

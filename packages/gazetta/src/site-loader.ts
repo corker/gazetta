@@ -34,9 +34,9 @@ async function discoverPages(
   storage: StorageProvider,
   pagesDir: string,
   pages: Map<string, PageManifest & { dir: string }> = new Map(),
-  prefix = ''
+  prefix = '',
 ): Promise<Map<string, PageManifest & { dir: string }>> {
-  if (!await storage.exists(pagesDir)) {
+  if (!(await storage.exists(pagesDir))) {
     if (!prefix) console.warn(`  Warning: pages/ directory not found at ${pagesDir}`)
     return pages
   }
@@ -46,7 +46,7 @@ async function discoverPages(
 
   // Parallelize manifest reads — sequential is untenable at 10k pages.
   // Bounded concurrency protects the fd table and cloud rate limits.
-  await mapLimit(subdirs, async (entry) => {
+  await mapLimit(subdirs, async entry => {
     const dir = join(pagesDir, entry.name)
     const name = prefix ? `${prefix}/${entry.name}` : entry.name
     const manifestPath = join(dir, 'page.json')
@@ -71,10 +71,10 @@ async function discoverPages(
 
 async function discoverFragments(
   storage: StorageProvider,
-  fragmentsDir: string
+  fragmentsDir: string,
 ): Promise<Map<string, FragmentManifest & { dir: string }>> {
   const fragments = new Map<string, FragmentManifest & { dir: string }>()
-  if (!await storage.exists(fragmentsDir)) {
+  if (!(await storage.exists(fragmentsDir))) {
     console.warn(`  Warning: fragments/ directory not found at ${fragmentsDir}`)
     return fragments
   }
@@ -82,10 +82,10 @@ async function discoverFragments(
   const entries = await storage.readDir(fragmentsDir)
   const subdirs = entries.filter(e => e.isDirectory)
 
-  await mapLimit(subdirs, async (entry) => {
+  await mapLimit(subdirs, async entry => {
     const fragDir = join(fragmentsDir, entry.name)
     const manifestPath = join(fragDir, 'fragment.json')
-    if (!await storage.exists(manifestPath)) return
+    if (!(await storage.exists(manifestPath))) return
     try {
       const manifest = await parseFragmentManifest(storage, manifestPath)
       fragments.set(entry.name, { ...manifest, dir: fragDir })
@@ -151,7 +151,7 @@ export async function loadSite(opts: LoadSiteOptions): Promise<Site> {
     manifest = opts.manifest
   } else {
     const siteYamlPath = contentRoot.path('site.yaml')
-    if (!await contentRoot.storage.exists(siteYamlPath)) {
+    if (!(await contentRoot.storage.exists(siteYamlPath))) {
       throw new Error(`No site.yaml found at ${siteYamlPath}. Is this a Gazetta site directory?`)
     }
     manifest = await parseSiteManifest(contentRoot.storage, siteYamlPath)
@@ -164,8 +164,13 @@ export async function loadSite(opts: LoadSiteOptions): Promise<Site> {
   }
 
   return {
-    manifest, pages, fragments, contentRoot,
+    manifest,
+    pages,
+    fragments,
+    contentRoot,
     // backward-compat fields
-    siteDir, templatesDir, storage: contentRoot.storage,
+    siteDir,
+    templatesDir,
+    storage: contentRoot.storage,
   }
 }

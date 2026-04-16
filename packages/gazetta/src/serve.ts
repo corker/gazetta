@@ -21,18 +21,18 @@ export function createServer(options: ServeOptions) {
   const app = new Hono()
 
   app.use(logger())
-  app.get('/health', (c) => c.json({ ok: true }))
+  app.get('/health', c => c.json({ ok: true }))
 
   if (type === 'static') {
     // Static mode — serve pre-rendered HTML files directly
-    app.get('*', async (c) => {
+    app.get('*', async c => {
       const requestPath = new URL(c.req.url).pathname
       const filePath = requestPath === '/' ? 'index.html' : `${requestPath.replace(/\/$/, '')}/index.html`
       try {
         const html = await storage.readFile(filePath)
         const etag = `"${createHash('sha256').update(html).digest('hex').slice(0, 16)}"`
         if (c.req.header('If-None-Match') === etag) return new Response(null, { status: 304, headers: { ETag: etag } })
-        return c.html(html, 200, { 'Cache-Control': 'public, max-age=0, must-revalidate', 'ETag': etag })
+        return c.html(html, 200, { 'Cache-Control': 'public, max-age=0, must-revalidate', ETag: etag })
       } catch {
         // Try without /index.html (bare file)
         try {
@@ -49,11 +49,11 @@ export function createServer(options: ServeOptions) {
   // ESI mode — assemble fragments at request time
 
   // Hashed CSS/JS — immutable cache
-  app.get('/pages/*', async (c) => serveAsset(c, storage))
-  app.get('/fragments/*', async (c) => serveAsset(c, storage))
+  app.get('/pages/*', async c => serveAsset(c, storage))
+  app.get('/fragments/*', async c => serveAsset(c, storage))
 
   // Page serving with ESI assembly
-  app.get('*', async (c) => {
+  app.get('*', async c => {
     const requestPath = new URL(c.req.url).pathname
 
     const pageHtml = await findPage(storage, requestPath)
@@ -64,10 +64,13 @@ export function createServer(options: ServeOptions) {
         const { html: raw404 } = parseCacheComment(notFoundHtml)
         const fragPaths = findEsiPaths(raw404)
         const fragEntries = await Promise.all(
-          fragPaths.map(async (p) => {
-            try { return [p, splitFragment(await storage.readFile(p.slice(1)))] as const }
-            catch { return [p, { head: '', body: '' }] as const }
-          })
+          fragPaths.map(async p => {
+            try {
+              return [p, splitFragment(await storage.readFile(p.slice(1)))] as const
+            } catch {
+              return [p, { head: '', body: '' }] as const
+            }
+          }),
         )
         return c.html(assembleEsi(raw404, new Map(fragEntries)), 404)
       }
@@ -79,14 +82,14 @@ export function createServer(options: ServeOptions) {
     // Fetch all fragments in parallel
     const fragmentPaths = findEsiPaths(rawHtml)
     const fragmentEntries = await Promise.all(
-      fragmentPaths.map(async (path) => {
+      fragmentPaths.map(async path => {
         try {
           const html = await storage.readFile(path.slice(1))
           return [path, splitFragment(html)] as const
         } catch {
           return [path, { head: '', body: `<!-- fragment not found: ${path} -->` }] as const
         }
-      })
+      }),
     )
 
     const html = assembleEsi(rawHtml, new Map(fragmentEntries))
@@ -98,7 +101,7 @@ export function createServer(options: ServeOptions) {
 
     return c.html(html, 200, {
       'Cache-Control': `public, max-age=${browser}, s-maxage=${edge}`,
-      'ETag': etag,
+      ETag: etag,
     })
   })
 
@@ -127,7 +130,9 @@ async function findPage(storage: StorageProvider, requestPath: string): Promise<
 
   try {
     return await storage.readFile(pagePath)
-  } catch { /* not found */ }
+  } catch {
+    /* not found */
+  }
 
   // Dynamic segments — list parent dir, find [param] entries
   const parts = requestPath.split('/').filter(Boolean)
@@ -142,10 +147,14 @@ async function findPage(storage: StorageProvider, requestPath: string): Promise<
           dynamicParts[i] = entry.name
           try {
             return await storage.readFile(`pages/${dynamicParts.join('/')}/index.html`)
-          } catch { /* not found */ }
+          } catch {
+            /* not found */
+          }
         }
       }
-    } catch { /* dir not found */ }
+    } catch {
+      /* dir not found */
+    }
   }
 
   return null

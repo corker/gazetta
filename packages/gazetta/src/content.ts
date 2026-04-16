@@ -7,7 +7,7 @@ import { z } from 'zod'
  */
 export function processContent(
   content: Record<string, unknown> | undefined,
-  schema: unknown
+  schema: unknown,
 ): Record<string, unknown> | undefined {
   if (!content || !schema) return content
 

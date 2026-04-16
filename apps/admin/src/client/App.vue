@@ -37,20 +37,26 @@ syncStatus.configure({
 // Reload site + content when the active target switches. Invalidate the
 // previously-active target's sync status (it'll be recomputed next refresh)
 // and kick off a new sync refresh for the now-non-active targets.
-watch(() => activeTarget.activeTargetName, (name, prev) => {
-  if (name && prev && name !== prev) {
-    site.reload()
-    // The new active target no longer needs a sync status; the previously
-    // active one does (from source perspective). Easiest: clear + refresh.
-    syncStatus.clear()
-    syncStatus.refreshAll()
-  }
-})
+watch(
+  () => activeTarget.activeTargetName,
+  (name, prev) => {
+    if (name && prev && name !== prev) {
+      site.reload()
+      // The new active target no longer needs a sync status; the previously
+      // active one does (from source perspective). Easiest: clear + refresh.
+      syncStatus.clear()
+      syncStatus.refreshAll()
+    }
+  },
+)
 
 // After the target list loads for the first time, run the initial compare.
-watch(() => activeTarget.targets.length, (n) => {
-  if (n > 1) syncStatus.refreshAll()
-})
+watch(
+  () => activeTarget.targets.length,
+  n => {
+    if (n > 1) syncStatus.refreshAll()
+  },
+)
 
 onMounted(() => {
   theme.init()

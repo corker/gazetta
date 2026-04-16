@@ -2,11 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { writeFile, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
-import {
-  parseSiteManifest,
-  parsePageManifest,
-  parseFragmentManifest,
-} from '../src/manifest.js'
+import { parseSiteManifest, parsePageManifest, parseFragmentManifest } from '../src/manifest.js'
 import { tempDir } from './_helpers/temp.js'
 
 const testDir = tempDir('manifest-test')
@@ -50,15 +46,14 @@ describe('parseSiteManifest', () => {
 
 describe('parsePageManifest', () => {
   it('parses a valid page.json', async () => {
-    const path = await writeTestFile('page.json', JSON.stringify({
-      template: 'page-default',
-      content: { title: 'Home' },
-      components: [
-        '@header',
-        { name: 'hero', template: 'hero', content: { title: 'Welcome' } },
-        '@footer',
-      ],
-    }))
+    const path = await writeTestFile(
+      'page.json',
+      JSON.stringify({
+        template: 'page-default',
+        content: { title: 'Home' },
+        components: ['@header', { name: 'hero', template: 'hero', content: { title: 'Welcome' } }, '@footer'],
+      }),
+    )
     const result = await parsePageManifest(storage, path)
     expect(result.template).toBe('page-default')
     expect(result.content?.title).toBe('Home')
@@ -69,20 +64,23 @@ describe('parsePageManifest', () => {
   })
 
   it('parses nested components', async () => {
-    const path = await writeTestFile('page.json', JSON.stringify({
-      template: 'page-default',
-      components: [
-        {
-          name: 'features',
-          template: 'features-grid',
-          content: { heading: 'Why?' },
-          components: [
-            { name: 'fast', template: 'feature-card', content: { title: 'Fast' } },
-            { name: 'composable', template: 'feature-card', content: { title: 'Composable' } },
-          ],
-        },
-      ],
-    }))
+    const path = await writeTestFile(
+      'page.json',
+      JSON.stringify({
+        template: 'page-default',
+        components: [
+          {
+            name: 'features',
+            template: 'features-grid',
+            content: { heading: 'Why?' },
+            components: [
+              { name: 'fast', template: 'feature-card', content: { title: 'Fast' } },
+              { name: 'composable', template: 'feature-card', content: { title: 'Composable' } },
+            ],
+          },
+        ],
+      }),
+    )
     const result = await parsePageManifest(storage, path)
     const features = result.components![0]
     expect(typeof features).toBe('object')
@@ -117,23 +115,29 @@ describe('parsePageManifest', () => {
 
 describe('parseFragmentManifest', () => {
   it('parses a valid fragment.json', async () => {
-    const path = await writeTestFile('fragment.json', JSON.stringify({
-      template: 'header-layout',
-      components: [
-        { name: 'logo', template: 'logo', content: { brand: 'Gazetta' } },
-        { name: 'nav', template: 'nav', content: { links: [] } },
-      ],
-    }))
+    const path = await writeTestFile(
+      'fragment.json',
+      JSON.stringify({
+        template: 'header-layout',
+        components: [
+          { name: 'logo', template: 'logo', content: { brand: 'Gazetta' } },
+          { name: 'nav', template: 'nav', content: { links: [] } },
+        ],
+      }),
+    )
     const result = await parseFragmentManifest(storage, path)
     expect(result.template).toBe('header-layout')
     expect(result.components).toHaveLength(2)
   })
 
   it('parses fragment with fragment references', async () => {
-    const path = await writeTestFile('fragment.json', JSON.stringify({
-      template: 'header-layout',
-      components: ['@logo', { name: 'nav', template: 'nav' }],
-    }))
+    const path = await writeTestFile(
+      'fragment.json',
+      JSON.stringify({
+        template: 'header-layout',
+        components: ['@logo', { name: 'nav', template: 'nav' }],
+      }),
+    )
     const result = await parseFragmentManifest(storage, path)
     expect(result.components![0]).toBe('@logo')
   })
@@ -144,10 +148,13 @@ describe('parseFragmentManifest', () => {
   })
 
   it('handles fragment with content', async () => {
-    const path = await writeTestFile('fragment.json', JSON.stringify({
-      template: 'hero',
-      content: { title: 'Hello' },
-    }))
+    const path = await writeTestFile(
+      'fragment.json',
+      JSON.stringify({
+        template: 'hero',
+        content: { title: 'Hello' },
+      }),
+    )
     const result = await parseFragmentManifest(storage, path)
     expect(result.content?.title).toBe('Hello')
   })

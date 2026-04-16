@@ -58,10 +58,12 @@ export function createS3Provider(options: S3ProviderOptions): StorageProvider & 
       const prefixWithSlash = prefix ? `${prefix}/` : ''
       const entries = new Map<string, boolean>()
 
-      const response = await client.send(new ListObjectsV2Command({
-        Bucket: bucket,
-        Prefix: prefixWithSlash,
-      }))
+      const response = await client.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefixWithSlash,
+        }),
+      )
 
       for (const obj of response.Contents ?? []) {
         const relativeName = obj.Key!.slice(prefixWithSlash.length)
@@ -81,22 +83,26 @@ export function createS3Provider(options: S3ProviderOptions): StorageProvider & 
         return true
       } catch {
         // Check if it's a "directory"
-        const response = await client.send(new ListObjectsV2Command({
-          Bucket: bucket,
-          Prefix: normalizePath(path) + '/',
-          MaxKeys: 1,
-        }))
+        const response = await client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: normalizePath(path) + '/',
+            MaxKeys: 1,
+          }),
+        )
         return (response.Contents?.length ?? 0) > 0
       }
     },
 
     async writeFile(path: string, content: string): Promise<void> {
-      await client.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: normalizePath(path),
-        Body: content,
-        ContentType: 'text/plain; charset=utf-8',
-      }))
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: normalizePath(path),
+          Body: content,
+          ContentType: 'text/plain; charset=utf-8',
+        }),
+      )
     },
 
     async mkdir(_path: string): Promise<void> {
@@ -108,7 +114,9 @@ export function createS3Provider(options: S3ProviderOptions): StorageProvider & 
       // Try deleting as a single object first
       try {
         await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: prefix }))
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       // Delete all objects with this prefix
       const response = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }))
       for (const obj of response.Contents ?? []) {

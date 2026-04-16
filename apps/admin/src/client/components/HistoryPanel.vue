@@ -47,7 +47,10 @@ const error = ref<string | null>(null)
 const restoringId = ref<string | null>(null)
 
 async function load() {
-  if (!targetName.value) { revisions.value = []; return }
+  if (!targetName.value) {
+    revisions.value = []
+    return
+  }
   loading.value = true
   error.value = null
   try {
@@ -62,9 +65,16 @@ async function load() {
 }
 
 // Reload whenever the panel opens OR the target changes while open.
-watch(() => [props.visible, targetName.value], ([v]) => { if (v) load() })
+watch(
+  () => [props.visible, targetName.value],
+  ([v]) => {
+    if (v) load()
+  },
+)
 
-function close() { emit('update:visible', false) }
+function close() {
+  emit('update:visible', false)
+}
 
 async function onRestore(id: string) {
   if (!targetName.value || restoringId.value) return

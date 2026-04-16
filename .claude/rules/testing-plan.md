@@ -52,44 +52,32 @@ all `*.test.ts`).
 
 ---
 
-#### ☐ 1.2 Direct unit tests for sidecars.ts
+#### ✓ 1.2 Direct unit tests for sidecars.ts
 
-[packages/gazetta/src/sidecars.ts](../../packages/gazetta/src/sidecars.ts) — central
-content-addressing I/O module, no dedicated test file (verified: grep for `readSidecars`,
-`listSidecars` in tests returns zero matches).
-
-**Stack:** in-memory `Map<string, string>`-backed `StorageProvider` fake.
-
-**Assertions:**
-- `readSidecars` returns `null` for missing dir
-- Parses `.hash`, `.uses-`, `.tpl-` correctly
-- `listSidecars` handles empty dirs
-- Writes are idempotent
-
-**Estimate:** ~0.5 day.
+Landed in [sidecars.test.ts](../../packages/gazetta/tests/sidecars.test.ts) — 20 tests
+covering `readSidecars` (null on missing dir, full state with all three sidecar kinds,
+ignores unrelated files, decodes subfolder-qualified names), `writeSidecars`
+(idempotence, stale-sidecar cleanup, leaves non-sidecar files alone), `listSidecars`
+(empty dir, recursion, skips sidecar-less subdirs), and `collectFragmentRefs`
+(recursion + deduplication). In-memory `Map<string, string>`-backed StorageProvider.
 
 ---
 
-#### ☐ 1.3 Property-based tests for hash.ts helpers
+#### ✓ 1.3 Property-based tests for hash.ts helpers
 
-Missing coverage:
-- `encodeRefName` / `decodeRefName`
-- `usesSidecarNameFor` / `parseUsesSidecarName`
-- `templateSidecarNameFor` / `parseTemplateSidecarName`
+Landed in [hash-sidecar-names.test.ts](../../packages/gazetta/tests/hash-sidecar-names.test.ts) —
+12 tests covering encode/decode round-trip, each sidecar-name codec round-trip, and
+kind-disambiguation (hash/uses/tpl regexes never collide). PBT via `fast-check`.
 
-(Verified: grep across all `*.test.ts` returns zero matches.)
+**Real bug caught:** `encodeRefName('foo__bar')` wasn't invertible — any input
+containing `__` produced a filename that `decodeRefName` misread as a subfolder
+path (`foo__bar` → encoded as `foo__bar` → decoded as `foo/bar`, silent misroute
+on sidecar reads). Fixed by rejecting `__` at encode time with a clear error
+(operations.md's lowercase-kebab-case + `/` for subfolders is the documented
+convention; `_` isn't part of it, so the rejection doesn't break valid inputs).
 
-**Stack:** `fast-check`.
-
-**Properties:**
-- `decodeRefName(encodeRefName(x)) === x` for arbitrary strings
-- Parse/generate round-trips for each sidecar kind
-- Non-collision between the three sidecar regexes
-
-**Skip:** `hashManifest` key-order invariance — already example-tested at
+**Skipped:** `hashManifest` key-order invariance — already example-tested at
 [hash.test.ts:55-68](../../packages/gazetta/tests/hash.test.ts#L55-L68).
-
-**Estimate:** ~0.5 day.
 
 ---
 
@@ -570,7 +558,7 @@ responses. Opt out with `GAZETTA_QUIET=1`.
 
 | Week | Coverage work | E2E work |
 |------|---------------|----------|
-| 1 | Priority 1.1-1.3 in parallel (Vue tests, sidecars, PBT) | Phase 1 (file moves, no-risk) |
+| 1 | ✓ Priority 1.2-1.3 (sidecars, PBT) · ☐ Priority 1.1 (Vue tests) | Phase 1 (file moves, no-risk) |
 | 2 | Priority 1.4 (fault injection) | Phase 2 (POMs) |
 | 3 | Priority 2.1 (Azure CRUD parity) | Phase 3 (scenarios) |
 | 4 | Priority 2.2-2.3 (documented behaviors, a11y) | Phase 4 (matrices) |

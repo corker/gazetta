@@ -89,7 +89,7 @@ function scanOne(entry: string, projectRoot: string): Promise<WorkerOutput> {
       w.terminate()
       resolveP(msg)
     })
-    w.once('error', (err) => {
+    w.once('error', err => {
       w.terminate()
       rejectP(err)
     })
@@ -106,29 +106,24 @@ function scanOne(entry: string, projectRoot: string): Promise<WorkerOutput> {
  *
  * `projectRoot` makes hashes stable across machines (paths are relative to it).
  */
-export async function scanTemplates(
-  templatesDir: string,
-  projectRoot: string
-): Promise<TemplateInfo[]> {
+export async function scanTemplates(templatesDir: string, projectRoot: string): Promise<TemplateInfo[]> {
   const templates = await discoverTemplates(templatesDir)
-  return Promise.all(templates.map(async t => {
-    try {
-      const out = await scanOne(t.entry, projectRoot)
-      return { name: t.name, ...out }
-    } catch (err) {
-      return { name: t.name, hash: '', valid: false, errors: [`worker error: ${(err as Error).message}`], files: [] }
-    }
-  }))
+  return Promise.all(
+    templates.map(async t => {
+      try {
+        const out = await scanOne(t.entry, projectRoot)
+        return { name: t.name, ...out }
+      } catch (err) {
+        return { name: t.name, hash: '', valid: false, errors: [`worker error: ${(err as Error).message}`], files: [] }
+      }
+    }),
+  )
 }
 
 /**
  * Re-scan a single template by name. Useful for the file watcher.
  */
-export async function scanTemplate(
-  templatesDir: string,
-  projectRoot: string,
-  name: string
-): Promise<TemplateInfo> {
+export async function scanTemplate(templatesDir: string, projectRoot: string, name: string): Promise<TemplateInfo> {
   const dir = join(templatesDir, name)
   const entry = await findEntry(dir)
   if (!entry) {

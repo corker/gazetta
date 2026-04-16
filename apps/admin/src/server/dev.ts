@@ -14,7 +14,7 @@ const { source, manifest, targetConfigs } = await buildSourceContext({ projectSi
 
 const app = createAdminApp({
   source,
-  siteDir,  // used for templatesDir/adminDir defaults
+  siteDir, // used for templatesDir/adminDir defaults
   targetConfigs,
 })
 

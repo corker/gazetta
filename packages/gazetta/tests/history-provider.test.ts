@@ -38,7 +38,9 @@ function memoryStorage(): StorageProvider & { dump(): Map<string, string> } {
       }
       return [...children].map(name => ({ name, isDirectory: false, isFile: true }))
     },
-    async mkdir(): Promise<void> { /* no-op; memoryStorage is flat */ },
+    async mkdir(): Promise<void> {
+      /* no-op; memoryStorage is flat */
+    },
     async rm(path: string): Promise<void> {
       files.delete(path)
       // Also handle dir deletes — remove everything under the prefix.
@@ -47,14 +49,13 @@ function memoryStorage(): StorageProvider & { dump(): Map<string, string> } {
         if (p.startsWith(prefix)) files.delete(p)
       }
     },
-    dump() { return files },
+    dump() {
+      return files
+    },
   }
 }
 
-function input(
-  items: Record<string, string>,
-  overrides: Partial<RevisionInput> = {},
-): RevisionInput {
+function input(items: Record<string, string>, overrides: Partial<RevisionInput> = {}): RevisionInput {
   return {
     operation: 'save',
     items: new Map(Object.entries(items)),
@@ -67,7 +68,9 @@ const ID_SHAPE = /^rev-\d{10,}(?:-\d+)?$/
 
 describe('createHistoryProvider', () => {
   let storage: ReturnType<typeof memoryStorage>
-  beforeEach(() => { storage = memoryStorage() })
+  beforeEach(() => {
+    storage = memoryStorage()
+  })
 
   describe('recordRevision', () => {
     it('assigns timestamp-based ids (rev-<unixMillis>[-seq])', async () => {
@@ -108,10 +111,9 @@ describe('createHistoryProvider', () => {
 
     it('returns the recorded Revision metadata (without the snapshot)', async () => {
       const h = createHistoryProvider({ storage })
-      const rev = await h.recordRevision(input(
-        { 'pages/home': 'a' },
-        { operation: 'publish', source: 'local', message: 'hotfix' },
-      ))
+      const rev = await h.recordRevision(
+        input({ 'pages/home': 'a' }, { operation: 'publish', source: 'local', message: 'hotfix' }),
+      )
       expect(rev.id).toMatch(ID_SHAPE)
       expect(rev).toMatchObject({
         operation: 'publish',
@@ -126,9 +128,7 @@ describe('createHistoryProvider', () => {
     it('sorts item paths deterministically in the manifest', async () => {
       const h = createHistoryProvider({ storage })
       const r = await h.recordRevision(input({ 'pages/z': 'z', 'pages/a': 'a', 'pages/m': 'm' }))
-      const manifest = JSON.parse(
-        await storage.readFile(`.gazetta/history/revisions/${r.id}.json`),
-      )
+      const manifest = JSON.parse(await storage.readFile(`.gazetta/history/revisions/${r.id}.json`))
       expect(manifest.items).toEqual(['pages/a', 'pages/m', 'pages/z'])
       expect(Object.keys(manifest.snapshot)).toEqual(['pages/a', 'pages/m', 'pages/z'])
     })

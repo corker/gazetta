@@ -51,10 +51,13 @@ export interface SourceSidecarWriterOptions {
 }
 
 export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): SourceSidecarWriter {
-  const root: ContentRoot = opts.contentRoot
-    ?? (opts.storage && opts.siteDir !== undefined
+  const root: ContentRoot =
+    opts.contentRoot ??
+    (opts.storage && opts.siteDir !== undefined
       ? createContentRoot(opts.storage, opts.siteDir)
-      : (() => { throw new Error('createSourceSidecarWriter: pass `contentRoot` (or legacy `storage` + `siteDir`)') })())
+      : (() => {
+          throw new Error('createSourceSidecarWriter: pass `contentRoot` (or legacy `storage` + `siteDir`)')
+        })())
 
   let templateHashes: Promise<Map<string, string>> | null = null
   const getTemplateHashes = () => {
@@ -70,9 +73,7 @@ export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): Sou
 
   async function runBackfill(): Promise<void> {
     if (!opts.templatesDir) {
-      throw new Error(
-        'SourceSidecarWriter.ensureBackfilled requires `templatesDir` in options'
-      )
+      throw new Error('SourceSidecarWriter.ensureBackfilled requires `templatesDir` in options')
     }
     const site = await loadSite({ contentRoot: root, templatesDir: opts.templatesDir })
     const [pagesList, fragmentsList] = await Promise.all([
@@ -82,10 +83,13 @@ export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): Sou
     const missingPages = [...site.pages.keys()].filter(n => !pagesList.has(n))
     const missingFragments = [...site.fragments.keys()].filter(n => !fragmentsList.has(n))
     if (!missingPages.length && !missingFragments.length) return
-    await mapLimit([
-      ...missingPages.map(n => ({ kind: 'page' as const, name: n })),
-      ...missingFragments.map(n => ({ kind: 'fragment' as const, name: n })),
-    ], it => writer.writeFor(it.kind, it.name))
+    await mapLimit(
+      [
+        ...missingPages.map(n => ({ kind: 'page' as const, name: n })),
+        ...missingFragments.map(n => ({ kind: 'fragment' as const, name: n })),
+      ],
+      it => writer.writeFor(it.kind, it.name),
+    )
   }
 
   const writer: SourceSidecarWriter = {
@@ -112,7 +116,7 @@ export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): Sou
     },
     ensureBackfilled() {
       if (!backfillPromise) {
-        backfillPromise = runBackfill().catch((err) => {
+        backfillPromise = runBackfill().catch(err => {
           // Clear on failure so the next caller retries. Otherwise one
           // transient error would poison backfill for the process lifetime.
           backfillPromise = null

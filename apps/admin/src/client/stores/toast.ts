@@ -24,18 +24,27 @@ export const useToastStore = defineStore('toast', () => {
   let timer: ReturnType<typeof setTimeout> | null = null
 
   function dismiss() {
-    if (timer) { clearTimeout(timer); timer = null }
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
     current.value = null
   }
 
-  function show(message: string, opts?: {
-    type?: 'success' | 'error' | 'info'
-    link?: string
-    action?: ToastAction
-    duration?: number
-  }) {
+  function show(
+    message: string,
+    opts?: {
+      type?: 'success' | 'error' | 'info'
+      link?: string
+      action?: ToastAction
+      duration?: number
+    },
+  ) {
     const type = opts?.type ?? 'success'
-    if (timer) { clearTimeout(timer); timer = null }
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
     current.value = { message, type, link: opts?.link, action: opts?.action }
     // Errors stay until the user dismisses them — they need to be readable
     // long enough to act on. Successes auto-dismiss. Info is transient but
@@ -46,12 +55,13 @@ export const useToastStore = defineStore('toast', () => {
     // disappears.
     const explicit = opts?.duration
     const hasAction = !!opts?.action
-    const defaultDuration = type === 'error' ? 0
-      : type === 'info' ? 6000
-      : hasAction ? 6000
-      : 3000
+    const defaultDuration = type === 'error' ? 0 : type === 'info' ? 6000 : hasAction ? 6000 : 3000
     const duration = explicit ?? defaultDuration
-    if (duration > 0) timer = setTimeout(() => { current.value = null; timer = null }, duration)
+    if (duration > 0)
+      timer = setTimeout(() => {
+        current.value = null
+        timer = null
+      }, duration)
   }
 
   function showError(err: unknown, fallback: string) {

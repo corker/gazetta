@@ -39,10 +39,7 @@ export function findEsiPaths(html: string): string[] {
 }
 
 /** Assemble page HTML with fragment head and body content */
-export function assembleEsi(
-  pageHtml: string,
-  fragments: Map<string, { head: string; body: string }>
-): string {
+export function assembleEsi(pageHtml: string, fragments: Map<string, { head: string; body: string }>): string {
   const esiHeadRegex = /<!--esi-head:(\/[^>]+)-->/g
   const esiBodyRegex = /<!--esi:(\/[^>]+)-->/g
 
@@ -63,7 +60,10 @@ export function assembleEsi(
   for (const path of esiHeadOrder) {
     const frag = fragments.get(path)
     if (!frag?.head) continue
-    for (const line of frag.head.split('\n').map(l => l.trim()).filter(Boolean)) {
+    for (const line of frag.head
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean)) {
       if (seen.has(line)) continue
       seen.add(line)
       if (line.includes('rel="stylesheet"') || line.includes("rel='stylesheet'")) {

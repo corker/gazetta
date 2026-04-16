@@ -17,7 +17,13 @@ const templatesApi = useTemplatesApi()
 // ESC exits playground — matches edit mode + fullscreen pattern
 onKeyStroke('Escape', () => {
   const active = document.activeElement as HTMLElement | null
-  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
+  if (
+    active &&
+    (active.tagName === 'INPUT' ||
+      active.tagName === 'TEXTAREA' ||
+      active.tagName === 'SELECT' ||
+      active.isContentEditable)
+  ) {
     active.blur()
     return
   }
@@ -25,9 +31,23 @@ onKeyStroke('Escape', () => {
 })
 
 // --- Data ---
-interface TemplateItem { name: string; hasEditor: boolean }
-interface FieldItem { name: string; path: string }
-type SelectedEditor = { type: 'editor'; name: string; hasEditor: boolean; editorUrl?: string; fieldsBaseUrl?: string; schema: Record<string, unknown>; realContent?: Record<string, unknown> }
+interface TemplateItem {
+  name: string
+  hasEditor: boolean
+}
+interface FieldItem {
+  name: string
+  path: string
+}
+type SelectedEditor = {
+  type: 'editor'
+  name: string
+  hasEditor: boolean
+  editorUrl?: string
+  fieldsBaseUrl?: string
+  schema: Record<string, unknown>
+  realContent?: Record<string, unknown>
+}
 type SelectedField = { type: 'field'; name: string; fieldsBaseUrl: string }
 type Selected = SelectedEditor | SelectedField
 
@@ -57,7 +77,7 @@ async function loadSidebar() {
     const items: TemplateItem[] = []
     for (const t of tpl) {
       try {
-        const resp = await templatesApi.getTemplateSchema(t.name) as Record<string, unknown> & { hasEditor?: boolean }
+        const resp = (await templatesApi.getTemplateSchema(t.name)) as Record<string, unknown> & { hasEditor?: boolean }
         items.push({ name: t.name, hasEditor: !!resp.hasEditor })
       } catch {
         items.push({ name: t.name, hasEditor: false })
@@ -82,10 +102,13 @@ loadSidebar().then(() => {
 // --- Computed ---
 const customEditors = computed(() => templates.value.filter(t => t.hasEditor))
 const defaultEditors = computed(() => templates.value.filter(t => !t.hasEditor))
-const themeMode = computed<'dark' | 'light'>(() => theme.dark ? 'dark' : 'light')
+const themeMode = computed<'dark' | 'light'>(() => (theme.dark ? 'dark' : 'light'))
 const valueHtml = computed(() => {
-  try { return syntaxHighlight(currentValue.value) }
-  catch { return escapeHtml(String(currentValue.value)) }
+  try {
+    return syntaxHighlight(currentValue.value)
+  } catch {
+    return escapeHtml(String(currentValue.value))
+  }
 })
 
 function escapeHtml(s: string): string {
@@ -112,7 +135,9 @@ function syntaxHighlight(obj: unknown, indent = 0): string {
   if (typeof obj === 'object') {
     const entries = Object.entries(obj as Record<string, unknown>)
     if (entries.length === 0) return '{}'
-    const props = entries.map(([k, v]) => `${pad}  <span class="jv-key">"${escapeHtml(k)}"</span>: ${syntaxHighlight(v, indent + 1)}`).join(',\n')
+    const props = entries
+      .map(([k, v]) => `${pad}  <span class="jv-key">"${escapeHtml(k)}"</span>: ${syntaxHighlight(v, indent + 1)}`)
+      .join(',\n')
     return `{\n${props}\n${pad}}`
   }
   return escapeHtml(String(obj))
@@ -123,7 +148,11 @@ async function selectEditor(name: string) {
   schemaLoading.value = true
   mountError.value = null
   try {
-    const resp = await templatesApi.getTemplateSchema(name) as Record<string, unknown> & { hasEditor?: boolean; editorUrl?: string; fieldsBaseUrl?: string }
+    const resp = (await templatesApi.getTemplateSchema(name)) as Record<string, unknown> & {
+      hasEditor?: boolean
+      editorUrl?: string
+      fieldsBaseUrl?: string
+    }
     const { hasEditor, editorUrl, fieldsBaseUrl, ...schema } = resp
 
     // Try to find real content from a page that uses this template
@@ -144,11 +173,18 @@ async function selectField(name: string) {
   let fieldsBaseUrl = ''
   if (templates.value.length) {
     try {
-      const resp = await templatesApi.getTemplateSchema(templates.value[0].name) as Record<string, unknown> & { fieldsBaseUrl?: string }
+      const resp = (await templatesApi.getTemplateSchema(templates.value[0].name)) as Record<string, unknown> & {
+        fieldsBaseUrl?: string
+      }
       fieldsBaseUrl = resp.fieldsBaseUrl ?? ''
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
-  if (!fieldsBaseUrl) { mountError.value = 'No fieldsBaseUrl available'; return }
+  if (!fieldsBaseUrl) {
+    mountError.value = 'No fieldsBaseUrl available'
+    return
+  }
   selected.value = { type: 'field', name, fieldsBaseUrl }
   router.replace(`/dev/field/${name}`)
 }
@@ -173,7 +209,10 @@ async function findRealContent(templateName: string): Promise<Record<string, unk
     }
 
     // Search inline components within pages and fragments
-    function findInlineContent(components: import('../api/client.js').ComponentEntry[], template: string): Record<string, unknown> | undefined {
+    function findInlineContent(
+      components: import('../api/client.js').ComponentEntry[],
+      template: string,
+    ): Record<string, unknown> | undefined {
       for (const entry of components) {
         if (typeof entry === 'string') continue
         if (entry.template === template && entry.content) return entry.content as Record<string, unknown>
@@ -197,14 +236,20 @@ async function findRealContent(templateName: string): Promise<Record<string, unk
       const found = findInlineContent(detail.components, templateName)
       if (found) return found
     }
-  } catch { /* ignore — fallback to generated mock */ }
+  } catch {
+    /* ignore — fallback to generated mock */
+  }
   return undefined
 }
 
 // --- Mount/unmount ---
 function unmountCurrent() {
   if (currentMount && mountRef.value) {
-    try { currentMount.unmount(mountRef.value) } catch { /* ignore */ }
+    try {
+      currentMount.unmount(mountRef.value)
+    } catch {
+      /* ignore */
+    }
     currentMount = null
   }
   mountError.value = null
@@ -224,11 +269,27 @@ async function mountSelected() {
       if (item.hasEditor && item.editorUrl) {
         const mod = await import(/* @vite-ignore */ item.editorUrl)
         const mount = (mod.default ?? mod) as EditorMount
-        mount.mount(el, { content, schema: item.schema, theme: themeMode.value, onChange: (c) => { currentValue.value = c }, fieldsBaseUrl: item.fieldsBaseUrl })
+        mount.mount(el, {
+          content,
+          schema: item.schema,
+          theme: themeMode.value,
+          onChange: c => {
+            currentValue.value = c
+          },
+          fieldsBaseUrl: item.fieldsBaseUrl,
+        })
         currentMount = mount
       } else {
         const mount = createEditorMount(item.schema)
-        mount.mount(el, { content, schema: item.schema, theme: themeMode.value, onChange: (c) => { currentValue.value = c }, fieldsBaseUrl: item.fieldsBaseUrl })
+        mount.mount(el, {
+          content,
+          schema: item.schema,
+          theme: themeMode.value,
+          onChange: c => {
+            currentValue.value = c
+          },
+          fieldsBaseUrl: item.fieldsBaseUrl,
+        })
         currentMount = mount
       }
     } else {
@@ -236,10 +297,20 @@ async function mountSelected() {
       currentValue.value = ''
       const url = `${item.fieldsBaseUrl}/${item.name}.tsx`
       let mod: unknown
-      try { mod = await import(/* @vite-ignore */ url) }
-      catch { mod = await import(/* @vite-ignore */ `${item.fieldsBaseUrl}/${item.name}.ts`) }
+      try {
+        mod = await import(/* @vite-ignore */ url)
+      } catch {
+        mod = await import(/* @vite-ignore */ `${item.fieldsBaseUrl}/${item.name}.ts`)
+      }
       const mount = ((mod as Record<string, unknown>).default ?? mod) as FieldMount
-      mount.mount(el, { value: '', schema: {}, theme: themeMode.value, onChange: (v) => { currentValue.value = v } })
+      mount.mount(el, {
+        value: '',
+        schema: {},
+        theme: themeMode.value,
+        onChange: v => {
+          currentValue.value = v
+        },
+      })
       currentMount = mount
     }
   } catch (err) {
@@ -247,7 +318,9 @@ async function mountSelected() {
   }
 }
 
-function reset() { if (selected.value) mountSelected() }
+function reset() {
+  if (selected.value) mountSelected()
+}
 
 watch(selected, () => mountSelected(), { flush: 'post' })
 onBeforeUnmount(() => unmountCurrent())
@@ -259,7 +332,7 @@ function generateMockContent(schema: Record<string, unknown>): Record<string, un
   const mock: Record<string, unknown> = {}
   for (const [key, prop] of Object.entries(props)) {
     const type = prop.type as string
-    if (type === 'string') mock[key] = prop.default as string ?? `Sample ${key}`
+    if (type === 'string') mock[key] = (prop.default as string) ?? `Sample ${key}`
     else if (type === 'number' || type === 'integer') mock[key] = 42
     else if (type === 'boolean') mock[key] = false
     else if (type === 'array') mock[key] = []
@@ -267,7 +340,6 @@ function generateMockContent(schema: Record<string, unknown>): Record<string, un
   }
   return mock
 }
-
 </script>
 
 <template>

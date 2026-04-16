@@ -16,14 +16,34 @@ export function parseSidecarName(entryName: string): string | null {
 
 /**
  * Filename-safe encoding for fragment/template names. Fragments can be
- * subfolder-qualified (e.g. "buttons/primary"); we replace / with __ so the
- * name works as a filename component and stays readable in listings.
+ * subfolder-qualified (e.g. "buttons/primary"); we replace `/` with `.`
+ * so the name works as a filename component and stays readable in
+ * listings.
+ *
+ * Why `.`: per operations.md, refs are lowercase-kebab-case — `.` is
+ * explicitly avoided in ref names ("confuses URL routing"), so using
+ * it as the path separator in encoded form is collision-free with
+ * the legal input alphabet (letters, digits, `-`, `_`, `/`).
+ *
+ * The prior `/` ↔ `__` scheme was ambiguous for any input containing
+ * `_` (a legitimate character in names like `my_fragment`) — a lone
+ * `_` adjacent to `/` encoded to `___` and decoded ambiguously.
+ *
+ * We reject `.` in inputs at encode time. It's already documented as
+ * off-limits in ref names; enforcing it here turns a silent
+ * round-trip bug into a loud error for anyone who tries.
  */
 export function encodeRefName(name: string): string {
-  return name.replace(/\//g, '__')
+  if (name.includes('.')) {
+    throw new Error(
+      `Invalid reference name "${name}": dot is reserved for path encoding. ` +
+        `Use lowercase-kebab-case with / for subfolders (e.g. "buttons/primary").`,
+    )
+  }
+  return name.replace(/\//g, '.')
 }
 export function decodeRefName(name: string): string {
-  return name.replace(/__/g, '/')
+  return name.replace(/\./g, '/')
 }
 
 /** `.uses-header` for a page/fragment that references @header. */
@@ -91,10 +111,7 @@ export interface HashManifestOptions {
  *
  * Result: 8 hex chars.
  */
-export function hashManifest(
-  manifest: PageManifest | FragmentManifest,
-  opts: HashManifestOptions
-): string {
+export function hashManifest(manifest: PageManifest | FragmentManifest, opts: HashManifestOptions): string {
   const rootHash = opts.templateHashes.get(manifest.template)
   const normalized = {
     template: rootHash ? `${manifest.template}#${rootHash}` : manifest.template,

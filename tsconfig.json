@@ -11,7 +11,5 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "references": [
-    { "path": "packages/gazetta" }
-  ]
+  "references": [{ "path": "packages/gazetta" }]
 }

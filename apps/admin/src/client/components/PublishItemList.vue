@@ -32,7 +32,7 @@ const { items, loading, error } = usePublishItems(
 
 // When items re-compute (source/destinations changed), default to selecting
 // every item with changes. Parent can still toggle individual ones.
-watch(items, (rows) => {
+watch(items, rows => {
   const next = new Set<string>()
   for (const r of rows) if (r.hasChanges) next.add(r.path)
   emit('update:selected', next)
@@ -54,7 +54,8 @@ function markerSymbol(kind: ItemChangeKind): string {
 
 function toggle(path: string, included: boolean) {
   const next = new Set(props.selected)
-  if (included) next.add(path); else next.delete(path)
+  if (included) next.add(path)
+  else next.delete(path)
   emit('update:selected', next)
 }
 

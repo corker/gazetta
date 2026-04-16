@@ -10,7 +10,14 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import type { EditorMount } from '../types.js'
 import type { IChangeEvent } from '@rjsf/core'
-import type { WidgetProps, ArrayFieldTemplateProps, ArrayFieldItemTemplateProps, ArrayFieldItemButtonsTemplateProps, ObjectFieldTemplateProps, IconButtonProps } from '@rjsf/utils'
+import type {
+  WidgetProps,
+  ArrayFieldTemplateProps,
+  ArrayFieldItemTemplateProps,
+  ArrayFieldItemButtonsTemplateProps,
+  ObjectFieldTemplateProps,
+  IconButtonProps,
+} from '@rjsf/utils'
 
 /** Form context passed to all templates and widgets */
 interface GzFormContext {
@@ -303,7 +310,17 @@ const STYLES = `
 // Helpers
 // ---------------------------------------------------------------------------
 
-const LONG_TEXT_NAMES = new Set(['body', 'description', 'text', 'content', 'bio', 'summary', 'message', 'notes', 'output'])
+const LONG_TEXT_NAMES = new Set([
+  'body',
+  'description',
+  'text',
+  'content',
+  'bio',
+  'summary',
+  'message',
+  'notes',
+  'output',
+])
 const URL_NAMES = new Set(['href', 'url', 'link', 'src'])
 const COLOR_NAMES = new Set(['background', 'color'])
 
@@ -325,7 +342,15 @@ function buildUiSchema(jsonSchema: JsonSchema): Record<string, unknown> {
       continue
     }
 
-    if (format === 'markdown' || format === 'richtext' || format === 'image' || format === 'link' || format === 'slug' || format === 'code' || format === 'json') {
+    if (
+      format === 'markdown' ||
+      format === 'richtext' ||
+      format === 'image' ||
+      format === 'link' ||
+      format === 'slug' ||
+      format === 'code' ||
+      format === 'json'
+    ) {
       ui[name] = { 'ui:widget': format }
       continue
     }
@@ -383,7 +408,7 @@ function MarkdownWidget(props: WidgetProps) {
     <div className="gz-markdown">
       <textarea
         value={props.value ?? ''}
-        onChange={(e) => props.onChange(e.target.value)}
+        onChange={e => props.onChange(e.target.value)}
         placeholder="Write markdown here..."
         rows={12}
       />
@@ -395,7 +420,12 @@ function MarkdownWidget(props: WidgetProps) {
 function ToggleWidget(props: WidgetProps) {
   const on = !!props.value
   return (
-    <div className="gz-toggle" onClick={() => !props.disabled && !props.readonly && props.onChange(!on)} role="switch" aria-checked={on}>
+    <div
+      className="gz-toggle"
+      onClick={() => !props.disabled && !props.readonly && props.onChange(!on)}
+      role="switch"
+      aria-checked={on}
+    >
       <div className={`gz-toggle-track${on ? ' on' : ''}`}>
         <div className="gz-toggle-thumb" />
       </div>
@@ -408,8 +438,8 @@ function ColorWidget(props: WidgetProps) {
   const val = props.value ?? ''
   return (
     <div className="gz-color-widget">
-      <input type="color" value={val || '#667eea'} onChange={(e) => props.onChange(e.target.value)} />
-      <input type="text" value={val} onChange={(e) => props.onChange(e.target.value)} placeholder="#667eea" />
+      <input type="color" value={val || '#667eea'} onChange={e => props.onChange(e.target.value)} />
+      <input type="text" value={val} onChange={e => props.onChange(e.target.value)} placeholder="#667eea" />
     </div>
   )
 }
@@ -441,16 +471,28 @@ function TagsWidget(props: WidgetProps) {
       {tags.map((tag, i) => (
         <span key={`${tag}-${i}`} className="gz-tag">
           {tag}
-          <button type="button" className="gz-tag-remove" onClick={(e) => { e.stopPropagation(); removeTag(i) }} aria-label={`Remove ${tag}`}>&times;</button>
+          <button
+            type="button"
+            className="gz-tag-remove"
+            onClick={e => {
+              e.stopPropagation()
+              removeTag(i)
+            }}
+            aria-label={`Remove ${tag}`}
+          >
+            &times;
+          </button>
         </span>
       ))}
       <input
         ref={inputRef}
         className="gz-tags-input"
         value={input}
-        onChange={(e) => setInput(e.target.value)}
+        onChange={e => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        onBlur={() => { if (input) addTag(input) }}
+        onBlur={() => {
+          if (input) addTag(input)
+        }}
         placeholder={tags.length === 0 ? 'Type and press Enter...' : ''}
       />
     </div>
@@ -461,30 +503,54 @@ function ImageWidget(props: WidgetProps) {
   const url = props.value ?? ''
   const [broken, setBroken] = React.useState(false)
 
-  React.useEffect(() => { setBroken(false) }, [url])
+  React.useEffect(() => {
+    setBroken(false)
+  }, [url])
 
   return (
     <div>
-      <input type="text" value={url} onChange={(e) => props.onChange(e.target.value)} placeholder="https://example.com/image.png" />
+      <input
+        type="text"
+        value={url}
+        onChange={e => props.onChange(e.target.value)}
+        placeholder="https://example.com/image.png"
+      />
       <div className={`gz-image-preview${url && !broken ? ' has-image' : ''}`}>
-        {url && !broken
-          ? <img src={url} alt="Preview" onError={() => setBroken(true)} />
-          : <div className="gz-image-preview-empty">{url ? 'Image failed to load' : 'Paste an image URL above'}</div>
-        }
+        {url && !broken ? (
+          <img src={url} alt="Preview" onError={() => setBroken(true)} />
+        ) : (
+          <div className="gz-image-preview-empty">{url ? 'Image failed to load' : 'Paste an image URL above'}</div>
+        )}
       </div>
     </div>
   )
 }
 
 function LinkWidget(props: WidgetProps) {
-  return <input type="url" value={props.value ?? ''} onChange={(e) => props.onChange(e.target.value)} placeholder="https://..." />
+  return (
+    <input
+      type="url"
+      value={props.value ?? ''}
+      onChange={e => props.onChange(e.target.value)}
+      placeholder="https://..."
+    />
+  )
 }
 
 function SlugWidget(props: WidgetProps) {
-  const toSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const toSlug = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
   return (
     <div className="gz-slug-widget">
-      <input type="text" value={props.value ?? ''} onChange={(e) => props.onChange(toSlug(e.target.value))} placeholder="my-page-slug" />
+      <input
+        type="text"
+        value={props.value ?? ''}
+        onChange={e => props.onChange(toSlug(e.target.value))}
+        placeholder="my-page-slug"
+      />
       <div className="gz-slug-hint">URL-safe identifier — lowercase, hyphens only</div>
     </div>
   )
@@ -494,7 +560,13 @@ function CodeWidget(props: WidgetProps) {
   const language = (props.schema as JsonSchema).language as string | undefined
   return (
     <div className="gz-code-widget">
-      <textarea value={props.value ?? ''} onChange={(e) => props.onChange(e.target.value)} placeholder={props.placeholder} rows={15} spellCheck={false} />
+      <textarea
+        value={props.value ?? ''}
+        onChange={e => props.onChange(e.target.value)}
+        placeholder={props.placeholder}
+        rows={15}
+        spellCheck={false}
+      />
       {language && <div className="gz-code-hint">{language}</div>}
     </div>
   )
@@ -509,7 +581,10 @@ function JsonWidget(props: WidgetProps) {
   })
 
   const handleBlur = () => {
-    if (!text.trim()) { setError(null); return }
+    if (!text.trim()) {
+      setError(null)
+      return
+    }
     try {
       JSON.parse(text)
       setError(null)
@@ -531,7 +606,14 @@ function JsonWidget(props: WidgetProps) {
 
   return (
     <div className="gz-json-widget">
-      <textarea value={text} onChange={(e) => handleChange(e.target.value)} onBlur={handleBlur} placeholder='{ "key": "value" }' rows={10} spellCheck={false} />
+      <textarea
+        value={text}
+        onChange={e => handleChange(e.target.value)}
+        onBlur={handleBlur}
+        placeholder='{ "key": "value" }'
+        rows={10}
+        spellCheck={false}
+      />
       {error && <div className="gz-json-error">{error}</div>}
     </div>
   )
@@ -562,14 +644,26 @@ function RichTextWidget(props: WidgetProps) {
   if (!editor) return null
 
   const Btn = ({ active, onClick, children }: { active?: boolean; onClick: () => void; children: React.ReactNode }) => (
-    <button type="button" className={`gz-rt-btn${active ? ' active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onClick() }}>{children}</button>
+    <button
+      type="button"
+      className={`gz-rt-btn${active ? ' active' : ''}`}
+      onMouseDown={e => {
+        e.preventDefault()
+        onClick()
+      }}
+    >
+      {children}
+    </button>
   )
 
   const addLink = () => {
     const prev = editor.getAttributes('link').href as string | undefined
     const url = prompt('URL:', prev ?? 'https://')
     if (url === null) return
-    if (url === '') { editor.chain().focus().extendMarkRange('link').unsetLink().run(); return }
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run()
+      return
+    }
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
   }
 
@@ -577,31 +671,69 @@ function RichTextWidget(props: WidgetProps) {
     <div className="gz-richtext">
       {/* Fixed toolbar */}
       <div className="gz-richtext-toolbar">
-        <Btn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>B</Btn>
-        <Btn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>I</Btn>
-        <Btn active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>S</Btn>
-        <Btn active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>&lt;/&gt;</Btn>
+        <Btn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+          B
+        </Btn>
+        <Btn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+          I
+        </Btn>
+        <Btn active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+          S
+        </Btn>
+        <Btn active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
+          &lt;/&gt;
+        </Btn>
         <div className="gz-rt-sep" />
-        <Btn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>H2</Btn>
-        <Btn active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>H3</Btn>
+        <Btn
+          active={editor.isActive('heading', { level: 2 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        >
+          H2
+        </Btn>
+        <Btn
+          active={editor.isActive('heading', { level: 3 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        >
+          H3
+        </Btn>
         <div className="gz-rt-sep" />
-        <Btn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>&bull;</Btn>
-        <Btn active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>1.</Btn>
-        <Btn active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>&ldquo;</Btn>
+        <Btn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+          &bull;
+        </Btn>
+        <Btn active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+          1.
+        </Btn>
+        <Btn active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+          &ldquo;
+        </Btn>
         <div className="gz-rt-sep" />
-        <Btn active={editor.isActive('link')} onClick={addLink}>Link</Btn>
+        <Btn active={editor.isActive('link')} onClick={addLink}>
+          Link
+        </Btn>
         <Btn onClick={() => editor.chain().focus().setHorizontalRule().run()}>&#x2014;</Btn>
-        <Btn active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>Code</Btn>
+        <Btn active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+          Code
+        </Btn>
       </div>
 
       {/* Floating toolbar on selection */}
       <BubbleMenu editor={editor}>
         <div className="gz-bubble">
-          <Btn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>B</Btn>
-          <Btn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>I</Btn>
-          <Btn active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>S</Btn>
-          <Btn active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>&lt;/&gt;</Btn>
-          <Btn active={editor.isActive('link')} onClick={addLink}>Link</Btn>
+          <Btn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+            B
+          </Btn>
+          <Btn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+            I
+          </Btn>
+          <Btn active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+            S
+          </Btn>
+          <Btn active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
+            &lt;/&gt;
+          </Btn>
+          <Btn active={editor.isActive('link')} onClick={addLink}>
+            Link
+          </Btn>
         </div>
       </BubbleMenu>
 
@@ -634,7 +766,9 @@ function GzArrayFieldTemplate(props: ArrayFieldTemplateProps) {
           No items yet
           {props.canAdd && (
             <div style={{ marginTop: '0.5rem' }}>
-              <button type="button" className="gz-array-add" onClick={props.onAddClick}>+ Add first item</button>
+              <button type="button" className="gz-array-add" onClick={props.onAddClick}>
+                + Add first item
+              </button>
             </div>
           )}
         </div>
@@ -647,11 +781,15 @@ function GzArrayFieldTemplate(props: ArrayFieldTemplateProps) {
       <div className="gz-array-header">
         {props.title && <span className="gz-array-title">{props.title}</span>}
         <span className="gz-array-count">{props.items.length}</span>
-        {props.canAdd && <button type="button" className="gz-array-add" onClick={props.onAddClick}>+ Add</button>}
+        {props.canAdd && (
+          <button type="button" className="gz-array-add" onClick={props.onAddClick}>
+            + Add
+          </button>
+        )}
       </div>
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId={fieldPath || 'array'}>
-          {(provided) => (
+          {provided => (
             <div className="gz-array-items" ref={provided.innerRef} {...provided.droppableProps}>
               {props.items}
               {provided.placeholder}
@@ -677,21 +815,19 @@ function GzArrayFieldItemTemplate(props: ArrayFieldItemTemplateProps) {
           {...provided.draggableProps}
         >
           <div className="gz-array-item-header" onClick={() => setOpen(!open)}>
-            <span
-              className="gz-array-item-handle"
-              {...provided.dragHandleProps}
-              onClick={(e) => e.stopPropagation()}
-            >&#x2801;&#x2801;</span>
+            <span className="gz-array-item-handle" {...provided.dragHandleProps} onClick={e => e.stopPropagation()}>
+              &#x2801;&#x2801;
+            </span>
             <span className={`gz-array-item-chevron${open ? ' open' : ''}`}>&#x25B6;</span>
             <span className="gz-array-item-idx">{props.index + 1}</span>
-            {!open && <span className={`gz-array-item-summary${summary ? '' : ' empty'}`}>{summary || 'Empty item'}</span>}
-            <div className="gz-array-item-actions" onClick={(e) => e.stopPropagation()}>
+            {!open && (
+              <span className={`gz-array-item-summary${summary ? '' : ' empty'}`}>{summary || 'Empty item'}</span>
+            )}
+            <div className="gz-array-item-actions" onClick={e => e.stopPropagation()}>
               <GzArrayFieldItemButtonsTemplate {...props.buttonsProps} />
             </div>
           </div>
-          <div className={`gz-array-item-body ${open ? 'expanded' : 'collapsed'}`}>
-            {props.children}
-          </div>
+          <div className={`gz-array-item-body ${open ? 'expanded' : 'collapsed'}`}>{props.children}</div>
         </div>
       )}
     </Draggable>
@@ -701,21 +837,37 @@ function GzArrayFieldItemTemplate(props: ArrayFieldItemTemplateProps) {
 function GzArrayFieldItemButtonsTemplate(props: ArrayFieldItemButtonsTemplateProps) {
   return (
     <>
-      {props.hasMoveUp && <button type="button" className="gz-btn-icon" onClick={props.onMoveUpItem} title="Move up">&#x2191;</button>}
-      {props.hasMoveDown && <button type="button" className="gz-btn-icon" onClick={props.onMoveDownItem} title="Move down">&#x2193;</button>}
-      {props.hasRemove && <button type="button" className="gz-btn-icon gz-btn-remove" onClick={props.onRemoveItem} title="Remove">&times;</button>}
+      {props.hasMoveUp && (
+        <button type="button" className="gz-btn-icon" onClick={props.onMoveUpItem} title="Move up">
+          &#x2191;
+        </button>
+      )}
+      {props.hasMoveDown && (
+        <button type="button" className="gz-btn-icon" onClick={props.onMoveDownItem} title="Move down">
+          &#x2193;
+        </button>
+      )}
+      {props.hasRemove && (
+        <button type="button" className="gz-btn-icon gz-btn-remove" onClick={props.onRemoveItem} title="Remove">
+          &times;
+        </button>
+      )}
     </>
   )
 }
 
 function GzObjectFieldTemplate(props: ObjectFieldTemplateProps) {
   const isRoot = props.fieldPathId?.$id === 'root'
-  if (isRoot) return <>{props.properties.map((p) => p.content)}</>
-  return <div className="gz-object-inline">{props.properties.map((p) => p.content)}</div>
+  if (isRoot) return <>{props.properties.map(p => p.content)}</>
+  return <div className="gz-object-inline">{props.properties.map(p => p.content)}</div>
 }
 
 function GzAddButton(props: IconButtonProps) {
-  return <button type="button" className="gz-array-add" onClick={props.onClick} disabled={props.disabled}>+ Add</button>
+  return (
+    <button type="button" className="gz-array-add" onClick={props.onClick} disabled={props.disabled}>
+      + Add
+    </button>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -731,7 +883,7 @@ function getCustomFieldWidget(fieldName: string): React.FC<WidgetProps> {
   const cached = fieldWidgetCache.get(fieldName)
   if (cached) return cached
 
-  const CustomFieldWidget: React.FC<WidgetProps> = (props) => {
+  const CustomFieldWidget: React.FC<WidgetProps> = props => {
     const containerRef = React.useRef<HTMLDivElement>(null)
     const mountRef = React.useRef<FieldMount | null>(null)
     const mountedRef = React.useRef(false)
@@ -756,7 +908,9 @@ function getCustomFieldWidget(fieldName: string): React.FC<WidgetProps> {
             mountRef.current = (mod.default ?? mod) as FieldMount
             setLoading(false)
             return
-          } catch { /* try next */ }
+          } catch {
+            /* try next */
+          }
         }
         setError(`Failed to load field "${fieldName}"`)
         setLoading(false)
@@ -772,10 +926,13 @@ function getCustomFieldWidget(fieldName: string): React.FC<WidgetProps> {
         value: props.value,
         schema: props.schema as Record<string, unknown>,
         theme: (ctx?.theme as 'dark' | 'light') ?? 'dark',
-        onChange: (v) => props.onChange(v),
+        onChange: v => props.onChange(v),
       })
       mountedRef.current = true
-      return () => { fm.unmount(el); mountedRef.current = false }
+      return () => {
+        fm.unmount(el)
+        mountedRef.current = false
+      }
     }, [loading])
 
     // Update value without re-mounting — call mount again with new value
@@ -786,11 +943,16 @@ function getCustomFieldWidget(fieldName: string): React.FC<WidgetProps> {
         value: props.value,
         schema: props.schema as Record<string, unknown>,
         theme: (ctx?.theme as 'dark' | 'light') ?? 'dark',
-        onChange: (v) => props.onChange(v),
+        onChange: v => props.onChange(v),
       })
     }, [props.value])
 
-    if (loading) return <div style={{ color: 'var(--color-muted)', fontSize: '0.75rem', padding: '0.5rem 0' }}>Loading {fieldName}...</div>
+    if (loading)
+      return (
+        <div style={{ color: 'var(--color-muted)', fontSize: '0.75rem', padding: '0.5rem 0' }}>
+          Loading {fieldName}...
+        </div>
+      )
     if (error) return <div style={{ color: 'var(--color-danger-fg)', fontSize: '0.75rem' }}>{error}</div>
     return <div ref={containerRef} />
   }
@@ -858,7 +1020,13 @@ export interface DefaultEditorFormProps {
  * The default @rjsf form editor as a React component.
  * Custom editors can embed this: `<DefaultEditorForm schema={schema} content={content} onChange={onChange} />`
  */
-export function DefaultEditorForm({ schema: jsonSchema, content, onChange, fieldsBaseUrl, theme }: DefaultEditorFormProps) {
+export function DefaultEditorForm({
+  schema: jsonSchema,
+  content,
+  onChange,
+  fieldsBaseUrl,
+  theme,
+}: DefaultEditorFormProps) {
   const uiSchema = React.useMemo(() => buildUiSchema(jsonSchema as JsonSchema), [jsonSchema])
   const widgets = React.useMemo(() => buildWidgets(jsonSchema as JsonSchema), [jsonSchema])
 
@@ -913,23 +1081,29 @@ export function DefaultEditorForm({ schema: jsonSchema, content, onChange, field
     return () => document.removeEventListener('keydown', handler)
   }, [])
 
-  const reorderArray = React.useCallback((fieldPath: string, fromIndex: number, toIndex: number) => {
-    setFormData((prev: Record<string, unknown>) => {
-      pushHistory(prev)
-      const parts = fieldPath.replace(/^root_/, '').split('_')
-      const key = parts[0]
-      const arr = prev[key]
-      if (!Array.isArray(arr)) return prev
-      const next = [...arr]
-      const [moved] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, moved)
-      const updated = { ...prev, [key]: next }
-      onChange(updated)
-      return updated
-    })
-  }, [onChange])
+  const reorderArray = React.useCallback(
+    (fieldPath: string, fromIndex: number, toIndex: number) => {
+      setFormData((prev: Record<string, unknown>) => {
+        pushHistory(prev)
+        const parts = fieldPath.replace(/^root_/, '').split('_')
+        const key = parts[0]
+        const arr = prev[key]
+        if (!Array.isArray(arr)) return prev
+        const next = [...arr]
+        const [moved] = next.splice(fromIndex, 1)
+        next.splice(toIndex, 0, moved)
+        const updated = { ...prev, [key]: next }
+        onChange(updated)
+        return updated
+      })
+    },
+    [onChange],
+  )
 
-  const formContext: GzFormContext = React.useMemo(() => ({ reorderArray, fieldsBaseUrl, theme }), [reorderArray, fieldsBaseUrl, theme])
+  const formContext: GzFormContext = React.useMemo(
+    () => ({ reorderArray, fieldsBaseUrl, theme }),
+    [reorderArray, fieldsBaseUrl, theme],
+  )
 
   return (
     <>
@@ -966,7 +1140,15 @@ export function createEditorMount(jsonSchema: object): EditorMount {
 
       const root = createRoot(el)
       roots.set(el, root)
-      root.render(<DefaultEditorForm schema={schema ?? jsonSchema as Record<string, unknown>} content={content} theme={theme} fieldsBaseUrl={fieldsBaseUrl} onChange={onChange} />)
+      root.render(
+        <DefaultEditorForm
+          schema={schema ?? (jsonSchema as Record<string, unknown>)}
+          content={content}
+          theme={theme}
+          fieldsBaseUrl={fieldsBaseUrl}
+          onChange={onChange}
+        />,
+      )
     },
 
     unmount(el) {

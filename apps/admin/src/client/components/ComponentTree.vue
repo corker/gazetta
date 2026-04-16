@@ -57,7 +57,12 @@ const componentCount = computed(() => detail.value?.components?.length ?? 0)
 type GzEntry = { path: string; template: string } | { isFragment: true; fragName: string }
 const gzMap = ref(new Map<string, GzEntry>())
 
-async function buildComponentNode(entry: import('../api/client.js').ComponentEntry, index: number, parentTreePath: string, map: Map<string, GzEntry>): Promise<ComponentNode> {
+async function buildComponentNode(
+  entry: import('../api/client.js').ComponentEntry,
+  index: number,
+  parentTreePath: string,
+  map: Map<string, GzEntry>,
+): Promise<ComponentNode> {
   // Fragment reference
   if (typeof entry === 'string') {
     const fragName = entry.slice(1)
@@ -72,11 +77,24 @@ async function buildComponentNode(entry: import('../api/client.js').ComponentEnt
       return {
         key: `frag:${fragName}:${index}`,
         label: entry,
-        data: { isFragment: true, fragName, treePath, path: treePath, template: frag.template, index, isTopLevel: true },
+        data: {
+          isFragment: true,
+          fragName,
+          treePath,
+          path: treePath,
+          template: frag.template,
+          index,
+          isTopLevel: true,
+        },
         children,
       }
     } catch (err) {
-      return { key: `frag:${fragName}:${index}`, label: entry, data: { isFragment: true, fragName, treePath, index, isTopLevel: true, error: (err as Error).message }, children: [] }
+      return {
+        key: `frag:${fragName}:${index}`,
+        label: entry,
+        data: { isFragment: true, fragName, treePath, index, isTopLevel: true, error: (err as Error).message },
+        children: [],
+      }
     }
   }
 
@@ -97,31 +115,39 @@ async function buildComponentNode(entry: import('../api/client.js').ComponentEnt
   }
 }
 
-watch(detail, async (d) => {
-  if (!d) { componentNodes.value = []; gzMap.value = new Map(); return }
+watch(
+  detail,
+  async d => {
+    if (!d) {
+      componentNodes.value = []
+      gzMap.value = new Map()
+      return
+    }
 
-  const map = new Map<string, GzEntry>()
-  const rootPath = selection.type === 'fragment' ? `@${selection.name}` : ''
-  const children = d.components
-    ? await Promise.all(d.components.map((entry, i) => buildComponentNode(entry, i, rootPath, map)))
-    : []
+    const map = new Map<string, GzEntry>()
+    const rootPath = selection.type === 'fragment' ? `@${selection.name}` : ''
+    const children = d.components
+      ? await Promise.all(d.components.map((entry, i) => buildComponentNode(entry, i, rootPath, map)))
+      : []
 
-  const rootNode: ComponentNode = {
-    key: `root:${selection.name}`,
-    label: selection.name ?? '',
-    data: { isPage: true, path: d.dir, template: d.template, treePath: rootPath },
-    children,
-  }
-  // Fragment root has data-gz in host-page preview — add to gzMap for click-to-select
-  if (rootPath && selection.type === 'fragment' && selection.name) {
-    map.set(hashPath(rootPath), { isFragment: true, fragName: selection.name })
-  }
-  componentNodes.value = [rootNode]
-  gzMap.value = map
+    const rootNode: ComponentNode = {
+      key: `root:${selection.name}`,
+      label: selection.name ?? '',
+      data: { isPage: true, path: d.dir, template: d.template, treePath: rootPath },
+      children,
+    }
+    // Fragment root has data-gz in host-page preview — add to gzMap for click-to-select
+    if (rootPath && selection.type === 'fragment' && selection.name) {
+      map.set(hashPath(rootPath), { isFragment: true, fragName: selection.name })
+    }
+    componentNodes.value = [rootNode]
+    gzMap.value = map
 
-  // Process pending selection if tree just built and a gzId is waiting
-  consumePending()
-}, { immediate: true })
+    // Process pending selection if tree just built and a gzId is waiting
+    consumePending()
+  },
+  { immediate: true },
+)
 
 function consumePending() {
   if (focus.pendingGzId && gzMap.value.size > 0) {
@@ -131,14 +157,23 @@ function consumePending() {
 }
 
 // Also react to pendingGzId changes when tree is already built (edit mode click-to-select)
-watch(() => focus.pendingGzId, () => consumePending())
+watch(
+  () => focus.pendingGzId,
+  () => consumePending(),
+)
 
 // Highlight tree node when component is hovered in preview
-watch(() => focus.previewHoverGzId, (gzId) => {
-  if (!gzId) { hoveredNodeKey.value = null; return }
-  const found = findNodeByKey(componentNodes.value, d => d.treePath ? hashPath(d.treePath) === gzId : false)
-  hoveredNodeKey.value = found?.key ?? null
-})
+watch(
+  () => focus.previewHoverGzId,
+  gzId => {
+    if (!gzId) {
+      hoveredNodeKey.value = null
+      return
+    }
+    const found = findNodeByKey(componentNodes.value, d => (d.treePath ? hashPath(d.treePath) === gzId : false))
+    hoveredNodeKey.value = found?.key ?? null
+  },
+)
 
 // Flat list for rendering — walk tree and produce { node, depth } pairs
 const flatNodes = computed(() => {

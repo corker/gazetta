@@ -13,11 +13,7 @@
  * as each endpoint moves to the new pattern (testing-plan.md Priority 3.2).
  */
 import { describe, it, expect } from 'vitest'
-import {
-  CreatePageRequestSchema,
-  CreatePageResponseSchema,
-  PageSummarySchema,
-} from 'gazetta/admin-api/schemas'
+import { CreatePageRequestSchema, CreatePageResponseSchema, PageSummarySchema } from 'gazetta/admin-api/schemas'
 import type { CreatePageRequest, CreatePageResponse, PageSummary } from 'gazetta/admin-api/schemas'
 
 describe('POST /api/pages contract', () => {

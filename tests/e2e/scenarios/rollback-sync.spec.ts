@@ -40,8 +40,10 @@ test.describe('Scenario — rollback refreshes site tree + sync indicators', () 
 
     // --- Open history panel from the active-target switcher menu ---
     await page.locator('[data-testid="active-target-indicator"]').click()
-    await page.locator('[data-testid="active-target-menu"]')
-      .getByRole('menuitem', { name: /view history/i }).click()
+    await page
+      .locator('[data-testid="active-target-menu"]')
+      .getByRole('menuitem', { name: /view history/i })
+      .click()
     await expect(page.locator('[data-testid="history-panel"]')).toBeVisible()
 
     // After one save, history has the save revision + the baseline that
@@ -54,8 +56,7 @@ test.describe('Scenario — rollback refreshes site tree + sync indicators', () 
     await baselineRow.locator('button', { hasText: 'Restore' }).click()
 
     // Toast confirms the restore round-trip completed.
-    await expect(page.locator('[data-testid="global-toast"]'))
-      .toContainText(/Restored/i, { timeout: 10000 })
+    await expect(page.locator('[data-testid="global-toast"]')).toContainText(/Restored/i, { timeout: 10000 })
     await page.locator('[data-testid="history-panel-close"]').click()
 
     // --- Verify downstream: content reverts in editor ---

@@ -21,14 +21,14 @@ describe('hashManifest', () => {
     route: '/home',
     template: 'page-default',
     content: { title: 'Hello' },
-    components: [
-      { name: 'hero', template: 'hero', content: { title: 'A' } },
-      '@header',
-    ],
+    components: [{ name: 'hero', template: 'hero', content: { title: 'A' } }, '@header'],
   }
 
   it('is stable for the same input', () => {
-    const t = new Map([['hero', 'h1'], ['page-default', 'p1']])
+    const t = new Map([
+      ['hero', 'h1'],
+      ['page-default', 'p1'],
+    ])
     const a = hashManifest(baseManifest, { templateHashes: t })
     const b = hashManifest(baseManifest, { templateHashes: t })
     expect(a).toBe(b)
@@ -36,7 +36,10 @@ describe('hashManifest', () => {
   })
 
   it('changes when content changes', () => {
-    const t = new Map([['hero', 'h1'], ['page-default', 'p1']])
+    const t = new Map([
+      ['hero', 'h1'],
+      ['page-default', 'p1'],
+    ])
     const a = hashManifest(baseManifest, { templateHashes: t })
     const modified: PageManifest = {
       ...baseManifest,
@@ -46,25 +49,31 @@ describe('hashManifest', () => {
   })
 
   it('changes when a template hash changes', () => {
-    const t1 = new Map([['hero', 'h1'], ['page-default', 'p1']])
-    const t2 = new Map([['hero', 'h2'], ['page-default', 'p1']])
-    expect(hashManifest(baseManifest, { templateHashes: t1 }))
-      .not.toBe(hashManifest(baseManifest, { templateHashes: t2 }))
+    const t1 = new Map([
+      ['hero', 'h1'],
+      ['page-default', 'p1'],
+    ])
+    const t2 = new Map([
+      ['hero', 'h2'],
+      ['page-default', 'p1'],
+    ])
+    expect(hashManifest(baseManifest, { templateHashes: t1 })).not.toBe(
+      hashManifest(baseManifest, { templateHashes: t2 }),
+    )
   })
 
   it('is invariant to JSON key order', () => {
-    const t = new Map([['hero', 'h1'], ['page-default', 'p1']])
+    const t = new Map([
+      ['hero', 'h1'],
+      ['page-default', 'p1'],
+    ])
     const reordered: PageManifest = {
       template: 'page-default',
       content: { title: 'Hello' },
       route: '/home',
-      components: [
-        { template: 'hero', name: 'hero', content: { title: 'A' } },
-        '@header',
-      ],
+      components: [{ template: 'hero', name: 'hero', content: { title: 'A' } }, '@header'],
     }
-    expect(hashManifest(baseManifest, { templateHashes: t }))
-      .toBe(hashManifest(reordered, { templateHashes: t }))
+    expect(hashManifest(baseManifest, { templateHashes: t })).toBe(hashManifest(reordered, { templateHashes: t }))
   })
 
   it('handles missing template hashes gracefully', () => {
@@ -82,15 +91,20 @@ describe('hashManifest', () => {
         {
           name: 'features',
           template: 'features-grid',
-          components: [
-            { name: 'fast', template: 'feature-card', content: { title: 'Fast' } },
-          ],
+          components: [{ name: 'fast', template: 'feature-card', content: { title: 'Fast' } }],
         },
       ],
     }
-    const t1 = new Map([['feature-card', 'fc1'], ['features-grid', 'fg1'], ['page-default', 'p1']])
-    const t2 = new Map([['feature-card', 'fc2'], ['features-grid', 'fg1'], ['page-default', 'p1']])
-    expect(hashManifest(nested, { templateHashes: t1 }))
-      .not.toBe(hashManifest(nested, { templateHashes: t2 }))
+    const t1 = new Map([
+      ['feature-card', 'fc1'],
+      ['features-grid', 'fg1'],
+      ['page-default', 'p1'],
+    ])
+    const t2 = new Map([
+      ['feature-card', 'fc2'],
+      ['features-grid', 'fg1'],
+      ['page-default', 'p1'],
+    ])
+    expect(hashManifest(nested, { templateHashes: t1 })).not.toBe(hashManifest(nested, { templateHashes: t2 }))
   })
 })

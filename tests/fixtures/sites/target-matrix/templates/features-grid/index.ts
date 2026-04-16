@@ -14,7 +14,10 @@ const template: TemplateFunction = ({ content = {}, children = [] }) => ({
 .features h2 { text-align: center; font-size: 1.75rem; margin-bottom: 2rem; }
 .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; max-width: 60rem; margin: 0 auto; }
 ${children.map(c => c.css).join('\n')}`,
-  js: children.map(c => c.js).filter(Boolean).join('\n'),
+  js: children
+    .map(c => c.js)
+    .filter(Boolean)
+    .join('\n'),
 })
 
 export default template

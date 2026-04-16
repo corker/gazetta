@@ -29,7 +29,7 @@ function mkResult(over: Partial<CompareResult>): CompareResult {
 }
 
 function fixedCompare(results: Record<string, CompareResult>): CompareFn {
-  return async (target) => {
+  return async target => {
     if (!(target in results)) throw new Error(`No result fixture for target: ${target}`)
     return results[target]
   }
@@ -79,7 +79,7 @@ describe('useSyncStatusStore', () => {
   })
 
   it('refreshAll compares every non-active target', async () => {
-    const compareFn = vi.fn<CompareFn>(async (target) => mkResult({ added: [`${target}-change`] }))
+    const compareFn = vi.fn<CompareFn>(async target => mkResult({ added: [`${target}-change`] }))
     const store = useSyncStatusStore()
     store.configure({
       compareFn,
@@ -96,7 +96,9 @@ describe('useSyncStatusStore', () => {
   it('stores errors without throwing when compare fails', async () => {
     const store = useSyncStatusStore()
     store.configure({
-      compareFn: async () => { throw new Error('network down') },
+      compareFn: async () => {
+        throw new Error('network down')
+      },
       listTargets: () => TARGETS,
       activeTarget: () => 'local',
     })
@@ -107,7 +109,9 @@ describe('useSyncStatusStore', () => {
 
   it('tracks in-flight loading per target', async () => {
     let release!: () => void
-    const pending = new Promise<CompareResult>(r => { release = () => r(EMPTY_RESULT) })
+    const pending = new Promise<CompareResult>(r => {
+      release = () => r(EMPTY_RESULT)
+    })
     const store = useSyncStatusStore()
     store.configure({
       compareFn: () => pending,

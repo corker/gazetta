@@ -24,13 +24,13 @@ import ComponentTree from '../src/client/components/ComponentTree.vue'
 import { FRAGMENTS_API, type FragmentsApi } from '../src/client/composables/api.js'
 import { useSelectionStore } from '../src/client/stores/selection.js'
 import { useEditingStore } from '../src/client/stores/editing.js'
-import type {
-  PageDetail, FragmentDetail,
-} from '../src/client/api/client.js'
+import type { PageDetail, FragmentDetail } from '../src/client/api/client.js'
 
 /** Minimal FragmentsApi fake — each method throws unless the test provides an impl. */
 function fakeFragmentsApi(partial: Partial<FragmentsApi> = {}): FragmentsApi {
-  const notImplemented = (name: string) => () => { throw new Error(`fakeFragmentsApi.${name} not stubbed`) }
+  const notImplemented = (name: string) => () => {
+    throw new Error(`fakeFragmentsApi.${name} not stubbed`)
+  }
   return {
     getFragments: notImplemented('getFragments'),
     getFragment: notImplemented('getFragment'),
@@ -118,12 +118,14 @@ describe('ComponentTree', () => {
   })
 
   it('resolves @fragment references via FragmentsApi', async () => {
-    const getFragment = vi.fn(async (name: string): Promise<FragmentDetail> => ({
-      name,
-      template: 'header-layout',
-      dir: `fragments/${name}`,
-      components: [{ name: 'logo', template: 'logo' }],
-    }))
+    const getFragment = vi.fn(
+      async (name: string): Promise<FragmentDetail> => ({
+        name,
+        template: 'header-layout',
+        dir: `fragments/${name}`,
+        components: [{ name: 'logo', template: 'logo' }],
+      }),
+    )
     setPageSelection({
       name: 'home',
       route: '/',
@@ -140,7 +142,9 @@ describe('ComponentTree', () => {
   })
 
   it('shows an error icon when a fragment fetch fails', async () => {
-    const getFragment = vi.fn(async () => { throw new Error('not found') })
+    const getFragment = vi.fn(async () => {
+      throw new Error('not found')
+    })
     setPageSelection({
       name: 'home',
       route: '/',

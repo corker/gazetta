@@ -15,25 +15,31 @@ export type TemplateFunction<T extends Record<string, unknown> = Record<string, 
 
 /** Mount function for framework-agnostic custom editors */
 export interface EditorMount {
-  mount(el: HTMLElement, props: {
-    content: Record<string, unknown>
-    schema: Record<string, unknown>
-    theme: 'dark' | 'light'
-    onChange: (content: Record<string, unknown>) => void
-    /** Base URL for loading custom field modules (dev mode: /@fs/ path) */
-    fieldsBaseUrl?: string
-  }): void
+  mount(
+    el: HTMLElement,
+    props: {
+      content: Record<string, unknown>
+      schema: Record<string, unknown>
+      theme: 'dark' | 'light'
+      onChange: (content: Record<string, unknown>) => void
+      /** Base URL for loading custom field modules (dev mode: /@fs/ path) */
+      fieldsBaseUrl?: string
+    },
+  ): void
   unmount(el: HTMLElement): void
 }
 
 /** Mount function for framework-agnostic custom field widgets */
 export interface FieldMount {
-  mount(el: HTMLElement, props: {
-    value: unknown
-    schema: Record<string, unknown>
-    theme: 'dark' | 'light'
-    onChange: (value: unknown) => void
-  }): void
+  mount(
+    el: HTMLElement,
+    props: {
+      value: unknown
+      schema: Record<string, unknown>
+      theme: 'dark' | 'light'
+      onChange: (value: unknown) => void
+    },
+  ): void
   unmount(el: HTMLElement): void
 }
 
@@ -185,7 +191,7 @@ export function getEnvironment(target: TargetConfig): TargetEnvironment {
  * Default: true for `environment: local`, false for `staging` / `production`.
  */
 export function isEditable(target: TargetConfig): boolean {
-  return target.editable ?? (getEnvironment(target) === 'local')
+  return target.editable ?? getEnvironment(target) === 'local'
 }
 
 /** Default retention: keep the last 50 revisions. Matches design-publishing.md. */

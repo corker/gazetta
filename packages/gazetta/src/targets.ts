@@ -29,10 +29,16 @@ export interface TargetRegistry {
 }
 
 export class UnknownTargetError extends Error {
-  constructor(name: string) { super(`Unknown target: ${name}`); this.name = 'UnknownTargetError' }
+  constructor(name: string) {
+    super(`Unknown target: ${name}`)
+    this.name = 'UnknownTargetError'
+  }
 }
 export class NoEditableTargetError extends Error {
-  constructor() { super('No editable target is configured. At least one target in site.yaml must be editable.'); this.name = 'NoEditableTargetError' }
+  constructor() {
+    super('No editable target is configured. At least one target in site.yaml must be editable.')
+    this.name = 'NoEditableTargetError'
+  }
 }
 
 /**
@@ -51,8 +57,12 @@ export function createTargetRegistryView(
       if (!p) throw new UnknownTargetError(name)
       return p
     },
-    getConfig(name) { return configs[name] },
-    list() { return [...orderedNames] },
+    getConfig(name) {
+      return configs[name]
+    },
+    list() {
+      return [...orderedNames]
+    },
     defaultEditable() {
       for (const name of orderedNames) {
         const cfg = configs[name]
@@ -65,7 +75,9 @@ export function createTargetRegistryView(
 
 /** Find all editable targets in declaration order. Pure helper. */
 export function listEditableTargets(configs: Record<string, TargetConfig>): string[] {
-  return Object.entries(configs).filter(([, cfg]) => isEditable(cfg)).map(([name]) => name)
+  return Object.entries(configs)
+    .filter(([, cfg]) => isEditable(cfg))
+    .map(([name]) => name)
 }
 
 export function resolveEnvVars(value: string | undefined): string | undefined {
@@ -82,7 +94,11 @@ export function resolveEnvVars(value: string | undefined): string | undefined {
  * that need custom paths. If neither `path` nor `targetName` is available for
  * a filesystem target, throws.
  */
-export async function createStorageProvider(config: StorageConfig, siteDir: string, targetName?: string): Promise<StorageProvider> {
+export async function createStorageProvider(
+  config: StorageConfig,
+  siteDir: string,
+  targetName?: string,
+): Promise<StorageProvider> {
   switch (config.type) {
     case 'filesystem': {
       const path = config.path ?? (targetName ? join('targets', targetName) : undefined)
@@ -134,23 +150,35 @@ export async function createStorageProvider(config: StorageConfig, siteDir: stri
             region: config.region,
           })
         } catch {
-          throw new Error('R2 with S3 credentials requires @aws-sdk/client-s3. Install it: npm install @aws-sdk/client-s3')
+          throw new Error(
+            'R2 with S3 credentials requires @aws-sdk/client-s3. Install it: npm install @aws-sdk/client-s3',
+          )
         }
       }
       // Fall back to Cloudflare REST API using wrangler auth
       let apiToken: string
       try {
-        const output = execSync('npx wrangler auth token', { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] })
+        const output = execSync('npx wrangler auth token', {
+          encoding: 'utf-8',
+          timeout: 10000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
         // wrangler prints a banner before the token — extract the last non-empty line
-        apiToken = output.split('\n').map(l => l.trim()).filter(l => l && !l.includes('wrangler') && !l.includes('───')).pop() ?? ''
+        apiToken =
+          output
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l && !l.includes('wrangler') && !l.includes('───'))
+            .pop() ?? ''
       } catch {
         throw new Error(
           'R2 storage: no credentials found.\n' +
-          '  Either set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables,\n' +
-          '  or run "npx wrangler login" to authenticate with Cloudflare.'
+            '  Either set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables,\n' +
+            '  or run "npx wrangler login" to authenticate with Cloudflare.',
         )
       }
-      if (!apiToken) throw new Error('R2 storage: wrangler returned empty token. Run "npx wrangler login" to authenticate.')
+      if (!apiToken)
+        throw new Error('R2 storage: wrangler returned empty token. Run "npx wrangler login" to authenticate.')
       const { createR2RestProvider } = await import('./providers/r2.js')
       return createR2RestProvider({ accountId: config.accountId, bucket: config.bucket, apiToken })
     }
@@ -167,28 +195,36 @@ export async function createStorageProvider(config: StorageConfig, siteDir: stri
  */
 const TARGET_INIT_TIMEOUT_MS = 10000
 
-export async function createTargetRegistry(targets: Record<string, TargetConfig>, siteDir: string): Promise<Map<string, StorageProvider>> {
+export async function createTargetRegistry(
+  targets: Record<string, TargetConfig>,
+  siteDir: string,
+): Promise<Map<string, StorageProvider>> {
   const registry = new Map<string, StorageProvider>()
   // Init targets in parallel — a slow/failing target must not serialize
   // behind the others. Each has its own timeout so a hang doesn't stall the
   // registry indefinitely.
-  await Promise.all(Object.entries(targets).map(async ([name, config]) => {
-    try {
-      const initOne = async () => {
-        const provider = await createStorageProvider(config.storage, siteDir, name)
-        if ('init' in provider && typeof provider.init === 'function') {
-          await (provider as StorageProvider & { init(): Promise<void> }).init()
+  await Promise.all(
+    Object.entries(targets).map(async ([name, config]) => {
+      try {
+        const initOne = async () => {
+          const provider = await createStorageProvider(config.storage, siteDir, name)
+          if ('init' in provider && typeof provider.init === 'function') {
+            await (provider as StorageProvider & { init(): Promise<void> }).init()
+          }
+          return provider
         }
-        return provider
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`init timed out after ${TARGET_INIT_TIMEOUT_MS}ms`)),
+            TARGET_INIT_TIMEOUT_MS,
+          ),
+        )
+        const provider = await Promise.race([initOne(), timeout])
+        registry.set(name, provider)
+      } catch (err) {
+        console.warn(`  Warning: target "${name}" failed to initialize: ${(err as Error).message}`)
       }
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`init timed out after ${TARGET_INIT_TIMEOUT_MS}ms`)), TARGET_INIT_TIMEOUT_MS),
-      )
-      const provider = await Promise.race([initOne(), timeout])
-      registry.set(name, provider)
-    } catch (err) {
-      console.warn(`  Warning: target "${name}" failed to initialize: ${(err as Error).message}`)
-    }
-  }))
+    }),
+  )
   return registry
 }

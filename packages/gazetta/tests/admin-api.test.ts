@@ -21,7 +21,7 @@ beforeAll(async () => {
   await rm(projectRoot, { recursive: true, force: true })
   await cp(realStarter, projectRoot, {
     recursive: true,
-    filter: (src) => !src.includes('/dist') && !src.includes('/node_modules') && !src.includes('/.tmp'),
+    filter: src => !src.includes('/dist') && !src.includes('/node_modules') && !src.includes('/.tmp'),
   })
   // Target-rooted source: storage points at targets/local, siteDir is '',
   // projectSiteDir is the actual project site directory.
@@ -32,7 +32,7 @@ beforeAll(async () => {
   })
   app = createAdminApp({
     source,
-    siteDir: projectSiteDir,  // used for templatesDir/adminDir defaults
+    siteDir: projectSiteDir, // used for templatesDir/adminDir defaults
     templatesDir: resolve(projectRoot, 'templates'),
     adminDir: resolve(projectRoot, 'admin'),
   })
@@ -228,7 +228,7 @@ describe('POST /preview/*', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        overrides: { 'hero': { title: 'Draft Title', subtitle: 'Draft Subtitle' } },
+        overrides: { hero: { title: 'Draft Title', subtitle: 'Draft Subtitle' } },
       }),
     })
     expect(res.status).toBe(200)
@@ -351,7 +351,13 @@ describe('PUT /api/pages/:name (update component content)', () => {
     // Restore original
     const restored = updated.components.map((c: any) => {
       if (typeof c === 'object' && c.name === 'hero') {
-        return { ...c, content: { title: 'Welcome to Gazetta', subtitle: 'A stateless CMS that composes pages from reusable components' } }
+        return {
+          ...c,
+          content: {
+            title: 'Welcome to Gazetta',
+            subtitle: 'A stateless CMS that composes pages from reusable components',
+          },
+        }
       }
       return c
     })

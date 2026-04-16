@@ -5,11 +5,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { TargetInfo } from '../src/client/api/client.js'
-import {
-  isSavingToProd,
-  saveButtonLabel,
-  saveButtonSeverity,
-} from '../src/client/composables/saveButtonBinding.js'
+import { isSavingToProd, saveButtonLabel, saveButtonSeverity } from '../src/client/composables/saveButtonBinding.js'
 
 const LOCAL: TargetInfo = { name: 'local', environment: 'local', type: 'static', editable: true }
 const STAGING: TargetInfo = { name: 'staging', environment: 'staging', type: 'static', editable: true }

@@ -58,8 +58,7 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   // 1. Validate + hash templates
   const scan = opts.scanTemplates ?? scanTemplates
   const templateInfos = await scan(opts.templatesDir, opts.projectRoot)
-  const invalidTemplates = templateInfos.filter(t => !t.valid)
-    .map(t => ({ name: t.name, errors: t.errors }))
+  const invalidTemplates = templateInfos.filter(t => !t.valid).map(t => ({ name: t.name, errors: t.errors }))
   const templateHashes = templateHashesFrom(templateInfos)
 
   // 2. Load local site, compute manifest hashes.
@@ -104,9 +103,7 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   }
 
   const local = new Map<string, string>()
-  const pageHashOpts = opts.type === 'static'
-    ? { templateHashes, fragmentHashes }
-    : { templateHashes }
+  const pageHashOpts = opts.type === 'static' ? { templateHashes, fragmentHashes } : { templateHashes }
   for (const [name, page] of site.pages) {
     // Source sidecars are written without fragmentHashes (source doesn't
     // know target's type). For static targets we must re-hash.
@@ -153,4 +150,3 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
 
   return result
 }
-

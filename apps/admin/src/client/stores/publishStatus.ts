@@ -29,10 +29,13 @@ export const usePublishStatusStore = defineStore('publishStatus', () => {
    * "everything is dirty" dots when the chosen target happens to be empty.
    * Falls back to the first listed target if no comparison succeeds.
    */
-  async function pickInformativeTarget(targets: TargetInfo[], signal: AbortSignal): Promise<{ name: string; result: CompareResult } | null> {
+  async function pickInformativeTarget(
+    targets: TargetInfo[],
+    signal: AbortSignal,
+  ): Promise<{ name: string; result: CompareResult } | null> {
     const ordered = [
       ...ENV_PRIORITY.flatMap(env => targets.filter(t => t.environment === env)),
-      ...targets.filter(t => !ENV_PRIORITY.includes(t.environment as typeof ENV_PRIORITY[number])),
+      ...targets.filter(t => !ENV_PRIORITY.includes(t.environment as (typeof ENV_PRIORITY)[number])),
     ]
     let firstPublishCandidate: { name: string; result: CompareResult } | null = null
     for (const t of ordered) {

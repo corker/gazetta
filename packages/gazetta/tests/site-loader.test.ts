@@ -49,7 +49,7 @@ describe('loadSite', () => {
     expect(site.pages.size).toBe(2)
     expect(site.pages.has('home')).toBe(true)
     expect(site.pages.has('about')).toBe(true)
-    expect(site.pages.get('home')!.route).toBe('/')  // derived from folder name 'home'
+    expect(site.pages.get('home')!.route).toBe('/') // derived from folder name 'home'
     spy.mockRestore()
   })
 
@@ -118,7 +118,11 @@ describe('loadSite', () => {
   it('loads the real starter site', async () => {
     const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
     // Content lives inside the local target (post-transformation layout).
-    const site = await loadSite({ siteDir: resolve(projectRoot, 'sites/main/targets/local'), storage, templatesDir: resolve(projectRoot, 'templates') })
+    const site = await loadSite({
+      siteDir: resolve(projectRoot, 'sites/main/targets/local'),
+      storage,
+      templatesDir: resolve(projectRoot, 'templates'),
+    })
     expect(site.manifest.name).toBe('Gazetta Starter')
     expect(site.pages.size).toBeGreaterThanOrEqual(3)
     expect(site.fragments.size).toBe(2)

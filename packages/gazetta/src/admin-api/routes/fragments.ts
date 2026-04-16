@@ -7,7 +7,7 @@ import type { SourceContextResolver } from '../source-context.js'
 export function fragmentRoutes(resolve: SourceContextResolver) {
   const app = new Hono()
 
-  app.get('/api/fragments', async (c) => {
+  app.get('/api/fragments', async c => {
     const source = await resolve(c.req.query('target'))
     // Empty target → empty list. See pages.ts for rationale.
     try {
@@ -24,10 +24,10 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     }
   })
 
-  app.post('/api/fragments', async (c) => {
+  app.post('/api/fragments', async c => {
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
-    const body = await c.req.json() as { name: string; template: string }
+    const body = (await c.req.json()) as { name: string; template: string }
     if (!body.name || !body.template) {
       return c.json({ error: 'Missing required fields: name, template' }, 400)
     }
@@ -46,7 +46,7 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     return c.json({ ok: true, name: body.name })
   })
 
-  app.get('/api/fragments/:name', async (c) => {
+  app.get('/api/fragments/:name', async c => {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const site = await loadSite({ contentRoot: source.contentRoot })
@@ -61,7 +61,7 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     })
   })
 
-  app.put('/api/fragments/:name', async (c) => {
+  app.put('/api/fragments/:name', async c => {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
@@ -94,7 +94,7 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     return c.json({ ok: true })
   })
 
-  app.delete('/api/fragments/:name', async (c) => {
+  app.delete('/api/fragments/:name', async c => {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const { storage } = source

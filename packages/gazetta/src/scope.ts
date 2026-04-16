@@ -37,4 +37,3 @@ export function scopeCss(css: string, scopeId: string): string {
 
   return result
 }
-
