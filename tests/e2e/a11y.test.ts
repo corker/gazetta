@@ -42,11 +42,6 @@ const BASELINE: Array<{ id: string; reason: string }> = [
     reason: 'several rjsf form inputs render without associated <label> — needs custom field wrapper fix',
   },
   {
-    id: 'frame-title',
-    reason:
-      "preview <iframe> lacks title attr — trivial add but requires tying into ActiveTargetIndicator's dynamic label",
-  },
-  {
     id: 'nested-interactive',
     reason: 'PrimeVue Checkbox inside a clickable row label; library-level issue with a clean fix via role=group',
   },
