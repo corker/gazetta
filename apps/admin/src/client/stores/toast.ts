@@ -40,8 +40,16 @@ export const useToastStore = defineStore('toast', () => {
     // Errors stay until the user dismisses them — they need to be readable
     // long enough to act on. Successes auto-dismiss. Info is transient but
     // longer than success so the user has time to act on any attached action.
+    //
+    // Toasts with an action (Undo, back-to-previous-target) get a longer
+    // window too: the user needs time to notice the affordance before it
+    // disappears.
     const explicit = opts?.duration
-    const defaultDuration = type === 'error' ? 0 : type === 'info' ? 6000 : 3000
+    const hasAction = !!opts?.action
+    const defaultDuration = type === 'error' ? 0
+      : type === 'info' ? 6000
+      : hasAction ? 6000
+      : 3000
     const duration = explicit ?? defaultDuration
     if (duration > 0) timer = setTimeout(() => { current.value = null; timer = null }, duration)
   }
@@ -54,15 +62,21 @@ export const useToastStore = defineStore('toast', () => {
     show(friendly, { type: 'error' })
   }
 
-  /** Run the action (if any) and auto-dismiss on completion. */
+  /**
+   * Run the active toast's action. The handler typically shows a
+   * follow-up toast ("Undone", "Restored") — which `show` installs as
+   * the new `current`. We DON'T dismiss on our own: the follow-up
+   * toast's own lifecycle (success auto-dismiss, error sticky) decides
+   * visibility from there. Dismissing here would race with the follow-
+   * up's show and clear it immediately.
+   *
+   * If the handler throws, it's expected to call `toast.showError` in
+   * its own catch — no further work to do here.
+   */
   async function runAction() {
     const action = current.value?.action
     if (!action) return
-    try {
-      await action.handler()
-    } finally {
-      dismiss()
-    }
+    await action.handler()
   }
 
   return { current, show, showError, dismiss, runAction }

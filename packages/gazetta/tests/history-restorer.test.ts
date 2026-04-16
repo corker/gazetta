@@ -148,6 +148,42 @@ describe('restoreRevision', () => {
     expect(restored.message).toBe('Undo typo fix')
   })
 
+  it('skips writes for items whose content already matches the restored snapshot', async () => {
+    // Two items; only pages/home differs between revisions. pages/about
+    // stays the same.
+    storage.seed({
+      'pages/home/page.json': 'home-v1',
+      'pages/about/page.json': 'about-same',
+    })
+    const history = createHistoryProvider({ storage })
+    const contentRoot = createContentRoot(storage)
+
+    const firstSave = await recordWrite({ history, contentRoot, operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'home-v1' }] })
+    storage.seed({ 'pages/home/page.json': 'home-v2' })
+    await recordWrite({ history, contentRoot, operation: 'save',
+      items: [{ path: 'pages/home/page.json', content: 'home-v2' }] })
+
+    // Instrument writeFile to count invocations during restore.
+    const origWrite = storage.writeFile
+    let writeCount = 0
+    storage.writeFile = async (p, c) => {
+      // Ignore history-internal writes (blobs + manifest + index) —
+      // they're part of the forward revision, not the content tree
+      // restore we're checking.
+      if (!p.startsWith('.gazetta/')) writeCount += 1
+      return origWrite.call(storage, p, c)
+    }
+
+    await restoreRevision({ history, contentRoot, revisionId: firstSave.id })
+
+    // Only pages/home needed to change — pages/about's hash matches
+    // the current head so the restorer should skip it.
+    expect(writeCount).toBe(1)
+    expect(await storage.readFile('pages/home/page.json')).toBe('home-v1')
+    expect(await storage.readFile('pages/about/page.json')).toBe('about-same')
+  })
+
   it('restoring the head is a no-op delete + a forward revision with identical snapshot', async () => {
     storage.seed({ 'pages/home/page.json': 'v1' })
     const history = createHistoryProvider({ storage })

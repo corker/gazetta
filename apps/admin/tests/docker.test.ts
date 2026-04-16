@@ -22,13 +22,33 @@ const composeDir = resolve(import.meta.dirname, '../../..')
 
 let env: StartedDockerComposeEnvironment
 let minioEndpoint: string
-let azuritePort: number
+let azuriteConnectionString: string
 
 beforeAll(async () => {
   env = await new DockerComposeEnvironment(composeDir, 'docker-compose.yml').up()
 
-  minioEndpoint = 'http://localhost:9000'
-  azuritePort = 10000
+  // Ports are unmapped in docker-compose.yml so parallel test runs /
+  // locally-running Azurite don't collide on the fixed 10000 / 9000.
+  // Discover the actual host-bound ports via testcontainers.
+  const minio = env.getContainer('minio-1')
+  minioEndpoint = `http://localhost:${minio.getMappedPort(9000)}`
+
+  const azurite = env.getContainer('azurite-1')
+  const blobPort = azurite.getMappedPort(10000)
+  const queuePort = azurite.getMappedPort(10001)
+  const tablePort = azurite.getMappedPort(10002)
+  // Full dev connection string (what `UseDevelopmentStorage=true`
+  // expands to internally), with the discovered host ports.
+  // AccountName/AccountKey are the well-known Azurite dev credentials.
+  const accountName = 'devstoreaccount1'
+  const accountKey = 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=='
+  azuriteConnectionString =
+    `DefaultEndpointsProtocol=http;` +
+    `AccountName=${accountName};` +
+    `AccountKey=${accountKey};` +
+    `BlobEndpoint=http://127.0.0.1:${blobPort}/${accountName};` +
+    `QueueEndpoint=http://127.0.0.1:${queuePort}/${accountName};` +
+    `TableEndpoint=http://127.0.0.1:${tablePort}/${accountName}`
 }, 120000)
 
 afterAll(async () => {
@@ -117,7 +137,7 @@ describe('Azure Blob publish (Azurite)', () => {
 
   beforeAll(async () => {
     blobProvider = createAzureBlobProvider({
-      connectionString: 'UseDevelopmentStorage=true',
+      connectionString: azuriteConnectionString,
       container: 'gazetta-test',
     })
     await blobProvider.init()
