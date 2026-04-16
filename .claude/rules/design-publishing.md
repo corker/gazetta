@@ -165,9 +165,24 @@ never destroyed. Full audit trail preserved.
 
 ### Retention
 
-Per-target configurable, default **keep last 50 revisions**. When the limit is hit, the
-oldest revision is evicted (its manifest deleted from `revisions/`, removed from
-`index.json`). Orphaned blobs in `objects/` are garbage-collected (lazy or on eviction).
+Per-target configurable via the `history` block in `site.yaml`, default **keep last 50
+revisions**. When the limit is hit, the oldest revision is evicted (its manifest deleted
+from `revisions/`, removed from `index.json`). Orphaned blobs in `objects/` are
+garbage-collected lazily — a future `gazetta gc` command walks all manifests and prunes
+unreferenced blobs.
+
+```yaml
+targets:
+  staging:
+    storage: { type: filesystem, path: ./dist/staging }
+    history:
+      enabled: true      # default; set to false to skip .gazetta/history/ entirely
+      retention: 100     # default 50
+```
+
+Use `enabled: false` to disable history on a target where the storage cost isn't
+worth it (ephemeral CI preview targets, for example). Disabling on production
+removes the undo safety net — not recommended.
 
 ### Conflict handling
 

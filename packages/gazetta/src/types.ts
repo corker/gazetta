@@ -149,6 +149,25 @@ export interface TargetConfig {
   /** Base URL of the site (e.g. https://gazetta.studio) */
   siteUrl?: string
   cache?: CacheConfig
+  /**
+   * Per-target history / revisions (undo, rollback). Default: enabled
+   * with 50-revision retention. Set `{ enabled: false }` to disable
+   * entirely (no `.gazetta/history/` writes on save/publish) for
+   * targets where the storage cost isn't worth it (e.g., ephemeral CI
+   * preview targets).
+   */
+  history?: HistoryConfig
+}
+
+/** Per-target history configuration. */
+export interface HistoryConfig {
+  /** Record revisions on save/publish. Default: true. */
+  enabled?: boolean
+  /**
+   * Keep at most N most-recent revisions; oldest evicted on write.
+   * Default: 50.
+   */
+  retention?: number
 }
 
 /** Determine rendering type for a target — centralised logic used by CLI and admin API */
@@ -167,6 +186,25 @@ export function getEnvironment(target: TargetConfig): TargetEnvironment {
  */
 export function isEditable(target: TargetConfig): boolean {
   return target.editable ?? (getEnvironment(target) === 'local')
+}
+
+/** Default retention: keep the last 50 revisions. Matches design-publishing.md. */
+export const DEFAULT_HISTORY_RETENTION = 50
+
+/** Whether this target records history on save/publish. Default: true. */
+export function isHistoryEnabled(target: TargetConfig): boolean {
+  return target.history?.enabled ?? true
+}
+
+/**
+ * Effective retention (max revisions) for this target. Defaults to
+ * `DEFAULT_HISTORY_RETENTION`. Values ≤ 0 are clamped to 1 — retaining
+ * zero revisions would mean every write evicts itself, which is
+ * confusing; use `enabled: false` to disable entirely.
+ */
+export function getHistoryRetention(target: TargetConfig): number {
+  const raw = target.history?.retention ?? DEFAULT_HISTORY_RETENTION
+  return raw > 0 ? raw : 1
 }
 
 /** Site manifest (site.yaml) */
