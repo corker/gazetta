@@ -23,12 +23,16 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
-import { api, type PublishResult } from '../api/client.js'
+import type { PublishResult } from '../api/client.js'
+import { usePublishApi, useHistoryApi } from '../composables/api.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useSyncStatusStore } from '../stores/syncStatus.js'
 import { useToastStore } from '../stores/toast.js'
 import { groupedEntries, type TargetGroup } from '../composables/targetGrouping.js'
 import PublishItemList from './PublishItemList.vue'
+
+const publishApi = usePublishApi()
+const historyApi = useHistoryApi()
 
 const props = defineProps<{
   visible: boolean
@@ -155,7 +159,7 @@ function resetPublishState() {
 async function undoPublish(targetName: string) {
   if (undoneTargets.value.has(targetName)) return
   try {
-    await api.undoLastWrite(targetName)
+    await historyApi.undoLastWrite(targetName)
     const next = new Set(undoneTargets.value)
     next.add(targetName)
     undoneTargets.value = next
@@ -188,7 +192,7 @@ async function runPublish() {
   invalidTemplates.value = []
   progress.value = new Map(dests.map(d => [d, { current: 0, total: 0, label: 'pending…', status: 'pending' as const }]))
   try {
-    const finalResults = await api.publishStream(items, dests, (ev) => {
+    const finalResults = await publishApi.publishStream(items, dests, (ev) => {
       if (ev.kind === 'target-start') {
         const m = new Map(progress.value)
         m.set(ev.target, { current: 0, total: ev.total, label: 'starting…', status: 'in-progress' })

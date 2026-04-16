@@ -22,8 +22,12 @@ import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useToastStore } from '../stores/toast.js'
 import { groupedEntries } from '../composables/targetGrouping.js'
-import { api, type TargetInfo } from '../api/client.js'
+import { usePagesApi, useFragmentsApi } from '../composables/api.js'
+import type { TargetInfo } from '../api/client.js'
 import HistoryPanel from './HistoryPanel.vue'
+
+const pagesApi = usePagesApi()
+const fragmentsApi = useFragmentsApi()
 
 const activeTarget = useActiveTargetStore()
 const editing = useEditingStore()
@@ -156,10 +160,10 @@ async function checkItemOnTarget(
 ): Promise<'ok' | 'missing'> {
   try {
     if (type === 'page') {
-      const list = await api.getPages({ target })
+      const list = await pagesApi.getPages({ target })
       return list.some(p => p.name === itemName) ? 'ok' : 'missing'
     } else {
-      const list = await api.getFragments({ target })
+      const list = await fragmentsApi.getFragments({ target })
       return list.some(f => f.name === itemName) ? 'ok' : 'missing'
     }
   } catch {

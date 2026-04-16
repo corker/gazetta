@@ -3,13 +3,16 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { onKeyStroke } from '@vueuse/core'
 import { useThemeStore } from '../stores/theme.js'
-import { api } from '../api/client.js'
+import { usePagesApi, useFragmentsApi, useTemplatesApi } from '../composables/api.js'
 import type { EditorMount, FieldMount } from 'gazetta/types'
 import { createEditorMount } from 'gazetta/editor'
 
 const theme = useThemeStore()
 const router = useRouter()
 const route = useRoute()
+const pagesApi = usePagesApi()
+const fragmentsApi = useFragmentsApi()
+const templatesApi = useTemplatesApi()
 
 // ESC exits playground — matches edit mode + fullscreen pattern
 onKeyStroke('Escape', () => {
@@ -48,13 +51,13 @@ let currentMount: { unmount: (el: HTMLElement) => void } | null = null
 async function loadSidebar() {
   loading.value = true
   try {
-    const [tpl, fld] = await Promise.all([api.getTemplates(), api.getFields()])
+    const [tpl, fld] = await Promise.all([templatesApi.getTemplates(), templatesApi.getFields()])
 
     // Check which templates have custom editors — one lightweight call each
     const items: TemplateItem[] = []
     for (const t of tpl) {
       try {
-        const resp = await api.getTemplateSchema(t.name) as Record<string, unknown> & { hasEditor?: boolean }
+        const resp = await templatesApi.getTemplateSchema(t.name) as Record<string, unknown> & { hasEditor?: boolean }
         items.push({ name: t.name, hasEditor: !!resp.hasEditor })
       } catch {
         items.push({ name: t.name, hasEditor: false })
@@ -120,7 +123,7 @@ async function selectEditor(name: string) {
   schemaLoading.value = true
   mountError.value = null
   try {
-    const resp = await api.getTemplateSchema(name) as Record<string, unknown> & { hasEditor?: boolean; editorUrl?: string; fieldsBaseUrl?: string }
+    const resp = await templatesApi.getTemplateSchema(name) as Record<string, unknown> & { hasEditor?: boolean; editorUrl?: string; fieldsBaseUrl?: string }
     const { hasEditor, editorUrl, fieldsBaseUrl, ...schema } = resp
 
     // Try to find real content from a page that uses this template
@@ -141,7 +144,7 @@ async function selectField(name: string) {
   let fieldsBaseUrl = ''
   if (templates.value.length) {
     try {
-      const resp = await api.getTemplateSchema(templates.value[0].name) as Record<string, unknown> & { fieldsBaseUrl?: string }
+      const resp = await templatesApi.getTemplateSchema(templates.value[0].name) as Record<string, unknown> & { fieldsBaseUrl?: string }
       fieldsBaseUrl = resp.fieldsBaseUrl ?? ''
     } catch { /* ignore */ }
   }
@@ -154,17 +157,17 @@ async function selectField(name: string) {
 async function findRealContent(templateName: string): Promise<Record<string, unknown> | undefined> {
   try {
     // Check top-level pages and fragments first
-    const [pages, frags] = await Promise.all([api.getPages(), api.getFragments()])
+    const [pages, frags] = await Promise.all([pagesApi.getPages(), fragmentsApi.getFragments()])
 
     for (const p of pages) {
       if (p.template === templateName) {
-        const detail = await api.getPage(p.name)
+        const detail = await pagesApi.getPage(p.name)
         if (detail.content && Object.keys(detail.content).length > 0) return detail.content
       }
     }
     for (const f of frags) {
       if (f.template === templateName) {
-        const detail = await api.getFragment(f.name)
+        const detail = await fragmentsApi.getFragment(f.name)
         if (detail.content && Object.keys(detail.content).length > 0) return detail.content
       }
     }
@@ -183,13 +186,13 @@ async function findRealContent(templateName: string): Promise<Record<string, unk
     }
 
     for (const p of pages) {
-      const detail = await api.getPage(p.name)
+      const detail = await pagesApi.getPage(p.name)
       if (!detail.components) continue
       const found = findInlineContent(detail.components, templateName)
       if (found) return found
     }
     for (const f of frags) {
-      const detail = await api.getFragment(f.name)
+      const detail = await fragmentsApi.getFragment(f.name)
       if (!detail.components) continue
       const found = findInlineContent(detail.components, templateName)
       if (found) return found
