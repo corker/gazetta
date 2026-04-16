@@ -3,8 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
+  # No base-branch filter — CI runs on every PR, including stacked ones
+  # whose base is another feature branch. Without this, stacked PRs show
+  # zero checks until they're retargeted to main.
   pull_request:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
