@@ -228,14 +228,28 @@ this is nightly-only for a reason. When raising `thresholds.break`, do it gradua
 
 ---
 
-#### ☐ 3.2 Contract tests via shared Zod schemas
+#### ◐ 3.2 Contract tests via shared Zod schemas
 
-Admin UI and admin API share no schema source → drift risk. Zod is already in both
-workspaces.
+First slice landed: `POST /api/pages` now has a Zod schema in
+[packages/gazetta/src/admin-api/schemas/pages.ts](../../packages/gazetta/src/admin-api/schemas/pages.ts),
+exposed via a new subpath export `gazetta/admin-api/schemas`. Server validates with
+`safeParse()`, client derives request/response types via `z.infer`.
 
-**Approach:** export Zod schemas from
-[packages/gazetta/src/admin-api/](../../packages/gazetta/src/admin-api/); import on the
-client; validate at the boundary.
+**Pattern established:**
+- Schemas live under `src/admin-api/schemas/{endpoint}.ts`
+- Re-exported from `schemas/index.ts` (barrel)
+- Subpath export keeps Hono + storage providers off the client's type graph
+- Contract test at
+  [apps/admin/tests/api-contract.test.ts](../../apps/admin/tests/api-contract.test.ts)
+  asserts value-level conformance (compile-time drift is already caught by `z.infer`)
+
+**Drift caught while landing:** The client's `createPage` body type was `{ name, template }`
+but the server already accepted an optional `content` field. The schema made this visible
+and the migration widened the client type to match.
+
+**Follow-ups (per-endpoint migration):** The remaining 20+ routes still use hand-rolled
+shape checks. Each migration is mechanical — same pattern, one PR per route group.
+Good starter tickets.
 
 **Skip:** Pact — overkill for single consumer/provider.
 

@@ -107,7 +107,19 @@ async function publishStream(
   return results
 }
 
-export interface PageSummary { name: string; route: string; template: string }
+// PageSummary / CreatePageRequest / CreatePageResponse come from the
+// shared schema source-of-truth in gazetta/admin-api/schemas. Any
+// drift between these and the server's Zod schema is a compile error
+// at build time — enforced here rather than at runtime.
+import type {
+  PageSummary as PageSummaryShape,
+  CreatePageRequest as CreatePageRequestShape,
+  CreatePageResponse as CreatePageResponseShape,
+} from 'gazetta/admin-api/schemas'
+export type PageSummary = PageSummaryShape
+export type CreatePageRequest = CreatePageRequestShape
+export type CreatePageResponse = CreatePageResponseShape
+
 export interface FragmentSummary { name: string; template: string }
 export interface TemplateSummary { name: string }
 export interface FieldSummary { name: string; path: string }
@@ -168,7 +180,7 @@ export const api = {
   getPages: (opts?: { target?: string }) =>
     request<PageSummary[]>(opts?.target ? `/pages?target=${encodeURIComponent(opts.target)}` : '/pages'),
   getPage: (name: string, options?: RequestInit) => request<PageDetail>(`/pages/${name}`, options),
-  createPage: (data: { name: string; template: string }) => request<{ ok: boolean; name: string }>('/pages', { method: 'POST', body: JSON.stringify(data) }),
+  createPage: (data: CreatePageRequest) => request<CreatePageResponse>('/pages', { method: 'POST', body: JSON.stringify(data) }),
   deletePage: (name: string) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'DELETE' }),
   updatePage: (name: string, data: Partial<PageDetail>) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
   /** List fragments. See getPages for the `target` option. */
