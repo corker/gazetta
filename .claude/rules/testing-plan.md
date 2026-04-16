@@ -408,12 +408,23 @@ files stay on `.test.ts` and are excluded via `testIgnore`.
 
 ---
 
-#### ☐ Phase 2 — Page Objects
+#### ◐ Phase 2 — Page Objects
 
-- Build `PublishPanel`, `SiteTree`, `ComponentTree` POMs
-- Adopt in heaviest tests first; iterate — don't big-bang
+First POM landed: [PublishPanelPom](../../tests/e2e/pages/PublishPanel.ts). Covers the
+full Publish-panel surface — opening, source/destinations, items, publish action (with
+prod confirmation variant), status surfaces (confirm banner, invalid-templates, progress,
+per-target results). Migrated the full `Publish panel` describe in
+[publish.spec.ts](../../tests/e2e/publish.spec.ts) — 14 tests, test count unchanged,
+pass rate unchanged.
 
-**Estimate:** ~1 day.
+**Pattern:** POMs live under `tests/e2e/pages/`, one file per surface. Composition, no
+inheritance — each POM takes a `page` in the constructor. Methods expose user-level
+actions; getters expose locators; assertions stay in the tests. Matches
+[Playwright POM docs](https://playwright.dev/docs/pom).
+
+**Follow-ups:** SiteTreePom + ComponentTreePom — deferred to PRs that actually migrate
+tests using them. Building POMs without consumers is dead code; adding a POM with its
+first migration keeps the API honest.
 
 ---
 
