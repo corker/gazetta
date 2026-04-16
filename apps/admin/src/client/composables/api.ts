@@ -34,6 +34,7 @@ import {
   type PublishProgress,
   type CompareResult,
   type RevisionSummary,
+  type DependentsResponse,
 } from '../api/client.js'
 
 // ---- Pages -----------------------------------------------------------------
@@ -58,7 +59,7 @@ export interface FragmentsApi {
   createFragment(data: { name: string; template: string }): Promise<{ ok: boolean; name: string }>
   deleteFragment(name: string): Promise<{ ok: boolean }>
   updateFragment(name: string, data: Partial<FragmentDetail>): Promise<{ ok: boolean }>
-  getDependents(item: string, options?: RequestInit): Promise<{ pages: string[]; fragments: string[] }>
+  getDependents(item: string, options?: RequestInit): Promise<DependentsResponse>
 }
 export const FRAGMENTS_API: InjectionKey<FragmentsApi> = Symbol('FragmentsApi')
 export function useFragmentsApi(): FragmentsApi {

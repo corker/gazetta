@@ -129,6 +129,8 @@ import type {
   TargetInfo as TargetInfoShape,
   TargetEnvironment as TargetEnvironmentShape,
   TargetType as TargetTypeShape,
+  SiteManifest as SiteManifestShape,
+  DependentsResponse as DependentsResponseShape,
 } from 'gazetta/admin-api/schemas'
 export type PageSummary = PageSummaryShape
 export type CreatePageRequest = CreatePageRequestShape
@@ -141,11 +143,8 @@ export type FieldSummary = FieldSummaryShape
 export type TargetInfo = TargetInfoShape
 export type TargetEnvironment = TargetEnvironmentShape
 export type TargetType = TargetTypeShape
-export interface SiteManifest {
-  name: string
-  version?: string
-  systemPages?: string[]
-}
+export type SiteManifest = SiteManifestShape
+export type DependentsResponse = DependentsResponseShape
 
 export interface InlineComponent {
   name: string
@@ -229,7 +228,7 @@ export const api = {
     return request<CompareResult>(`/compare${qs}`, options)
   },
   getDependents: (item: string, options?: RequestInit) =>
-    request<{ pages: string[]; fragments: string[] }>(`/dependents?item=${encodeURIComponent(item)}`, options),
+    request<DependentsResponse>(`/dependents?item=${encodeURIComponent(item)}`, options),
   fetchFromTarget: (source: string, items?: string[]) =>
     request<{ success: boolean; copiedFiles: number; items: string[] }>('/fetch', {
       method: 'POST',
