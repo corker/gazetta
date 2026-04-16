@@ -163,18 +163,24 @@ is a legitimate testcontainers approach — it manages lifecycle programmaticall
 
 ---
 
-#### ☐ 2.3 Accessibility scans in e2e
+#### ◐ 2.3 Accessibility scans in e2e
 
-Zero a11y assertions. PrimeVue claims WCAG 2.1 AA with
-[open issues](https://github.com/primefaces/primevue/issues/7949); custom chrome
-(env-colored indicators, read-only states) has no coverage.
+Landed via `@axe-core/playwright` in [tests/e2e/a11y.test.ts](../../tests/e2e/a11y.test.ts).
+Four surfaces scanned (site tree, editor view, Publish panel, active-target switcher).
 
-**Stack:** `@axe-core/playwright` (Deque-maintained) in the existing e2e suite.
+**Baseline allowlist pattern:** 5 known violations tracked in the test file's `BASELINE`
+array — each entry names a rule id + the reason it's deferred. New violations not in the
+allowlist fail CI; fixes remove entries. Known debt at introduction (2026-04-16):
 
-**Skip:** Vitest-level a11y via `@chialab/vitest-axe` — viable but adds a dependency for
-marginal gain over e2e coverage.
+- `color-contrast` — tinted state colors below 4.5:1 in dark mode
+- `button-name` — icon-only buttons need aria-label audit
+- `label` — rjsf inputs rendering without labels
+- `frame-title` — preview iframe missing dynamic title
+- `nested-interactive` — PrimeVue Checkbox inside clickable row
 
-**Estimate:** ~0.5 day.
+**Remaining work:** burn down the BASELINE entries as fixes land.
+
+**Skipped:** Vitest-level a11y via `@chialab/vitest-axe` — e2e coverage is sufficient.
 
 ---
 

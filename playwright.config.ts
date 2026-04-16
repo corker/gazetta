@@ -21,7 +21,11 @@ export default defineConfig({
   projects: [
     {
       name: 'dev',
-      testMatch: 'editor.test.ts',
+      // editor.test.ts is the big feature suite; additional dev-admin spec
+      // files (e.g. a11y.test.ts) opt in by matching this glob. Excludes
+      // the production-* files which run against pre-built admins on fixed
+      // ports in their own projects.
+      testMatch: /^(?!production(?:-|\.)).*\.test\.ts$/,
       // baseURL is set per-worker by the testSite fixture in tests/e2e/fixtures.ts
     },
     {

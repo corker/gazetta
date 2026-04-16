@@ -22,6 +22,7 @@
     "smoke": "bash scripts/smoke-publish.sh"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@playwright/test": "^1.59.1",
     "playwright": "^1.59.1",
     "react": "^19.2.0",
