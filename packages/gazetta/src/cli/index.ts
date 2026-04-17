@@ -694,16 +694,21 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
         console.log(`    ${c.dim('· sitemap.xml')}`)
       }
 
-      // robots.txt: user file wins, else generate default
-      let robotsTxt: string
-      try {
-        robotsTxt = await source.contentRoot.storage.readFile(source.contentRoot.path('robots.txt'))
-      } catch {
-        robotsTxt = generateRobotsTxt({ baseUrl })
+      // robots.txt: only at the domain root — Google ignores robots.txt at
+      // subpaths. If siteUrl has a path component, the domain root belongs
+      // to someone else (host, reverse proxy, another app).
+      const isRootDeploy = !new URL(baseUrl).pathname.replace(/\/+$/, '')
+      if (isRootDeploy) {
+        let robotsTxt: string
+        try {
+          robotsTxt = await source.contentRoot.storage.readFile(source.contentRoot.path('robots.txt'))
+        } catch {
+          robotsTxt = generateRobotsTxt({ baseUrl })
+        }
+        await targetStorage.writeFile('robots.txt', robotsTxt)
+        totalFiles++
+        console.log(`    ${c.dim('· robots.txt')}`)
       }
-      await targetStorage.writeFile('robots.txt', robotsTxt)
-      totalFiles++
-      console.log(`    ${c.dim('· robots.txt')}`)
     }
 
     const removedMsg = totalRemoved > 0 ? c.dim(` (${totalRemoved} old files cleaned)`) : ''
