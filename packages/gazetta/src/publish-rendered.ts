@@ -53,6 +53,8 @@ export async function publishPageRendered(
   templatesDir?: string,
   manifestHash?: string,
   preloadedSite?: Site,
+  /** SEO context for the fallback chain — caller builds from manifest + target config. */
+  seo?: import('./seo.js').SeoContext,
 ): Promise<{ files: number; removed: number }> {
   // Reuse a preloaded site when the caller already has one (runPublish loops
   // over N items; loading per-item was quadratic). loadSite is idempotent.
@@ -128,9 +130,23 @@ export async function publishPageRendered(
     fileCount++
   }
 
+  // SEO tags from the fallback chain — same logic as renderPage uses for
+  // static publish. Template head parts are checked for duplicates so the
+  // renderer doesn't double-emit tags the template already provides.
+  const { resolveSeoTags, escapeAttr } = await import('./seo.js')
+  const templateHead = localHeadParts.join('\n')
+  const seoHead = resolveSeoTags({
+    metadata: page.metadata,
+    content: page.content,
+    route: page.route,
+    seo: seo ?? {},
+    templateHead,
+  })
+
   const headContent = [
     `<meta charset="UTF-8">`,
     `<meta name="viewport" content="width=device-width, initial-scale=1.0">`,
+    seoHead,
     ...localHeadParts,
     pageCssLink,
     ...esiHeadTags,
@@ -140,6 +156,7 @@ export async function publishPageRendered(
     .join('\n  ')
 
   const bodyContent = bodyParts.join('\n')
+  const lang = seo?.locale || 'en'
 
   // Resolve cache config: page → target → defaults
   const browser = page.cache?.browser ?? targetCache?.browser ?? 0
@@ -147,7 +164,7 @@ export async function publishPageRendered(
   const cacheComment = `<!--cache:browser=${browser},edge=${edge}-->\n`
 
   const html = `${cacheComment}<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeAttr(lang)}">
 <head>
   ${headContent}
 </head>

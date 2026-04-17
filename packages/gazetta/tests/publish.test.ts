@@ -261,11 +261,9 @@ describe('publishRendered', () => {
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<!--esi:/fragments/header/index.html-->')
     expect(html).toContain('Welcome to Gazetta')
-    // Note: ESI publish path assembles <head> from per-component output,
-    // not via renderPage. SEO fallback chain doesn't run here — <title>
-    // must come from template head or be added to the ESI assembly.
-    // Template no longer emits <title> (renderer owns it), so ESI pages
-    // currently lack it. This is a known gap to fix separately.
+    // ESI publish path now runs resolveSeoTags for <head> SEO injection.
+    // metadata.title wins via the fallback chain.
+    expect(html).toContain('<title>Gazetta — Composable CMS</title>')
 
     // Check hashed CSS exists
     const entries = await target.readDir('pages/home')
