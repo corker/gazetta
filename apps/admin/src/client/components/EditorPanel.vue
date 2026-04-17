@@ -8,6 +8,7 @@ import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from 'gazetta/editor'
 import type { EditorMount } from 'gazetta/types'
 import FragmentBlastRadius from './FragmentBlastRadius.vue'
+import PageMetadataEditor from './PageMetadataEditor.vue'
 
 const editing = useEditingStore()
 const selection = useSelectionStore()
@@ -73,13 +74,14 @@ onKeyStroke('s', e => {
       <i class="pi pi-pencil" style="font-size: 2rem; opacity: 0.3; margin-bottom: 0.5rem;" />
       <p>Select a component to edit</p>
     </div>
-    <div v-else>
+    <div v-else class="editor-active">
       <div class="editor-header">
         <h3>{{ editing.template }}</h3>
         <FragmentBlastRadius v-if="fragmentName" :fragmentName="fragmentName" />
       </div>
       <div v-if="hasProperties" ref="containerRef" class="editor-container" data-testid="editor-container" :key="editing.path" />
       <p v-else class="editor-no-schema">No editable content. Edit its children instead.</p>
+      <PageMetadataEditor v-if="selection.type === 'page'" />
     </div>
   </div>
 </template>
