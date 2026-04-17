@@ -324,6 +324,74 @@ describe('PUT /api/pages/:name', () => {
   })
 })
 
+describe('PUT /api/pages/:name (metadata round-trip)', () => {
+  afterAll(async () => {
+    await rm(resolve(localTargetDir, 'pages/meta-test'), { recursive: true, force: true })
+  })
+
+  it('saves and retrieves metadata', async () => {
+    // Create page
+    await app.request('/api/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'meta-test', template: 'page-default' }),
+    })
+
+    // Set metadata
+    const res = await app.request('/api/pages/meta-test', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        metadata: {
+          title: 'SEO Title',
+          description: 'SEO desc',
+          ogImage: '/img.jpg',
+          canonical: 'https://example.com/meta-test',
+          robots: 'noindex',
+        },
+      }),
+    })
+    expect(res.status).toBe(200)
+
+    // Verify round-trip
+    const { body } = await get('/api/pages/meta-test')
+    expect(body.metadata).toEqual({
+      title: 'SEO Title',
+      description: 'SEO desc',
+      ogImage: '/img.jpg',
+      canonical: 'https://example.com/meta-test',
+      robots: 'noindex',
+    })
+  })
+
+  it('preserves metadata when updating only content', async () => {
+    // Update content only — metadata should be preserved
+    const res = await app.request('/api/pages/meta-test', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: { title: 'New Content Title' } }),
+    })
+    expect(res.status).toBe(200)
+
+    const { body } = await get('/api/pages/meta-test')
+    expect(body.content.title).toBe('New Content Title')
+    expect(body.metadata.title).toBe('SEO Title')
+    expect(body.metadata.robots).toBe('noindex')
+  })
+
+  it('clears metadata when explicitly set to empty object', async () => {
+    const res = await app.request('/api/pages/meta-test', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metadata: {} }),
+    })
+    expect(res.status).toBe(200)
+
+    const { body } = await get('/api/pages/meta-test')
+    expect(body.metadata).toEqual({})
+  })
+})
+
 describe('PUT /api/pages/:name (update component content)', () => {
   it('updates page with modified component content', async () => {
     // Read current page
