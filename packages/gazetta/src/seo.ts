@@ -29,11 +29,11 @@ export interface SeoContext {
   defaultOgImage?: string
 }
 
-/** Build SeoContext from a SiteManifest. */
-export function seoContextFromManifest(manifest: SiteManifest | undefined): SeoContext {
+/** Build SeoContext from a SiteManifest + optional target siteUrl. */
+export function seoContextFromManifest(manifest: SiteManifest | undefined, siteUrl?: string): SeoContext {
   return {
     siteName: manifest?.name,
-    baseUrl: manifest?.baseUrl,
+    baseUrl: siteUrl,
     locale: manifest?.locale,
     defaultOgImage: manifest?.defaultOgImage,
   }

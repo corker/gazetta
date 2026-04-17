@@ -12,7 +12,6 @@ export const SiteManifestSchema = z
     name: z.string(),
     version: z.string().optional(),
     locale: z.string().optional(),
-    baseUrl: z.string().optional(),
     systemPages: z.array(z.string()).optional(),
   })
   .loose()

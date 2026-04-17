@@ -231,7 +231,6 @@ export interface SiteManifest {
   name: string
   version?: string
   locale?: string
-  baseUrl?: string
   /** Default Open Graph image for pages that don't specify their own. */
   defaultOgImage?: string
   systemPages?: string[]

@@ -354,7 +354,7 @@ export function publishRoutes(
         yield { kind: 'progress', target: targetName, current, total, label: 'site manifest' }
 
         // 3b. Sitemap + robots.txt
-        const baseUrl = config?.siteUrl ?? site.manifest.baseUrl
+        const baseUrl = config?.siteUrl
         if (baseUrl) {
           const { listSidecars } = await import('../../sidecars.js')
           const { generateSitemap } = await import('../../sitemap.js')
