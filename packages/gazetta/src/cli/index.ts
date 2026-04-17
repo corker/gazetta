@@ -1310,8 +1310,18 @@ async function runDev(siteDir: string, port: number) {
     app.get(page.route, async c => {
       try {
         const freshSite = await loadSite({ contentRoot: source.contentRoot, templatesDir, manifest })
+        const freshPage = freshSite.pages.get(pageName)
         const resolved = await resolvePage(pageName, freshSite)
-        const html = await renderPage(resolved, c.req.param())
+        const html = await renderPage(resolved, {
+          routeParams: c.req.param(),
+          metadata: freshPage?.metadata,
+          route: freshPage?.route,
+          seo: {
+            siteName: freshSite.manifest.name,
+            locale: freshSite.manifest.locale,
+            defaultOgImage: freshSite.manifest.defaultOgImage,
+          },
+        })
         return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
       } catch (err) {
         return c.html(renderErrorOverlay(err as Error), 500)
