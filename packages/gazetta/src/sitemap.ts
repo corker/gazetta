@@ -45,7 +45,9 @@ export function generateSitemap(opts: GenerateSitemapOptions): string | null {
   const base = opts.siteUrl.replace(/\/+$/, '')
   const urls: string[] = []
 
-  for (const [name, state] of opts.pages) {
+  // Sort by page name for deterministic output across runs.
+  const sorted = [...opts.pages.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  for (const [name, state] of sorted) {
     if (systemSet.has(name)) continue
     if (state.pub?.noindex) continue
 
