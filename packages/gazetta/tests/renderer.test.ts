@@ -384,4 +384,147 @@ describe('renderPage', () => {
     expect(html).toContain('A &amp; B &lt;script>')
     expect(html).toContain('content="He said &quot;hello&quot;"')
   })
+
+  // --- Fallback chain tests ---
+
+  it('title falls back to content.title + site name when metadata.title is empty', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({ html: '<p>body</p>', css: '', js: '' }),
+      children: [],
+      treePath: 'page',
+      content: { title: 'About Us' },
+    }
+    const html = await renderPage(page, { seo: { siteName: 'Gazetta' } })
+    expect(html).toContain('<title>About Us — Gazetta</title>')
+    expect(html).toContain('property="og:title" content="About Us — Gazetta"')
+  })
+
+  it('title falls back to content.title without suffix when siteName is absent', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({ html: '<p>body</p>', css: '', js: '' }),
+      children: [],
+      treePath: 'page',
+      content: { title: 'About Us' },
+    }
+    const html = await renderPage(page, { seo: {} })
+    expect(html).toContain('<title>About Us</title>')
+  })
+
+  it('description falls back to content.description', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({ html: '<p>body</p>', css: '', js: '' }),
+      children: [],
+      treePath: 'page',
+      content: { description: 'A page about us' },
+    }
+    const html = await renderPage(page, { seo: {} })
+    expect(html).toContain('name="description" content="A page about us"')
+    expect(html).toContain('property="og:description" content="A page about us"')
+  })
+
+  it('canonical falls back to baseUrl + route', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { route: '/about', seo: { baseUrl: 'https://example.com' } })
+    expect(html).toContain('href="https://example.com/about"')
+    expect(html).toContain('property="og:url" content="https://example.com/about"')
+  })
+
+  it('og:image falls back to site defaultOgImage', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { seo: { defaultOgImage: '/images/default.jpg' } })
+    expect(html).toContain('property="og:image" content="/images/default.jpg"')
+  })
+
+  it('metadata.ogImage overrides site defaultOgImage', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, {
+      metadata: { ogImage: '/images/page.jpg' },
+      seo: { defaultOgImage: '/images/default.jpg' },
+    })
+    expect(html).toContain('property="og:image" content="/images/page.jpg"')
+    expect(html).not.toContain('default.jpg')
+  })
+
+  it('emits og:type=website and twitter:card', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { seo: {} })
+    expect(html).toContain('property="og:type" content="website"')
+    expect(html).toContain('name="twitter:card" content="summary"')
+  })
+
+  it('twitter:card is summary_large_image when og:image is resolved', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { metadata: { ogImage: '/img.jpg' } })
+    expect(html).toContain('name="twitter:card" content="summary_large_image"')
+  })
+
+  it('emits robots meta when metadata.robots is set', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { metadata: { robots: 'noindex, nofollow' } })
+    expect(html).toContain('name="robots" content="noindex, nofollow"')
+  })
+
+  it('omits robots meta when metadata.robots is absent', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { metadata: {} })
+    expect(html).not.toContain('name="robots"')
+  })
+
+  it('uses site locale for <html lang>', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { seo: { locale: 'fr' } })
+    expect(html).toContain('<html lang="fr">')
+  })
+
+  it('defaults <html lang> to en when locale is absent', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { seo: {} })
+    expect(html).toContain('<html lang="en">')
+  })
+
+  it('metadata.title wins over content.title fallback', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({ html: '<p>body</p>', css: '', js: '' }),
+      children: [],
+      treePath: 'page',
+      content: { title: 'Content Title' },
+    }
+    const html = await renderPage(page, {
+      metadata: { title: 'SEO Title' },
+      seo: { siteName: 'Site' },
+    })
+    expect(html).toContain('<title>SEO Title</title>')
+    expect(html).not.toContain('Content Title')
+  })
+
+  it('full fallback chain with all values populated', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({ html: '<p>body</p>', css: '', js: '' }),
+      children: [],
+      treePath: 'page',
+      content: { title: 'Fallback', description: 'Fallback desc' },
+    }
+    const html = await renderPage(page, {
+      metadata: {
+        title: 'SEO Title',
+        description: 'SEO desc',
+        ogImage: '/seo.jpg',
+        canonical: 'https://example.com/page',
+        robots: 'noindex',
+      },
+      route: '/page',
+      seo: { siteName: 'MySite', baseUrl: 'https://example.com', locale: 'de', defaultOgImage: '/default.jpg' },
+    })
+    expect(html).toContain('<html lang="de">')
+    expect(html).toContain('<title>SEO Title</title>')
+    expect(html).toContain('name="description" content="SEO desc"')
+    expect(html).toContain('href="https://example.com/page"')
+    expect(html).toContain('property="og:image" content="/seo.jpg"')
+    expect(html).toContain('property="og:url" content="https://example.com/page"')
+    expect(html).toContain('property="og:type" content="website"')
+    expect(html).toContain('name="twitter:card" content="summary_large_image"')
+    expect(html).toContain('name="robots" content="noindex"')
+    expect(html).not.toContain('Fallback')
+    expect(html).not.toContain('default.jpg')
+  })
 })

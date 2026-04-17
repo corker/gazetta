@@ -95,6 +95,10 @@ export interface PageMetadata {
   description?: string
   ogImage?: string
   canonical?: string
+  /** Robots directive — e.g. "noindex", "nofollow", "noindex, nofollow".
+   *  When set, emitted as `<meta name="robots" content="...">`.
+   *  When absent, the tag is omitted (default: allow indexing). */
+  robots?: string
 }
 
 /** Page manifest (routable component) */
@@ -228,6 +232,8 @@ export interface SiteManifest {
   version?: string
   locale?: string
   baseUrl?: string
+  /** Default Open Graph image for pages that don't specify their own. */
+  defaultOgImage?: string
   systemPages?: string[]
   targets?: Record<string, TargetConfig>
 }

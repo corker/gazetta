@@ -62,7 +62,7 @@ complaint without adding admin UI complexity.
 
 ## Tier 1 — closes the adoption-blocker gap
 
-### ☐ 1.1 Fallback chains in renderer
+### ◐ 1.1 Fallback chains in renderer
 
 The renderer should compute SEO values from existing data when metadata fields are
 empty. Authors override only when they want different values for search vs content.
