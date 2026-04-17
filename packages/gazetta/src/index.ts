@@ -69,6 +69,7 @@ export {
   type RenderPageOptions,
   type SeoContext,
 } from './renderer.js'
+export { resolveSeoTags, type ResolveSeoTagsInput } from './seo.js'
 export { resolveComponent, resolveFragment, resolvePage } from './resolver.js'
 export { loadSite } from './site-loader.js'
 export type { Site, LoadSiteOptions } from './site-loader.js'
