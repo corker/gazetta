@@ -312,4 +312,76 @@ describe('renderPage', () => {
     expect(html1).toContain(`data-gz="${id}"`)
     expect(html2).toContain(`data-gz="${id}"`)
   })
+
+  it('injects metadata title and description into <head> when template omits them', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, {
+      metadata: { title: 'My Page', description: 'A test page' },
+    })
+    expect(html).toContain('<title>My Page</title>')
+    expect(html).toContain('<meta name="description" content="A test page">')
+    expect(html).toContain('<meta property="og:title" content="My Page">')
+    expect(html).toContain('<meta property="og:description" content="A test page">')
+  })
+
+  it('injects og:image and canonical link when provided', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, {
+      metadata: { ogImage: 'https://example.com/img.jpg', canonical: 'https://example.com/' },
+    })
+    expect(html).toContain('<meta property="og:image" content="https://example.com/img.jpg">')
+    expect(html).toContain('<link rel="canonical" href="https://example.com/">')
+  })
+
+  it('does not duplicate title when template already provides one', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({ html: '<p>body</p>', css: '', js: '', head: '<title>Template Title</title>' }),
+      children: [],
+      treePath: 'page',
+    }
+    const html = await renderPage(page, {
+      metadata: { title: 'Meta Title', description: 'desc' },
+    })
+    expect(html).toContain('<title>Template Title</title>')
+    expect(html).not.toContain('<title>Meta Title</title>')
+    // description should still appear since template didn't provide one
+    expect(html).toContain('<meta name="description" content="desc">')
+  })
+
+  it('does not duplicate description when template already provides one', async () => {
+    const page: ResolvedComponent = {
+      template: () => ({
+        html: '<p>body</p>',
+        css: '',
+        js: '',
+        head: '<meta name="description" content="from template">',
+      }),
+      children: [],
+      treePath: 'page',
+    }
+    const html = await renderPage(page, {
+      metadata: { description: 'from metadata' },
+    })
+    expect(html).toContain('name="description" content="from template"')
+    // metadata's name="description" should NOT be injected (template provided one)
+    expect(html).not.toContain('name="description" content="from metadata"')
+    // og:description should still be injected since template didn't provide that
+    expect(html).toContain('property="og:description" content="from metadata"')
+  })
+
+  it('renders without metadata (backward compatible)', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page)
+    expect(html).toContain('<p>body</p>')
+    expect(html).not.toContain('og:title')
+  })
+
+  it('escapes special characters in metadata values', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, {
+      metadata: { title: 'A & B <script>', description: 'He said "hello"' },
+    })
+    expect(html).toContain('A &amp; B &lt;script>')
+    expect(html).toContain('content="He said &quot;hello&quot;"')
+  })
 })

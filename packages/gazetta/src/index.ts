@@ -58,10 +58,10 @@ export {
   getHistoryRetention,
   DEFAULT_HISTORY_RETENTION,
 } from './types.js'
-export type { HistoryConfig } from './types.js'
+export type { HistoryConfig, PageMetadata } from './types.js'
 
 // Renderer
-export { renderComponent, renderFragment, renderPage } from './renderer.js'
+export { renderComponent, renderFragment, renderPage, type RenderPageOptions } from './renderer.js'
 export { resolveComponent, resolveFragment, resolvePage } from './resolver.js'
 export { loadSite } from './site-loader.js'
 export type { Site, LoadSiteOptions } from './site-loader.js'

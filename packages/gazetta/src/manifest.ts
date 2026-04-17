@@ -72,6 +72,7 @@ export async function parsePageManifest(storage: StorageProvider, filePath: stri
     template: raw.template as string,
     content: raw.content as Record<string, unknown> | undefined,
     components: parseComponents(raw.components),
+    metadata: raw.metadata as import('./types.js').PageMetadata | undefined,
     cache: raw.cache as import('./types.js').CacheConfig | undefined,
   }
 }

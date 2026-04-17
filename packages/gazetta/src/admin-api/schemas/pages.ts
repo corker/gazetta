@@ -14,6 +14,17 @@
  */
 import { z } from 'zod'
 
+/** SEO metadata for a page — surfaced in <head> and used by sitemap generation. */
+export const PageMetadataSchema = z
+  .object({
+    title: z.string().optional(),
+    description: z.string().optional(),
+    ogImage: z.string().optional(),
+    canonical: z.string().optional(),
+  })
+  .optional()
+export type PageMetadata = z.infer<typeof PageMetadataSchema>
+
 /** Summary used in list responses (GET /api/pages). */
 export const PageSummarySchema = z.object({
   name: z.string(),

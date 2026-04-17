@@ -4,6 +4,10 @@
     "title": "About",
     "description": "About Gazetta"
   },
+  "metadata": {
+    "title": "About — Gazetta",
+    "description": "Learn about Gazetta, the stateless CMS built on composable fragments."
+  },
   "components": [
     "@header",
     {

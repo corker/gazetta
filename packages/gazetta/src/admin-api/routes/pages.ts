@@ -82,6 +82,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
       template: page.template,
       content: page.content,
       components: page.components,
+      metadata: page.metadata,
       dir: page.dir,
     })
   })
@@ -95,11 +96,13 @@ export function pageRoutes(resolve: SourceContextResolver) {
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
 
     const body = await c.req.json()
-    const manifest = {
+    const manifest: Record<string, unknown> = {
       template: body.template ?? page.template,
       content: body.content ?? page.content,
       components: body.components ?? page.components,
     }
+    if (body.metadata !== undefined) manifest.metadata = body.metadata
+    else if (page.metadata) manifest.metadata = page.metadata
 
     const manifestPath = join(page.dir, 'page.json')
     const serialized = JSON.stringify(manifest, null, 2) + '\n'
