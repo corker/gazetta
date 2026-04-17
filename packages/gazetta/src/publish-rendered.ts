@@ -194,7 +194,12 @@ export async function publishPageStatic(
 
   // Scope IDs are now deterministic (hash-based), no reset needed
   const resolved = await resolvePage(pageName, site)
-  const html = await renderPage(resolved, { metadata: page.metadata })
+  const { seoContextFromManifest } = await import('./renderer.js')
+  const html = await renderPage(resolved, {
+    metadata: page.metadata,
+    route: page.route,
+    seo: seoContextFromManifest(site.manifest),
+  })
 
   // URL path: / → index.html, /about → about/index.html
   const urlPath = page.route === '/' ? '' : page.route.replace(/^\//, '')

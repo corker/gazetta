@@ -78,7 +78,15 @@ async function renderPreview(
       try {
         const resolved = await resolvePage(pageName, site)
         if (overrides) applyOverrides(resolved, overrides)
-        return c.html(await renderPage(resolved, { routeParams: params, metadata: page.metadata }))
+        const { seoContextFromManifest } = await import('../../renderer.js')
+        return c.html(
+          await renderPage(resolved, {
+            routeParams: params,
+            metadata: page.metadata,
+            route: page.route,
+            seo: seoContextFromManifest(site.manifest),
+          }),
+        )
       } catch (err) {
         const e = err as Error
         const msg = e.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')

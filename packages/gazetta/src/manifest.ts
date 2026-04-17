@@ -58,6 +58,7 @@ export async function parseSiteManifest(storage: StorageProvider, filePath: stri
     version: raw.version as string | undefined,
     locale: raw.locale as string | undefined,
     baseUrl: raw.baseUrl as string | undefined,
+    defaultOgImage: raw.defaultOgImage as string | undefined,
     systemPages: Array.isArray(raw.systemPages) ? (raw.systemPages as string[]) : undefined,
   }
 }

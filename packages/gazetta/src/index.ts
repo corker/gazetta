@@ -61,7 +61,14 @@ export {
 export type { HistoryConfig, PageMetadata } from './types.js'
 
 // Renderer
-export { renderComponent, renderFragment, renderPage, type RenderPageOptions } from './renderer.js'
+export {
+  renderComponent,
+  renderFragment,
+  renderPage,
+  seoContextFromManifest,
+  type RenderPageOptions,
+  type SeoContext,
+} from './renderer.js'
 export { resolveComponent, resolveFragment, resolvePage } from './resolver.js'
 export { loadSite } from './site-loader.js'
 export type { Site, LoadSiteOptions } from './site-loader.js'

@@ -21,6 +21,7 @@ export const PageMetadataSchema = z
     description: z.string().optional(),
     ogImage: z.string().optional(),
     canonical: z.string().optional(),
+    robots: z.string().optional(),
   })
   .optional()
 export type PageMetadata = z.infer<typeof PageMetadataSchema>
