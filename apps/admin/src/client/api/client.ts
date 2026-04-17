@@ -121,6 +121,7 @@ import type {
   PageSummary as PageSummaryShape,
   CreatePageRequest as CreatePageRequestShape,
   CreatePageResponse as CreatePageResponseShape,
+  PageMetadata as PageMetadataShape,
   FragmentSummary as FragmentSummaryShape,
   CreateFragmentRequest as CreateFragmentRequestShape,
   CreateFragmentResponse as CreateFragmentResponseShape,
@@ -143,6 +144,7 @@ import type {
 export type PageSummary = PageSummaryShape
 export type CreatePageRequest = CreatePageRequestShape
 export type CreatePageResponse = CreatePageResponseShape
+export type PageMetadata = PageMetadataShape
 export type FragmentSummary = FragmentSummaryShape
 export type CreateFragmentRequest = CreateFragmentRequestShape
 export type CreateFragmentResponse = CreateFragmentResponseShape
@@ -173,6 +175,7 @@ export type ComponentEntry = string | InlineComponent
 export interface PageDetail extends PageSummary {
   content?: Record<string, unknown>
   components?: ComponentEntry[]
+  metadata?: PageMetadata
   dir: string
 }
 

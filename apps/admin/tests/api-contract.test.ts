@@ -17,6 +17,7 @@ import {
   CreatePageRequestSchema,
   CreatePageResponseSchema,
   PageSummarySchema,
+  PageMetadataSchema,
   CreateFragmentRequestSchema,
   CreateFragmentResponseSchema,
   FragmentSummarySchema,
@@ -39,6 +40,7 @@ import type {
   CreatePageRequest,
   CreatePageResponse,
   PageSummary,
+  PageMetadata,
   CreateFragmentRequest,
   CreateFragmentResponse,
   FragmentSummary,
@@ -109,6 +111,30 @@ describe('POST /api/pages contract', () => {
 
     it('rejects entries missing required fields', () => {
       expect(PageSummarySchema.safeParse({ name: 'home', route: '/' }).success).toBe(false)
+    })
+  })
+
+  describe('PageMetadata (optional SEO metadata on pages)', () => {
+    it('accepts a fully populated metadata object', () => {
+      const meta: PageMetadata = {
+        title: 'My Page',
+        description: 'A description',
+        ogImage: 'https://example.com/img.jpg',
+        canonical: 'https://example.com/my-page',
+      }
+      expect(PageMetadataSchema.safeParse(meta)?.success).toBe(true)
+    })
+
+    it('accepts undefined (metadata is optional on pages)', () => {
+      expect(PageMetadataSchema.safeParse(undefined)?.success).toBe(true)
+    })
+
+    it('accepts an empty object (all fields optional)', () => {
+      expect(PageMetadataSchema.safeParse({})?.success).toBe(true)
+    })
+
+    it('accepts partial metadata', () => {
+      expect(PageMetadataSchema.safeParse({ title: 'Just a title' })?.success).toBe(true)
     })
   })
 })

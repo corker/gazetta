@@ -89,9 +89,18 @@ export interface CacheConfig {
   purge?: PurgeConfig
 }
 
+/** SEO metadata for a page — surfaced in <head> and used by sitemap generation. */
+export interface PageMetadata {
+  title?: string
+  description?: string
+  ogImage?: string
+  canonical?: string
+}
+
 /** Page manifest (routable component) */
 export interface PageManifest extends ComponentManifest {
   route: string
+  metadata?: PageMetadata
   cache?: CacheConfig
 }
 

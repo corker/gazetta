@@ -78,7 +78,7 @@ async function renderPreview(
       try {
         const resolved = await resolvePage(pageName, site)
         if (overrides) applyOverrides(resolved, overrides)
-        return c.html(await renderPage(resolved, params))
+        return c.html(await renderPage(resolved, { routeParams: params, metadata: page.metadata }))
       } catch (err) {
         const e = err as Error
         const msg = e.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
