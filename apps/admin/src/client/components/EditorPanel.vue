@@ -81,7 +81,7 @@ onKeyStroke('s', e => {
       </div>
       <div v-if="hasProperties" ref="containerRef" class="editor-container" data-testid="editor-container" :key="editing.path" />
       <p v-else class="editor-no-schema">No editable content. Edit its children instead.</p>
-      <PageMetadataEditor v-if="selection.type === 'page'" />
+      <PageMetadataEditor v-if="selection.type === 'page' && editing.path === '_root'" />
     </div>
   </div>
 </template>
