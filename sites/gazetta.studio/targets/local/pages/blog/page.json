@@ -1,6 +1,6 @@
 {
   "template": "site-layout",
-  "content": {
+  "metadata": {
     "title": "Blog — Gazetta",
     "description": "News, tutorials, and updates from the Gazetta team."
   },

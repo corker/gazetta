@@ -1,14 +1,17 @@
 import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
 
-export const schema = z.object({
-  title: z.string().describe('Page title'),
-  description: z.string().optional().describe('Page description'),
-})
+// Layout template — renders children in a <main> wrapper with a CSS
+// reset. Has no content of its own (no visible fields for the editor).
+//
+// SEO tags (<title>, <meta description>, OG, canonical) are handled
+// by the renderer's fallback chain from page.metadata / content of
+// child components. Templates should NOT emit SEO tags — the renderer
+// deduplicates, but the clean pattern is to let the renderer own <head>
+// SEO and let templates own visible HTML + non-SEO head (fonts, icons).
+export const schema = z.object({})
 
-type Content = z.infer<typeof schema>
-
-const template: TemplateFunction<Content> = ({ content, children = [] }) => ({
+const template: TemplateFunction = ({ children = [] }) => ({
   html: `<main>${children.map(c => c.html).join('\n')}</main>`,
   css: `*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; line-height: 1.6; }
@@ -18,9 +21,7 @@ ${children.map(c => c.css).join('\n')}`,
     .map(c => c.js)
     .filter(Boolean)
     .join('\n'),
-  head: `<title>${content?.title ?? ''}</title>
-${content?.description ? `<meta name="description" content="${content.description}">` : ''}
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  head: `<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
 ${children
   .map(c => c.head)
   .filter(Boolean)

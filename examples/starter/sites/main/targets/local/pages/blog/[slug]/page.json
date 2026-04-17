@@ -1,6 +1,6 @@
 {
   "template": "page-default",
-  "content": {
+  "metadata": {
     "title": "Blog Post"
   },
   "components": [

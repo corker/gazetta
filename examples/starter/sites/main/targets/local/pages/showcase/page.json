@@ -1,6 +1,6 @@
 {
   "template": "page-default",
-  "content": {
+  "metadata": {
     "title": "Editor Showcase",
     "description": "Demonstrates all editor input types"
   },
