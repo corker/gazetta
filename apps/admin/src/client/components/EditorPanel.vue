@@ -80,8 +80,8 @@ onKeyStroke('s', e => {
         <FragmentBlastRadius v-if="fragmentName" :fragmentName="fragmentName" />
       </div>
       <div v-if="hasProperties" ref="containerRef" class="editor-container" data-testid="editor-container" :key="editing.path" />
-      <p v-else class="editor-no-schema">No editable content. Edit its children instead.</p>
       <PageMetadataEditor v-if="selection.type === 'page' && editing.path === '_root'" />
+      <p v-else-if="!hasProperties" class="editor-no-schema">No editable content. Edit its children instead.</p>
     </div>
   </div>
 </template>
