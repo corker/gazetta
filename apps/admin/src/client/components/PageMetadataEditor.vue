@@ -76,7 +76,6 @@ const pageDetail = computed(() =>
   selection.type === 'page' ? (selection.detail as import('../api/client.js').PageDetail | null) : null,
 )
 const siteName = computed(() => site.manifest?.name)
-const baseUrl = computed(() => site.manifest?.baseUrl)
 
 // SERP preview uses the same fallback chain as the renderer (seo.ts):
 //   metadata field → content field + site name → omit
@@ -86,13 +85,11 @@ const serpTitle = computed(() => {
   if (contentTitle) return siteName.value ? `${contentTitle} — ${siteName.value}` : contentTitle
   return selection.name || ''
 })
-const serpUrl = computed(
-  () =>
-    canonical.value ||
-    (baseUrl.value
-      ? `${baseUrl.value}${pageDetail.value?.route ?? '/'}`
-      : `https://example.com${pageDetail.value?.route ?? '/'}`),
-)
+// SERP URL shows the route structure. The actual canonical URL is
+// resolved at publish time from the target's siteUrl — the admin
+// doesn't know which target will be published to, so we show a
+// placeholder domain.
+const serpUrl = computed(() => canonical.value || `https://example.com${pageDetail.value?.route ?? '/'}`)
 const serpDescription = computed(() => description.value || (pageDetail.value?.content?.description as string) || '')
 </script>
 
