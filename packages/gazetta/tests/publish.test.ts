@@ -538,3 +538,146 @@ describe('findDependentsFromSidecars', () => {
     expect(r.pages).toEqual(['home'])
   })
 })
+
+describe('SEO publish integration', () => {
+  const projectRoot2 = resolve(import.meta.dirname, '../../../examples/starter')
+  const starterDir = resolve(projectRoot2, 'sites/main/targets/local')
+  const templatesDir = resolve(projectRoot2, 'templates')
+  const storage = createFilesystemProvider()
+  const seoTargetDir = tempDir('seo-publish-test-' + Date.now())
+
+  beforeEach(async () => {
+    await mkdir(seoTargetDir, { recursive: true })
+  })
+  afterEach(async () => {
+    await rm(seoTargetDir, { recursive: true, force: true })
+  })
+
+  it('.pub sidecar is written with timestamp after static publish', async () => {
+    const target = createFilesystemProvider(seoTargetDir)
+    const { hashManifest } = await import('../src/hash.js')
+    const { loadSite } = await import('../src/site-loader.js')
+    const { scanTemplates, templateHashesFrom } = await import('../src/templates-scan.js')
+
+    const contentRoot = createContentRoot(storage, starterDir)
+    const site = await loadSite({ contentRoot, templatesDir })
+    const templateInfos = await scanTemplates(templatesDir, projectRoot2)
+    const templateHashes = templateHashesFrom(templateInfos)
+    const page = site.pages.get('home')!
+    const hash = hashManifest(page, { templateHashes })
+
+    const before = Date.now()
+    await publishPageStatic('home', contentRoot, target, templatesDir, hash, site)
+    const after = Date.now()
+
+    // The .pub-* sidecar should exist on the target under pages/home/
+    const entries = await target.readDir('pages/home')
+    const pubFile = entries.find(e => e.name.startsWith('.pub-'))
+    expect(pubFile).toBeDefined()
+    expect(pubFile!.name).toMatch(/^\.pub-\d{8}T\d{6}Z$/)
+
+    // Parse and check timestamp is within the test window.
+    // compactTimestamp truncates milliseconds, so the parsed value
+    // can be up to 1s before `before`. Use a 2s window.
+    const { parsePubSidecarName } = await import('../src/hash.js')
+    const parsed = parsePubSidecarName(pubFile!.name)
+    expect(parsed).not.toBeNull()
+    expect(parsed!.noindex).toBe(false)
+    const ts = new Date(parsed!.lastPublished).getTime()
+    expect(ts).toBeGreaterThanOrEqual(before - 2000)
+    expect(ts).toBeLessThanOrEqual(after + 2000)
+  })
+
+  it('.pub sidecar has noindex flag when page metadata contains noindex', async () => {
+    // Create a source with a noindex page
+    const noindexSourceDir = tempDir('noindex-source-' + Date.now())
+    await mkdir(join(noindexSourceDir, 'pages/secret'), { recursive: true })
+    await writeFile(
+      join(noindexSourceDir, 'pages/secret/page.json'),
+      JSON.stringify({
+        template: 'page-default',
+        content: { title: 'Secret' },
+        metadata: { robots: 'noindex' },
+      }),
+    )
+    // Copy site.yaml from starter
+    const { readFile: readF } = await import('node:fs/promises')
+    await writeFile(join(noindexSourceDir, 'site.yaml'), await readF(join(starterDir, '../../site.yaml'), 'utf-8'))
+
+    const target = createFilesystemProvider(seoTargetDir)
+    const { hashManifest } = await import('../src/hash.js')
+    const { loadSite } = await import('../src/site-loader.js')
+    const { scanTemplates, templateHashesFrom } = await import('../src/templates-scan.js')
+
+    const contentRoot = createContentRoot(createFilesystemProvider(), noindexSourceDir)
+    const site = await loadSite({ contentRoot, templatesDir })
+    const templateInfos = await scanTemplates(templatesDir, projectRoot2)
+    const templateHashes = templateHashesFrom(templateInfos)
+    const page = site.pages.get('secret')!
+    const hash = hashManifest(page, { templateHashes })
+
+    await publishPageStatic('secret', contentRoot, target, templatesDir, hash, site)
+
+    const entries = await target.readDir('pages/secret')
+    const pubFile = entries.find(e => e.name.startsWith('.pub-'))
+    expect(pubFile).toBeDefined()
+    expect(pubFile!.name).toMatch(/-noindex$/)
+
+    const { parsePubSidecarName } = await import('../src/hash.js')
+    const parsed = parsePubSidecarName(pubFile!.name)
+    expect(parsed!.noindex).toBe(true)
+
+    await rm(noindexSourceDir, { recursive: true, force: true })
+  })
+
+  it('sitemap.xml is generated from target sidecars after publish', async () => {
+    const target = createFilesystemProvider(seoTargetDir)
+    const { hashManifest } = await import('../src/hash.js')
+    const { loadSite } = await import('../src/site-loader.js')
+    const { scanTemplates, templateHashesFrom } = await import('../src/templates-scan.js')
+    const { listSidecars } = await import('../src/sidecars.js')
+    const { generateSitemap } = await import('../src/sitemap.js')
+
+    const contentRoot = createContentRoot(storage, starterDir)
+    const site = await loadSite({ contentRoot, templatesDir })
+    const templateInfos = await scanTemplates(templatesDir, projectRoot2)
+    const templateHashes = templateHashesFrom(templateInfos)
+
+    // Publish home + about
+    for (const name of ['home', 'about']) {
+      const page = site.pages.get(name)!
+      const hash = hashManifest(page, { templateHashes })
+      await publishPageStatic(name, contentRoot, target, templatesDir, hash, site)
+    }
+
+    // Generate sitemap from target sidecars
+    const sidecars = await listSidecars(target, 'pages')
+    expect(sidecars.size).toBe(2)
+
+    const xml = generateSitemap({
+      baseUrl: 'https://example.com',
+      pages: sidecars,
+    })
+    expect(xml).not.toBeNull()
+    expect(xml).toContain('<loc>https://example.com/</loc>')
+    expect(xml).toContain('<loc>https://example.com/about</loc>')
+    expect(xml).toContain('<lastmod>')
+
+    // Write and verify it's readable
+    await target.writeFile('sitemap.xml', xml!)
+    const stored = await target.readFile('sitemap.xml')
+    expect(stored).toBe(xml)
+  })
+
+  it('robots.txt is generated with sitemap reference', async () => {
+    const { generateRobotsTxt } = await import('../src/robots.js')
+    const target = createFilesystemProvider(seoTargetDir)
+
+    const txt = generateRobotsTxt({ baseUrl: 'https://example.com' })
+    await target.writeFile('robots.txt', txt)
+
+    const stored = await target.readFile('robots.txt')
+    expect(stored).toContain('User-agent: *')
+    expect(stored).toContain('Sitemap: https://example.com/sitemap.xml')
+  })
+})
