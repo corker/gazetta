@@ -1,9 +1,5 @@
 {
   "template": "page-default",
-  "content": {
-    "title": "Home",
-    "description": "Welcome to Gazetta"
-  },
   "metadata": {
     "title": "Gazetta — Composable CMS",
     "description": "A stateless CMS that structures websites as composable fragments. All state lives in targets."

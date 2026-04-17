@@ -1,11 +1,8 @@
 {
   "template": "site-layout",
-  "content": {
-    "title": "Documentation — Gazetta",
-    "description": "Learn how to build composable websites with Gazetta."
-  },
   "metadata": {
-    "description": "Learn how to build composable websites with Gazetta. Templates, fragments, pages, targets, and CLI reference."
+    "description": "Learn how to build composable websites with Gazetta. Templates, fragments, pages, targets, and CLI reference.",
+    "title": "Documentation — Gazetta"
   },
   "components": [
     "@header",
