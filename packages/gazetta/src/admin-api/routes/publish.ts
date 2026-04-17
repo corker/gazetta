@@ -377,14 +377,18 @@ export function publishRoutes(
             await targetStorage.writeFile('sitemap.xml', sitemapXml)
             totalFiles++
           }
-          let robotsTxt: string
-          try {
-            robotsTxt = await source.contentRoot.storage.readFile(source.contentRoot.path('robots.txt'))
-          } catch {
-            robotsTxt = generateRobotsTxt({ baseUrl })
+          // robots.txt only at domain root — Google ignores it at subpaths.
+          const isRootDeploy = !new URL(baseUrl).pathname.replace(/\/+$/, '')
+          if (isRootDeploy) {
+            let robotsTxt: string
+            try {
+              robotsTxt = await source.contentRoot.storage.readFile(source.contentRoot.path('robots.txt'))
+            } catch {
+              robotsTxt = generateRobotsTxt({ baseUrl })
+            }
+            await targetStorage.writeFile('robots.txt', robotsTxt)
+            totalFiles++
           }
-          await targetStorage.writeFile('robots.txt', robotsTxt)
-          totalFiles++
         }
 
         // 4. Purge CDN cache
