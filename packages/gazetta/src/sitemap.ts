@@ -42,6 +42,7 @@ function escapeXml(s: string): string {
  */
 export function generateSitemap(opts: GenerateSitemapOptions): string | null {
   const systemSet = new Set(opts.systemPages ?? [])
+  const base = opts.baseUrl.replace(/\/+$/, '')
   const urls: string[] = []
 
   for (const [name, state] of opts.pages) {
@@ -49,7 +50,7 @@ export function generateSitemap(opts: GenerateSitemapOptions): string | null {
     if (state.pub?.noindex) continue
 
     const route = deriveRoute(name)
-    const loc = `${opts.baseUrl}${route}`
+    const loc = `${base}${route}`
     const lastmod = state.pub?.lastPublished
 
     const parts = [`    <loc>${escapeXml(loc)}</loc>`]
