@@ -191,6 +191,8 @@ export async function publishPageStatic(
   templatesDir?: string,
   manifestHash?: string,
   preloadedSite?: Site,
+  /** Target's public URL — used for canonical/og:url in the rendered HTML. */
+  siteUrl?: string,
 ): Promise<{ files: number }> {
   const site = preloadedSite ?? (await loadSite({ contentRoot: sourceRoot, templatesDir }))
   const page = site.pages.get(pageName)
@@ -202,7 +204,7 @@ export async function publishPageStatic(
   const html = await renderPage(resolved, {
     metadata: page.metadata,
     route: page.route,
-    seo: seoContextFromManifest(site.manifest),
+    seo: seoContextFromManifest(site.manifest, siteUrl),
   })
 
   // URL path: / → index.html, /about → about/index.html
