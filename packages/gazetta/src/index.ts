@@ -65,7 +65,6 @@ export {
   renderComponent,
   renderFragment,
   renderPage,
-  seoContextFromManifest,
   type RenderPageOptions,
   type SeoContext,
 } from './renderer.js'

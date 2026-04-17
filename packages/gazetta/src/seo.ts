@@ -10,33 +10,28 @@
  * Open for extension: adding a new tag type is a new block in
  * `resolveSeoTags()`, not a change to the renderer.
  */
-import type { PageMetadata, SiteManifest } from './types.js'
+import type { PageMetadata } from './types.js'
 
 /** Escape HTML attribute values — prevents XSS in generated meta tags. */
 export function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 }
 
-/** Site-level SEO defaults that pages inherit via the fallback chain. */
+/**
+ * SEO context for a rendering pass — assembled by the caller from
+ * whatever sources it has (site manifest, target config, etc.).
+ * The renderer and seo module depend on this interface only, not
+ * on SiteManifest or TargetConfig (DIP).
+ */
 export interface SeoContext {
   /** Site name — appended to auto-generated titles ("Page — Site Name"). */
   siteName?: string
-  /** Base URL for canonical/og:url generation (e.g. "https://gazetta.studio"). */
-  baseUrl?: string
+  /** Target's public URL for canonical/og:url (e.g. "https://gazetta.studio"). */
+  siteUrl?: string
   /** Site locale for `<html lang>` (e.g. "en", "fr"). Default: "en". */
   locale?: string
   /** Default OG image for pages that don't specify their own. */
   defaultOgImage?: string
-}
-
-/** Build SeoContext from a SiteManifest + optional target siteUrl. */
-export function seoContextFromManifest(manifest: SiteManifest | undefined, siteUrl?: string): SeoContext {
-  return {
-    siteName: manifest?.name,
-    baseUrl: siteUrl,
-    locale: manifest?.locale,
-    defaultOgImage: manifest?.defaultOgImage,
-  }
 }
 
 export interface ResolveSeoTagsInput {
@@ -71,8 +66,8 @@ export function resolveSeoTags(input: ResolveSeoTagsInput): string {
     parts.push(`<meta name="description" content="${escapeAttr(description)}">`)
   }
 
-  // Canonical: metadata.canonical → baseUrl + route → omit
-  const canonical = meta?.canonical || (seo.baseUrl && route ? `${seo.baseUrl}${route}` : undefined)
+  // Canonical: metadata.canonical → siteUrl + route → omit
+  const canonical = meta?.canonical || (seo.siteUrl && route ? `${seo.siteUrl}${route}` : undefined)
   if (canonical) {
     parts.push(`<link rel="canonical" href="${escapeAttr(canonical)}">`)
   }

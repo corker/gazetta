@@ -422,9 +422,9 @@ describe('renderPage', () => {
     expect(html).toContain('property="og:description" content="A page about us"')
   })
 
-  it('canonical falls back to baseUrl + route', async () => {
+  it('canonical falls back to siteUrl + route', async () => {
     const page = leaf('<p>body</p>', '', '', 'page')
-    const html = await renderPage(page, { route: '/about', seo: { baseUrl: 'https://example.com' } })
+    const html = await renderPage(page, { route: '/about', seo: { siteUrl: 'https://example.com' } })
     expect(html).toContain('href="https://example.com/about"')
     expect(html).toContain('property="og:url" content="https://example.com/about"')
   })
@@ -513,7 +513,7 @@ describe('renderPage', () => {
         robots: 'noindex',
       },
       route: '/page',
-      seo: { siteName: 'MySite', baseUrl: 'https://example.com', locale: 'de', defaultOgImage: '/default.jpg' },
+      seo: { siteName: 'MySite', siteUrl: 'https://example.com', locale: 'de', defaultOgImage: '/default.jpg' },
     })
     expect(html).toContain('<html lang="de">')
     expect(html).toContain('<title>SEO Title</title>')

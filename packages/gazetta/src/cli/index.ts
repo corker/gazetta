@@ -593,6 +593,14 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     let skipped = 0
     const sourceRoot = source.contentRoot
 
+    // SEO context for this target — built once, shared across all page renders.
+    const seo = {
+      siteName: site.manifest.name,
+      siteUrl: targetConfig?.siteUrl,
+      locale: site.manifest.locale,
+      defaultOgImage: site.manifest.defaultOgImage,
+    }
+
     if (isStatic) {
       // Static mode — fully assembled HTML, no fragments needed separately.
       // Page hash must include fragment hashes so a fragment change
@@ -615,7 +623,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
           templatesDir,
           manifestHash,
           site,
-          targetConfig?.siteUrl,
+          seo,
         )
         totalFiles += files
         console.log(`    ${c.green('✓')} ${pageName}`)

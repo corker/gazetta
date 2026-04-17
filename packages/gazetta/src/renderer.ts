@@ -2,8 +2,7 @@ import type { RenderOutput, ResolvedComponent, PageMetadata } from './types.js'
 import { hashPath, scopeHtml, scopeCss } from './scope.js'
 import { resolveSeoTags, escapeAttr, type SeoContext } from './seo.js'
 
-// Re-export so existing consumers don't break
-export { type SeoContext, seoContextFromManifest } from './seo.js'
+export { type SeoContext } from './seo.js'
 
 export async function renderComponent(
   component: ResolvedComponent,

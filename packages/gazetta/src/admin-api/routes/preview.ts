@@ -78,13 +78,16 @@ async function renderPreview(
       try {
         const resolved = await resolvePage(pageName, site)
         if (overrides) applyOverrides(resolved, overrides)
-        const { seoContextFromManifest } = await import('../../renderer.js')
         return c.html(
           await renderPage(resolved, {
             routeParams: params,
             metadata: page.metadata,
             route: page.route,
-            seo: seoContextFromManifest(site.manifest),
+            seo: {
+              siteName: site.manifest.name,
+              locale: site.manifest.locale,
+              defaultOgImage: site.manifest.defaultOgImage,
+            },
           }),
         )
       } catch (err) {
