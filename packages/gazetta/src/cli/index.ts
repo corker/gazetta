@@ -662,6 +662,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
           templatesDir,
           manifestHash,
           site,
+          seo,
         )
         totalFiles += files
         totalRemoved += removed

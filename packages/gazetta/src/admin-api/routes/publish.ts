@@ -326,6 +326,7 @@ export function publishRoutes(
               tdir,
               manifestHash,
               site,
+              seo,
             )
             return { files }
           }
