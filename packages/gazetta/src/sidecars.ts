@@ -138,8 +138,11 @@ export async function listSidecars(storage: StorageProvider, rootDir: string): P
     } catch {
       return
     }
+    // Parse sidecar state directly from the entries we already have —
+    // avoids a second readDir per directory (readSidecars would re-read
+    // the same dir). At 10k pages this halves the I/O calls.
     if (relative) {
-      const state = await readSidecars(storage, dir).catch(() => null)
+      const state = parseSidecarEntries(entries)
       if (state) out.set(relative, state)
     }
     const subdirs = entries.filter(e => e.isDirectory)
@@ -147,6 +150,36 @@ export async function listSidecars(storage: StorageProvider, rootDir: string): P
   }
   await walk(rootDir, '')
   return out
+}
+
+/** Parse sidecar state from already-read directory entries. */
+function parseSidecarEntries(entries: { name: string; isDirectory: boolean }[]): SidecarState | null {
+  let hash: string | null = null
+  const uses: string[] = []
+  let template: string | null = null
+  let pub: PubSidecar | null = null
+  for (const e of entries) {
+    if (e.isDirectory) continue
+    const h = parseSidecarName(e.name)
+    if (h) {
+      hash = h
+      continue
+    }
+    const u = parseUsesSidecarName(e.name)
+    if (u) {
+      uses.push(u)
+      continue
+    }
+    const t = parseTemplateSidecarName(e.name)
+    if (t) {
+      template = t
+      continue
+    }
+    const p = parsePubSidecarName(e.name)
+    if (p) pub = p
+  }
+  if (!hash) return null
+  return { hash, uses, template, pub }
 }
 
 /**
