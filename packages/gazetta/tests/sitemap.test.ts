@@ -65,4 +65,13 @@ describe('generateSitemap', () => {
     const xml = generateSitemap({ siteUrl: 'https://example.com', pages })!
     expect(xml).toContain('search&amp;filter')
   })
+
+  it('skips dynamic route pages (template patterns are not crawlable)', () => {
+    const pages = new Map([page('home'), page('blog/[slug]'), page('docs/[...path]')])
+    const xml = generateSitemap({ siteUrl: 'https://example.com', pages })!
+    expect(xml).toContain('<loc>https://example.com/</loc>')
+    expect(xml).not.toContain(':slug')
+    expect(xml).not.toContain('[slug]')
+    expect(xml).not.toContain('[...path]')
+  })
 })
