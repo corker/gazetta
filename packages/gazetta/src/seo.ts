@@ -67,7 +67,8 @@ export function resolveSeoTags(input: ResolveSeoTagsInput): string {
   }
 
   // Canonical: metadata.canonical → siteUrl + route → omit
-  const canonical = meta?.canonical || (seo.siteUrl && route ? `${seo.siteUrl}${route}` : undefined)
+  const base = seo.siteUrl?.replace(/\/+$/, '')
+  const canonical = meta?.canonical || (base && route ? `${base}${route}` : undefined)
   if (canonical) {
     parts.push(`<link rel="canonical" href="${escapeAttr(canonical)}">`)
   }

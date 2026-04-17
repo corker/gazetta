@@ -23,7 +23,8 @@ export interface GenerateRobotsOptions {
 export function generateRobotsTxt(opts: GenerateRobotsOptions): string {
   const lines = ['User-agent: *', 'Allow: /']
   if (opts.baseUrl) {
-    lines.push('', `Sitemap: ${opts.baseUrl}/sitemap.xml`)
+    const base = opts.baseUrl.replace(/\/+$/, '')
+    lines.push('', `Sitemap: ${base}/sitemap.xml`)
   }
   return lines.join('\n') + '\n'
 }
