@@ -18,6 +18,7 @@ const canonical = ref('')
 const noindex = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
+const expanded = ref(false)
 
 const TITLE_MAX = 60
 const DESC_MAX = 160
@@ -66,6 +67,7 @@ async function save() {
 }
 
 function charClass(current: number, max: number): string {
+  if (current === 0) return 'ok'
   const ratio = current / max
   if (ratio >= 1) return 'over'
   if (ratio >= 0.9) return 'warn'
@@ -77,77 +79,96 @@ const pageDetail = computed(() =>
 )
 const siteName = computed(() => site.manifest?.name)
 
-// SERP preview uses the same fallback chain as the renderer (seo.ts):
-//   metadata field → content field + site name → omit
-const serpTitle = computed(() => {
-  if (title.value) return title.value
+// Fallback values — what the renderer will use when fields are empty.
+// Shown as placeholders and in the SERP preview.
+const fallbackTitle = computed(() => {
   const contentTitle = pageDetail.value?.content?.title as string | undefined
   if (contentTitle) return siteName.value ? `${contentTitle} — ${siteName.value}` : contentTitle
   return selection.name || ''
 })
-// SERP URL shows the route structure. The actual canonical URL is
-// resolved at publish time from the target's siteUrl — the admin
-// doesn't know which target will be published to, so we show a
-// placeholder domain.
-const serpUrl = computed(() => canonical.value || `https://example.com${pageDetail.value?.route ?? '/'}`)
-const serpDescription = computed(() => description.value || (pageDetail.value?.content?.description as string) || '')
+const fallbackDescription = computed(() => (pageDetail.value?.content?.description as string) || '')
+const fallbackCanonical = computed(() => `${pageDetail.value?.route ?? '/'}`)
+
+// SERP preview uses explicit value when set, fallback when empty —
+// same chain as the renderer (seo.ts).
+const serpTitle = computed(() => title.value || fallbackTitle.value)
+const serpUrl = computed(() => canonical.value || `https://example.com${fallbackCanonical.value}`)
+const serpDescription = computed(() => description.value || fallbackDescription.value)
+
+// Collapsed summary — shows the effective title so the author knows
+// what Google will see without expanding.
+const summaryTitle = computed(() => {
+  const effective = title.value || fallbackTitle.value
+  return effective.length > 50 ? effective.slice(0, 50) + '…' : effective
+})
+const hasOverrides = computed(
+  () => !!(title.value || description.value || ogImage.value || canonical.value || noindex.value),
+)
 </script>
 
 <template>
   <div class="metadata-editor" data-testid="metadata-editor">
-    <div class="meta-header">
-      <h3>SEO Metadata</h3>
-      <button v-if="dirty" class="meta-save-btn" :disabled="saving" @click="save" data-testid="metadata-save">
-        {{ saving ? 'Saving…' : 'Save metadata' }}
+    <button class="meta-toggle" @click="expanded = !expanded" type="button" data-testid="metadata-toggle">
+      <i :class="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="toggle-icon" />
+      <span class="toggle-label">SEO</span>
+      <span class="toggle-summary">{{ summaryTitle }}</span>
+      <span v-if="noindex" class="toggle-noindex">noindex</span>
+      <span v-if="hasOverrides" class="toggle-badge">customized</span>
+      <button v-if="dirty && expanded" class="meta-save-btn" :disabled="saving" @click.stop="save" data-testid="metadata-save">
+        {{ saving ? 'Saving…' : 'Save' }}
       </button>
-    </div>
+    </button>
 
-    <div class="meta-fields">
-      <div class="field">
-        <label for="meta-title">Title</label>
-        <input id="meta-title" v-model="title" @input="markDirty" placeholder="Page title for search engines"
-          data-testid="meta-title" />
-        <span :class="['char-count', charClass(title.length, TITLE_MAX)]">{{ title.length }}/{{ TITLE_MAX }}</span>
+    <div v-if="expanded" class="meta-body">
+      <div class="meta-fields">
+        <div class="field">
+          <label for="meta-title">Title</label>
+          <input id="meta-title" v-model="title" @input="markDirty"
+            :placeholder="fallbackTitle ? `${fallbackTitle} (auto)` : 'Page title for search engines'"
+            data-testid="meta-title" />
+          <span v-if="title" :class="['char-count', charClass(title.length, TITLE_MAX)]">{{ title.length }}/{{ TITLE_MAX }}</span>
+        </div>
+
+        <div class="field">
+          <label for="meta-description">Description</label>
+          <textarea id="meta-description" v-model="description" @input="markDirty"
+            :placeholder="fallbackDescription ? `${fallbackDescription} (auto)` : 'Brief description for search results'"
+            rows="2" data-testid="meta-description" />
+          <span v-if="description" :class="['char-count', charClass(description.length, DESC_MAX)]">{{ description.length }}/{{ DESC_MAX }}</span>
+        </div>
+
+        <div class="field">
+          <label for="meta-og-image">OG Image URL</label>
+          <input id="meta-og-image" v-model="ogImage" @input="markDirty" placeholder="https://example.com/image.jpg"
+            data-testid="meta-og-image" />
+        </div>
+
+        <div class="field">
+          <label for="meta-canonical">Canonical URL</label>
+          <input id="meta-canonical" v-model="canonical" @input="markDirty"
+            :placeholder="`Leave empty — auto-generated from route (${fallbackCanonical})`"
+            data-testid="meta-canonical" />
+        </div>
+
+        <div class="field field-checkbox">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="noindex" @change="markDirty" data-testid="meta-noindex" />
+            <span>Hide from search engines</span>
+          </label>
+          <span class="checkbox-hint">Adds <code>noindex</code> robots directive. Page won't appear in sitemap.</span>
+        </div>
       </div>
 
-      <div class="field">
-        <label for="meta-description">Description</label>
-        <textarea id="meta-description" v-model="description" @input="markDirty"
-          placeholder="Brief description for search results" rows="2"
-          data-testid="meta-description" />
-        <span :class="['char-count', charClass(description.length, DESC_MAX)]">{{ description.length }}/{{ DESC_MAX }}</span>
-      </div>
-
-      <div class="field">
-        <label for="meta-og-image">OG Image URL</label>
-        <input id="meta-og-image" v-model="ogImage" @input="markDirty" placeholder="https://example.com/image.jpg"
-          data-testid="meta-og-image" />
-      </div>
-
-      <div class="field">
-        <label for="meta-canonical">Canonical URL</label>
-        <input id="meta-canonical" v-model="canonical" @input="markDirty" placeholder="https://example.com/page"
-          data-testid="meta-canonical" />
-      </div>
-
-      <div class="field field-checkbox">
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="noindex" @change="markDirty" data-testid="meta-noindex" />
-          <span>Hide from search engines</span>
-        </label>
-        <span class="checkbox-hint">Adds <code>noindex</code> robots directive. Page won't appear in sitemap.</span>
-      </div>
-    </div>
-
-    <!-- SERP preview — always light-themed to match Google's appearance -->
-    <div :class="['serp-preview', { 'serp-noindex': noindex }]" data-testid="serp-preview">
-      <div v-if="noindex" class="serp-noindex-badge">
-        <i class="pi pi-eye-slash" aria-hidden="true" /> noindex — hidden from search engines
-      </div>
-      <div class="serp-card">
-        <div class="serp-url">{{ serpUrl }}</div>
-        <div class="serp-title">{{ serpTitle.slice(0, 70) }}{{ serpTitle.length > 70 ? '…' : '' }}</div>
-        <div class="serp-desc">{{ serpDescription.slice(0, 170) }}{{ serpDescription.length > 170 ? '…' : '' }}</div>
+      <!-- SERP preview — always light-themed to match Google's appearance -->
+      <div :class="['serp-preview', { 'serp-noindex': noindex }]" data-testid="serp-preview">
+        <div v-if="noindex" class="serp-noindex-badge">
+          <i class="pi pi-eye-slash" aria-hidden="true" /> noindex — hidden from search engines
+        </div>
+        <div class="serp-card">
+          <div class="serp-url">{{ serpUrl }}</div>
+          <div class="serp-title">{{ serpTitle.slice(0, 70) }}{{ serpTitle.length > 70 ? '…' : '' }}</div>
+          <div class="serp-desc">{{ serpDescription.slice(0, 170) }}{{ serpDescription.length > 170 ? '…' : '' }}</div>
+        </div>
       </div>
     </div>
   </div>
@@ -156,33 +177,74 @@ const serpDescription = computed(() => description.value || (pageDetail.value?.c
 <style scoped>
 .metadata-editor {
   border-top: 1px solid var(--color-border);
-  padding-top: 1rem;
   margin-top: 1rem;
 }
-.meta-header {
+.meta-toggle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 0.5rem 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--color-fg);
+  text-align: left;
 }
-.meta-header h3 {
-  font-size: 0.75rem;
+.toggle-icon { font-size: 0.625rem; color: var(--color-muted); width: 0.75rem; }
+.toggle-label {
+  font-size: 0.6875rem;
   text-transform: uppercase;
-  color: var(--color-muted);
   letter-spacing: 0.05em;
-  margin: 0;
+  color: var(--color-muted);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.toggle-summary {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.toggle-noindex {
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.0625rem 0.3125rem;
+  border-radius: 2px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-fg);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.toggle-badge {
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.0625rem 0.3125rem;
+  border-radius: 2px;
+  background: var(--color-hover-bg);
+  color: var(--color-muted);
+  flex-shrink: 0;
 }
 .meta-save-btn {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.75rem;
+  font-size: 0.6875rem;
+  padding: 0.1875rem 0.5rem;
   border: 1px solid var(--p-primary-color);
   border-radius: var(--p-border-radius-sm);
   background: var(--p-primary-color);
   color: #fff;
   cursor: pointer;
   font-family: inherit;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .meta-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.meta-body { padding-bottom: 0.5rem; }
 .meta-fields { display: flex; flex-direction: column; gap: 0.625rem; }
 .field { display: flex; flex-direction: column; gap: 0.25rem; position: relative; }
 .field label {
@@ -202,6 +264,11 @@ const serpDescription = computed(() => description.value || (pageDetail.value?.c
   font-family: inherit;
   resize: vertical;
 }
+.field input::placeholder, .field textarea::placeholder {
+  color: var(--color-muted);
+  opacity: 0.6;
+  font-style: italic;
+}
 .field input:focus, .field textarea:focus {
   outline: 2px solid var(--p-primary-color);
   outline-offset: -1px;
@@ -214,7 +281,6 @@ const serpDescription = computed(() => description.value || (pageDetail.value?.c
 .char-count.ok { color: var(--color-muted); }
 .char-count.warn { color: var(--color-warning-fg); }
 .char-count.over { color: var(--color-danger-fg); font-weight: 600; }
-
 .field-checkbox { flex-direction: row; align-items: flex-start; gap: 0.375rem; }
 .checkbox-label {
   display: flex;
