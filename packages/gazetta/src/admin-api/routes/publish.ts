@@ -362,14 +362,14 @@ export function publishRoutes(
         yield { kind: 'progress', target: targetName, current, total, label: 'site manifest' }
 
         // 3b. Sitemap + robots.txt
-        const baseUrl = config?.siteUrl
-        if (baseUrl) {
+        const siteUrl = config?.siteUrl
+        if (siteUrl) {
           const { listSidecars } = await import('../../sidecars.js')
           const { generateSitemap } = await import('../../sitemap.js')
           const { generateRobotsTxt } = await import('../../robots.js')
           const targetPageSidecars = await listSidecars(targetStorage, 'pages')
           const sitemapXml = generateSitemap({
-            baseUrl,
+            siteUrl,
             pages: targetPageSidecars,
             systemPages: site.manifest.systemPages,
           })
@@ -378,13 +378,13 @@ export function publishRoutes(
             totalFiles++
           }
           // robots.txt only at domain root — Google ignores it at subpaths.
-          const isRootDeploy = !new URL(baseUrl).pathname.replace(/\/+$/, '')
+          const isRootDeploy = !new URL(siteUrl).pathname.replace(/\/+$/, '')
           if (isRootDeploy) {
             let robotsTxt: string
             try {
               robotsTxt = await source.contentRoot.storage.readFile(source.contentRoot.path('robots.txt'))
             } catch {
-              robotsTxt = generateRobotsTxt({ baseUrl })
+              robotsTxt = generateRobotsTxt({ siteUrl })
             }
             await targetStorage.writeFile('robots.txt', robotsTxt)
             totalFiles++

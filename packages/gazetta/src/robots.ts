@@ -8,22 +8,22 @@
  * Strategy:
  *   1. If the site has a `robots.txt` file, use it verbatim.
  *   2. Otherwise, generate a permissive default with a Sitemap
- *      reference (when baseUrl is available).
+ *      reference (when siteUrl is available).
  */
 
 export interface GenerateRobotsOptions {
   /** Absolute base URL — used for the Sitemap directive. Optional. */
-  baseUrl?: string
+  siteUrl?: string
 }
 
 /**
  * Generate a default robots.txt. Permissive (allow all crawlers)
- * with a Sitemap reference when baseUrl is available.
+ * with a Sitemap reference when siteUrl is available.
  */
 export function generateRobotsTxt(opts: GenerateRobotsOptions): string {
   const lines = ['User-agent: *', 'Allow: /']
-  if (opts.baseUrl) {
-    const base = opts.baseUrl.replace(/\/+$/, '')
+  if (opts.siteUrl) {
+    const base = opts.siteUrl.replace(/\/+$/, '')
     lines.push('', `Sitemap: ${base}/sitemap.xml`)
   }
   return lines.join('\n') + '\n'

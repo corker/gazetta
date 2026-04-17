@@ -655,7 +655,7 @@ describe('SEO publish integration', () => {
     expect(sidecars.size).toBe(2)
 
     const xml = generateSitemap({
-      baseUrl: 'https://example.com',
+      siteUrl: 'https://example.com',
       pages: sidecars,
     })
     expect(xml).not.toBeNull()
@@ -673,7 +673,7 @@ describe('SEO publish integration', () => {
     const { generateRobotsTxt } = await import('../src/robots.js')
     const target = createFilesystemProvider(seoTargetDir)
 
-    const txt = generateRobotsTxt({ baseUrl: 'https://example.com' })
+    const txt = generateRobotsTxt({ siteUrl: 'https://example.com' })
     await target.writeFile('robots.txt', txt)
 
     const stored = await target.readFile('robots.txt')
