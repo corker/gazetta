@@ -6,6 +6,7 @@ import { resolvePage, resolveComponent } from './resolver.js'
 import { renderComponent, renderPage } from './renderer.js'
 import { writeSidecars, collectFragmentRefs } from './sidecars.js'
 import { createContentRoot, type ContentRoot } from './content-root.js'
+import { resolveSeoTags, escapeAttr } from './seo.js'
 
 function contentHash(content: string): string {
   return createHash('md5').update(content).digest('hex').slice(0, 8)
@@ -133,7 +134,6 @@ export async function publishPageRendered(
   // SEO tags from the fallback chain — same logic as renderPage uses for
   // static publish. Template head parts are checked for duplicates so the
   // renderer doesn't double-emit tags the template already provides.
-  const { resolveSeoTags, escapeAttr } = await import('./seo.js')
   const templateHead = localHeadParts.join('\n')
   const seoHead = resolveSeoTags({
     metadata: page.metadata,
