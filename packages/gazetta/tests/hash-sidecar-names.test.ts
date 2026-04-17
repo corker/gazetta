@@ -29,6 +29,10 @@ import {
   parseUsesSidecarName,
   templateSidecarNameFor,
   parseTemplateSidecarName,
+  pubSidecarNameFor,
+  parsePubSidecarName,
+  compactTimestamp,
+  parseCompactTimestamp,
 } from '../src/hash.js'
 
 /**
@@ -178,5 +182,47 @@ describe('sidecar kind disambiguation', () => {
         expect(parseSidecarName(fname)).toBe(hex)
       }),
     )
+  })
+})
+
+describe('pub sidecar', () => {
+  it('compactTimestamp round-trips through parseCompactTimestamp', () => {
+    const date = new Date('2026-04-17T22:05:30Z')
+    const compact = compactTimestamp(date)
+    expect(compact).toBe('20260417T220530Z')
+    expect(parseCompactTimestamp(compact)).toBe('2026-04-17T22:05:30Z')
+  })
+
+  it('pubSidecarNameFor generates correct filename', () => {
+    const date = new Date('2026-04-17T22:00:00Z')
+    expect(pubSidecarNameFor(date, false)).toBe('.pub-20260417T220000Z')
+    expect(pubSidecarNameFor(date, true)).toBe('.pub-20260417T220000Z-noindex')
+  })
+
+  it('parsePubSidecarName round-trips', () => {
+    const date = new Date('2026-04-17T22:00:00Z')
+    const name = pubSidecarNameFor(date, false)
+    const parsed = parsePubSidecarName(name)
+    expect(parsed).toEqual({ lastPublished: '2026-04-17T22:00:00Z', noindex: false })
+  })
+
+  it('parsePubSidecarName detects noindex', () => {
+    const parsed = parsePubSidecarName('.pub-20260417T220000Z-noindex')
+    expect(parsed).toEqual({ lastPublished: '2026-04-17T22:00:00Z', noindex: true })
+  })
+
+  it('parsePubSidecarName rejects non-pub sidecars', () => {
+    expect(parsePubSidecarName('.abcd1234.hash')).toBeNull()
+    expect(parsePubSidecarName('.uses-header')).toBeNull()
+    expect(parsePubSidecarName('.tpl-page-default')).toBeNull()
+    expect(parsePubSidecarName('random.txt')).toBeNull()
+  })
+
+  it('pub sidecar does not collide with other sidecar kinds', () => {
+    const pubName = pubSidecarNameFor(new Date('2026-04-17T22:00:00Z'))
+    expect(parseSidecarName(pubName)).toBeNull()
+    expect(parseUsesSidecarName(pubName)).toBeNull()
+    expect(parseTemplateSidecarName(pubName)).toBeNull()
+    expect(parsePubSidecarName(pubName)).not.toBeNull()
   })
 })

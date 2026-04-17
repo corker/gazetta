@@ -4,6 +4,7 @@ import type { ComponentEntry, FragmentManifest, PageManifest } from './types.js'
 const SIDECAR_RE = /^\.([0-9a-f]{8})\.hash$/
 const USES_SIDECAR_RE = /^\.uses-(.+)$/
 const TPL_SIDECAR_RE = /^\.tpl-(.+)$/
+const PUB_SIDECAR_RE = /^\.pub-(\d{8}T\d{6}Z)(-noindex)?$/
 
 export function sidecarNameFor(hash: string): string {
   return `.${hash}.hash`
@@ -62,6 +63,39 @@ export function templateSidecarNameFor(templateName: string): string {
 export function parseTemplateSidecarName(entryName: string): string | null {
   const m = TPL_SIDECAR_RE.exec(entryName)
   return m ? decodeRefName(m[1]) : null
+}
+
+/** Compact ISO timestamp for `.pub-` sidecar filenames: `20260417T220000Z`. */
+export function compactTimestamp(date: Date = new Date()): string {
+  return date
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '')
+}
+
+/** Parse compact timestamp back to ISO string: `2026-04-17T22:00:00Z`. */
+export function parseCompactTimestamp(compact: string): string {
+  // 20260417T220000Z → 2026-04-17T22:00:00Z
+  return `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}T${compact.slice(9, 11)}:${compact.slice(11, 13)}:${compact.slice(13, 15)}Z`
+}
+
+export interface PubSidecar {
+  lastPublished: string // ISO timestamp
+  noindex: boolean
+}
+
+/** `.pub-20260417T220000Z` or `.pub-20260417T220000Z-noindex` */
+export function pubSidecarNameFor(date: Date = new Date(), noindex = false): string {
+  return `.pub-${compactTimestamp(date)}${noindex ? '-noindex' : ''}`
+}
+
+export function parsePubSidecarName(entryName: string): PubSidecar | null {
+  const m = PUB_SIDECAR_RE.exec(entryName)
+  if (!m) return null
+  return {
+    lastPublished: parseCompactTimestamp(m[1]),
+    noindex: !!m[2],
+  }
 }
 
 /**
