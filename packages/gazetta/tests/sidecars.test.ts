@@ -90,6 +90,7 @@ describe('readSidecars', () => {
       hash: 'abcd1234',
       uses: [],
       template: null,
+      pub: null,
     })
   })
 
@@ -118,6 +119,7 @@ describe('readSidecars', () => {
       hash: 'abcd1234',
       uses: [],
       template: null,
+      pub: null,
     })
   })
 
@@ -143,6 +145,7 @@ describe('writeSidecars', () => {
       hash: 'deadbeef',
       uses: ['header', 'footer'],
       template: 'page-default',
+      pub: null,
     }
     await writeSidecars(storage, 'pages/home', state)
     const files = [...storage.dump().keys()].filter(p => p.startsWith('pages/home/'))
@@ -153,14 +156,14 @@ describe('writeSidecars', () => {
   })
 
   it('skips tpl-* when template is null', async () => {
-    await writeSidecars(storage, 'pages/home', { hash: 'deadbeef', uses: [], template: null })
+    await writeSidecars(storage, 'pages/home', { hash: 'deadbeef', uses: [], template: null, pub: null })
     const files = [...storage.dump().keys()].filter(p => p.startsWith('pages/home/'))
     expect(files).toContain('pages/home/.deadbeef.hash')
     expect(files.some(f => f.includes('.tpl-'))).toBe(false)
   })
 
   it('is idempotent — writing the same state twice leaves the same files', async () => {
-    const state: SidecarState = { hash: 'aa11bb22', uses: ['nav'], template: 'layout' }
+    const state: SidecarState = { hash: 'aa11bb22', uses: ['nav'], template: 'layout', pub: null }
     await writeSidecars(storage, 'pages/home', state)
     const snap1 = new Set([...storage.dump().keys()])
     await writeSidecars(storage, 'pages/home', state)
@@ -174,12 +177,14 @@ describe('writeSidecars', () => {
       hash: '11111111',
       uses: ['header', 'footer'],
       template: 'old-layout',
+      pub: null,
     })
     // New state: only header, different template, different hash
     await writeSidecars(storage, 'pages/home', {
       hash: '22222222',
       uses: ['header'],
       template: 'new-layout',
+      pub: null,
     })
     const files = [...storage.dump().keys()].filter(p => p.startsWith('pages/home/'))
     expect(files).toContain('pages/home/.22222222.hash')
@@ -197,7 +202,7 @@ describe('writeSidecars', () => {
       'pages/home/index.html': '<html>',
       'pages/home/.01234567.hash': '', // an old sidecar — this SHOULD be removed
     })
-    await writeSidecars(storage, 'pages/home', { hash: 'abcdef01', uses: [], template: null })
+    await writeSidecars(storage, 'pages/home', { hash: 'abcdef01', uses: [], template: null, pub: null })
     const files = [...storage.dump().keys()].filter(p => p.startsWith('pages/home/'))
     expect(files).toContain('pages/home/page.json')
     expect(files).toContain('pages/home/index.html')

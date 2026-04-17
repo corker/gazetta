@@ -24,6 +24,9 @@ import {
   usesSidecarNameFor,
   parseTemplateSidecarName,
   templateSidecarNameFor,
+  parsePubSidecarName,
+  pubSidecarNameFor,
+  type PubSidecar,
 } from './hash.js'
 import { mapLimit } from './concurrency.js'
 
@@ -32,6 +35,9 @@ export interface SidecarState {
   hash: string
   uses: string[]
   template: string | null
+  /** Publish timestamp + noindex flag. Present only on target sidecars
+   *  written by the publish pipeline; absent on source-side sidecars. */
+  pub: PubSidecar | null
 }
 
 /**
@@ -51,6 +57,7 @@ export async function readSidecars(storage: StorageProvider, dir: string): Promi
   let hash: string | null = null
   const uses: string[] = []
   let template: string | null = null
+  let pub: PubSidecar | null = null
   for (const e of entries) {
     if (e.isDirectory) continue
     const h = parseSidecarName(e.name)
@@ -64,10 +71,15 @@ export async function readSidecars(storage: StorageProvider, dir: string): Promi
       continue
     }
     const t = parseTemplateSidecarName(e.name)
-    if (t) template = t
+    if (t) {
+      template = t
+      continue
+    }
+    const p = parsePubSidecarName(e.name)
+    if (p) pub = p
   }
   if (!hash) return null
-  return { hash, uses, template }
+  return { hash, uses, template, pub }
 }
 
 /**
@@ -80,13 +92,19 @@ export async function writeSidecars(storage: StorageProvider, dir: string, state
   const want = new Set<string>([sidecarNameFor(state.hash)])
   for (const frag of state.uses) want.add(usesSidecarNameFor(frag))
   if (state.template) want.add(templateSidecarNameFor(state.template))
+  if (state.pub) want.add(pubSidecarNameFor(new Date(state.pub.lastPublished), state.pub.noindex))
 
   // Remove stale sidecars of known kinds that aren't in `want`.
   try {
     const entries = await storage.readDir(dir)
     for (const e of entries) {
       if (want.has(e.name)) continue
-      if (parseSidecarName(e.name) || parseUsesSidecarName(e.name) || parseTemplateSidecarName(e.name)) {
+      if (
+        parseSidecarName(e.name) ||
+        parseUsesSidecarName(e.name) ||
+        parseTemplateSidecarName(e.name) ||
+        parsePubSidecarName(e.name)
+      ) {
         try {
           await storage.rm(`${dir}/${e.name}`)
         } catch {

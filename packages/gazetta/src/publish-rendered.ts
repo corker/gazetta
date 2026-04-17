@@ -166,6 +166,10 @@ ${bodyContent}
       hash: manifestHash,
       uses: collectFragmentRefs(page.components),
       template: page.template,
+      pub: {
+        lastPublished: new Date().toISOString(),
+        noindex: !!page.metadata?.robots?.includes('noindex'),
+      },
     })
   }
 
@@ -216,6 +220,10 @@ export async function publishPageStatic(
       hash: manifestHash,
       uses: collectFragmentRefs(page.components),
       template: page.template,
+      pub: {
+        lastPublished: new Date().toISOString(),
+        noindex: !!page.metadata?.robots?.includes('noindex'),
+      },
     })
   }
 
@@ -290,6 +298,7 @@ export async function publishFragmentRendered(
       hash: manifestHash,
       uses: collectFragmentRefs(fragment.components),
       template: fragment.template,
+      pub: null,
     })
   }
 

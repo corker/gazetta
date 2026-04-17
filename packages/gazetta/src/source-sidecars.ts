@@ -112,6 +112,7 @@ export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): Sou
         hash,
         uses: collectFragmentRefs(manifest.components),
         template: manifest.template,
+        pub: null,
       })
     },
     ensureBackfilled() {
