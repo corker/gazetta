@@ -50,6 +50,7 @@ export function generateSitemap(opts: GenerateSitemapOptions): string | null {
   for (const [name, state] of sorted) {
     if (systemSet.has(name)) continue
     if (state.pub?.noindex) continue
+    if (name.includes('[')) continue // dynamic routes — can't sitemap template patterns
 
     const route = deriveRoute(name)
     const loc = `${base}${route}`
