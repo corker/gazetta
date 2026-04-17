@@ -659,6 +659,37 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     await publishFragmentIndex(sourceRoot, targetStorage, site)
     totalFiles += 2
 
+    // Sitemap + robots.txt — generated from target sidecars
+    const baseUrl = site.manifest.baseUrl ?? targetConfig?.siteUrl
+    if (baseUrl) {
+      const { listSidecars } = await import('../sidecars.js')
+      const { generateSitemap } = await import('../sitemap.js')
+      const { generateRobotsTxt } = await import('../robots.js')
+
+      const targetPageSidecars = await listSidecars(targetStorage, 'pages')
+      const sitemapXml = generateSitemap({
+        baseUrl,
+        pages: targetPageSidecars,
+        systemPages: site.manifest.systemPages,
+      })
+      if (sitemapXml) {
+        await targetStorage.writeFile('sitemap.xml', sitemapXml)
+        totalFiles++
+        console.log(`    ${c.dim('· sitemap.xml')}`)
+      }
+
+      // robots.txt: user file wins, else generate default
+      let robotsTxt: string
+      try {
+        robotsTxt = await source.contentRoot.storage.readFile(source.contentRoot.path('robots.txt'))
+      } catch {
+        robotsTxt = generateRobotsTxt({ baseUrl })
+      }
+      await targetStorage.writeFile('robots.txt', robotsTxt)
+      totalFiles++
+      console.log(`    ${c.dim('· robots.txt')}`)
+    }
+
     const removedMsg = totalRemoved > 0 ? c.dim(` (${totalRemoved} old files cleaned)`) : ''
     console.log(`\n  ${c.green('✓')} ${c.bold(name)}: ${totalFiles} files published${removedMsg}\n`)
   }
