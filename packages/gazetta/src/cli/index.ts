@@ -660,7 +660,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     totalFiles += 2
 
     // Sitemap + robots.txt — generated from target sidecars
-    const baseUrl = site.manifest.baseUrl ?? targetConfig?.siteUrl
+    const baseUrl = targetConfig?.siteUrl ?? site.manifest.baseUrl
     if (baseUrl) {
       const { listSidecars } = await import('../sidecars.js')
       const { generateSitemap } = await import('../sitemap.js')
