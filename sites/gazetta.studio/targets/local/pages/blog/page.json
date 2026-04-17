@@ -4,11 +4,6 @@
     "title": "Blog — Gazetta",
     "description": "News, tutorials, and updates from the Gazetta team."
   },
-  "metadata": {
-    "title": "Blog — Gazetta",
-    "description": "News, tutorials, and updates from the Gazetta team.",
-    "canonical": "https://gazetta.studio/blog"
-  },
   "components": [
     "@header",
     {
