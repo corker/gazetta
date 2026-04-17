@@ -4,6 +4,11 @@
     "title": "Documentation — Gazetta",
     "description": "Learn how to build composable websites with Gazetta."
   },
+  "metadata": {
+    "title": "Documentation — Gazetta",
+    "description": "Learn how to build composable websites with Gazetta. Templates, fragments, pages, targets, and CLI reference.",
+    "canonical": "https://gazetta.studio/docs"
+  },
   "components": [
     "@header",
     {

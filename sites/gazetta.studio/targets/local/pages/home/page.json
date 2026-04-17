@@ -4,6 +4,11 @@
     "title": "Gazetta — Stateless CMS for Composable Websites",
     "description": "No database. No build step. Pages composed from reusable components at serve time."
   },
+  "metadata": {
+    "title": "Gazetta — Stateless CMS for Composable Websites",
+    "description": "No database. No build step. Pages composed from reusable components at serve time.",
+    "canonical": "https://gazetta.studio/"
+  },
   "components": [
     "@header",
     {
