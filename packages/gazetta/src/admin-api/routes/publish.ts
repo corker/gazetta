@@ -302,21 +302,21 @@ export function publishRoutes(
         }
         const pageHashOpts = isStatic ? { templateHashes, fragmentHashes } : { templateHashes }
 
+        // SEO context for this target — built once, shared across all page renders.
+        const seo = {
+          siteName: site.manifest.name,
+          siteUrl: config?.siteUrl,
+          locale: site.manifest.locale,
+          defaultOgImage: site.manifest.defaultOgImage,
+        }
+
         const renderItem = async (item: string): Promise<{ files: number }> => {
           if (item.startsWith('pages/')) {
             const pageName = item.replace('pages/', '')
             const page = site.pages.get(pageName)
             const manifestHash = page ? hashManifest(page, pageHashOpts) : undefined
             if (isStatic) {
-              return publishPageStatic(
-                pageName,
-                source.contentRoot,
-                targetStorage,
-                tdir,
-                manifestHash,
-                site,
-                config?.siteUrl,
-              )
+              return publishPageStatic(pageName, source.contentRoot, targetStorage, tdir, manifestHash, site, seo)
             }
             const { files } = await publishPageRendered(
               pageName,
