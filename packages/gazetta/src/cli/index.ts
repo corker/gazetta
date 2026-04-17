@@ -676,15 +676,15 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     totalFiles += 2
 
     // Sitemap + robots.txt — generated from target sidecars
-    const baseUrl = targetConfig?.siteUrl
-    if (baseUrl) {
+    const siteUrl = targetConfig?.siteUrl
+    if (siteUrl) {
       const { listSidecars } = await import('../sidecars.js')
       const { generateSitemap } = await import('../sitemap.js')
       const { generateRobotsTxt } = await import('../robots.js')
 
       const targetPageSidecars = await listSidecars(targetStorage, 'pages')
       const sitemapXml = generateSitemap({
-        baseUrl,
+        siteUrl,
         pages: targetPageSidecars,
         systemPages: site.manifest.systemPages,
       })
@@ -697,13 +697,13 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       // robots.txt: only at the domain root — Google ignores robots.txt at
       // subpaths. If siteUrl has a path component, the domain root belongs
       // to someone else (host, reverse proxy, another app).
-      const isRootDeploy = !new URL(baseUrl).pathname.replace(/\/+$/, '')
+      const isRootDeploy = !new URL(siteUrl).pathname.replace(/\/+$/, '')
       if (isRootDeploy) {
         let robotsTxt: string
         try {
           robotsTxt = await source.contentRoot.storage.readFile(source.contentRoot.path('robots.txt'))
         } catch {
-          robotsTxt = generateRobotsTxt({ baseUrl })
+          robotsTxt = generateRobotsTxt({ siteUrl })
         }
         await targetStorage.writeFile('robots.txt', robotsTxt)
         totalFiles++

@@ -20,7 +20,7 @@ import { deriveRoute } from './site-loader.js'
 
 export interface GenerateSitemapOptions {
   /** Absolute base URL (e.g. "https://gazetta.studio"). */
-  baseUrl: string
+  siteUrl: string
   /** Target sidecar listing — keyed by page name (e.g. "home", "about"). */
   pages: Map<string, SidecarState>
   /** System page names to exclude (e.g. ["404"]). */
@@ -42,7 +42,7 @@ function escapeXml(s: string): string {
  */
 export function generateSitemap(opts: GenerateSitemapOptions): string | null {
   const systemSet = new Set(opts.systemPages ?? [])
-  const base = opts.baseUrl.replace(/\/+$/, '')
+  const base = opts.siteUrl.replace(/\/+$/, '')
   const urls: string[] = []
 
   for (const [name, state] of opts.pages) {
