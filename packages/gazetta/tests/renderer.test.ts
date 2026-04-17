@@ -429,6 +429,13 @@ describe('renderPage', () => {
     expect(html).toContain('property="og:url" content="https://example.com/about"')
   })
 
+  it('strips trailing slash from siteUrl before appending route', async () => {
+    const page = leaf('<p>body</p>', '', '', 'page')
+    const html = await renderPage(page, { route: '/about', seo: { siteUrl: 'https://example.com/blog/' } })
+    expect(html).toContain('href="https://example.com/blog/about"')
+    expect(html).not.toContain('blog//about')
+  })
+
   it('og:image falls back to site defaultOgImage', async () => {
     const page = leaf('<p>body</p>', '', '', 'page')
     const html = await renderPage(page, { seo: { defaultOgImage: '/images/default.jpg' } })

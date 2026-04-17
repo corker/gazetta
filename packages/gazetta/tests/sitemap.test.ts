@@ -66,6 +66,19 @@ describe('generateSitemap', () => {
     expect(xml).toContain('search&amp;filter')
   })
 
+  it('strips trailing slash from siteUrl', () => {
+    const pages = new Map([page('about')])
+    const xml = generateSitemap({ siteUrl: 'https://example.com/', pages })!
+    expect(xml).toContain('<loc>https://example.com/about</loc>')
+    expect(xml).not.toContain('//about')
+  })
+
+  it('handles siteUrl with subpath and trailing slash', () => {
+    const pages = new Map([page('about')])
+    const xml = generateSitemap({ siteUrl: 'https://example.com/blog/', pages })!
+    expect(xml).toContain('<loc>https://example.com/blog/about</loc>')
+  })
+
   it('skips dynamic route pages (template patterns are not crawlable)', () => {
     const pages = new Map([page('home'), page('blog/[slug]'), page('docs/[...path]')])
     const xml = generateSitemap({ siteUrl: 'https://example.com', pages })!
