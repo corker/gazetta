@@ -18,7 +18,6 @@ const canonical = ref('')
 const noindex = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
-const expanded = ref(false)
 
 const TITLE_MAX = 60
 const DESC_MAX = 160
@@ -94,33 +93,18 @@ const fallbackCanonical = computed(() => `${pageDetail.value?.route ?? '/'}`)
 const serpTitle = computed(() => title.value || fallbackTitle.value)
 const serpUrl = computed(() => canonical.value || `https://example.com${fallbackCanonical.value}`)
 const serpDescription = computed(() => description.value || fallbackDescription.value)
-
-// Collapsed summary — shows the effective title so the author knows
-// what Google will see without expanding.
-const summaryTitle = computed(() => {
-  const effective = title.value || fallbackTitle.value
-  return effective.length > 50 ? effective.slice(0, 50) + '…' : effective
-})
-const hasOverrides = computed(
-  () => !!(title.value || description.value || ogImage.value || canonical.value || noindex.value),
-)
 </script>
 
 <template>
   <div class="metadata-editor" data-testid="metadata-editor">
-    <button class="meta-toggle" @click="expanded = !expanded" type="button" data-testid="metadata-toggle">
-      <i :class="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="toggle-icon" />
-      <span class="toggle-label">SEO</span>
-      <span class="toggle-summary">{{ summaryTitle }}</span>
-      <span v-if="noindex" class="toggle-noindex">noindex</span>
-      <span v-if="hasOverrides" class="toggle-badge">customized</span>
-      <button v-if="dirty && expanded" class="meta-save-btn" :disabled="saving" @click.stop="save" data-testid="metadata-save">
+    <div class="meta-header">
+      <h3>SEO</h3>
+      <button v-if="dirty" class="meta-save-btn" :disabled="saving" @click="save" data-testid="metadata-save">
         {{ saving ? 'Saving…' : 'Save' }}
       </button>
-    </button>
+    </div>
 
-    <div v-if="expanded" class="meta-body">
-      <div class="meta-fields">
+    <div class="meta-fields">
         <div class="field">
           <label for="meta-title">Title</label>
           <input id="meta-title" v-model="title" @input="markDirty"
@@ -169,7 +153,6 @@ const hasOverrides = computed(
           <div class="serp-title">{{ serpTitle.slice(0, 70) }}{{ serpTitle.length > 70 ? '…' : '' }}</div>
           <div class="serp-desc">{{ serpDescription.slice(0, 170) }}{{ serpDescription.length > 170 ? '…' : '' }}</div>
         </div>
-      </div>
     </div>
   </div>
 </template>
@@ -177,59 +160,21 @@ const hasOverrides = computed(
 <style scoped>
 .metadata-editor {
   border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
   margin-top: 1rem;
 }
-.meta-toggle {
+.meta-header {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  width: 100%;
-  padding: 0.5rem 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  color: var(--color-fg);
-  text-align: left;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
 }
-.toggle-icon { font-size: 0.625rem; color: var(--color-muted); width: 0.75rem; }
-.toggle-label {
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-muted);
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.toggle-summary {
+.meta-header h3 {
   font-size: 0.75rem;
-  color: var(--color-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-.toggle-noindex {
-  font-size: 0.5625rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0.0625rem 0.3125rem;
-  border-radius: 2px;
-  background: var(--color-danger-bg);
-  color: var(--color-danger-fg);
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.toggle-badge {
-  font-size: 0.5625rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0.0625rem 0.3125rem;
-  border-radius: 2px;
-  background: var(--color-hover-bg);
   color: var(--color-muted);
-  flex-shrink: 0;
+  letter-spacing: 0.05em;
+  margin: 0;
 }
 .meta-save-btn {
   font-size: 0.6875rem;
@@ -240,11 +185,8 @@ const hasOverrides = computed(
   color: #fff;
   cursor: pointer;
   font-family: inherit;
-  flex-shrink: 0;
-  margin-left: auto;
 }
 .meta-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.meta-body { padding-bottom: 0.5rem; }
 .meta-fields { display: flex; flex-direction: column; gap: 0.625rem; }
 .field { display: flex; flex-direction: column; gap: 0.25rem; position: relative; }
 .field label {
