@@ -353,6 +353,32 @@ export function publishRoutes(
         current++
         yield { kind: 'progress', target: targetName, current, total, label: 'site manifest' }
 
+        // 3b. Sitemap + robots.txt
+        const baseUrl = site.manifest.baseUrl ?? config?.siteUrl
+        if (baseUrl) {
+          const { listSidecars } = await import('../../sidecars.js')
+          const { generateSitemap } = await import('../../sitemap.js')
+          const { generateRobotsTxt } = await import('../../robots.js')
+          const targetPageSidecars = await listSidecars(targetStorage, 'pages')
+          const sitemapXml = generateSitemap({
+            baseUrl,
+            pages: targetPageSidecars,
+            systemPages: site.manifest.systemPages,
+          })
+          if (sitemapXml) {
+            await targetStorage.writeFile('sitemap.xml', sitemapXml)
+            totalFiles++
+          }
+          let robotsTxt: string
+          try {
+            robotsTxt = await source.contentRoot.storage.readFile(source.contentRoot.path('robots.txt'))
+          } catch {
+            robotsTxt = generateRobotsTxt({ baseUrl })
+          }
+          await targetStorage.writeFile('robots.txt', robotsTxt)
+          totalFiles++
+        }
+
         // 4. Purge CDN cache
         if (purgeConfig?.type === 'cloudflare') {
           const apiToken = resolveEnvVars(purgeConfig.apiToken)
