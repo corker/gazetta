@@ -118,7 +118,7 @@ export const useEditingStore = defineStore('editing', () => {
 
       // Deep clone the components array and update the target component's content
       const updatedComponents = deepClone(detail.components ?? [])
-      const parts = namePath.split('/')
+      const parts = resolveComponentPath(namePath).split('/')
       let components = updatedComponents as Array<
         string | { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }
       >
@@ -147,13 +147,28 @@ export const useEditingStore = defineStore('editing', () => {
     }
   }
 
+  /**
+   * Resolve a tree path to a component-relative path. The component tree
+   * prefixes fragment children with `@{fragmentName}/` (e.g. `@header/logo`)
+   * for preview click-to-select, but the fragment's components list uses
+   * plain names (`logo`). Strip the prefix so lookups and saves navigate
+   * the correct tree.
+   */
+  function resolveComponentPath(namePath: string): string {
+    const sel = useSelectionStore()
+    if (sel.type === 'fragment' && sel.name && namePath.startsWith(`@${sel.name}/`)) {
+      return namePath.slice(`@${sel.name}/`.length)
+    }
+    return namePath
+  }
+
   /** Find an inline component by name path (e.g., "hero", "features/fast") in the selection detail */
   function findComponentByNamePath(namePath: string): { template: string; content: Record<string, unknown> } | null {
     const sel = useSelectionStore()
     const detail = sel.detail
     if (!detail?.components) return null
 
-    const parts = namePath.split('/')
+    const parts = resolveComponentPath(namePath).split('/')
     let components = detail.components as Array<
       string | { name: string; template: string; content?: Record<string, unknown>; components?: unknown[] }
     >
