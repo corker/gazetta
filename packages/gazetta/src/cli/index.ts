@@ -608,7 +608,15 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
           continue
         }
         const manifestHash = hashManifest(page, { templateHashes, fragmentHashes })
-        const { files } = await publishPageStatic(pageName, sourceRoot, targetStorage, templatesDir, manifestHash, site)
+        const { files } = await publishPageStatic(
+          pageName,
+          sourceRoot,
+          targetStorage,
+          templatesDir,
+          manifestHash,
+          site,
+          targetConfig?.siteUrl,
+        )
         totalFiles += files
         console.log(`    ${c.green('✓')} ${pageName}`)
       }
