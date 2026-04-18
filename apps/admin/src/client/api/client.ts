@@ -208,7 +208,8 @@ export const api = {
   updateFragment: (name: string, data: Partial<FragmentDetail>) =>
     request<{ ok: boolean }>(`/fragments/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
   getTemplates: () => request<TemplateSummary[]>('/templates'),
-  getTemplateSchema: (name: string) => request<Record<string, unknown>>(`/templates/${name}/schema`),
+  getTemplateSchema: (name: string, options?: RequestInit) =>
+    request<Record<string, unknown>>(`/templates/${name}/schema`, options),
   getFields: () => request<FieldSummary[]>('/fields'),
   getTargets: () => request<TargetInfo[]>('/targets'),
   publish: (items: string[], targets: string[]) =>
