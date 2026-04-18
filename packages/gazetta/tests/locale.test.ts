@@ -8,6 +8,7 @@ import {
   resolveLocaleFallback,
   localeRoutePrefix,
 } from '../src/locale.js'
+import { resolveSeoTags, type SeoContext } from '../src/seo.js'
 import type { SiteManifest, TargetConfig } from '../src/types.js'
 
 describe('normalizeLocale', () => {
@@ -211,5 +212,71 @@ describe('localeRoutePrefix', () => {
 
   it('normalizes locale', () => {
     expect(localeRoutePrefix('FR', resolved)).toBe('/fr')
+  })
+})
+
+describe('hreflang in resolveSeoTags', () => {
+  const baseSeo: SeoContext = { siteUrl: 'https://example.com', locale: 'en' }
+
+  it('emits hreflang tags when alternates have 2+ entries', () => {
+    const seo: SeoContext = {
+      ...baseSeo,
+      hreflangAlternates: { en: 'https://example.com/about', fr: 'https://example.com/fr/about' },
+      defaultLocale: 'en',
+    }
+    const result = resolveSeoTags({ seo, route: '/about' })
+    expect(result).toContain('hreflang="en"')
+    expect(result).toContain('href="https://example.com/about"')
+    expect(result).toContain('hreflang="fr"')
+    expect(result).toContain('href="https://example.com/fr/about"')
+  })
+
+  it('emits x-default pointing to default locale', () => {
+    const seo: SeoContext = {
+      ...baseSeo,
+      hreflangAlternates: { en: 'https://example.com/about', fr: 'https://example.com/fr/about' },
+      defaultLocale: 'en',
+    }
+    const result = resolveSeoTags({ seo, route: '/about' })
+    expect(result).toContain('hreflang="x-default"')
+    expect(result).toContain('href="https://example.com/about"')
+  })
+
+  it('omits hreflang when only one alternate', () => {
+    const seo: SeoContext = {
+      ...baseSeo,
+      hreflangAlternates: { en: 'https://example.com/about' },
+      defaultLocale: 'en',
+    }
+    const result = resolveSeoTags({ seo, route: '/about' })
+    expect(result).not.toContain('hreflang')
+  })
+
+  it('omits hreflang when no alternates', () => {
+    const result = resolveSeoTags({ seo: baseSeo, route: '/about' })
+    expect(result).not.toContain('hreflang')
+  })
+
+  it('includes self-referencing alternate', () => {
+    const seo: SeoContext = {
+      ...baseSeo,
+      locale: 'fr',
+      hreflangAlternates: { en: 'https://example.com/about', fr: 'https://example.com/fr/about' },
+      defaultLocale: 'en',
+    }
+    const result = resolveSeoTags({ seo, route: '/fr/about' })
+    // Both locales present — including the current page's own locale
+    expect(result).toContain('hreflang="fr"')
+    expect(result).toContain('hreflang="en"')
+  })
+
+  it('escapes locale codes in hreflang', () => {
+    const seo: SeoContext = {
+      ...baseSeo,
+      hreflangAlternates: { 'en-gb': 'https://example.com/about', fr: 'https://example.com/fr/about' },
+      defaultLocale: 'en-gb',
+    }
+    const result = resolveSeoTags({ seo, route: '/about' })
+    expect(result).toContain('hreflang="en-gb"')
   })
 })
