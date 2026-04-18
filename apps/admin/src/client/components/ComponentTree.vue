@@ -301,7 +301,12 @@ function nodeToSelection(node: ComponentNode): EditorSelection | null {
       childPath: parts.length > 1 ? parts.slice(1).join('/') : null,
     }
   }
-  return { kind: 'component', path: node.data.path, template: node.data.template ?? '' }
+  // On a fragment page, strip the @fragName/ prefix so the hash stores
+  // the path relative to the fragment (e.g. "logo" not "@header/logo").
+  const prefix = selection.type === 'fragment' && selection.name ? `@${selection.name}/` : ''
+  const relativePath =
+    prefix && node.data.path.startsWith(prefix) ? node.data.path.slice(prefix.length) : node.data.path
+  return { kind: 'component', path: relativePath, template: node.data.template ?? '' }
 }
 
 /** Apply a typed selection — opens the right editor and updates the URL hash. */
