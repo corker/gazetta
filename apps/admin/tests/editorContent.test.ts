@@ -53,6 +53,24 @@ describe('editorContent', () => {
       expect(store.mountVersion).toBe(2)
     })
 
+    it('discards stale custom editor import when a newer open() starts', async () => {
+      const store = useEditorContentStore()
+      // Simulate two rapid opens — first has a custom editor, second doesn't
+      const slowTarget = makeTarget({
+        template: 'slow',
+        hasEditor: true,
+        editorUrl: 'data:text/javascript,export default { mount(){}, unmount(){} }',
+      })
+      const fastTarget = makeTarget({ template: 'fast' })
+      // Start both opens — the second should win
+      const p1 = store.open(slowTarget)
+      const p2 = store.open(fastTarget)
+      await Promise.all([p1, p2])
+      // The fast target should be active, custom editor should be null (fast has none)
+      expect(store.target?.template).toBe('fast')
+      expect(store.customEditorMount).toBeNull()
+    })
+
     it('clears fragmentLink and loadError', async () => {
       const store = useEditorContentStore()
       store.showFragmentLink('header')

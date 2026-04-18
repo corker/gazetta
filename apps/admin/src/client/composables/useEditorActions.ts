@@ -156,7 +156,8 @@ export function useEditorActions() {
     runOpen: () => Promise<void>,
     retryFn: () => void,
   ) {
-    clearRetry()
+    clearRetry() // increments retryGeneration — invalidates any previous open
+    const gen = retryGeneration
     stashCurrent()
     const stashed = stash.restore(stashKey)
     if (stashed) {
@@ -168,6 +169,8 @@ export function useEditorActions() {
       try {
         await runOpen()
       } catch (err) {
+        // Discard if a newer open started while we were fetching
+        if (gen !== retryGeneration) return
         ec.setLoadError(`Failed to load "${errorLabel}": ${(err as Error).message}`)
         attempt++
         if (attempt < MAX_RETRY_ATTEMPTS) {
@@ -312,10 +315,14 @@ export function useEditorActions() {
 
   async function save() {
     const current = ec.target && ec.content ? { target: ec.target, content: ec.content } : null
-    const result = await persistence.save(current, [...stash.values()])
+    // Snapshot stash keys before save — only clear these on success.
+    // If a new entry is stashed during the async save, it survives.
+    const stashedEntries = [...stash.values()]
+    const stashedKeys = [...stash.entries].map(([k]) => k)
+    const result = await persistence.save(current, stashedEntries)
     if (result.success) {
       ec.markSaved()
-      stash.clearAll()
+      for (const key of stashedKeys) stash.revert(key)
       usePreviewStore().invalidate()
       usePublishStatusStore().refresh()
       toast.show('Saved', { action: buildUndoAction() })
