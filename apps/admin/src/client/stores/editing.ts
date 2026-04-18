@@ -3,13 +3,14 @@ function deepClone<T>(obj: T): T {
 }
 
 import { defineStore } from 'pinia'
-import { ref, reactive, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useToastStore } from './toast.js'
 import { usePreviewStore } from './preview.js'
 import { useSelectionStore } from './selection.js'
 import { usePublishStatusStore } from './publishStatus.js'
 import { useActiveTargetStore } from './activeTarget.js'
 import { useSiteStore } from './site.js'
+import { useEditorStashStore } from './editorStash.js'
 import { api } from '../api/client.js'
 import type { EditorMount } from 'gazetta/types'
 
@@ -24,13 +25,9 @@ export interface EditingTarget {
   save: (content: Record<string, unknown>) => Promise<void>
 }
 
-interface StashedEdit {
-  target: EditingTarget
-  editedContent: Record<string, unknown>
-}
-
 export const useEditingStore = defineStore('editing', () => {
   const toast = useToastStore()
+  const stash = useEditorStashStore()
 
   const target = ref<EditingTarget | null>(null)
   const content = ref<Record<string, unknown> | null>(null)
@@ -43,7 +40,6 @@ export const useEditingStore = defineStore('editing', () => {
   /** Set when the user clicks a fragment or its child from page context */
   const fragmentLink = ref<string | null>(null)
   let retryTimer: ReturnType<typeof setInterval> | null = null
-  const pendingEdits = reactive<Map<string, StashedEdit>>(new Map())
 
   const template = computed(() => target.value?.template ?? null)
   const path = computed(() => target.value?.path ?? null)
@@ -52,17 +48,17 @@ export const useEditingStore = defineStore('editing', () => {
     if (!content.value || !saved.value) return false
     return JSON.stringify(content.value) !== JSON.stringify(saved.value)
   })
-  const pendingCount = computed(() => pendingEdits.size + (dirty.value ? 1 : 0))
+  const pendingCount = computed(() => stash.size + (dirty.value ? 1 : 0))
   const hasPendingEdits = computed(() => pendingCount.value > 0)
   const allOverrides = computed(() => {
     const result: Record<string, Record<string, unknown>> = {}
-    for (const [p, entry] of pendingEdits) result[p] = entry.editedContent
+    for (const entry of stash.entries) result[entry[0]] = entry[1].editedContent
     if (path.value && content.value && dirty.value) result[path.value] = content.value
     return result
   })
 
   function hasPendingEdit(componentPath: string): boolean {
-    return pendingEdits.has(componentPath)
+    return stash.has(componentPath)
   }
 
   function clearRetry() {
@@ -74,7 +70,7 @@ export const useEditingStore = defineStore('editing', () => {
 
   function stashCurrent() {
     if (dirty.value && target.value && content.value) {
-      pendingEdits.set(target.value.path, { target: target.value, editedContent: deepClone(content.value) })
+      stash.stash(target.value.path, target.value, deepClone(content.value))
     }
   }
 
@@ -203,9 +199,8 @@ export const useEditingStore = defineStore('editing', () => {
   async function openComponent(namePath: string, templateName: string) {
     clearRetry()
     stashCurrent()
-    const stashed = pendingEdits.get(namePath)
+    const stashed = stash.restore(namePath)
     if (stashed) {
-      pendingEdits.delete(namePath)
       await open(stashed.target, stashed.editedContent)
       return
     }
@@ -238,9 +233,8 @@ export const useEditingStore = defineStore('editing', () => {
     const selection = sel.selection
     if (!d || !selection) return
     const rootPath = '_root'
-    const stashed = pendingEdits.get(rootPath)
+    const stashed = stash.restore(rootPath)
     if (stashed) {
-      pendingEdits.delete(rootPath)
       await open(stashed.target, stashed.editedContent)
       return
     }
@@ -272,9 +266,8 @@ export const useEditingStore = defineStore('editing', () => {
     clearRetry()
     stashCurrent()
     const stashKey = `@${fragName}`
-    const stashed = pendingEdits.get(stashKey)
+    const stashed = stash.restore(stashKey)
     if (stashed) {
-      pendingEdits.delete(stashKey)
       await open(stashed.target, stashed.editedContent)
       return
     }
@@ -308,7 +301,7 @@ export const useEditingStore = defineStore('editing', () => {
     saved.value = null
     saving.value = false
     lastSaveError.value = null
-    pendingEdits.clear()
+    stash.clearAll()
   }
 
   const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
@@ -327,7 +320,7 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   function revertStashed(componentPath: string) {
-    pendingEdits.delete(componentPath)
+    stash.revert(componentPath)
     usePreviewStore().invalidateDraft()
   }
 
@@ -393,7 +386,7 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   async function save() {
-    if (!target.value && pendingEdits.size === 0) return
+    if (!target.value && stash.size === 0) return
     saving.value = true
     lastSaveError.value = null
     try {
@@ -401,10 +394,10 @@ export const useEditingStore = defineStore('editing', () => {
         await target.value.save(content.value)
         saved.value = deepClone(content.value)
       }
-      for (const entry of pendingEdits.values()) {
+      for (const entry of stash.values()) {
         await entry.target.save(entry.editedContent)
       }
-      pendingEdits.clear()
+      stash.clearAll()
       usePreviewStore().invalidate()
       // Re-check publish state — saving may have flipped this page from
       // unchanged to dirty (or vice-versa if content matches the target).
@@ -433,7 +426,6 @@ export const useEditingStore = defineStore('editing', () => {
     loadError,
     mountVersion,
     customEditorMount,
-    pendingEdits,
     pendingCount,
     hasPendingEdits,
     allOverrides,
