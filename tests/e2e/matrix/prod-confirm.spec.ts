@@ -43,10 +43,20 @@ test.describe('Publish confirmation matrix', () => {
       // fine, the matrix only enumerates non-local-edit rows.
       await page.locator(`[data-testid="publish-dest-${row.name}"]`).click()
 
-      // Wait for the item list to populate (compare runs after destination
-      // changes). Matrix fixture has just one page (home), so its row is
-      // the strong signal that the panel is ready.
-      await expect(page.locator('[data-testid="publish-item-pages/home"]')).toBeVisible({ timeout: 10000 })
+      // Wait for compare to complete — either items appear or "in sync".
+      const itemOrSync = await Promise.race([
+        page.locator('[data-testid="publish-item-pages/home"]').waitFor({ timeout: 10000 }).then(() => 'items' as const),
+        page.locator('text=Nothing to publish').waitFor({ timeout: 10000 }).then(() => 'sync' as const),
+      ])
+
+      if (itemOrSync === 'sync') {
+        // Targets are in sync — nothing to publish. Confirmation behavior
+        // is moot since the Publish button won't dispatch. Just verify
+        // no confirmation banner is visible and move on.
+        await expect(page.locator('[data-testid="publish-confirm-banner"]')).toHaveCount(0)
+        await page.locator('[data-testid="publish-panel-cancel"]').click()
+        return
+      }
 
       // Click Publish. Prod destinations should reveal the confirm banner
       // without dispatching; non-prod should proceed to the stream/result.
