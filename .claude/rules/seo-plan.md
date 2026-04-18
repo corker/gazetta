@@ -62,7 +62,7 @@ complaint without adding admin UI complexity.
 
 ## Tier 1 — closes the adoption-blocker gap
 
-### ◐ 1.1 Fallback chains in renderer
+### ✓ 1.1 Fallback chains in renderer
 
 The renderer should compute SEO values from existing data when metadata fields are
 empty. Authors override only when they want different values for search vs content.
@@ -81,41 +81,47 @@ empty. Authors override only when they want different values for search vs conte
 | `<meta name="robots">` | `metadata.robots` when set → omit (allow indexing) |
 | `<html lang>` | `site.locale` → `"en"` |
 
-**Implementation:**
-- `renderPage` needs access to `SiteManifest` (for `site.name`, `baseUrl`, `locale`,
-  `defaultOgImage`). Add to `RenderPageOptions`.
-- `metadataHead()` already exists; extend it with the fallback logic.
-- Fallback-generated values should flow into the SERP preview (admin UI) so the author
-  sees what Google will actually use.
+**Implementation (done):**
+- `seo.ts` extracts SEO tag resolution (SRP) — `resolveSeoTags()` computes all tags
+  from metadata + content + site config fallbacks.
+- `renderPage` receives `SeoContext` (site name, locale, defaultOgImage, siteUrl) via
+  `RenderPageOptions.seo`.
+- `siteUrl` lives on each target config (not site-level `baseUrl` — removed). Canonical
+  URLs use the target's `siteUrl` since each target may serve from a different domain.
+- Fallback-generated values flow into the SERP preview via the admin API.
+
+**target config additions:**
+```yaml
+targets:
+  production:
+    siteUrl: https://gazetta.studio   # per-target (required for sitemap/canonical)
+```
 
 **site.yaml additions:**
 ```yaml
-baseUrl: https://gazetta.studio     # already exists (optional)
-locale: en                          # already exists (optional)
+locale: en                          # already existed (optional)
 defaultOgImage: /images/og-default.jpg  # new (optional)
 ```
 
 **Changes to `PageMetadata` type:**
-- Add `robots?: string` (free-text: `"noindex"`, `"nofollow"`, `"noindex, nofollow"`)
-- Keep ogTitle/ogDescription OUT — research showed authors rarely differentiate; the
-  fallback chain handles it. Add later if requested.
+- Added `robots?: string` (free-text: `"noindex"`, `"nofollow"`, `"noindex, nofollow"`)
+- ogTitle/ogDescription kept OUT — fallback chain handles it.
 
 ---
 
-### ☐ 1.2 sitemap.xml generation on publish
+### ✓ 1.2 sitemap.xml generation on publish
 
 Generate `sitemap.xml` at publish time from published pages. Store in target root.
 
-**What goes in:**
-- One `<url>` per page with `<loc>` (absolute URL from canonical chain)
-- `<lastmod>` from publish timestamp (the revision system has timestamps)
-- Skip system pages (404) — via `site.yaml systemPages`
-- Skip pages with `metadata.robots` containing `"noindex"`
+**What goes in (done):**
+- One `<url>` per page with `<loc>` (absolute URL from target `siteUrl` + derived route)
+- `<lastmod>` from `.pub` sidecar timestamp (date-only per spec)
+- Skip dynamic routes (template patterns like `/blog/:slug` aren't crawlable)
+- Skip pages with `metadata.robots` containing `"noindex"` (via `.pub-*-noindex` sidecar)
 
-**Requirements:**
-- `baseUrl` or target `siteUrl` must be set (can't generate absolute URLs without it)
-- Skip generation silently when no base URL is available
-- Generate per-target (each target gets its own sitemap reflecting its published state)
+**Requirements (met):**
+- Target `siteUrl` must be set (returns null without it)
+- Generated per-target from target sidecars (reflects what's actually published)
 
 **Format:**
 ```xml
@@ -134,28 +140,29 @@ Generate `sitemap.xml` at publish time from published pages. Store in target roo
 
 ---
 
-### ☐ 1.3 robots.txt on publish
+### ✓ 1.3 robots.txt on publish
 
-**Strategy:** if `sites/{name}/robots.txt` exists, copy it to target root. Otherwise,
+**Strategy (done):** if `sites/{name}/robots.txt` exists, copy it to target root. Otherwise,
 generate a default:
 
 ```
 User-agent: *
 Allow: /
 
-Sitemap: {baseUrl}/sitemap.xml
+Sitemap: {siteUrl}/sitemap.xml
 ```
 
-The `Sitemap:` line is only included when `baseUrl` is available.
+The `Sitemap:` line is only included when `siteUrl` is available. Skipped entirely for
+subpath deployments (Google ignores robots.txt at non-root paths).
 
 ---
 
-### ☐ 1.4 Admin UI: noindex toggle + SERP preview with fallbacks
+### ✓ 1.4 Admin UI: noindex toggle + SERP preview with fallbacks
 
-- Add a "Hide from search engines" checkbox → sets `metadata.robots = "noindex"`
-- Update SERP preview to show the fallback-generated title (with site name suffix)
-  instead of raw field values, so the author sees exactly what Google sees
-- Show a "noindex" badge on the SERP preview when the page is excluded
+- Added "Hide from search engines" toggle → sets `metadata.robots = "noindex"` (done)
+- SERP preview shows fallback-generated values (title with site name suffix) (done)
+- "noindex" badge shown on SERP preview when page is excluded (done)
+- SEO editor shown only on page root, not on child components (done)
 
 ---
 
@@ -195,11 +202,11 @@ The `Sitemap:` line is only included when `baseUrl` is available.
 
 ## PR sequence
 
-| PR | Scope | Depends on |
-|----|-------|-----------|
-| **A** | Renderer: fallback chains + og:url/type + twitter:card + html lang + robots meta. site.yaml `defaultOgImage`. Add `robots` to `PageMetadata`. | #185 (merged), #186 (pending) |
-| **B** | Publish: sitemap.xml + robots.txt generation | PR A (needs fallback chain for canonical URLs) |
-| **C** | Admin: noindex toggle + SERP preview shows fallback-generated values | PR A (needs fallback chain values available to client) |
+All Tier 1 items landed in a single branch (#187):
+
+| PR | Scope | Status |
+|----|-------|--------|
+| **#187** | Renderer fallback chains, sitemap.xml, robots.txt, admin noindex toggle + SERP preview with fallbacks, siteUrl on targets, .pub sidecars, listSidecars perf fix | ✓ |
 
 ---
 
