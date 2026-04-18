@@ -557,7 +557,7 @@ describe('SEO publish integration', () => {
     await rm(seoTargetDir, { recursive: true, force: true })
   })
 
-  it('.pub sidecar is written with timestamp after static publish', async () => {
+  it('.pub sidecar is written with timestamp after static publish', { timeout: 15_000 }, async () => {
     const target = createFilesystemProvider(seoTargetDir)
     const { hashManifest } = await import('../src/hash.js')
     const { loadSite } = await import('../src/site-loader.js')

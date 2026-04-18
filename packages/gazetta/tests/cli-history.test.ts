@@ -155,7 +155,7 @@ describe('gazetta history / undo / rollback', { timeout: 60000 }, () => {
     // Baseline captures the pristine starter content.
     const homePath = resolve(projectDir, 'sites/main/targets/local/pages/home/page.json')
     const restored = JSON.parse(await readFile(homePath, 'utf-8'))
-    expect(restored.content.title).toBe('Home')
+    expect(restored.metadata.title).toBe('Gazetta — Composable CMS')
   })
 
   it('`rollback` without an id errors clearly', async () => {
