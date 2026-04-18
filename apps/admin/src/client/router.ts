@@ -55,23 +55,28 @@ export function createRouter() {
       }
     }
 
-    // Sync active target ↔ URL query param.
-    // URL is source of truth: ?target=staging switches the active target.
-    // If no ?target=, use the current active target (default on first load).
-    // All navigations carry ?target= so the URL is always shareable.
+    // Sync active target from URL query param.
+    // ?target=staging → switch to staging. No ?target= → use default (first editable).
+    // Only non-default targets appear in the URL — keeps default URLs clean.
     const activeTarget = useActiveTargetStore()
     const urlTarget = to.query.target as string | undefined
     if (urlTarget) {
+      // Strip ?target= if it's the default — keep URLs clean
+      if (urlTarget === activeTarget.defaultTargetName) {
+        const { target: _, ...rest } = to.query
+        return { ...to, query: rest }
+      }
       if (urlTarget !== activeTarget.activeTargetName) {
         try {
           activeTarget.setActiveTarget(urlTarget)
         } catch {
-          return { ...to, query: { ...to.query, target: undefined } }
+          const { target: _, ...rest } = to.query
+          return { ...to, query: rest }
         }
       }
-    } else if (activeTarget.activeTargetName && !isDev(to.name?.toString())) {
-      // No ?target= in URL — inject the current active target so the URL stays shareable
-      return { ...to, query: { ...to.query, target: activeTarget.activeTargetName } }
+    } else if (activeTarget.activeTargetName !== activeTarget.defaultTargetName) {
+      // No ?target= — reset to default
+      activeTarget.resetToDefault()
     }
 
     // Hydrate selection from route params
