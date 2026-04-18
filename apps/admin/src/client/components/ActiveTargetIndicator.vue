@@ -138,7 +138,8 @@ async function switchTo(name: string) {
     })
   } else {
     // Item exists — stay on the same page, just switch target via query
-    router.push({ query: { ...router.currentRoute.value.query, target: name } })
+    const current = router.currentRoute.value
+    router.push({ path: current.path, query: { ...current.query, target: name }, hash: current.hash })
   }
 }
 
