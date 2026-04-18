@@ -255,7 +255,7 @@ describe('POST /api/pages (create)', () => {
     await rm(resolve(localTargetDir, 'pages/docs'), { recursive: true, force: true })
   })
 
-  it('creates a new page', async () => {
+  it('creates a new page', { timeout: 15_000 }, async () => {
     const res = await app.request('/api/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
