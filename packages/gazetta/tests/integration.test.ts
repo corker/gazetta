@@ -25,11 +25,12 @@ describe('starter site', () => {
 
   it('resolves and renders the home page', async () => {
     const site = await loadSite({ siteDir, storage, templatesDir })
+    const page = site.pages.get('home')!
     const resolved = await resolvePage('home', site)
-    const html = await renderPage(resolved)
+    const html = await renderPage(resolved, { metadata: page.metadata, route: page.route })
 
     expect(html).toContain('<!DOCTYPE html>')
-    expect(html).toContain('<title>Home</title>')
+    expect(html).toContain('<title>Gazetta — Composable CMS</title>')
     expect(html).toContain('Gazetta')
     expect(html).toContain('href="/"')
     expect(html).toContain('href="/about"')
@@ -40,10 +41,11 @@ describe('starter site', () => {
 
   it('resolves and renders the about page', async () => {
     const site = await loadSite({ siteDir, storage, templatesDir })
+    const page = site.pages.get('about')!
     const resolved = await resolvePage('about', site)
-    const html = await renderPage(resolved)
+    const html = await renderPage(resolved, { metadata: page.metadata, route: page.route })
 
-    expect(html).toContain('<title>About</title>')
+    expect(html).toContain('<title>About — Gazetta</title>')
     expect(html).toContain('About Gazetta')
     expect(html).toContain('stateless CMS')
     expect(html).toContain('© 2026 Gazetta')
@@ -124,8 +126,9 @@ describe('starter site', () => {
 
   it('resolves and renders blog page with route params', async () => {
     const site = await loadSite({ siteDir, storage, templatesDir })
+    const page = site.pages.get('blog/[slug]')!
     const resolved = await resolvePage('blog/[slug]', site)
-    const html = await renderPage(resolved, { slug: 'hello-world' })
+    const html = await renderPage(resolved, { routeParams: { slug: 'hello-world' }, metadata: page.metadata, route: page.route })
 
     expect(html).toContain('<title>Blog Post</title>')
     expect(html).toContain('Hello from Gazetta')
