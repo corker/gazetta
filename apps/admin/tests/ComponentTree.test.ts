@@ -24,6 +24,7 @@ import ComponentTree from '../src/client/components/ComponentTree.vue'
 import { FRAGMENTS_API, type FragmentsApi } from '../src/client/composables/api.js'
 import { useSelectionStore } from '../src/client/stores/selection.js'
 import { useEditingStore } from '../src/client/stores/editing.js'
+import { useEditorStashStore } from '../src/client/stores/editorStash.js'
 import type { PageDetail, FragmentDetail } from '../src/client/api/client.js'
 
 /** Minimal FragmentsApi fake — each method throws unless the test provides an impl. */
@@ -168,12 +169,13 @@ describe('ComponentTree', () => {
       dir: 'pages/home',
       components: [{ name: 'hero', template: 'hero', content: { title: 'Hi' } }],
     })
-    const editing = useEditingStore()
+    const stash = useEditorStashStore()
     // Simulate a pending edit on the hero component's path.
-    editing.pendingEdits.set('hero', {
-      target: { path: 'hero', template: 'hero', content: { title: 'Hi' }, hasEditor: false, save: async () => {} },
-      editedContent: { title: 'Updated' },
-    })
+    stash.stash(
+      'hero',
+      { path: 'hero', template: 'hero', content: { title: 'Hi' }, schema: {}, save: async () => {} },
+      { title: 'Updated' },
+    )
 
     const w = mountTree(fakeFragmentsApi())
     await flushMicrotasks()
@@ -277,9 +279,10 @@ describe('ComponentTree', () => {
     })
     expect(editing.dirty).toBe(true)
     editing.showFragmentLink('footer')
-    // Dirty edits should be stashed in pendingEdits
-    expect(editing.pendingEdits.has('hero')).toBe(true)
-    expect(editing.pendingEdits.get('hero')!.editedContent).toEqual({ title: 'changed' })
+    // Dirty edits should be stashed in editorStash
+    const stash = useEditorStashStore()
+    expect(stash.has('hero')).toBe(true)
+    expect(stash.entries.get('hero')!.editedContent).toEqual({ title: 'changed' })
     // Editor should be cleared
     expect(editing.target).toBeNull()
     expect(editing.fragmentLink).toBe('footer')
