@@ -58,7 +58,19 @@ export {
   getHistoryRetention,
   DEFAULT_HISTORY_RETENTION,
 } from './types.js'
-export type { HistoryConfig, PageMetadata } from './types.js'
+export type { HistoryConfig, LocalesConfig, PageMetadata } from './types.js'
+
+// Locale resolution
+export {
+  normalizeLocale,
+  resolveSiteLocales,
+  resolveTargetLocales,
+  localeFromFilename,
+  localeFilename,
+  resolveLocaleFallback,
+  localeRoutePrefix,
+} from './locale.js'
+export type { ResolvedLocales } from './locale.js'
 
 // Renderer
 export {
