@@ -54,15 +54,47 @@ Zero template changes, zero schema changes. Opt-in via `locales` in site.yaml.
 ```yaml
 # site.yaml
 name: "My Site"
-locale: en                    # existing field — becomes the default locale
+locale: en                    # existing field — becomes the site-level default locale
 locales:                      # new (optional) — enables i18n
   supported: [en, fr, de, pt-BR]
   fallbacks:                  # optional — locale-specific fallback chains
     pt-BR: pt                 # pt-BR falls back to pt before default
   defaultPrefix: false        # optional — default locale has no URL prefix (default: false)
+
+targets:
+  local:
+    storage: { type: filesystem }
+    # no locales override — serves all site-level locales, default = en
+
+  production-de:
+    storage: { type: s3, bucket: site-de }
+    environment: production
+    siteUrl: https://example.de
+    locales: [de, en]          # only German and English
+    locale: de                 # German is this target's default (no /de/ prefix)
+    # → /about (de), /en/about (en)
+
+  production-global:
+    storage: { type: s3, bucket: site-global }
+    environment: production
+    siteUrl: https://example.com
+    # no locales override — serves all, default = en
+    # → /about (en), /fr/about, /de/about, /pt-br/about
 ```
 
-When `locales` is absent, the site is single-locale. `locale: en` is used for
+### Target locale rules
+
+- Target inherits site-level `locales.supported` and `locale` (default) unless
+  it declares its own.
+- `locales: [de, en]` on a target restricts which locales are published/served.
+  Pages without a matching locale file are skipped.
+- `locale: de` on a target overrides the default locale for that target. The
+  default locale has no URL prefix; other locales get prefixed.
+- A target with a single locale (e.g., `locales: [de]`) treats it as the
+  default — no URL prefix, no hreflang, no locale switching. The target is
+  effectively single-language.
+
+When `locales` is absent from both site and target, the site is single-locale. `locale: en` is used for
 `<html lang>` and sitemap, same as today.
 
 ---
@@ -263,6 +295,13 @@ Publishing a subset of locales is supported — author can publish only the
 | noindex on one locale but not another | Excluded from hreflang group; only visible locale gets hreflang |
 | Sitemap with 500 pages × 20 locales | Single sitemap for now; add index splitting when needed |
 | Locale-specific slugs (/fr/blog/bonjour) | Future — `slug` field in manifest. Same directory slug for now |
+| Target with `locales: [de]` (single locale) | Treated as default — no prefix, no hreflang, no locale switching |
+| Target with `locale: de` (different default) | `/about` is German, `/en/about` is English on this target |
+| Target locales subset missing a page locale | Page skipped on publish — only target's locales are rendered |
+| Page has `fr` but target doesn't serve `fr` | French page not published/served on that target |
+| Publish to target with locale subset | Only renders locale files matching the target's locales |
+| hreflang on target with locale subset | Only includes the target's locales, not all site-level locales |
+| Target with no `locales` override | Inherits all site-level locales and default |
 
 ---
 
@@ -273,7 +312,7 @@ Publishing a subset of locales is supported — author can publish only the
 - **The editor form** — @rjsf renders from schema, no locale awareness needed
 - **The save pipeline** — writes to `page.fr.json` same as `page.json`
 - **The storage providers** — files are files
-- **The target model** — targets are environments, not locales
+- **The target model** — targets are environments + optionally locale subsets
 
 ---
 
