@@ -4,6 +4,7 @@ import { api, type PageDetail, type FragmentDetail, type PageSummary } from '../
 import { useToastStore } from './toast.js'
 import { usePreviewStore } from './preview.js'
 import { useSiteStore } from './site.js'
+import { useLocaleStore } from './locale.js'
 
 export type Selection =
   | { type: 'page'; name: string; detail: PageDetail }
@@ -51,7 +52,8 @@ export const useSelectionStore = defineStore('selection', () => {
     selectController = new AbortController()
     const { signal } = selectController
     try {
-      const detail = await api.getPage(pageName, { signal })
+      const locale = useLocaleStore().effectiveLocale ?? undefined
+      const detail = await api.getPage(pageName, { signal, locale })
       selection.value = { type: 'page', name: pageName, detail }
       fragmentHostPage.value = null
       usePreviewStore().invalidate()
@@ -66,7 +68,8 @@ export const useSelectionStore = defineStore('selection', () => {
     selectController = new AbortController()
     const { signal } = selectController
     try {
-      const detail = await api.getFragment(fragName, { signal })
+      const locale = useLocaleStore().effectiveLocale ?? undefined
+      const detail = await api.getFragment(fragName, { signal, locale })
       selection.value = { type: 'fragment', name: fragName, detail }
       if (!fragmentHostPage.value) resolveDefaultHostPage()
       usePreviewStore().invalidate()
