@@ -187,9 +187,10 @@ function restoreFromHash() {
       break
     }
     case 'fragmentLink': {
-      const found =
-        findNodeByKey(componentNodes.value, d => d.fragName === sel.fragmentName) ??
-        findNodeByKey(componentNodes.value, d => d.path === sel.treePath)
+      // If a child was clicked (@header/logo), select the child node; otherwise the fragment root
+      const found = sel.childPath
+        ? findNodeByKey(componentNodes.value, d => d.path === sel.treePath)
+        : findNodeByKey(componentNodes.value, d => d.fragName === sel.fragmentName)
       if (found) selectedNodeKey.value = found.key
       break
     }

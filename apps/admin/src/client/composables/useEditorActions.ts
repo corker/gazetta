@@ -161,9 +161,11 @@ export function useEditorActions() {
       case 'component': {
         const comp = findComponentByNamePath(sel.path)
         if (!comp) throw new Error(`Component "${sel.path}" not found in page manifest`)
-        const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(sel.template, signal)
+        // Use template from the manifest — sel.template may be empty when restoring from URL hash
+        const templateName = sel.template || comp.template
+        const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(templateName, signal)
         return {
-          template: sel.template,
+          template: templateName,
           path: sel.path,
           content: comp.content,
           schema,
