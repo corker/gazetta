@@ -19,11 +19,15 @@ export function pageRoutes(resolve: SourceContextResolver) {
     // hides legitimate targets the user might want to switch to).
     try {
       const site = await loadSite({ contentRoot: source.contentRoot })
-      const pages = [...site.pages.entries()].map(([name, page]) => ({
-        name,
-        route: page.route,
-        template: page.template,
-      }))
+      const pages = [...site.pages.entries()].map(([name, page]) => {
+        const localeEntry = site.pageLocales.get(name)
+        return {
+          name,
+          route: page.route,
+          template: page.template,
+          locales: localeEntry ? [...localeEntry.locales.keys()] : undefined,
+        }
+      })
       return c.json(pages)
     } catch (err) {
       const msg = (err as Error).message
@@ -72,10 +76,21 @@ export function pageRoutes(resolve: SourceContextResolver) {
 
   app.get('/api/pages/:name{.+}', async c => {
     const name = c.req.param('name')
+    const locale = c.req.query('locale')
     const source = await resolve(c.req.query('target'))
     const site = await loadSite({ contentRoot: source.contentRoot })
-    const page = site.pages.get(name)
+
+    // If a locale is requested, return the locale variant
+    let page = site.pages.get(name)
+    if (locale) {
+      const localeEntry = site.pageLocales.get(name)
+      const localeVariant = localeEntry?.locales.get(locale)
+      if (localeVariant) page = localeVariant
+      else if (!page) return c.json({ error: `Page "${name}" locale "${locale}" not found` }, 404)
+    }
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
+
+    const localeEntry = site.pageLocales.get(name)
     return c.json({
       name,
       route: page.route,
@@ -84,6 +99,8 @@ export function pageRoutes(resolve: SourceContextResolver) {
       components: page.components,
       metadata: page.metadata,
       dir: page.dir,
+      locale: locale ?? undefined,
+      locales: localeEntry ? [...localeEntry.locales.keys()] : undefined,
     })
   })
 

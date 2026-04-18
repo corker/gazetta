@@ -13,10 +13,14 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     // Empty target → empty list. See pages.ts for rationale.
     try {
       const site = await loadSite({ contentRoot: source.contentRoot })
-      const fragments = [...site.fragments.entries()].map(([name, frag]) => ({
-        name,
-        template: frag.template,
-      }))
+      const fragments = [...site.fragments.entries()].map(([name, frag]) => {
+        const localeEntry = site.fragmentLocales.get(name)
+        return {
+          name,
+          template: frag.template,
+          locales: localeEntry ? [...localeEntry.locales.keys()] : undefined,
+        }
+      })
       return c.json(fragments)
     } catch (err) {
       const msg = (err as Error).message
@@ -58,16 +62,28 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
 
   app.get('/api/fragments/:name', async c => {
     const name = c.req.param('name')
+    const locale = c.req.query('locale')
     const source = await resolve(c.req.query('target'))
     const site = await loadSite({ contentRoot: source.contentRoot })
-    const fragment = site.fragments.get(name)
+
+    let fragment = site.fragments.get(name)
+    if (locale) {
+      const localeEntry = site.fragmentLocales.get(name)
+      const localeVariant = localeEntry?.locales.get(locale)
+      if (localeVariant) fragment = localeVariant
+      else if (!fragment) return c.json({ error: `Fragment "${name}" locale "${locale}" not found` }, 404)
+    }
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
+
+    const localeEntry = site.fragmentLocales.get(name)
     return c.json({
       name,
       template: fragment.template,
       content: fragment.content,
       components: fragment.components,
       dir: fragment.dir,
+      locale: locale ?? undefined,
+      locales: localeEntry ? [...localeEntry.locales.keys()] : undefined,
     })
   })
 
