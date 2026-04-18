@@ -99,7 +99,7 @@ onKeyStroke('s', e => {
     <div v-else-if="editing.fragmentLink" class="editor-fragment-link" data-testid="editor-fragment-link">
       <i class="pi pi-share-alt" />
       <p>This is part of a shared fragment.</p>
-      <a class="fragment-go-link" @click="goToFragment">Edit @{{ editing.fragmentLink }}</a>
+      <a class="fragment-go-link" data-testid="fragment-go-link" @click="goToFragment">Edit @{{ editing.fragmentLink }}</a>
     </div>
     <div v-else-if="!editing.path" class="editor-empty" data-testid="editor-empty">
       <i class="pi pi-pencil" style="font-size: 2rem; opacity: 0.3; margin-bottom: 0.5rem;" />
