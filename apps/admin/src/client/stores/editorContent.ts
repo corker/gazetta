@@ -35,6 +35,8 @@ export const useEditorContentStore = defineStore('editorContent', () => {
   const fragmentLink = ref<string | null>(null)
   /** The full path passed to showFragmentLink (e.g. "@header/logo"), before extracting the fragment name. */
   const fragmentLinkPath = ref<string | null>(null)
+  /** Generation counter — incremented on every open(). Used to discard stale async results. */
+  let openGeneration = 0
 
   const template = computed(() => target.value?.template ?? null)
   const path = computed(() => target.value?.path ?? null)
@@ -50,6 +52,7 @@ export const useEditorContentStore = defineStore('editorContent', () => {
    * React remount.
    */
   async function open(t: EditingTarget, editedContent?: Record<string, unknown>) {
+    const gen = ++openGeneration
     loadError.value = null
     fragmentLink.value = null
     fragmentLinkPath.value = null
@@ -62,12 +65,16 @@ export const useEditorContentStore = defineStore('editorContent', () => {
     if (t.hasEditor && t.editorUrl) {
       try {
         const mod = await import(/* @vite-ignore */ t.editorUrl)
+        // Discard if a newer open() started while the import was pending
+        if (gen !== openGeneration) return
         customEditorMount.value = (mod.default ?? mod) as EditorMount
       } catch (err) {
+        if (gen !== openGeneration) return
         console.warn(`Custom editor for "${t.template}" failed to load:`, err)
       }
     }
 
+    if (gen !== openGeneration) return
     mountVersion.value++
   }
 
