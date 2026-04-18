@@ -8,10 +8,13 @@ import { useComponentFocusStore } from '../stores/componentFocus.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { useFragmentsApi } from '../composables/api.js'
 import { useEditorHash } from '../composables/useEditorHash.js'
+import type { EditorSelection } from '../composables/editorSelection.js'
+import { useUiModeStore } from '../stores/uiMode.js'
 import AddComponentDialog from './AddComponentDialog.vue'
 
 const fragmentsApi = useFragmentsApi()
 const editorHash = useEditorHash()
+const uiMode = useUiModeStore()
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
 function hashPath(path: string): string {
@@ -162,41 +165,42 @@ function consumePending() {
 }
 
 function restoreFromHash() {
-  const hashPath = editorHash.readHash()
-  if (!hashPath || componentNodes.value.length === 0) return
-  if (hashPath === '_root') {
-    // Select the root node
-    const rootNode = componentNodes.value[0]
-    if (rootNode) {
-      selectedNodeKey.value = rootNode.key
-      editing.openPageRoot()
+  if (componentNodes.value.length === 0) return
+  const onFragmentPage = selection.type === 'fragment'
+  const sel = editorHash.readSelection(onFragmentPage)
+  if (!sel) return
+
+  // Find the tree node to highlight
+  switch (sel.kind) {
+    case 'root': {
+      const rootNode = componentNodes.value[0]
+      if (rootNode) selectedNodeKey.value = rootNode.key
+      break
     }
-    return
-  }
-  if (hashPath.startsWith('@')) {
-    if (selection.type === 'page') {
-      // On a page — show fragment link (same as clicking the fragment in the tree)
-      editing.showFragmentLink(hashPath)
-      const fragName = hashPath.split('/')[0].slice(1)
+    case 'component': {
+      const found = findNodeByKey(componentNodes.value, d => d.path === sel.path)
+      if (found) {
+        selectedNodeKey.value = found.key
+        // Fill in template from tree node (hash doesn't carry it)
+        sel.template = found.data?.template ?? ''
+      }
+      break
+    }
+    case 'fragmentLink': {
       const found =
-        findNodeByKey(componentNodes.value, d => d.fragName === fragName) ??
-        findNodeByKey(componentNodes.value, d => d.path === hashPath)
+        findNodeByKey(componentNodes.value, d => d.fragName === sel.fragmentName) ??
+        findNodeByKey(componentNodes.value, d => d.path === sel.treePath)
       if (found) selectedNodeKey.value = found.key
-    } else {
-      // On a fragment — open it for editing
-      const fragName = hashPath.slice(1)
-      editing.openFragment(fragName)
-      const found = findNodeByKey(componentNodes.value, d => d.fragName === fragName)
-      if (found) selectedNodeKey.value = found.key
+      break
     }
-    return
+    case 'fragmentEdit': {
+      const found = findNodeByKey(componentNodes.value, d => d.fragName === sel.fragmentName)
+      if (found) selectedNodeKey.value = found.key
+      break
+    }
   }
-  // Inline component — look up template from selection detail
-  const found = findNodeByKey(componentNodes.value, d => d.path === hashPath)
-  if (found) {
-    selectedNodeKey.value = found.key
-    editing.openComponent(hashPath, found.data?.template ?? '')
-  }
+
+  applySelection(sel)
 }
 
 // Also react to pendingGzId changes when tree is already built (edit mode click-to-select)
@@ -268,36 +272,61 @@ function onHoverEnd() {
 
 // --- Node selection ---
 
+/** Derive a typed selection from a clicked tree node. */
+function nodeToSelection(node: ComponentNode): EditorSelection | null {
+  if (!node.data) return null
+  if (node.data.isPage) return { kind: 'root' }
+  if (node.data.isFragment && node.data.fragName) {
+    if (selection.type === 'page') {
+      return {
+        kind: 'fragmentLink',
+        fragmentName: node.data.fragName,
+        treePath: `@${node.data.fragName}`,
+        childPath: null,
+      }
+    }
+    return { kind: 'fragmentEdit', fragmentName: node.data.fragName }
+  }
+  if (!node.data.path) return null
+  if (selection.type === 'page' && node.data.path.startsWith('@')) {
+    const parts = node.data.path.slice(1).split('/')
+    return {
+      kind: 'fragmentLink',
+      fragmentName: parts[0],
+      treePath: node.data.path,
+      childPath: parts.length > 1 ? parts.slice(1).join('/') : null,
+    }
+  }
+  return { kind: 'component', path: node.data.path, template: node.data.template ?? '' }
+}
+
+/** Apply a typed selection — opens the right editor and updates the URL hash. */
+function applySelection(sel: EditorSelection) {
+  switch (sel.kind) {
+    case 'root':
+      editing.openPageRoot()
+      break
+    case 'component':
+      editing.openComponent(sel.path, sel.template)
+      break
+    case 'fragmentLink':
+      editing.showFragmentLink(sel.treePath)
+      break
+    case 'fragmentEdit':
+      editing.openFragment(sel.fragmentName)
+      break
+  }
+  if (uiMode.mode === 'edit') editorHash.setSelection(sel)
+}
+
 async function onSelect(node: ComponentNode) {
   if (!node.data) return
   selectedNodeKey.value = node.key
   focus.clearPending()
   const treePath = node.data.treePath
   focus.select(treePath ? hashPath(treePath) : null)
-  if (node.data.isFragment && node.data.fragName) {
-    if (selection.type === 'page') {
-      editing.showFragmentLink(node.data.fragName!)
-      editorHash.setHash(`@${node.data.fragName!}`)
-    } else {
-      editing.openFragment(node.data.fragName!)
-      editorHash.setHash(`@${node.data.fragName!}`)
-    }
-    return
-  }
-  if (node.data.isPage) {
-    editing.openPageRoot()
-    editorHash.setHash('_root')
-    return
-  }
-  if (!node.data.path) return
-  // Fragment child clicked from page context — show link to the fragment
-  if (selection.type === 'page' && node.data.path!.startsWith('@')) {
-    editing.showFragmentLink(node.data.path!)
-    editorHash.setHash(node.data.path!)
-    return
-  }
-  editing.openComponent(node.data.path!, node.data.template ?? '')
-  editorHash.setHash(node.data.path!)
+  const sel = nodeToSelection(node)
+  if (sel) applySelection(sel)
 }
 
 // Find a node by walking the tree
@@ -317,28 +346,30 @@ function selectByGzId(gzId: string) {
   const entry = gzMap.value.get(gzId)
   if (!entry) return
   focus.select(gzId)
+  let sel: EditorSelection
   if ('isFragment' in entry) {
     const found = findNodeByKey(componentNodes.value, d => d.fragName === entry.fragName)
     if (found) selectedNodeKey.value = found.key
-    if (selection.type === 'page') {
-      editing.showFragmentLink(entry.fragName)
-      editorHash.setHash(`@${entry.fragName}`)
+    sel =
+      selection.type === 'page'
+        ? { kind: 'fragmentLink', fragmentName: entry.fragName, treePath: `@${entry.fragName}`, childPath: null }
+        : { kind: 'fragmentEdit', fragmentName: entry.fragName }
+  } else {
+    const found = findNodeByKey(componentNodes.value, d => d.path === entry.path)
+    if (found) selectedNodeKey.value = found.key
+    if (selection.type === 'page' && entry.path.startsWith('@')) {
+      const parts = entry.path.slice(1).split('/')
+      sel = {
+        kind: 'fragmentLink',
+        fragmentName: parts[0],
+        treePath: entry.path,
+        childPath: parts.length > 1 ? parts.slice(1).join('/') : null,
+      }
     } else {
-      editing.openFragment(entry.fragName)
-      editorHash.setHash(`@${entry.fragName}`)
+      sel = { kind: 'component', path: entry.path, template: entry.template }
     }
-    return
   }
-  const found = findNodeByKey(componentNodes.value, d => d.path === entry.path)
-  if (found) selectedNodeKey.value = found.key
-  // Fragment child clicked from page context — show link to the fragment
-  if (selection.type === 'page' && entry.path.startsWith('@')) {
-    editing.showFragmentLink(entry.path)
-    editorHash.setHash(entry.path)
-    return
-  }
-  editing.openComponent(entry.path, entry.template)
-  editorHash.setHash(entry.path)
+  applySelection(sel)
 }
 
 // --- Component operations ---

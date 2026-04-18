@@ -1,5 +1,6 @@
 import { useRouter, useRoute } from 'vue-router'
 import { type Router, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { type EditorSelection, selectionToHash, hashToSelection } from './editorSelection.js'
 
 const HASH_PREFIX = 'component='
 
@@ -33,6 +34,21 @@ export function useEditorHash() {
     }
   }
 
+  /** Set hash from a typed EditorSelection. */
+  function setSelection(sel: EditorSelection) {
+    if (!router || !route) return
+    const hash = selectionToHash(sel)
+    if (route.hash !== hash) {
+      router.push({ hash, replace: true })
+    }
+  }
+
+  /** Read the hash as a typed EditorSelection. */
+  function readSelection(onFragmentPage: boolean): EditorSelection | null {
+    if (!route) return null
+    return hashToSelection(route.hash, onFragmentPage)
+  }
+
   function clearHash() {
     if (!router || !route) return
     if (route.hash) {
@@ -49,5 +65,5 @@ export function useEditorHash() {
     return decodeURIComponent(encoded)
   }
 
-  return { setHash, clearHash, readHash }
+  return { setHash, clearHash, readHash, setSelection, readSelection }
 }
