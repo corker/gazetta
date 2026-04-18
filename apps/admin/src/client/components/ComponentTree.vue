@@ -142,6 +142,7 @@ watch(
     }
     componentNodes.value = [rootNode]
     gzMap.value = map
+    selectedNodeKey.value = null
 
     // Process pending selection if tree just built and a gzId is waiting
     consumePending()
@@ -232,7 +233,11 @@ async function onSelect(node: ComponentNode) {
   const treePath = node.data.treePath
   focus.select(treePath ? hashPath(treePath) : null)
   if (node.data.isFragment && node.data.fragName) {
-    editing.openFragment(node.data.fragName!)
+    if (selection.type === 'page') {
+      editing.showFragmentLink(node.data.fragName!)
+    } else {
+      editing.openFragment(node.data.fragName!)
+    }
     return
   }
   if (node.data.isPage) {
@@ -240,6 +245,11 @@ async function onSelect(node: ComponentNode) {
     return
   }
   if (!node.data.path) return
+  // Fragment child clicked from page context — show link to the fragment
+  if (selection.type === 'page' && node.data.path!.startsWith('@')) {
+    editing.showFragmentLink(node.data.path!)
+    return
+  }
   editing.openComponent(node.data.path!, node.data.template ?? '')
 }
 
@@ -263,11 +273,20 @@ function selectByGzId(gzId: string) {
   if ('isFragment' in entry) {
     const found = findNodeByKey(componentNodes.value, d => d.fragName === entry.fragName)
     if (found) selectedNodeKey.value = found.key
-    editing.openFragment(entry.fragName)
+    if (selection.type === 'page') {
+      editing.showFragmentLink(entry.fragName)
+    } else {
+      editing.openFragment(entry.fragName)
+    }
     return
   }
   const found = findNodeByKey(componentNodes.value, d => d.path === entry.path)
   if (found) selectedNodeKey.value = found.key
+  // Fragment child clicked from page context — show link to the fragment
+  if (selection.type === 'page' && entry.path.startsWith('@')) {
+    editing.showFragmentLink(entry.path)
+    return
+  }
   editing.openComponent(entry.path, entry.template)
 }
 
