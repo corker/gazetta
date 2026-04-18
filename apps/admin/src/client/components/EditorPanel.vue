@@ -6,7 +6,7 @@ import { useEditingStore } from '../stores/editing.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
-import { useEditorHash } from '../composables/useEditorHash.js'
+import { fragmentLinkDestinationHash, type FragmentLinkSelection } from '../composables/editorSelection.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from 'gazetta/editor'
 import type { EditorMount } from 'gazetta/types'
@@ -17,28 +17,28 @@ const editing = useEditingStore()
 const selection = useSelectionStore()
 const theme = useThemeStore()
 const unsavedGuard = useUnsavedGuardStore()
-const editorHash = useEditorHash()
 const router = useRouter()
 const containerRef = ref<HTMLElement | null>(null)
 
 async function goToFragment() {
   const fragName = editing.fragmentLink
   if (!fragName) return
-  // If the user clicked a fragment child (e.g. @header/logo), carry
-  // the child path so the fragment editor opens on the right component.
+  // Build the destination hash from the fragmentLinkPath. If the user
+  // clicked @header/logo, the destination is /fragments/header/edit#component=logo.
+  // If they clicked @header, it's /fragments/header/edit#component=_root.
   const linkPath = editing.fragmentLinkPath
   const childPath = linkPath && linkPath.includes('/') ? linkPath.split('/').slice(1).join('/') : null
+  const hash = childPath
+    ? fragmentLinkDestinationHash({ kind: 'fragmentLink', fragmentName: fragName, treePath: linkPath!, childPath })
+    : '#component=_root'
   if (editing.hasPendingEdits) {
     const result = await unsavedGuard.guard()
     if (result === 'cancel') return
     if (result === 'save') await editing.save()
   }
   editing.clear()
-  const hash = childPath ? `#component=${encodeURIComponent(childPath)}` : '#component=_root'
   await router.push({ path: `/fragments/${fragName}/edit`, hash })
   // restoreFromHash in ComponentTree opens the right component after the tree builds.
-  // If no childPath, it falls through to the inline-component branch which opens "logo" etc.
-  // If no hash at all, nothing is selected — user picks from the tree.
 }
 
 // Show blast radius when the selected root item is a fragment, regardless

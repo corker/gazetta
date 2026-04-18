@@ -218,7 +218,7 @@ describe('ComponentTree', () => {
     const w = mountTree(fakeFragmentsApi({ getFragment }))
     await flushMicrotasks()
     await w.find('[data-testid="component-header"]').trigger('click')
-    expect(spy).toHaveBeenCalledWith('header')
+    expect(spy).toHaveBeenCalledWith('@header')
     expect(editing.fragmentLink).toBe('header')
   })
 
