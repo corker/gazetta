@@ -18,6 +18,12 @@
 import type { SidecarState } from './sidecars.js'
 import { deriveRoute } from './site-loader.js'
 
+/** hreflang alternate for a single page — locale code + absolute URL. */
+export interface HreflangAlternate {
+  locale: string
+  url: string
+}
+
 export interface GenerateSitemapOptions {
   /** Absolute base URL (e.g. "https://gazetta.studio"). */
   siteUrl: string
@@ -25,6 +31,14 @@ export interface GenerateSitemapOptions {
   pages: Map<string, SidecarState>
   /** System page names to exclude (e.g. ["404"]). */
   systemPages?: string[]
+  /**
+   * hreflang alternates per page — keyed by page name. Each entry lists
+   * all locale variants (including self). Only pages with 2+ alternates
+   * get hreflang in the sitemap. Noindex variants are excluded by the caller.
+   */
+  hreflangGroups?: Map<string, HreflangAlternate[]>
+  /** Default locale code — used for x-default in hreflang. */
+  defaultLocale?: string
 }
 
 function escapeXml(s: string): string {
@@ -61,16 +75,30 @@ export function generateSitemap(opts: GenerateSitemapOptions): string | null {
       // Sitemap spec wants YYYY-MM-DD or full ISO — use date only
       parts.push(`    <lastmod>${lastmod.slice(0, 10)}</lastmod>`)
     }
+    // hreflang cross-links — only when 2+ locale variants exist
+    const alternates = opts.hreflangGroups?.get(name)
+    if (alternates && alternates.length > 1) {
+      for (const alt of alternates) {
+        parts.push(
+          `    <xhtml:link rel="alternate" hreflang="${escapeXml(alt.locale)}" href="${escapeXml(alt.url)}" />`,
+        )
+      }
+      if (opts.defaultLocale) {
+        const defaultAlt = alternates.find(a => a.locale === opts.defaultLocale)
+        if (defaultAlt) {
+          parts.push(`    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(defaultAlt.url)}" />`)
+        }
+      }
+    }
     urls.push(`  <url>\n${parts.join('\n')}\n  </url>`)
   }
 
   if (urls.length === 0) return null
 
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...urls,
-    '</urlset>',
-    '',
-  ].join('\n')
+  const hasHreflang = opts.hreflangGroups && [...opts.hreflangGroups.values()].some(alts => alts.length > 1)
+  const xmlns = hasHreflang
+    ? '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+    : '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+
+  return ['<?xml version="1.0" encoding="UTF-8"?>', xmlns, ...urls, '</urlset>', ''].join('\n')
 }
