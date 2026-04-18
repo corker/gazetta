@@ -46,6 +46,9 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
     if (opts.loadTargets) loadTargetsFn = opts.loadTargets
   }
 
+  /** The default target name (first editable, or first). No ?target= needed in URL for this one. */
+  const defaultTargetName = computed(() => pickDefault(targets.value))
+
   /** The full TargetInfo for the active target, or null if not loaded / not found. */
   const activeTarget = computed<TargetInfo | null>(() => {
     if (!activeTargetName.value) return null
@@ -98,6 +101,11 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
     activeTargetName.value = name
   }
 
+  /** Reset to the default target (called when URL has no ?target=). */
+  function resetToDefault() {
+    activeTargetName.value = defaultTargetName.value
+  }
+
   /** Clear the store (e.g., on logout or site switch). */
   function clear() {
     targets.value = []
@@ -110,6 +118,7 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
     // state
     targets,
     activeTargetName,
+    defaultTargetName,
     loading,
     error,
     // getters
@@ -121,6 +130,7 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
     configure,
     load,
     setActiveTarget,
+    resetToDefault,
     clear,
   }
 })
