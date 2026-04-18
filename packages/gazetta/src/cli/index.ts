@@ -540,6 +540,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
 
   const { publishPageRendered, publishPageStatic, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } =
     await import('../publish-rendered.js')
+  const { publishPageAllLocales, publishFragmentAllLocales } = await import('../publish-locale.js')
   const { scanTemplates, templateHashesFrom, reportTemplateErrors } = await import('../templates-scan.js')
   const { hashManifest } = await import('../hash.js')
 
@@ -630,39 +631,35 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       }
     } else {
       // ESI mode — fragments separate, pages with placeholders
-      for (const [fragName, frag] of site.fragments) {
+      for (const [fragName] of site.fragments) {
         if (unchanged.has(`fragments/${fragName}`)) {
           skipped++
           continue
         }
-        const manifestHash = hashManifest(frag, { templateHashes })
-        const { files, removed } = await publishFragmentRendered(
+        const { files, removed } = await publishFragmentAllLocales(
           fragName,
           sourceRoot,
           targetStorage,
-          templatesDir,
-          manifestHash,
           site,
+          { templateHashes },
+          { templatesDir },
         )
         totalFiles += files
         totalRemoved += removed
         console.log(`    ${c.green('✓')} @${fragName}`)
       }
-      for (const [pageName, page] of site.pages) {
+      for (const [pageName] of site.pages) {
         if (unchanged.has(`pages/${pageName}`)) {
           skipped++
           continue
         }
-        const manifestHash = hashManifest(page, { templateHashes })
-        const { files, removed } = await publishPageRendered(
+        const { files, removed } = await publishPageAllLocales(
           pageName,
           sourceRoot,
           targetStorage,
-          targetConfig?.cache,
-          templatesDir,
-          manifestHash,
           site,
-          seo,
+          { templateHashes },
+          { cache: targetConfig?.cache, templatesDir, seo },
         )
         totalFiles += files
         totalRemoved += removed
