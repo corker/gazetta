@@ -28,7 +28,7 @@ export function useEditorHash() {
 
   function setHash(componentPath: string) {
     if (!router || !route) return
-    const hash = `#${HASH_PREFIX}${encodeURIComponent(componentPath)}`
+    const hash = `#${HASH_PREFIX}${componentPath}`
     if (route.hash !== hash) {
       router.push({ hash, replace: true })
     }
@@ -60,9 +60,9 @@ export function useEditorHash() {
     if (!route) return null
     const hash = route.hash
     if (!hash.startsWith(`#${HASH_PREFIX}`)) return null
-    const encoded = hash.slice(1 + HASH_PREFIX.length)
-    if (!encoded) return null
-    return decodeURIComponent(encoded)
+    const value = hash.slice(1 + HASH_PREFIX.length)
+    if (!value) return null
+    return value
   }
 
   return { setHash, clearHash, readHash, setSelection, readSelection }
