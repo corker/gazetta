@@ -31,9 +31,7 @@ const destinations = [
 
 test.describe('Publish confirmation matrix', () => {
   for (const row of destinations) {
-    test(`dest=${row.name} (env=${row.env}) → requiresConfirm=${row.requiresConfirm}`, { retry: 1 }, async ({
-      page,
-    }) => {
+    test(`dest=${row.name} (env=${row.env}) → requiresConfirm=${row.requiresConfirm}`, async ({ page }) => {
       await page.goto('/admin')
       await page.locator('[data-testid="publish-btn"]').click()
       await expect(page.locator('[data-testid="publish-panel"]')).toBeVisible()
@@ -44,6 +42,8 @@ test.describe('Publish confirmation matrix', () => {
       await page.locator(`[data-testid="publish-dest-${row.name}"]`).click()
 
       // Wait for compare to complete — either items appear or "in sync".
+      // Dynamic targets may report "in sync" despite content differences
+      // because sidecar hashes match the rendered output.
       const itemOrSync = await Promise.race([
         page
           .locator('[data-testid="publish-item-pages/home"]')
@@ -56,9 +56,7 @@ test.describe('Publish confirmation matrix', () => {
       ])
 
       if (itemOrSync === 'sync') {
-        // Targets are in sync — nothing to publish. Confirmation behavior
-        // is moot since the Publish button won't dispatch. Just verify
-        // no confirmation banner is visible and move on.
+        // In sync — confirmation behavior is moot. Verify no banner and move on.
         await expect(page.locator('[data-testid="publish-confirm-banner"]')).toHaveCount(0)
         await page.locator('[data-testid="publish-panel-cancel"]').click()
         return
