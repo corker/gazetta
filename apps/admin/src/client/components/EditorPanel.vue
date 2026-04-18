@@ -27,7 +27,7 @@ async function goToFragment() {
   const childPath = linkPath && linkPath.includes('/') ? linkPath.split('/').slice(1).join('/') : null
   const hash = childPath
     ? fragmentLinkDestinationHash({ kind: 'fragmentLink', fragmentName: fragName, treePath: linkPath!, childPath })
-    : '#component=_root'
+    : ''
   if (editing.hasPendingEdits) {
     const result = await unsavedGuard.guard()
     if (result === 'cancel') return

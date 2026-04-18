@@ -9,24 +9,22 @@ import {
 
 describe('editorSelection', () => {
   describe('selectionToHash', () => {
-    it('encodes root', () => {
-      expect(selectionToHash({ kind: 'root' })).toBe('#component=_root')
+    it('encodes root as empty hash', () => {
+      expect(selectionToHash({ kind: 'root' })).toBe('')
     })
 
     it('encodes inline component', () => {
-      expect(selectionToHash({ kind: 'component', path: 'hero', template: 'hero' })).toBe('#component=hero')
+      expect(selectionToHash({ kind: 'component', path: 'hero', template: 'hero' })).toBe('#hero')
     })
 
     it('encodes nested component path', () => {
-      expect(selectionToHash({ kind: 'component', path: 'features/fast', template: 'card' })).toBe(
-        '#component=features/fast',
-      )
+      expect(selectionToHash({ kind: 'component', path: 'features/fast', template: 'card' })).toBe('#features/fast')
     })
 
     it('encodes fragment link from page context', () => {
       expect(
         selectionToHash({ kind: 'fragmentLink', fragmentName: 'header', treePath: '@header', childPath: null }),
-      ).toBe('#component=@header')
+      ).toBe('#@header')
     })
 
     it('encodes fragment link child from page context', () => {
@@ -37,46 +35,46 @@ describe('editorSelection', () => {
           treePath: '@header/logo',
           childPath: 'logo',
         }),
-      ).toBe('#component=@header/logo')
+      ).toBe('#@header/logo')
     })
 
     it('encodes fragment edit', () => {
-      expect(selectionToHash({ kind: 'fragmentEdit', fragmentName: 'header' })).toBe('#component=@header')
+      expect(selectionToHash({ kind: 'fragmentEdit', fragmentName: 'header' })).toBe('#@header')
     })
   })
 
   describe('hashToSelection', () => {
-    it('returns null for empty hash', () => {
-      expect(hashToSelection('', false)).toBeNull()
+    it('parses empty hash as root', () => {
+      expect(hashToSelection('', false)).toEqual({ kind: 'root' })
     })
 
-    it('returns null for unrelated hash', () => {
-      expect(hashToSelection('#other', false)).toBeNull()
+    it('parses # as root', () => {
+      expect(hashToSelection('#', false)).toEqual({ kind: 'root' })
     })
 
-    it('parses root', () => {
-      expect(hashToSelection('#component=_root', false)).toEqual({ kind: 'root' })
+    it('parses plain string as component', () => {
+      expect(hashToSelection('#other', false)).toEqual({ kind: 'component', path: 'other', template: '' })
     })
 
     it('parses inline component', () => {
-      const sel = hashToSelection('#component=hero', false)
+      const sel = hashToSelection('#hero', false)
       expect(sel?.kind).toBe('component')
       expect((sel as { path: string }).path).toBe('hero')
     })
 
     it('parses encoded nested component', () => {
-      const sel = hashToSelection('#component=features/fast', false)
+      const sel = hashToSelection('#features/fast', false)
       expect(sel?.kind).toBe('component')
       expect((sel as { path: string }).path).toBe('features/fast')
     })
 
     it('parses @fragment on a page as fragmentLink', () => {
-      const sel = hashToSelection('#component=@header', false)
+      const sel = hashToSelection('#@header', false)
       expect(sel).toEqual({ kind: 'fragmentLink', fragmentName: 'header', treePath: '@header', childPath: null })
     })
 
     it('parses @fragment/child on a page as fragmentLink with childPath', () => {
-      const sel = hashToSelection('#component=@header/logo', false)
+      const sel = hashToSelection('#@header/logo', false)
       expect(sel).toEqual({
         kind: 'fragmentLink',
         fragmentName: 'header',
@@ -86,11 +84,11 @@ describe('editorSelection', () => {
     })
 
     it('parses @fragment on a fragment page as fragmentEdit', () => {
-      const sel = hashToSelection('#component=@header', true)
+      const sel = hashToSelection('#@header', true)
       expect(sel).toEqual({ kind: 'fragmentEdit', fragmentName: 'header' })
     })
 
-    it('round-trips root', () => {
+    it('round-trips root (empty hash)', () => {
       const original: EditorSelection = { kind: 'root' }
       expect(hashToSelection(selectionToHash(original), false)).toEqual(original)
     })
@@ -121,7 +119,7 @@ describe('editorSelection', () => {
         treePath: '@header/logo',
         childPath: 'logo',
       }
-      expect(fragmentLinkDestinationHash(sel)).toBe('#component=logo')
+      expect(fragmentLinkDestinationHash(sel)).toBe('#logo')
     })
 
     it('returns empty string when fragment root was clicked', () => {
@@ -141,7 +139,7 @@ describe('editorSelection', () => {
         treePath: '@header/nav/links',
         childPath: 'nav/links',
       }
-      expect(fragmentLinkDestinationHash(sel)).toBe('#component=nav/links')
+      expect(fragmentLinkDestinationHash(sel)).toBe('#nav/links')
     })
   })
 })

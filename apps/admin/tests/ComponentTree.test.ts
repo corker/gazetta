@@ -332,8 +332,8 @@ describe('ComponentTree', () => {
       components: [{ name: 'logo', template: 'logo' }],
     })
     await flushMicrotasks()
-    // No node should be selected after rebuild
-    expect(w.find('.selected').exists()).toBe(false)
+    // Previous selection (logo) should be cleared; root auto-selected (empty hash = root)
+    expect(w.find('[data-testid="component-logo"].selected').exists()).toBe(false)
   })
 
   it('reuses the FragmentsApi for nested fragment references', async () => {
