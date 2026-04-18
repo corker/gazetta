@@ -262,26 +262,78 @@ navigate manually.
   serve the same pages in different locales (cross-domain hreflang).
 - No locale config on a target → inherits all site-level locales.
 
-### Cross-domain hreflang
+### hreflang strategy: HTML for subpath, sitemap for cross-domain
 
-When the same page exists across per-domain targets, hreflang cross-links
-use each target's `siteUrl`:
+Two different hreflang mechanisms depending on deployment strategy.
+This avoids the timing problem (publishing one domain before another
+creates hreflang pointing to 404s — Google ignores the entire cluster).
+
+#### Subpath targets (one domain, all locales)
+
+hreflang in HTML `<head>`, injected at render time. No timing issues —
+all locales are published to the same target in one pass.
 
 ```html
-<!-- On example.com/about (en target) -->
+<!-- On example.com/about (en, subpath target) -->
 <link rel="alternate" hreflang="en" href="https://example.com/about" />
-<link rel="alternate" hreflang="fr" href="https://example.fr/about" />
-<link rel="alternate" hreflang="x-default" href="https://example.com/about" />
-
-<!-- On example.fr/about (fr target) -->
-<link rel="alternate" hreflang="en" href="https://example.com/about" />
-<link rel="alternate" hreflang="fr" href="https://example.fr/about" />
+<link rel="alternate" hreflang="fr" href="https://example.com/fr/about" />
 <link rel="alternate" hreflang="x-default" href="https://example.com/about" />
 ```
 
-The publisher resolves cross-domain alternates at publish time by scanning
-all targets for the same page in different locales. This requires publishing
-all locale targets in one pass (or a post-publish hreflang reconciliation).
+Self-referencing required (Google ignores the cluster without it).
+Only includes locales that have content (discovered from sibling
+`page.*.json` files).
+
+#### Per-domain targets (separate domains per locale)
+
+hreflang in **sitemap only** — NOT in HTML `<head>`. Generated as a
+post-publish step after all targets are published.
+
+```xml
+<!-- sitemap.xml on example.com -->
+<url>
+  <loc>https://example.com/about</loc>
+  <xhtml:link rel="alternate" hreflang="en" href="https://example.com/about"/>
+  <xhtml:link rel="alternate" hreflang="fr" href="https://example.fr/about"/>
+  <xhtml:link rel="alternate" hreflang="x-default" href="https://example.com/about"/>
+</url>
+```
+
+Each target's sitemap includes cross-domain links to all other targets.
+Bidirectionality enforced — `example.com` sitemap links to `example.fr`
+AND `example.fr` sitemap links back to `example.com`.
+
+**Why sitemap, not HTML:**
+- Publishing `prod-en` before `prod-fr` would create HTML hreflang
+  pointing to pages that don't exist yet (404). Google ignores the
+  entire hreflang cluster when this happens.
+- Sitemaps are regenerated AFTER all targets are published. Only pages
+  that return 200 on all targets get cross-domain hreflang.
+- Google processes sitemap hreflang the same as HTML hreflang.
+
+**Post-publish sitemap generation:**
+1. Publish all locale targets (existing sequential pipeline)
+2. After all targets are done, scan all targets' sidecars
+3. Group pages by directory (same page, different locales/targets)
+4. Generate per-target sitemaps with cross-domain hreflang
+5. Upload sitemaps to each target's storage
+
+If a page exists on `prod-en` but not yet on `prod-fr`, the sitemap
+omits the cross-domain hreflang for that page. When `prod-fr` is
+published later, the sitemap is regenerated with the new link.
+
+**Validation:** `gazetta validate` checks that all cross-domain
+hreflang pairs are bidirectional and that target URLs return 200.
+
+#### Mixed strategy
+
+A site can use both:
+- `production-global` (subpath, one domain, all locales): HTML hreflang
+- `production-de` (per-domain, single locale): sitemap hreflang
+
+The publisher detects the strategy from target config:
+- Target with 2+ locales → subpath → HTML hreflang at render time
+- Target with 1 locale + other targets serving same pages → cross-domain → sitemap hreflang post-publish
 
 ---
 
@@ -341,41 +393,64 @@ This applies at both render time (dev server, publish) and request time
 
 ### Static targets (pre-rendered)
 
-Publishing `@header` produces one rendered HTML per locale:
-- `fragments/header/rendered.html` (default)
-- `fragments/header/rendered.fr.html` (French)
-- `fragments/header/rendered.de.html` (German)
+Publishing `@header` produces one rendered HTML per locale. Locale
+suffix in filename matches the content file pattern:
 
-The edge runtime knows the page's locale from the URL prefix. When
-assembling a French page, it fetches `rendered.fr.html` for `@header`,
-falling back to `rendered.html` if the French version doesn't exist.
+```
+fragments/header/           (target storage)
+  index.html                ← default locale
+  index.fr.html             ← French
+  index.de.html             ← German
+  styles.a1b2c3d4.css       ← shared (or per-locale if CSS differs)
+  script.e5f6g7h8.js        ← shared
+```
+
+**ESI placeholders** carry the locale:
+```html
+<!-- Page rendered for French locale -->
+<!--esi:/fragments/header/index.fr.html-->
+```
+
+The edge runtime extracts the locale from the URL prefix, then
+fetches the locale-suffixed fragment file. Fallback: if
+`index.fr.html` doesn't exist, fetch `index.html` (default).
+
+**Sidecars** carry the locale in the filename:
+```
+.cf120e4b.hash              ← default locale hash
+.cf120e4b.hash.fr           ← French locale hash (different content → different hash)
+.uses-header                ← same across locales (structural)
+.tpl-header-layout          ← same across locales (structural)
+.pub-20260419T100000Z       ← default locale publish timestamp
+.pub-20260419T100000Z.fr    ← French publish timestamp
+```
+
+Each locale variant has its own hash and publish timestamp. The
+compare pipeline diffs per-locale — only changed locale variants
+are re-rendered on incremental publish.
 
 ### Dynamic targets (SSR)
 
 The runtime SSRs the fragment using the locale-specific manifest
-(`fragment.fr.json`), falling back through the chain.
+(`fragment.fr.json`), falling back through the chain. No pre-rendered
+files — the manifest is loaded per request.
 
 ---
 
 ## SEO: hreflang
 
-The renderer injects hreflang `<link>` tags into `<head>` for pages that
-exist in 2+ locales:
+See "hreflang strategy" section above for the full design.
 
-```html
-<link rel="alternate" hreflang="en" href="https://example.com/about" />
-<link rel="alternate" hreflang="fr" href="https://example.com/fr/about" />
-<link rel="alternate" hreflang="x-default" href="https://example.com/about" />
-```
+**Summary:** HTML `<head>` hreflang for subpath targets (same domain, all
+locales). Sitemap-only hreflang for cross-domain targets (avoids timing/404
+problems). Mixed strategy supported.
 
-- Only emitted when sibling `page.*.json` files exist (2+ locales)
-- `x-default` points to the default locale page
-- Locale variants with `metadata.robots: "noindex"` are excluded from hreflang
-- Single-locale pages get no hreflang tags
-
-Discovery: the renderer scans the page directory for `page.*.json` siblings
-at publish time. The resolved alternates are stored in sidecars for the
-edge runtime.
+**Rules for both mechanisms:**
+- Self-referencing required (Google ignores the cluster without it)
+- Only includes locales that have content (discovered from sibling files)
+- Locale variants with `metadata.robots: "noindex"` excluded
+- `x-default` points to the default locale
+- Bidirectionality enforced — validated by `gazetta validate`
 
 ---
 
