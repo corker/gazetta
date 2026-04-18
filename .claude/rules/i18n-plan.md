@@ -146,6 +146,56 @@ Author works in subpath mode locally (one server, all locales). Publishes
 to separate per-domain production targets. Same content files, different
 URL structure per target.
 
+### Language detection and redirect
+
+The Hono runtime detects the visitor's preferred language from the
+`Accept-Language` header and redirects to the matching locale subpath.
+
+```
+GET /about
+Accept-Language: fr-FR,fr;q=0.9,en;q=0.8
+
+→ 302 Location: /fr/about
+```
+
+Behavior:
+- Only redirects when the request path has no locale prefix (i.e., hits
+  the default locale route)
+- Checks Accept-Language against the target's supported locales
+- Redirects to the best match, or serves the default locale if no match
+- Uses 302 (temporary) — not 301, so Google crawls the default URL
+- Cookie opt-out: after the user explicitly switches locale, a `locale`
+  cookie overrides Accept-Language on subsequent visits
+- Configurable at site level (default for all targets) and per target
+  (override). Target config wins.
+
+```yaml
+# site.yaml
+locales:
+  supported: [en, fr, de]
+  detection: true               # site-level default — all targets redirect
+  defaultPrefix: false          # site-level default — no prefix for default locale
+
+targets:
+  local:
+    storage: { type: filesystem }
+    # inherits site-level detection: true
+
+  production:
+    siteUrl: https://example.com
+    detection: false            # override — no redirect on production (CDN handles it)
+    defaultPrefix: true         # override — all locales prefixed: /en/about, /fr/about
+
+  staging:
+    siteUrl: https://staging.example.com
+    # inherits site-level detection: true, defaultPrefix: false
+```
+
+This is a runtime feature — only applies to `gazetta serve` and edge
+workers. `gazetta dev` supports it for testing. Static file hosting
+(no runtime) cannot do this — users land on the default locale and
+navigate manually.
+
 ### Target locale rules
 
 - Target inherits site-level `locales.supported` and `locale` (default) unless
@@ -391,6 +441,11 @@ Publishing a subset of locales is supported — author can publish only the
 | Subpath + per-domain mixed | Valid — local uses subpath, production uses per-domain |
 | Per-domain: sitemap per target | Each target gets its own sitemap with its own locale subset |
 | Per-domain: x-default across domains | x-default points to the site-level default locale's target siteUrl |
+| Language detection: bot vs human | Googlebot sends Accept-Language but redirect is 302 — Google indexes the default URL |
+| Language detection: user overrides | Cookie `locale=fr` overrides Accept-Language after explicit locale switch |
+| Language detection: static hosting | Not available — requires Hono runtime. Users land on default, navigate manually |
+| Language detection: per-domain targets | Not needed — the domain itself determines the locale |
+| Language detection: no Accept-Language | Serves default locale, no redirect |
 
 ---
 
