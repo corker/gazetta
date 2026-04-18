@@ -12,18 +12,19 @@ import { useSiteStore } from '../stores/site.js'
 import { useEditorStashStore } from '../stores/editorStash.js'
 import { useEditorPersistenceStore } from '../stores/editorPersistence.js'
 import { useEditorContentStore, type EditingTarget } from '../stores/editorContent.js'
+import { type EditorSelection, selectionToStashKey, selectionToErrorLabel } from './editorSelection.js'
 import { api } from '../api/client.js'
 
 const MAX_RETRY_ATTEMPTS = 3
 const BASE_RETRY_DELAY = 3000
 
 /**
- * Editor action mediator — wires editorContent, editorStash, and
- * editorPersistence together. Owns all orchestration: stash-before-open,
- * retry with bounded backoff, save + side effects, undo, and
- * beforeunload guard.
+ * Editor action mediator — one entry point for all editor navigation.
  *
- * Components call these actions. State is read from the individual stores.
+ * All component opens go through `navigate(sel)`. It handles stash,
+ * abort, fetch, open, retry — in one place. The AbortController cancels
+ * pending fetches when a new navigation starts, matching the pattern
+ * already used in selection.ts for page/fragment loading.
  */
 export function useEditorActions() {
   const toast = useToastStore()
@@ -31,30 +32,23 @@ export function useEditorActions() {
   const persistence = useEditorPersistenceStore()
   const ec = useEditorContentStore()
 
-  // --- Retry state ---
+  // --- Navigation state ---
 
+  let navController: AbortController | null = null
   let retryTimer: ReturnType<typeof setTimeout> | null = null
-  let retryGeneration = 0
+  let retryAttempt = 0
 
-  function clearRetry() {
-    retryGeneration++
+  function cancelPending() {
+    navController?.abort()
+    navController = null
     if (retryTimer !== null) {
       clearTimeout(retryTimer)
       retryTimer = null
     }
+    retryAttempt = 0
   }
 
-  function scheduleRetry(fn: () => void, attempt: number) {
-    const delay = BASE_RETRY_DELAY * 2 ** attempt
-    const gen = retryGeneration
-    retryTimer = setTimeout(() => {
-      if (gen !== retryGeneration) return
-      retryTimer = null
-      fn()
-    }, delay)
-  }
-
-  // --- Stash helpers ---
+  // --- Stash ---
 
   function stashCurrent() {
     if (ec.dirty && ec.target && ec.content) {
@@ -64,8 +58,8 @@ export function useEditorActions() {
 
   // --- Schema + component lookup ---
 
-  async function fetchSchema(templateName: string) {
-    const response = await api.getTemplateSchema(templateName)
+  async function fetchSchema(templateName: string, signal: AbortSignal) {
+    const response = await api.getTemplateSchema(templateName, { signal })
     const { hasEditor, editorUrl, fieldsBaseUrl, ...schema } = response as Record<string, unknown> & {
       hasEditor?: boolean
       editorUrl?: string
@@ -138,90 +132,22 @@ export function useEditorActions() {
     }
   }
 
-  // --- Open (with side effects) ---
+  // --- Build an EditingTarget from a selection ---
 
-  async function open(t: EditingTarget, editedContent?: Record<string, unknown>) {
-    clearRetry()
-    persistence.saving = false
-    persistence.lastSaveError = null
-    await ec.open(t, editedContent)
-    usePreviewStore().invalidateDraft()
-  }
-
-  // --- Stash + retry wrapper ---
-
-  async function withStashAndRetry(
-    stashKey: string,
-    errorLabel: string,
-    runOpen: () => Promise<void>,
-    retryFn: () => void,
-  ) {
-    clearRetry() // increments retryGeneration — invalidates any previous open
-    const gen = retryGeneration
-    stashCurrent()
-    const stashed = stash.restore(stashKey)
-    if (stashed) {
-      await open(stashed.target, stashed.editedContent)
-      return
-    }
-    let attempt = 0
-    const tryOnce = async () => {
-      try {
-        await runOpen()
-      } catch (err) {
-        // Discard if a newer open started while we were fetching
-        if (gen !== retryGeneration) return
-        ec.setLoadError(`Failed to load "${errorLabel}": ${(err as Error).message}`)
-        attempt++
-        if (attempt < MAX_RETRY_ATTEMPTS) {
-          scheduleRetry(retryFn, attempt - 1)
-        }
-      }
-    }
-    await tryOnce()
-  }
-
-  // --- Public open methods ---
-
-  async function openComponent(namePath: string, templateName: string) {
-    await withStashAndRetry(
-      namePath,
-      templateName,
-      async () => {
-        const comp = findComponentByNamePath(namePath)
-        if (!comp) throw new Error(`Component "${namePath}" not found in page manifest`)
-        const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(templateName)
-        await open({
-          template: templateName,
-          path: namePath,
-          content: comp.content,
-          schema,
-          hasEditor,
-          editorUrl,
-          fieldsBaseUrl,
-          save: buildSaveFn(namePath),
-        })
-      },
-      () => openComponent(namePath, templateName),
-    )
-  }
-
-  async function openPageRoot() {
-    const sel = useSelectionStore()
-    const d = sel.detail
-    const selection = sel.selection
-    if (!d || !selection) return
-    await withStashAndRetry(
-      '_root',
-      d.template,
-      async () => {
+  async function buildTarget(sel: EditorSelection, signal: AbortSignal): Promise<EditingTarget> {
+    const selStore = useSelectionStore()
+    switch (sel.kind) {
+      case 'root': {
+        const d = selStore.detail
+        const selection = selStore.selection
+        if (!d || !selection) throw new Error('No page/fragment selected')
         const pageContent = (d.content as Record<string, unknown>) ?? {}
-        const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(d.template)
+        const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(d.template, signal)
         const saveFn =
           selection.type === 'page'
             ? (c: Record<string, unknown>) => api.updatePage(selection.name, { content: c }).then(() => {})
             : (c: Record<string, unknown>) => api.updateFragment(selection.name, { content: c }).then(() => {})
-        await open({
+        return {
           template: d.template,
           path: '_root',
           content: pageContent,
@@ -230,41 +156,119 @@ export function useEditorActions() {
           editorUrl,
           fieldsBaseUrl,
           save: saveFn,
-        })
-      },
-      () => openPageRoot(),
-    )
-  }
-
-  async function openFragment(fragName: string) {
-    await withStashAndRetry(
-      `@${fragName}`,
-      `fragment "${fragName}"`,
-      async () => {
-        const frag = await api.getFragment(fragName)
+        }
+      }
+      case 'component': {
+        const comp = findComponentByNamePath(sel.path)
+        if (!comp) throw new Error(`Component "${sel.path}" not found in page manifest`)
+        const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(sel.template, signal)
+        return {
+          template: sel.template,
+          path: sel.path,
+          content: comp.content,
+          schema,
+          hasEditor,
+          editorUrl,
+          fieldsBaseUrl,
+          save: buildSaveFn(sel.path),
+        }
+      }
+      case 'fragmentEdit': {
+        const frag = await api.getFragment(sel.fragmentName, { signal })
         const fragContent = (frag.content as Record<string, unknown>) ?? {}
-        const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(frag.template)
-        await open({
+        const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(frag.template, signal)
+        return {
           template: frag.template,
-          path: `@${fragName}`,
+          path: `@${sel.fragmentName}`,
           content: fragContent,
           schema,
           hasEditor,
           editorUrl,
           fieldsBaseUrl,
-          save: c => api.updateFragment(fragName, { content: c }).then(() => {}),
-        })
-      },
-      () => openFragment(fragName),
-    )
+          save: c => api.updateFragment(sel.fragmentName, { content: c }).then(() => {}),
+        }
+      }
+      case 'fragmentLink':
+        throw new Error('fragmentLink does not produce an EditingTarget')
+    }
   }
 
-  // --- Fragment link ---
+  // --- The single navigation entry point ---
+
+  /**
+   * Navigate to a component selection. Cancels any pending navigation,
+   * stashes dirty edits, and opens the target.
+   *
+   * This is the only function that starts async editor loads. All
+   * component tree clicks, hash restorations, and post-restore re-opens
+   * go through here.
+   */
+  async function navigate(sel: EditorSelection) {
+    cancelPending()
+    stashCurrent()
+
+    // Fragment links are synchronous — no fetch, no abort needed
+    if (sel.kind === 'fragmentLink') {
+      ec.showFragmentLink(sel.treePath)
+      return
+    }
+
+    // Check stash before fetching
+    const stashKey = selectionToStashKey(sel)
+    if (stashKey) {
+      const stashed = stash.restore(stashKey)
+      if (stashed) {
+        persistence.saving = false
+        persistence.lastSaveError = null
+        await ec.open(stashed.target, stashed.editedContent)
+        usePreviewStore().invalidateDraft()
+        return
+      }
+    }
+
+    // Async fetch — cancellable via AbortController
+    navController = new AbortController()
+    const { signal } = navController
+    try {
+      const target = await buildTarget(sel, signal)
+      persistence.saving = false
+      persistence.lastSaveError = null
+      await ec.open(target)
+      usePreviewStore().invalidateDraft()
+      retryAttempt = 0
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return
+      ec.setLoadError(`Failed to load "${selectionToErrorLabel(sel)}": ${(err as Error).message}`)
+      retryAttempt++
+      if (retryAttempt < MAX_RETRY_ATTEMPTS) {
+        const delay = BASE_RETRY_DELAY * 2 ** (retryAttempt - 1)
+        retryTimer = setTimeout(() => {
+          retryTimer = null
+          navigate(sel)
+        }, delay)
+      }
+    }
+  }
+
+  // --- Convenience wrappers (for backward compatibility) ---
+
+  async function openComponent(namePath: string, templateName: string) {
+    await navigate({ kind: 'component', path: namePath, template: templateName })
+  }
+
+  async function openPageRoot() {
+    await navigate({ kind: 'root' })
+  }
+
+  async function openFragment(fragName: string) {
+    await navigate({ kind: 'fragmentEdit', fragmentName: fragName })
+  }
 
   function showFragmentLink(nameOrPath: string) {
-    stashCurrent()
-    clearRetry()
-    ec.showFragmentLink(nameOrPath)
+    const fragmentName = nameOrPath.startsWith('@') ? nameOrPath.split('/')[0].slice(1) : nameOrPath
+    const childPath = nameOrPath.includes('/') ? nameOrPath.split('/').slice(1).join('/') : null
+    const treePath = nameOrPath.startsWith('@') ? nameOrPath : `@${nameOrPath}`
+    navigate({ kind: 'fragmentLink', fragmentName, treePath, childPath })
   }
 
   // --- Content operations (with preview side effects) ---
@@ -287,7 +291,7 @@ export function useEditorActions() {
   // --- Clear ---
 
   function clear() {
-    clearRetry()
+    cancelPending()
     ec.clear()
     persistence.saving = false
     persistence.lastSaveError = null
@@ -315,8 +319,6 @@ export function useEditorActions() {
 
   async function save() {
     const current = ec.target && ec.content ? { target: ec.target, content: ec.content } : null
-    // Snapshot stash keys before save — only clear these on success.
-    // If a new entry is stashed during the async save, it survives.
     const stashedEntries = [...stash.values()]
     const stashedKeys = [...stash.entries].map(([k]) => k)
     const result = await persistence.save(current, stashedEntries)
@@ -339,13 +341,11 @@ export function useEditorActions() {
     await useSiteStore().reload()
     await useSelectionStore().reload()
     if (targetSnapshot) {
-      if (targetSnapshot.path === '_root') {
-        const sel = useSelectionStore()
-        if (sel.type === 'page') await openPageRoot()
-        else if (sel.type === 'fragment' && sel.name) await openFragment(sel.name)
-      } else {
-        await openComponent(targetSnapshot.path, targetSnapshot.template)
-      }
+      const sel: EditorSelection =
+        targetSnapshot.path === '_root'
+          ? { kind: 'root' }
+          : { kind: 'component', path: targetSnapshot.path, template: targetSnapshot.template }
+      await navigate(sel)
     }
     usePreviewStore().invalidate()
     usePublishStatusStore().refresh()
@@ -374,12 +374,14 @@ export function useEditorActions() {
   }
 
   return {
-    // Actions
+    // Primary entry point
+    navigate,
+    // Convenience wrappers (backward compat — callers can migrate to navigate() over time)
     openComponent,
     openPageRoot,
     openFragment,
     showFragmentLink,
-    open,
+    // Other actions
     markDirty,
     revertStashed,
     discard,

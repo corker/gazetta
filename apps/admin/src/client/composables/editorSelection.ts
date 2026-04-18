@@ -40,6 +40,36 @@ export interface FragmentEditSelection {
 
 export type EditorSelection = RootSelection | ComponentSelection | FragmentLinkSelection | FragmentEditSelection
 
+// --- Stash key ---
+
+/** Derive the stash map key for a selection. */
+export function selectionToStashKey(sel: EditorSelection): string | null {
+  switch (sel.kind) {
+    case 'root':
+      return '_root'
+    case 'component':
+      return sel.path
+    case 'fragmentLink':
+      return null // fragment links don't open the editor — nothing to stash
+    case 'fragmentEdit':
+      return `@${sel.fragmentName}`
+  }
+}
+
+/** Derive the error label for a failed navigation. */
+export function selectionToErrorLabel(sel: EditorSelection): string {
+  switch (sel.kind) {
+    case 'root':
+      return 'page root'
+    case 'component':
+      return sel.template || sel.path
+    case 'fragmentLink':
+      return sel.fragmentName
+    case 'fragmentEdit':
+      return `fragment "${sel.fragmentName}"`
+  }
+}
+
 // --- URL hash serialization ---
 
 const HASH_PREFIX = 'component='
