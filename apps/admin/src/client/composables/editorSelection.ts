@@ -74,16 +74,22 @@ export function selectionToErrorLabel(sel: EditorSelection): string {
 
 const HASH_PREFIX = 'component='
 
+/**
+ * Encode a selection as a URL hash string. Values are NOT percent-encoded
+ * because vue-router encodes the hash when navigating via router.push()
+ * and decodes it when reading via route.hash. Encoding here would
+ * double-encode (e.g. @ → %40 → %2540).
+ */
 export function selectionToHash(sel: EditorSelection): string {
   switch (sel.kind) {
     case 'root':
       return `#${HASH_PREFIX}_root`
     case 'component':
-      return `#${HASH_PREFIX}${encodeURIComponent(sel.path)}`
+      return `#${HASH_PREFIX}${sel.path}`
     case 'fragmentLink':
-      return `#${HASH_PREFIX}${encodeURIComponent(sel.treePath)}`
+      return `#${HASH_PREFIX}${sel.treePath}`
     case 'fragmentEdit':
-      return `#${HASH_PREFIX}${encodeURIComponent(`@${sel.fragmentName}`)}`
+      return `#${HASH_PREFIX}@${sel.fragmentName}`
   }
 }
 
@@ -97,9 +103,8 @@ export function selectionToHash(sel: EditorSelection): string {
  */
 export function hashToSelection(hash: string, onFragmentPage: boolean): EditorSelection | null {
   if (!hash.startsWith(`#${HASH_PREFIX}`)) return null
-  const encoded = hash.slice(1 + HASH_PREFIX.length)
-  if (!encoded) return null
-  const decoded = decodeURIComponent(encoded)
+  const decoded = hash.slice(1 + HASH_PREFIX.length)
+  if (!decoded) return null
 
   if (decoded === '_root') return { kind: 'root' }
 
@@ -127,7 +132,7 @@ export function hashToSelection(hash: string, onFragmentPage: boolean): EditorSe
  */
 export function fragmentLinkDestinationHash(sel: FragmentLinkSelection): string {
   if (sel.childPath) {
-    return `#${HASH_PREFIX}${encodeURIComponent(sel.childPath)}`
+    return `#${HASH_PREFIX}${sel.childPath}`
   }
   return ''
 }

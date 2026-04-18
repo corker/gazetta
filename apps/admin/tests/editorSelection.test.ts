@@ -19,14 +19,14 @@ describe('editorSelection', () => {
 
     it('encodes nested component path', () => {
       expect(selectionToHash({ kind: 'component', path: 'features/fast', template: 'card' })).toBe(
-        '#component=features%2Ffast',
+        '#component=features/fast',
       )
     })
 
     it('encodes fragment link from page context', () => {
       expect(
         selectionToHash({ kind: 'fragmentLink', fragmentName: 'header', treePath: '@header', childPath: null }),
-      ).toBe('#component=%40header')
+      ).toBe('#component=@header')
     })
 
     it('encodes fragment link child from page context', () => {
@@ -37,11 +37,11 @@ describe('editorSelection', () => {
           treePath: '@header/logo',
           childPath: 'logo',
         }),
-      ).toBe('#component=%40header%2Flogo')
+      ).toBe('#component=@header/logo')
     })
 
     it('encodes fragment edit', () => {
-      expect(selectionToHash({ kind: 'fragmentEdit', fragmentName: 'header' })).toBe('#component=%40header')
+      expect(selectionToHash({ kind: 'fragmentEdit', fragmentName: 'header' })).toBe('#component=@header')
     })
   })
 
@@ -65,18 +65,18 @@ describe('editorSelection', () => {
     })
 
     it('parses encoded nested component', () => {
-      const sel = hashToSelection('#component=features%2Ffast', false)
+      const sel = hashToSelection('#component=features/fast', false)
       expect(sel?.kind).toBe('component')
       expect((sel as { path: string }).path).toBe('features/fast')
     })
 
     it('parses @fragment on a page as fragmentLink', () => {
-      const sel = hashToSelection('#component=%40header', false)
+      const sel = hashToSelection('#component=@header', false)
       expect(sel).toEqual({ kind: 'fragmentLink', fragmentName: 'header', treePath: '@header', childPath: null })
     })
 
     it('parses @fragment/child on a page as fragmentLink with childPath', () => {
-      const sel = hashToSelection('#component=%40header%2Flogo', false)
+      const sel = hashToSelection('#component=@header/logo', false)
       expect(sel).toEqual({
         kind: 'fragmentLink',
         fragmentName: 'header',
@@ -86,7 +86,7 @@ describe('editorSelection', () => {
     })
 
     it('parses @fragment on a fragment page as fragmentEdit', () => {
-      const sel = hashToSelection('#component=%40header', true)
+      const sel = hashToSelection('#component=@header', true)
       expect(sel).toEqual({ kind: 'fragmentEdit', fragmentName: 'header' })
     })
 
@@ -141,7 +141,7 @@ describe('editorSelection', () => {
         treePath: '@header/nav/links',
         childPath: 'nav/links',
       }
-      expect(fragmentLinkDestinationHash(sel)).toBe('#component=nav%2Flinks')
+      expect(fragmentLinkDestinationHash(sel)).toBe('#component=nav/links')
     })
   })
 })
