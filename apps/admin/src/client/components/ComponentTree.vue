@@ -7,9 +7,11 @@ import { useToastStore } from '../stores/toast.js'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { useFragmentsApi } from '../composables/api.js'
+import { useEditorHash } from '../composables/useEditorHash.js'
 import AddComponentDialog from './AddComponentDialog.vue'
 
 const fragmentsApi = useFragmentsApi()
+const editorHash = useEditorHash()
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
 function hashPath(path: string): string {
@@ -146,6 +148,8 @@ watch(
 
     // Process pending selection if tree just built and a gzId is waiting
     consumePending()
+    // Restore component from URL hash on refresh (only if no pending selection)
+    if (!focus.pendingGzId) restoreFromHash()
   },
   { immediate: true },
 )
@@ -154,6 +158,44 @@ function consumePending() {
   if (focus.pendingGzId && gzMap.value.size > 0) {
     selectByGzId(focus.pendingGzId)
     focus.clearPending()
+  }
+}
+
+function restoreFromHash() {
+  const hashPath = editorHash.readHash()
+  if (!hashPath || componentNodes.value.length === 0) return
+  if (hashPath === '_root') {
+    // Select the root node
+    const rootNode = componentNodes.value[0]
+    if (rootNode) {
+      selectedNodeKey.value = rootNode.key
+      editing.openPageRoot()
+    }
+    return
+  }
+  if (hashPath.startsWith('@')) {
+    if (selection.type === 'page') {
+      // On a page — show fragment link (same as clicking the fragment in the tree)
+      editing.showFragmentLink(hashPath)
+      const fragName = hashPath.split('/')[0].slice(1)
+      const found =
+        findNodeByKey(componentNodes.value, d => d.fragName === fragName) ??
+        findNodeByKey(componentNodes.value, d => d.path === hashPath)
+      if (found) selectedNodeKey.value = found.key
+    } else {
+      // On a fragment — open it for editing
+      const fragName = hashPath.slice(1)
+      editing.openFragment(fragName)
+      const found = findNodeByKey(componentNodes.value, d => d.fragName === fragName)
+      if (found) selectedNodeKey.value = found.key
+    }
+    return
+  }
+  // Inline component — look up template from selection detail
+  const found = findNodeByKey(componentNodes.value, d => d.path === hashPath)
+  if (found) {
+    selectedNodeKey.value = found.key
+    editing.openComponent(hashPath, found.data?.template ?? '')
   }
 }
 
@@ -235,22 +277,27 @@ async function onSelect(node: ComponentNode) {
   if (node.data.isFragment && node.data.fragName) {
     if (selection.type === 'page') {
       editing.showFragmentLink(node.data.fragName!)
+      editorHash.setHash(`@${node.data.fragName!}`)
     } else {
       editing.openFragment(node.data.fragName!)
+      editorHash.setHash(`@${node.data.fragName!}`)
     }
     return
   }
   if (node.data.isPage) {
     editing.openPageRoot()
+    editorHash.setHash('_root')
     return
   }
   if (!node.data.path) return
   // Fragment child clicked from page context — show link to the fragment
   if (selection.type === 'page' && node.data.path!.startsWith('@')) {
     editing.showFragmentLink(node.data.path!)
+    editorHash.setHash(node.data.path!)
     return
   }
   editing.openComponent(node.data.path!, node.data.template ?? '')
+  editorHash.setHash(node.data.path!)
 }
 
 // Find a node by walking the tree
@@ -275,8 +322,10 @@ function selectByGzId(gzId: string) {
     if (found) selectedNodeKey.value = found.key
     if (selection.type === 'page') {
       editing.showFragmentLink(entry.fragName)
+      editorHash.setHash(`@${entry.fragName}`)
     } else {
       editing.openFragment(entry.fragName)
+      editorHash.setHash(`@${entry.fragName}`)
     }
     return
   }
@@ -285,9 +334,11 @@ function selectByGzId(gzId: string) {
   // Fragment child clicked from page context — show link to the fragment
   if (selection.type === 'page' && entry.path.startsWith('@')) {
     editing.showFragmentLink(entry.path)
+    editorHash.setHash(entry.path)
     return
   }
   editing.openComponent(entry.path, entry.template)
+  editorHash.setHash(entry.path)
 }
 
 // --- Component operations ---

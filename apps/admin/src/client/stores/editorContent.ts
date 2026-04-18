@@ -33,6 +33,8 @@ export const useEditorContentStore = defineStore('editorContent', () => {
   const mountVersion = ref(0)
   const customEditorMount = ref<EditorMount | null>(null)
   const fragmentLink = ref<string | null>(null)
+  /** The full path passed to showFragmentLink (e.g. "@header/logo"), before extracting the fragment name. */
+  const fragmentLinkPath = ref<string | null>(null)
 
   const template = computed(() => target.value?.template ?? null)
   const path = computed(() => target.value?.path ?? null)
@@ -50,6 +52,7 @@ export const useEditorContentStore = defineStore('editorContent', () => {
   async function open(t: EditingTarget, editedContent?: Record<string, unknown>) {
     loadError.value = null
     fragmentLink.value = null
+    fragmentLinkPath.value = null
     target.value = t
     content.value = editedContent ? deepClone(editedContent) : deepClone(t.content)
     saved.value = deepClone(t.content)
@@ -97,12 +100,14 @@ export const useEditorContentStore = defineStore('editorContent', () => {
     content.value = null
     saved.value = null
     savedJson.value = ''
+    fragmentLinkPath.value = nameOrPath
     fragmentLink.value = nameOrPath.startsWith('@') ? nameOrPath.split('/')[0].slice(1) : nameOrPath
   }
 
   function clear() {
     loadError.value = null
     fragmentLink.value = null
+    fragmentLinkPath.value = null
     target.value = null
     content.value = null
     saved.value = null
@@ -118,6 +123,7 @@ export const useEditorContentStore = defineStore('editorContent', () => {
     mountVersion,
     customEditorMount,
     fragmentLink,
+    fragmentLinkPath,
     template,
     path,
     schema,
