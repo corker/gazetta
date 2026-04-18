@@ -19,6 +19,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import PrimeVue from 'primevue/config'
 import ComponentTree from '../src/client/components/ComponentTree.vue'
 import { FRAGMENTS_API, type FragmentsApi } from '../src/client/composables/api.js'
@@ -44,10 +45,19 @@ function fakeFragmentsApi(partial: Partial<FragmentsApi> = {}): FragmentsApi {
   } as FragmentsApi
 }
 
+const testRouter = createRouter({
+  history: createMemoryHistory(),
+  routes: [
+    { path: '/', component: { template: '<div />' } },
+    { path: '/pages/:name/edit', component: { template: '<div />' }, name: 'page-edit' },
+    { path: '/fragments/:name/edit', component: { template: '<div />' }, name: 'fragment-edit' },
+  ],
+})
+
 function mountTree(fragmentsApi: FragmentsApi) {
   return mount(ComponentTree, {
     global: {
-      plugins: [PrimeVue],
+      plugins: [PrimeVue, testRouter],
       provide: { [FRAGMENTS_API as symbol]: fragmentsApi },
       stubs: { AddComponentDialog: true },
     },

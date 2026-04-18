@@ -45,8 +45,12 @@ export function useEditorHash() {
 
   /** Read the hash as a typed EditorSelection. */
   function readSelection(onFragmentPage: boolean): EditorSelection | null {
-    if (!route) return null
-    return hashToSelection(route.hash, onFragmentPage)
+    if (!router) return null
+    // Use router.currentRoute (reflects in-progress navigation) rather
+    // than useRoute() (may still hold the previous route's hash during
+    // a beforeEach guard).
+    const hash = router.currentRoute.value.hash
+    return hashToSelection(hash, onFragmentPage)
   }
 
   function clearHash() {

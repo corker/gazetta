@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useSelectionStore } from '../stores/selection.js'
 import { useEditingStore } from '../stores/editing.js'
@@ -7,13 +8,13 @@ import { useToastStore } from '../stores/toast.js'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { useFragmentsApi } from '../composables/api.js'
-import { useEditorHash } from '../composables/useEditorHash.js'
-import type { EditorSelection } from '../composables/editorSelection.js'
+import { hashToSelection, selectionToHash, type EditorSelection } from '../composables/editorSelection.js'
 import { useUiModeStore } from '../stores/uiMode.js'
 import AddComponentDialog from './AddComponentDialog.vue'
 
 const fragmentsApi = useFragmentsApi()
-const editorHash = useEditorHash()
+const route = useRoute()
+const router = useRouter()
 const uiMode = useUiModeStore()
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
@@ -151,8 +152,9 @@ watch(
 
     // Process pending selection if tree just built and a gzId is waiting
     consumePending()
-    // Restore component from URL hash on refresh (only if no pending selection)
-    if (!focus.pendingGzId) restoreFromHash()
+    // Hash-based restore is handled by the route.hash watcher below.
+    // Trigger it now in case the hash was already set before the tree built.
+    if (!focus.pendingGzId) applyHashSelection()
   },
   { immediate: true },
 )
@@ -164,13 +166,21 @@ function consumePending() {
   }
 }
 
-function restoreFromHash() {
+/**
+ * Read the current route hash and open the corresponding editor.
+ * This is the SINGLE place that translates a URL hash into editor state.
+ * Called from:
+ * - the detail watcher (after tree builds — handles page refresh)
+ * - the route.hash watcher (handles click-driven hash changes)
+ */
+function applyHashSelection() {
   if (componentNodes.value.length === 0) return
   const onFragmentPage = selection.type === 'fragment'
-  const sel = editorHash.readSelection(onFragmentPage)
+  const sel = hashToSelection(route.hash, onFragmentPage)
   if (!sel) return
 
-  // Find the tree node to highlight
+  // Find and highlight the tree node
+  const prefix = onFragmentPage && selection.name ? `@${selection.name}/` : ''
   switch (sel.kind) {
     case 'root': {
       const rootNode = componentNodes.value[0]
@@ -178,9 +188,6 @@ function restoreFromHash() {
       break
     }
     case 'component': {
-      // On a fragment page, tree paths are prefixed with @fragName/ (e.g. @header/logo)
-      // but the hash stores the path relative to the fragment (e.g. logo).
-      const prefix = onFragmentPage && selection.name ? `@${selection.name}/` : ''
       const fullPath = prefix + sel.path
       const found = findNodeByKey(componentNodes.value, d => d.path === fullPath || d.path === sel.path)
       if (found) {
@@ -190,7 +197,6 @@ function restoreFromHash() {
       break
     }
     case 'fragmentLink': {
-      // If a child was clicked (@header/logo), select the child node; otherwise the fragment root
       const found = sel.childPath
         ? findNodeByKey(componentNodes.value, d => d.path === sel.treePath)
         : findNodeByKey(componentNodes.value, d => d.fragName === sel.fragmentName)
@@ -204,8 +210,30 @@ function restoreFromHash() {
     }
   }
 
-  applySelection(sel)
+  // Open the editor — NO hash write here (URL is already correct)
+  switch (sel.kind) {
+    case 'root':
+      editing.openPageRoot()
+      break
+    case 'component':
+      editing.openComponent(sel.path, sel.template)
+      break
+    case 'fragmentLink':
+      editing.showFragmentLink(sel.treePath)
+      break
+    case 'fragmentEdit':
+      editing.openFragment(sel.fragmentName)
+      break
+  }
 }
+
+// React to hash changes — this is the single driver of editor state from URL.
+// Fires on: click (onSelect writes hash), goToFragment (router.push with hash),
+// page refresh (hash already in URL), browser back/forward.
+watch(
+  () => route.hash,
+  () => applyHashSelection(),
+)
 
 // Also react to pendingGzId changes when tree is already built (edit mode click-to-select)
 watch(
@@ -309,25 +337,6 @@ function nodeToSelection(node: ComponentNode): EditorSelection | null {
   return { kind: 'component', path: relativePath, template: node.data.template ?? '' }
 }
 
-/** Apply a typed selection — opens the right editor and updates the URL hash. */
-function applySelection(sel: EditorSelection) {
-  switch (sel.kind) {
-    case 'root':
-      editing.openPageRoot()
-      break
-    case 'component':
-      editing.openComponent(sel.path, sel.template)
-      break
-    case 'fragmentLink':
-      editing.showFragmentLink(sel.treePath)
-      break
-    case 'fragmentEdit':
-      editing.openFragment(sel.fragmentName)
-      break
-  }
-  if (uiMode.mode === 'edit') editorHash.setSelection(sel)
-}
-
 async function onSelect(node: ComponentNode) {
   if (!node.data) return
   selectedNodeKey.value = node.key
@@ -335,7 +344,29 @@ async function onSelect(node: ComponentNode) {
   const treePath = node.data.treePath
   focus.select(treePath ? hashPath(treePath) : null)
   const sel = nodeToSelection(node)
-  if (sel) applySelection(sel)
+  if (!sel) return
+  if (uiMode.mode === 'edit') {
+    // Write the hash — the route.hash watcher will open the editor.
+    const hash = selectionToHash(sel)
+    if (route.hash !== hash) {
+      router.push({ hash, replace: true })
+    } else {
+      // Hash unchanged (e.g. clicking same component) — apply directly
+      applyHashSelection()
+    }
+  } else {
+    // Browse mode — no hash, open directly
+    switch (sel.kind) {
+      case 'fragmentLink':
+        editing.showFragmentLink(sel.treePath)
+        break
+      case 'fragmentEdit':
+        editing.openFragment(sel.fragmentName)
+        break
+      default:
+        break
+    }
+  }
 }
 
 // Find a node by walking the tree
@@ -378,7 +409,13 @@ function selectByGzId(gzId: string) {
       sel = { kind: 'component', path: entry.path, template: entry.template }
     }
   }
-  applySelection(sel)
+  // Write hash — the watcher opens the editor
+  const hash = selectionToHash(sel)
+  if (route.hash !== hash) {
+    router.push({ hash, replace: true })
+  } else {
+    applyHashSelection()
+  }
 }
 
 // --- Component operations ---
