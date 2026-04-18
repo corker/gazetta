@@ -10,6 +10,7 @@ import { z } from 'zod'
 export const FragmentSummarySchema = z.object({
   name: z.string(),
   template: z.string(),
+  locales: z.array(z.string()).optional(),
 })
 export type FragmentSummary = z.infer<typeof FragmentSummarySchema>
 

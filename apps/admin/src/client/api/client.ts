@@ -177,12 +177,18 @@ export interface PageDetail extends PageSummary {
   components?: ComponentEntry[]
   metadata?: PageMetadata
   dir: string
+  /** Current locale (when loaded via ?locale=) */
+  locale?: string
+  /** Available locale codes for this page */
+  locales?: string[]
 }
 
 export interface FragmentDetail extends FragmentSummary {
   content?: Record<string, unknown>
   components?: ComponentEntry[]
   dir: string
+  locale?: string
+  locales?: string[]
 }
 
 export const api = {
@@ -192,7 +198,10 @@ export const api = {
    *  item availability before switching the active target. */
   getPages: (opts?: { target?: string }) =>
     request<PageSummary[]>(opts?.target ? `/pages?target=${encodeURIComponent(opts.target)}` : '/pages'),
-  getPage: (name: string, options?: RequestInit) => request<PageDetail>(`/pages/${name}`, options),
+  getPage: (name: string, options?: RequestInit & { locale?: string }) => {
+    const path = options?.locale ? `/pages/${name}?locale=${encodeURIComponent(options.locale)}` : `/pages/${name}`
+    return request<PageDetail>(path, options)
+  },
   createPage: (data: CreatePageRequest) =>
     request<CreatePageResponse>('/pages', { method: 'POST', body: JSON.stringify(data) }),
   deletePage: (name: string) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'DELETE' }),
@@ -201,7 +210,12 @@ export const api = {
   /** List fragments. See getPages for the `target` option. */
   getFragments: (opts?: { target?: string }) =>
     request<FragmentSummary[]>(opts?.target ? `/fragments?target=${encodeURIComponent(opts.target)}` : '/fragments'),
-  getFragment: (name: string, options?: RequestInit) => request<FragmentDetail>(`/fragments/${name}`, options),
+  getFragment: (name: string, options?: RequestInit & { locale?: string }) => {
+    const path = options?.locale
+      ? `/fragments/${name}?locale=${encodeURIComponent(options.locale)}`
+      : `/fragments/${name}`
+    return request<FragmentDetail>(path, options)
+  },
   createFragment: (data: CreateFragmentRequest) =>
     request<CreateFragmentResponse>('/fragments', { method: 'POST', body: JSON.stringify(data) }),
   deleteFragment: (name: string) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'DELETE' }),
