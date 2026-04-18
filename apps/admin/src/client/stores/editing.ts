@@ -31,7 +31,6 @@ export const useEditingStore = defineStore('editing', () => {
     mountVersion: computed(() => ec.mountVersion),
     customEditorMount: computed(() => ec.customEditorMount),
     fragmentLink: computed(() => ec.fragmentLink),
-    fragmentLinkPath: computed(() => ec.fragmentLinkPath),
     // State from editorPersistence
     saving: computed(() => persistence.saving),
     lastSaveError: computed(() => persistence.lastSaveError),

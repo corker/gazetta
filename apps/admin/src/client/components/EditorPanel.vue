@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { onKeyStroke } from '@vueuse/core'
 import { useEditingStore } from '../stores/editing.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
-import { fragmentLinkDestinationHash, type FragmentLinkSelection } from '../composables/editorSelection.js'
+import { hashToSelection, fragmentLinkDestinationHash } from '../composables/editorSelection.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from 'gazetta/editor'
 import type { EditorMount } from 'gazetta/types'
@@ -17,17 +17,17 @@ const editing = useEditingStore()
 const selection = useSelectionStore()
 const theme = useThemeStore()
 const unsavedGuard = useUnsavedGuardStore()
+const route = useRoute()
 const router = useRouter()
 const containerRef = ref<HTMLElement | null>(null)
 
 async function goToFragment() {
   const fragName = editing.fragmentLink
-  const linkPath = editing.fragmentLinkPath
   if (!fragName) return
-  const childPath = linkPath && linkPath.includes('/') ? linkPath.split('/').slice(1).join('/') : null
-  const hash = childPath
-    ? fragmentLinkDestinationHash({ kind: 'fragmentLink', fragmentName: fragName, treePath: linkPath!, childPath })
-    : ''
+  // Derive child path from route hash — the hash already encodes the selection
+  // (e.g. #@header/logo → childPath = logo)
+  const sel = hashToSelection(route.hash, false)
+  const hash = sel?.kind === 'fragmentLink' && sel.childPath ? fragmentLinkDestinationHash(sel) : ''
   if (editing.hasPendingEdits) {
     const result = await unsavedGuard.guard()
     if (result === 'cancel') return
