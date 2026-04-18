@@ -16,6 +16,7 @@ import {
   lookupCloudflareZoneId,
 } from '../../publish-rendered.js'
 import { loadSite } from '../../site-loader.js'
+import { publishPageAllLocales, publishFragmentAllLocales } from '../../publish-locale.js'
 import { resolveEnvVars } from '../../targets.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from '../../templates-scan.js'
 import { hashManifest } from '../../hash.js'
@@ -318,29 +319,25 @@ export function publishRoutes(
             if (isStatic) {
               return publishPageStatic(pageName, source.contentRoot, targetStorage, tdir, manifestHash, site, seo)
             }
-            const { files } = await publishPageRendered(
+            const { files } = await publishPageAllLocales(
               pageName,
               source.contentRoot,
               targetStorage,
-              config?.cache,
-              tdir,
-              manifestHash,
               site,
-              seo,
+              pageHashOpts,
+              { cache: config?.cache, templatesDir: tdir, seo },
             )
             return { files }
           }
           if (item.startsWith('fragments/') && !isStatic) {
             const fragName = item.replace('fragments/', '')
-            const frag = site.fragments.get(fragName)
-            const manifestHash = frag ? hashManifest(frag, { templateHashes }) : undefined
-            const { files } = await publishFragmentRendered(
+            const { files } = await publishFragmentAllLocales(
               fragName,
               source.contentRoot,
               targetStorage,
-              tdir,
-              manifestHash,
               site,
+              { templateHashes },
+              { templatesDir: tdir },
             )
             return { files }
           }
