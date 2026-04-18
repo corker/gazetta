@@ -178,10 +178,13 @@ function restoreFromHash() {
       break
     }
     case 'component': {
-      const found = findNodeByKey(componentNodes.value, d => d.path === sel.path)
+      // On a fragment page, tree paths are prefixed with @fragName/ (e.g. @header/logo)
+      // but the hash stores the path relative to the fragment (e.g. logo).
+      const prefix = onFragmentPage && selection.name ? `@${selection.name}/` : ''
+      const fullPath = prefix + sel.path
+      const found = findNodeByKey(componentNodes.value, d => d.path === fullPath || d.path === sel.path)
       if (found) {
         selectedNodeKey.value = found.key
-        // Fill in template from tree node (hash doesn't carry it)
         sel.template = found.data?.template ?? ''
       }
       break
