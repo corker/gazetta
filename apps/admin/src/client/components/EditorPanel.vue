@@ -6,6 +6,7 @@ import { useEditingStore } from '../stores/editing.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useThemeStore } from '../stores/theme.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
+import { useEditorHash } from '../composables/useEditorHash.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from 'gazetta/editor'
 import type { EditorMount } from 'gazetta/types'
@@ -16,20 +17,31 @@ const editing = useEditingStore()
 const selection = useSelectionStore()
 const theme = useThemeStore()
 const unsavedGuard = useUnsavedGuardStore()
+const editorHash = useEditorHash()
 const router = useRouter()
 const containerRef = ref<HTMLElement | null>(null)
 
 async function goToFragment() {
   const fragName = editing.fragmentLink
   if (!fragName) return
+  // If the user clicked a fragment child (e.g. @header/logo), carry
+  // the child path so the fragment editor opens on the right component.
+  const linkPath = editing.fragmentLinkPath
+  const childPath = linkPath && linkPath.includes('/') ? linkPath.split('/').slice(1).join('/') : null
   if (editing.hasPendingEdits) {
     const result = await unsavedGuard.guard()
     if (result === 'cancel') return
     if (result === 'save') await editing.save()
   }
   editing.clear()
-  await router.push(`/fragments/${fragName}/edit`)
-  editing.openFragment(fragName)
+  const hash = childPath ? `#component=${encodeURIComponent(childPath)}` : ''
+  await router.push(`/fragments/${fragName}/edit${hash}`)
+  if (childPath) {
+    // Child component — will be opened by restoreFromHash after tree builds
+  } else {
+    editing.openFragment(fragName)
+    editorHash.setHash(`@${fragName}`)
+  }
 }
 
 // Show blast radius when the selected root item is a fragment, regardless
