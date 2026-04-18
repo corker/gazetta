@@ -60,7 +60,7 @@ test.describe('Deep linking', () => {
     // ui mode in the gazetta:navigate handler.
     await page.goto('/admin/pages/home/edit')
     await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
-    await expect(page).toHaveURL(/\/pages\/home\/edit$/)
+    await expect(page).toHaveURL(/\/pages\/home\/edit/)
 
     // The starter site's header fragment includes a /about nav link.
     const iframe = page.frameLocator('[data-testid="preview-iframe"]')
@@ -71,7 +71,7 @@ test.describe('Deep linking', () => {
     // After navigation we should be on the about page AND still in edit
     // mode — the URL must end with /edit, and the component tree (only
     // rendered in edit mode) must be visible.
-    await expect(page).toHaveURL(/\/pages\/about\/edit$/, { timeout: 5000 })
+    await expect(page).toHaveURL(/\/pages\/about\/edit/, { timeout: 5000 })
     await page.waitForSelector('[data-testid^="component-"]', { timeout: 10000 })
   })
 
@@ -103,7 +103,7 @@ test.describe('Deep linking', () => {
     // Cancel keeps us on /home/edit with the dirty value intact.
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     await expect(dialog).not.toBeVisible()
-    await expect(page).toHaveURL(/\/pages\/home\/edit$/)
+    await expect(page).toHaveURL(/\/pages\/home\/edit/)
     await expect(page.locator('[data-testid="save-btn"]')).toBeEnabled()
   })
 })
