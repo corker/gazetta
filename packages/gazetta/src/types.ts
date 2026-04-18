@@ -167,6 +167,26 @@ export interface TargetConfig {
   editable?: boolean
   /** Base URL of the site (e.g. https://gazetta.studio) */
   siteUrl?: string
+  /**
+   * Locale subset this target serves. Inherits site-level `locales.supported`
+   * when absent. A single-entry list (e.g. `[fr]`) makes the target
+   * single-language — no URL prefix, no locale switching.
+   */
+  locales?: string[]
+  /**
+   * Default locale for this target. Inherits site-level `locale` when absent.
+   * The default locale has no URL prefix (unless `defaultPrefix` is true).
+   * For single-locale targets, auto-inferred from the `locales` list.
+   */
+  locale?: string
+  /**
+   * Override site-level `locales.defaultPrefix` for this target.
+   */
+  defaultPrefix?: boolean
+  /**
+   * Override site-level `locales.detection` for this target.
+   */
+  detection?: boolean
   cache?: CacheConfig
   /**
    * Per-target history / revisions (undo, rollback). Default: enabled
@@ -226,11 +246,29 @@ export function getHistoryRetention(target: TargetConfig): number {
   return raw > 0 ? raw : 1
 }
 
+/**
+ * i18n configuration. Opt-in: absent = single-locale site.
+ * Adding `locales` enables multi-locale support.
+ */
+export interface LocalesConfig {
+  /** All supported locale codes (BCP 47). First entry is the default if `locale` is not set. */
+  supported: string[]
+  /** Locale-specific fallback chains. E.g. `{ 'pt-BR': 'pt' }` → pt-BR falls back to pt before default. */
+  fallbacks?: Record<string, string>
+  /** Whether the default locale gets a URL prefix. Default: false (no prefix for default). */
+  defaultPrefix?: boolean
+  /** Enable Accept-Language detection and redirect. Default: false. */
+  detection?: boolean
+}
+
 /** Site manifest (site.yaml) */
 export interface SiteManifest {
   name: string
   version?: string
+  /** Default locale code (BCP 47). Falls back to first in `locales.supported`, then 'en'. */
   locale?: string
+  /** i18n configuration. Absent = single-locale site. */
+  locales?: LocalesConfig
   /** Default Open Graph image for pages that don't specify their own. */
   defaultOgImage?: string
   systemPages?: string[]
