@@ -62,12 +62,61 @@ locales:                      # new (optional) — enables i18n
 ```
 
 When `locales` is absent, the site is single-locale. `locale: en` is used for
-`<html lang>` and sitemap, same as today.
+`<html lang>` and sitemap, same as today. Adding `locales.supported` is the
+only change needed to enable i18n — everything else has sensible defaults.
+
+### Defaults
+
+#### Site-level defaults
+
+| Setting | Default | Why |
+|---------|---------|-----|
+| `locale` | First in `supported` list | `supported: [en, fr]` → default is `en` |
+| `detection` | `false` | Opt-in — don't redirect until the author is ready |
+| `defaultPrefix` | `false` | Google recommended — `/about` not `/en/about` |
+| `fallbacks` | None — fall through to default locale | Explicit chains are rare |
+
+#### Target-level defaults
+
+Every target setting inherits from the site level unless overridden.
+
+| Setting | Default | Why |
+|---------|---------|-----|
+| `locales` | Site's `supported` | Serve all locales unless narrowed |
+| `locale` | Site's `locale` | Same default locale unless overridden |
+| `detection` | Site's `detection` | Consistent unless overridden |
+| `defaultPrefix` | Site's `defaultPrefix` | Consistent unless overridden |
+
+#### Single-locale target inference
+
+A target with `locales: [fr]` (one entry) automatically infers:
+- `locale: fr` — the only locale IS the default
+- `defaultPrefix: false` — no prefix needed
+- `detection: false` — nothing to detect
+
+No explicit config needed — the system infers from the single-entry list.
+
+#### Minimal i18n setup
+
+```yaml
+# Minimum config to enable i18n — everything else is inferred
+locale: en
+locales:
+  supported: [en, fr]
+```
+
+This gives:
+- `page.json` = English (default), `page.fr.json` = French
+- Routes: `/about` (en), `/fr/about` (fr)
+- hreflang in `<head>` and sitemap
+- All targets serve both locales
+- No language detection redirect
+- No prefix for default locale
 
 ### Deployment strategies
 
-Two strategies for serving localized content. Same content files, different
-target configurations. Both can coexist in the same site.
+Three strategies for serving localized content. Same content files, different
+target configurations. All can coexist in the same site.
 
 #### Strategy 1: Subpath — one target, all locales in URL
 
