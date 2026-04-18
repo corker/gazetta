@@ -128,7 +128,11 @@ describe('starter site', () => {
     const site = await loadSite({ siteDir, storage, templatesDir })
     const page = site.pages.get('blog/[slug]')!
     const resolved = await resolvePage('blog/[slug]', site)
-    const html = await renderPage(resolved, { routeParams: { slug: 'hello-world' }, metadata: page.metadata, route: page.route })
+    const html = await renderPage(resolved, {
+      routeParams: { slug: 'hello-world' },
+      metadata: page.metadata,
+      route: page.route,
+    })
 
     expect(html).toContain('<title>Blog Post</title>')
     expect(html).toContain('Hello from Gazetta')
