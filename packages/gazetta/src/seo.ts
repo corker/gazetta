@@ -32,6 +32,15 @@ export interface SeoContext {
   locale?: string
   /** Default OG image for pages that don't specify their own. */
   defaultOgImage?: string
+  /**
+   * Locale alternates for hreflang — maps locale code to absolute URL.
+   * Only set for subpath targets (same domain, all locales).
+   * Cross-domain hreflang is handled via sitemap, not HTML tags.
+   * Example: { en: "https://example.com/about", fr: "https://example.com/fr/about" }
+   */
+  hreflangAlternates?: Record<string, string>
+  /** The default locale code — used for x-default hreflang. */
+  defaultLocale?: string
 }
 
 export interface ResolveSeoTagsInput {
@@ -107,6 +116,18 @@ export function resolveSeoTags(input: ResolveSeoTagsInput): string {
   // Robots: only when explicitly set (absence = allow indexing)
   if (meta?.robots) {
     parts.push(`<meta name="robots" content="${escapeAttr(meta.robots)}">`)
+  }
+
+  // hreflang alternates (subpath targets only — cross-domain uses sitemap)
+  if (seo.hreflangAlternates && Object.keys(seo.hreflangAlternates).length > 1) {
+    for (const [locale, url] of Object.entries(seo.hreflangAlternates)) {
+      parts.push(`<link rel="alternate" hreflang="${escapeAttr(locale)}" href="${escapeAttr(url)}">`)
+    }
+    // x-default points to the default locale URL
+    const defaultUrl = seo.defaultLocale && seo.hreflangAlternates[seo.defaultLocale]
+    if (defaultUrl) {
+      parts.push(`<link rel="alternate" hreflang="x-default" href="${escapeAttr(defaultUrl)}">`)
+    }
   }
 
   return parts.join('\n  ')
