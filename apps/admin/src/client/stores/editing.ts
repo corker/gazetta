@@ -11,6 +11,7 @@ import { usePublishStatusStore } from './publishStatus.js'
 import { useActiveTargetStore } from './activeTarget.js'
 import { useSiteStore } from './site.js'
 import { useEditorStashStore } from './editorStash.js'
+import { useEditorPersistenceStore } from './editorPersistence.js'
 import { api } from '../api/client.js'
 import type { EditorMount } from 'gazetta/types'
 
@@ -28,12 +29,11 @@ export interface EditingTarget {
 export const useEditingStore = defineStore('editing', () => {
   const toast = useToastStore()
   const stash = useEditorStashStore()
+  const persistence = useEditorPersistenceStore()
 
   const target = ref<EditingTarget | null>(null)
   const content = ref<Record<string, unknown> | null>(null)
   const saved = ref<Record<string, unknown> | null>(null)
-  const saving = ref(false)
-  const lastSaveError = ref<string | null>(null)
   const loadError = ref<string | null>(null)
   const mountVersion = ref(0)
   const customEditorMount = ref<EditorMount | null>(null)
@@ -105,8 +105,8 @@ export const useEditingStore = defineStore('editing', () => {
     target.value = t
     content.value = editedContent ? deepClone(editedContent) : deepClone(t.content)
     saved.value = deepClone(t.content)
-    saving.value = false
-    lastSaveError.value = null
+    persistence.saving = false
+    persistence.lastSaveError = null
     customEditorMount.value = null
 
     if (t.hasEditor && t.editorUrl) {
@@ -299,8 +299,8 @@ export const useEditingStore = defineStore('editing', () => {
     target.value = null
     content.value = null
     saved.value = null
-    saving.value = false
-    lastSaveError.value = null
+    persistence.saving = false
+    persistence.lastSaveError = null
     stash.clearAll()
   }
 
@@ -386,30 +386,16 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   async function save() {
-    if (!target.value && stash.size === 0) return
-    saving.value = true
-    lastSaveError.value = null
-    try {
-      if (target.value && content.value) {
-        await target.value.save(content.value)
-        saved.value = deepClone(content.value)
-      }
-      for (const entry of stash.values()) {
-        await entry.target.save(entry.editedContent)
-      }
+    const current = target.value && content.value ? { target: target.value, content: content.value } : null
+    const result = await persistence.save(current, [...stash.values()])
+    if (result.success) {
+      if (current) saved.value = deepClone(content.value!)
       stash.clearAll()
       usePreviewStore().invalidate()
-      // Re-check publish state — saving may have flipped this page from
-      // unchanged to dirty (or vice-versa if content matches the target).
       usePublishStatusStore().refresh()
-      toast.show('Saved', {
-        action: buildUndoAction(),
-      })
-    } catch (err) {
-      lastSaveError.value = (err as Error).message
-      toast.showError(err, 'Failed to save')
-    } finally {
-      saving.value = false
+      toast.show('Saved', { action: buildUndoAction() })
+    } else {
+      toast.showError(new Error(result.error), 'Failed to save')
     }
   }
 
@@ -417,8 +403,8 @@ export const useEditingStore = defineStore('editing', () => {
     target,
     content,
     saved,
-    saving,
-    lastSaveError,
+    saving: computed(() => persistence.saving),
+    lastSaveError: computed(() => persistence.lastSaveError),
     template,
     path,
     schema,
