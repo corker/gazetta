@@ -79,7 +79,9 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
       site = {
         manifest: { name: '(empty)', targets: {} },
         pages: new Map(),
+        pageLocales: new Map(),
         fragments: new Map(),
+        fragmentLocales: new Map(),
         contentRoot: sourceRoot,
         storage: sourceRoot.storage,
         siteDir: sourceRoot.rootPath,

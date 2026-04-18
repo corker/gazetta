@@ -83,7 +83,7 @@ export {
 export { resolveSeoTags, type ResolveSeoTagsInput } from './seo.js'
 export { resolveComponent, resolveFragment, resolvePage } from './resolver.js'
 export { loadSite } from './site-loader.js'
-export type { Site, LoadSiteOptions } from './site-loader.js'
+export type { Site, LocalizedEntry, LoadSiteOptions } from './site-loader.js'
 export { loadTemplate, invalidateTemplate, invalidateAllTemplates } from './template-loader.js'
 export { scopeHtml, scopeCss, hashPath } from './scope.js'
 

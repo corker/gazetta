@@ -3,6 +3,7 @@ import type { PageManifest, FragmentManifest, SiteManifest, StorageProvider } fr
 import { parseSiteManifest, parsePageManifest, parseFragmentManifest } from './manifest.js'
 import { mapLimit } from './concurrency.js'
 import { createContentRoot, type ContentRoot } from './content-root.js'
+import { localeFromFilename } from './locale.js'
 
 /** Derive route from page folder name: home → /, about → /about, blog/[slug] → /blog/:slug */
 export function deriveRoute(pageName: string): string {
@@ -10,10 +11,22 @@ export function deriveRoute(pageName: string): string {
   return '/' + pageName.replace(/\[([^\]]+)\]/g, ':$1')
 }
 
+/** A page or fragment with its locale variants. */
+export interface LocalizedEntry<T> {
+  /** Default locale manifest (from page.json / fragment.json). */
+  default: T
+  /** Locale variants keyed by normalized locale code. Empty if single-locale. */
+  locales: Map<string, T>
+}
+
 export interface Site {
   manifest: SiteManifest
   pages: Map<string, PageManifest & { dir: string }>
+  /** Locale variants for pages. Only populated when site has `locales` config. */
+  pageLocales: Map<string, LocalizedEntry<PageManifest & { dir: string }>>
   fragments: Map<string, FragmentManifest & { dir: string }>
+  /** Locale variants for fragments. Only populated when site has `locales` config. */
+  fragmentLocales: Map<string, LocalizedEntry<FragmentManifest & { dir: string }>>
   /** Content root — `{storage, rootPath}` pair for accessing site content. */
   contentRoot: ContentRoot
   /**
@@ -30,15 +43,20 @@ export interface Site {
   templatesDir: string
 }
 
+interface DiscoverPagesResult {
+  pages: Map<string, PageManifest & { dir: string }>
+  pageLocales: Map<string, LocalizedEntry<PageManifest & { dir: string }>>
+}
+
 async function discoverPages(
   storage: StorageProvider,
   pagesDir: string,
-  pages: Map<string, PageManifest & { dir: string }> = new Map(),
+  result: DiscoverPagesResult = { pages: new Map(), pageLocales: new Map() },
   prefix = '',
-): Promise<Map<string, PageManifest & { dir: string }>> {
+): Promise<DiscoverPagesResult> {
   if (!(await storage.exists(pagesDir))) {
     if (!prefix) console.warn(`  Warning: pages/ directory not found at ${pagesDir}`)
-    return pages
+    return result
   }
 
   const entries = await storage.readDir(pagesDir)
@@ -55,28 +73,48 @@ async function discoverPages(
       try {
         const manifest = await parsePageManifest(storage, manifestPath)
         const route = deriveRoute(name)
-        pages.set(name, { ...manifest, route, dir })
+        const pageWithDir = { ...manifest, route, dir }
+        result.pages.set(name, pageWithDir)
+
+        // Discover locale variants (page.fr.json, page.en-gb.json, etc.)
+        const locales = new Map<string, PageManifest & { dir: string }>()
+        const dirEntries = await storage.readDir(dir)
+        for (const f of dirEntries) {
+          if (f.isDirectory) continue
+          const locale = localeFromFilename(f.name, 'page')
+          if (!locale) continue
+          try {
+            const localeManifest = await parsePageManifest(storage, join(dir, f.name))
+            const localeRoute = `/${locale}${route === '/' ? '' : route}`
+            locales.set(locale, { ...localeManifest, route: localeRoute, dir })
+          } catch (err) {
+            console.warn(`  Warning: skipping page "${name}" locale "${locale}": ${(err as Error).message}`)
+          }
+        }
+        if (locales.size > 0) {
+          result.pageLocales.set(name, { default: pageWithDir, locales })
+        }
       } catch (err) {
         console.warn(`  Warning: skipping page "${name}": ${(err as Error).message}`)
       }
     }
 
     // Recurse into subdirectories to find nested pages (e.g., blog/[slug]).
-    // Recursive call inherits the same bounded mapLimit — workers at each
-    // level compete for the same concurrency budget.
-    await discoverPages(storage, dir, pages, name)
+    await discoverPages(storage, dir, result, name)
   })
-  return pages
+  return result
 }
 
-async function discoverFragments(
-  storage: StorageProvider,
-  fragmentsDir: string,
-): Promise<Map<string, FragmentManifest & { dir: string }>> {
-  const fragments = new Map<string, FragmentManifest & { dir: string }>()
+interface DiscoverFragmentsResult {
+  fragments: Map<string, FragmentManifest & { dir: string }>
+  fragmentLocales: Map<string, LocalizedEntry<FragmentManifest & { dir: string }>>
+}
+
+async function discoverFragments(storage: StorageProvider, fragmentsDir: string): Promise<DiscoverFragmentsResult> {
+  const result: DiscoverFragmentsResult = { fragments: new Map(), fragmentLocales: new Map() }
   if (!(await storage.exists(fragmentsDir))) {
     console.warn(`  Warning: fragments/ directory not found at ${fragmentsDir}`)
-    return fragments
+    return result
   }
 
   const entries = await storage.readDir(fragmentsDir)
@@ -88,12 +126,31 @@ async function discoverFragments(
     if (!(await storage.exists(manifestPath))) return
     try {
       const manifest = await parseFragmentManifest(storage, manifestPath)
-      fragments.set(entry.name, { ...manifest, dir: fragDir })
+      const fragWithDir = { ...manifest, dir: fragDir }
+      result.fragments.set(entry.name, fragWithDir)
+
+      // Discover locale variants (fragment.fr.json, etc.)
+      const locales = new Map<string, FragmentManifest & { dir: string }>()
+      const dirEntries = await storage.readDir(fragDir)
+      for (const f of dirEntries) {
+        if (f.isDirectory) continue
+        const locale = localeFromFilename(f.name, 'fragment')
+        if (!locale) continue
+        try {
+          const localeManifest = await parseFragmentManifest(storage, join(fragDir, f.name))
+          locales.set(locale, { ...localeManifest, dir: fragDir })
+        } catch (err) {
+          console.warn(`  Warning: skipping fragment "${entry.name}" locale "${locale}": ${(err as Error).message}`)
+        }
+      }
+      if (locales.size > 0) {
+        result.fragmentLocales.set(entry.name, { default: fragWithDir, locales })
+      }
     } catch (err) {
       console.warn(`  Warning: skipping fragment "${entry.name}": ${(err as Error).message}`)
     }
   })
-  return fragments
+  return result
 }
 
 export interface LoadSiteOptions {
@@ -156,8 +213,8 @@ export async function loadSite(opts: LoadSiteOptions): Promise<Site> {
     }
     manifest = await parseSiteManifest(contentRoot.storage, siteYamlPath)
   }
-  const pages = await discoverPages(contentRoot.storage, contentRoot.path('pages'))
-  const fragments = await discoverFragments(contentRoot.storage, contentRoot.path('fragments'))
+  const { pages, pageLocales } = await discoverPages(contentRoot.storage, contentRoot.path('pages'))
+  const { fragments, fragmentLocales } = await discoverFragments(contentRoot.storage, contentRoot.path('fragments'))
 
   if (pages.size === 0) {
     console.warn(`  Warning: no pages found in ${contentRoot.path('pages')}`)
@@ -166,7 +223,9 @@ export async function loadSite(opts: LoadSiteOptions): Promise<Site> {
   return {
     manifest,
     pages,
+    pageLocales,
     fragments,
+    fragmentLocales,
     contentRoot,
     // backward-compat fields
     siteDir,
