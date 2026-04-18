@@ -45,8 +45,14 @@ test.describe('Publish confirmation matrix', () => {
 
       // Wait for compare to complete — either items appear or "in sync".
       const itemOrSync = await Promise.race([
-        page.locator('[data-testid="publish-item-pages/home"]').waitFor({ timeout: 10000 }).then(() => 'items' as const),
-        page.locator('text=Nothing to publish').waitFor({ timeout: 10000 }).then(() => 'sync' as const),
+        page
+          .locator('[data-testid="publish-item-pages/home"]')
+          .waitFor({ timeout: 10000 })
+          .then(() => 'items' as const),
+        page
+          .locator('text=Nothing to publish')
+          .waitFor({ timeout: 10000 })
+          .then(() => 'sync' as const),
       ])
 
       if (itemOrSync === 'sync') {
