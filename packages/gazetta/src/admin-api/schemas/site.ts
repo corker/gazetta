@@ -7,11 +7,19 @@
  */
 import { z } from 'zod'
 
+export const LocalesConfigSchema = z.object({
+  supported: z.array(z.string()),
+  fallbacks: z.record(z.string(), z.string()).optional(),
+  defaultPrefix: z.boolean().optional(),
+  detection: z.boolean().optional(),
+})
+
 export const SiteManifestSchema = z
   .object({
     name: z.string(),
     version: z.string().optional(),
     locale: z.string().optional(),
+    locales: LocalesConfigSchema.optional(),
     systemPages: z.array(z.string()).optional(),
   })
   .loose()

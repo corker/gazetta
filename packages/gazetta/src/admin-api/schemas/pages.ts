@@ -31,6 +31,7 @@ export const PageSummarySchema = z.object({
   name: z.string(),
   route: z.string(),
   template: z.string(),
+  locales: z.array(z.string()).optional(),
 })
 export type PageSummary = z.infer<typeof PageSummarySchema>
 
