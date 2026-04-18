@@ -121,23 +121,24 @@ async function switchTo(name: string) {
   // Pre-check item availability only when we have something selected —
   // no selection means no focus to preserve, so skip the extra round-trip.
   const missingCheck = focused ? await checkItemOnTarget(name, focused.type, focused.name) : ('ok' as const)
-  activeTarget.setActiveTarget(name)
   if (missingCheck === 'missing' && focused && prevName) {
-    // Navigate to the site root on the new target and let the author
-    // one-click back if this wasn't what they meant.
-    router.push('/admin')
+    // Item doesn't exist on the destination — navigate to site root
+    // with the new target in the query. The router guard applies it.
+    router.push({ path: '/', query: { target: name } })
     const itemLabel = focused.type === 'page' ? `pages/${focused.name}` : `@${focused.name}`
     toast.show(`${itemLabel} isn't on ${name} — showing site root`, {
       type: 'info',
       action: {
         label: `back to ${itemLabel} on ${prevName}`,
         handler: async () => {
-          activeTarget.setActiveTarget(prevName)
           const prefix = focused.type === 'page' ? '/pages' : '/fragments'
-          router.push(`${prefix}/${focused.name}`)
+          router.push({ path: `${prefix}/${focused.name}`, query: { target: prevName } })
         },
       },
     })
+  } else {
+    // Item exists — stay on the same page, just switch target via query
+    router.push({ query: { ...router.currentRoute.value.query, target: name } })
   }
 }
 

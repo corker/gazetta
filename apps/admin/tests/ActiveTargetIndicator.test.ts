@@ -20,21 +20,10 @@ import ActiveTargetIndicator from '../src/client/components/ActiveTargetIndicato
 import { useActiveTargetStore } from '../src/client/stores/activeTarget.js'
 import type { TargetInfo } from '../src/client/api/client.js'
 
-const memoryPersistence = () => {
-  let v: string | null = null
-  return {
-    get: () => v,
-    set: (n: string) => {
-      v = n
-    },
-  }
-}
-
 function setup(targets: TargetInfo[], active: string | null) {
   const active$ = useActiveTargetStore()
   active$.configure({
     loadTargets: async () => targets,
-    persistence: memoryPersistence(),
   })
   active$.targets = targets
   active$.activeTargetName = active

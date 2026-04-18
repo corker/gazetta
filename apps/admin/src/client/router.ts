@@ -6,6 +6,7 @@ import { useSelectionStore } from './stores/selection.js'
 import { useEditingStore } from './stores/editing.js'
 import { useUiModeStore } from './stores/uiMode.js'
 import { useUnsavedGuardStore } from './stores/unsavedGuard.js'
+import { useActiveTargetStore } from './stores/activeTarget.js'
 
 export function createRouter() {
   const base = import.meta.env.BASE_URL || '/'
@@ -52,6 +53,25 @@ export function createRouter() {
         if (result === 'save') await editing.save()
         editing.clear()
       }
+    }
+
+    // Sync active target ↔ URL query param.
+    // URL is source of truth: ?target=staging switches the active target.
+    // If no ?target=, use the current active target (default on first load).
+    // All navigations carry ?target= so the URL is always shareable.
+    const activeTarget = useActiveTargetStore()
+    const urlTarget = to.query.target as string | undefined
+    if (urlTarget) {
+      if (urlTarget !== activeTarget.activeTargetName) {
+        try {
+          activeTarget.setActiveTarget(urlTarget)
+        } catch {
+          return { ...to, query: { ...to.query, target: undefined } }
+        }
+      }
+    } else if (activeTarget.activeTargetName && !isDev(to.name?.toString())) {
+      // No ?target= in URL — inject the current active target so the URL stays shareable
+      return { ...to, query: { ...to.query, target: activeTarget.activeTargetName } }
     }
 
     // Hydrate selection from route params
