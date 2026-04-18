@@ -141,6 +141,8 @@ function printHelp() {
     gazetta serve [target] [site]   Serve published pages from target storage
     gazetta deploy [target] [site]  Deploy worker to hosting (one-time setup)
     gazetta validate [site]         Check site for broken references
+    gazetta translate <item> --to <locale>
+                                    Create a locale copy of a page or fragment
     gazetta history [target] [site] List revisions on a target
     gazetta undo [target] [site]    Restore the previous revision (soft undo)
     gazetta rollback <rev> [target] [site]
@@ -1821,6 +1823,41 @@ async function main() {
     case 'admin':
       await runAdmin(siteDir, parsed.port ?? 3000)
       break
+    case 'translate': {
+      const itemArg = args[1]
+      const localeArg = args.find(a => a.startsWith('--to='))?.slice(5) ?? args[args.indexOf('--to') + 1]
+      if (!itemArg || !localeArg) {
+        console.error('  Usage: gazetta translate <pages/name|fragments/name> --to <locale>')
+        console.error('  Example: gazetta translate pages/about --to fr')
+        process.exit(1)
+      }
+      const { normalizeLocale, localeFilename } = await import('../locale.js')
+      const locale = normalizeLocale(localeArg)
+      const isPage = itemArg.startsWith('pages/')
+      const isFragment = itemArg.startsWith('fragments/')
+      if (!isPage && !isFragment) {
+        console.error(`  Error: item must start with pages/ or fragments/ (got "${itemArg}")`)
+        process.exit(1)
+      }
+      const itemName = itemArg.replace(/^(pages|fragments)\//, '')
+      const baseName = isPage ? 'page' : 'fragment'
+      const dir = join(siteDir, itemArg)
+      const sourceFile = join(dir, `${baseName}.json`)
+      const destFile = join(dir, localeFilename(baseName, locale))
+      const fs = await import('node:fs/promises')
+      if (!existsSync(sourceFile)) {
+        console.error(`  Error: ${sourceFile} not found`)
+        process.exit(1)
+      }
+      if (existsSync(destFile)) {
+        console.error(`  Error: ${destFile} already exists`)
+        process.exit(1)
+      }
+      await fs.copyFile(sourceFile, destFile)
+      console.log(`  ${c.green('✓')} Created ${relative(process.cwd(), destFile)}`)
+      console.log(`  Edit the file to translate the content.`)
+      break
+    }
     case 'history':
     case 'undo':
     case 'rollback': {

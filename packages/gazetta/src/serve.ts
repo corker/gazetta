@@ -87,6 +87,17 @@ export function createServer(options: ServeOptions) {
           const html = await storage.readFile(path.slice(1))
           return [path, splitFragment(html)] as const
         } catch {
+          // Locale fragment not found — fall back to default locale
+          // e.g. /fragments/header/index.fr.html → /fragments/header/index.html
+          const localeFallback = path.replace(/\/index\.[a-z-]+\.html$/, '/index.html')
+          if (localeFallback !== path) {
+            try {
+              const html = await storage.readFile(localeFallback.slice(1))
+              return [path, splitFragment(html)] as const
+            } catch {
+              /* fallback also missing */
+            }
+          }
           return [path, { head: '', body: `<!-- fragment not found: ${path} -->` }] as const
         }
       }),
