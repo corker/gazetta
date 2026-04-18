@@ -22,11 +22,8 @@ const containerRef = ref<HTMLElement | null>(null)
 
 async function goToFragment() {
   const fragName = editing.fragmentLink
-  if (!fragName) return
-  // Build the destination hash from the fragmentLinkPath. If the user
-  // clicked @header/logo, the destination is /fragments/header/edit#component=logo.
-  // If they clicked @header, it's /fragments/header/edit#component=_root.
   const linkPath = editing.fragmentLinkPath
+  if (!fragName) return
   const childPath = linkPath && linkPath.includes('/') ? linkPath.split('/').slice(1).join('/') : null
   const hash = childPath
     ? fragmentLinkDestinationHash({ kind: 'fragmentLink', fragmentName: fragName, treePath: linkPath!, childPath })
@@ -38,7 +35,6 @@ async function goToFragment() {
   }
   editing.clear()
   await router.push({ path: `/fragments/${fragName}/edit`, hash })
-  // restoreFromHash in ComponentTree opens the right component after the tree builds.
 }
 
 // Show blast radius when the selected root item is a fragment, regardless
@@ -99,7 +95,7 @@ onKeyStroke('s', e => {
     <div v-else-if="editing.fragmentLink" class="editor-fragment-link" data-testid="editor-fragment-link">
       <i class="pi pi-share-alt" />
       <p>This is part of a shared fragment.</p>
-      <a class="fragment-go-link" data-testid="fragment-go-link" @click.stop="goToFragment">Edit @{{ editing.fragmentLink }}</a>
+      <a class="fragment-go-link" data-testid="fragment-go-link" @click.stop.prevent="goToFragment">Edit @{{ editing.fragmentLink }}</a>
     </div>
     <div v-else-if="!editing.path" class="editor-empty" data-testid="editor-empty">
       <i class="pi pi-pencil" style="font-size: 2rem; opacity: 0.3; margin-bottom: 0.5rem;" />
