@@ -34,14 +34,11 @@ async function goToFragment() {
     if (result === 'save') await editing.save()
   }
   editing.clear()
-  const hash = childPath ? `#component=${encodeURIComponent(childPath)}` : ''
-  await router.push(`/fragments/${fragName}/edit${hash}`)
-  if (childPath) {
-    // Child component — will be opened by restoreFromHash after tree builds
-  } else {
-    editing.openFragment(fragName)
-    editorHash.setHash(`@${fragName}`)
-  }
+  const hash = childPath ? `#component=${encodeURIComponent(childPath)}` : '#component=_root'
+  await router.push({ path: `/fragments/${fragName}/edit`, hash })
+  // restoreFromHash in ComponentTree opens the right component after the tree builds.
+  // If no childPath, it falls through to the inline-component branch which opens "logo" etc.
+  // If no hash at all, nothing is selected — user picks from the tree.
 }
 
 // Show blast radius when the selected root item is a fragment, regardless

@@ -52,10 +52,6 @@ export function createRouter() {
         if (result === 'save') await editing.save()
         editing.clear()
       }
-      // Clear component hash when switching pages (hash is page-specific)
-      if (leavingPage && to.hash) {
-        return { ...to, hash: '' }
-      }
     }
 
     // Hydrate selection from route params
