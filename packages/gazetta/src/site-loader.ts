@@ -3,7 +3,7 @@ import type { PageManifest, FragmentManifest, SiteManifest, StorageProvider } fr
 import { parseSiteManifest, parsePageManifest, parseFragmentManifest } from './manifest.js'
 import { mapLimit } from './concurrency.js'
 import { createContentRoot, type ContentRoot } from './content-root.js'
-import { localeFromFilename } from './locale.js'
+import { localeFromFilename, localeRoutePrefix, resolveSiteLocales } from './locale.js'
 
 /** Derive route from page folder name: home → /, about → /about, blog/[slug] → /blog/:slug */
 export function deriveRoute(pageName: string): string {
@@ -51,6 +51,7 @@ interface DiscoverPagesResult {
 async function discoverPages(
   storage: StorageProvider,
   pagesDir: string,
+  siteManifest: SiteManifest,
   result: DiscoverPagesResult = { pages: new Map(), pageLocales: new Map() },
   prefix = '',
 ): Promise<DiscoverPagesResult> {
@@ -85,7 +86,9 @@ async function discoverPages(
           if (!locale) continue
           try {
             const localeManifest = await parsePageManifest(storage, join(dir, f.name))
-            const localeRoute = `/${locale}${route === '/' ? '' : route}`
+            const siteLocales = resolveSiteLocales(siteManifest)
+            const routePrefix = siteLocales ? localeRoutePrefix(locale, siteLocales) : `/${locale}`
+            const localeRoute = `${routePrefix}${route === '/' ? '' : route}` || '/'
             locales.set(locale, { ...localeManifest, route: localeRoute, dir })
           } catch (err) {
             console.warn(`  Warning: skipping page "${name}" locale "${locale}": ${(err as Error).message}`)
@@ -100,7 +103,7 @@ async function discoverPages(
     }
 
     // Recurse into subdirectories to find nested pages (e.g., blog/[slug]).
-    await discoverPages(storage, dir, result, name)
+    await discoverPages(storage, dir, siteManifest, result, name)
   })
   return result
 }
@@ -213,7 +216,7 @@ export async function loadSite(opts: LoadSiteOptions): Promise<Site> {
     }
     manifest = await parseSiteManifest(contentRoot.storage, siteYamlPath)
   }
-  const { pages, pageLocales } = await discoverPages(contentRoot.storage, contentRoot.path('pages'))
+  const { pages, pageLocales } = await discoverPages(contentRoot.storage, contentRoot.path('pages'), manifest)
   const { fragments, fragmentLocales } = await discoverFragments(contentRoot.storage, contentRoot.path('fragments'))
 
   if (pages.size === 0) {
