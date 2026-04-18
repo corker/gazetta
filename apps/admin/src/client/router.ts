@@ -7,6 +7,7 @@ import { useEditingStore } from './stores/editing.js'
 import { useUiModeStore } from './stores/uiMode.js'
 import { useUnsavedGuardStore } from './stores/unsavedGuard.js'
 import { useActiveTargetStore } from './stores/activeTarget.js'
+import { useLocaleStore } from './stores/locale.js'
 
 export function createRouter() {
   const base = import.meta.env.BASE_URL || '/'
@@ -78,6 +79,11 @@ export function createRouter() {
       // No ?target= — reset to default
       activeTarget.resetToDefault()
     }
+
+    // Sync locale from URL query param
+    const localeStore = useLocaleStore()
+    const urlLocale = to.query.locale as string | undefined
+    localeStore.setLocale(urlLocale ?? null)
 
     // Hydrate selection from route params
     if (isEditorRoute) {
