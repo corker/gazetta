@@ -87,19 +87,19 @@ per language. No fallbacks, no per-field translation, no translation workflow.
 - Per-document (Strapi style): separate document per locale, linked by ID
 - Per-page tree (current): `pages/home/`, `pages/fr/home/` — simplest, no schema changes
 
-### Draft / published states
+### ~~Draft / published states~~ — NOT A GAP
 
-**What others do:** All 7 have draft/published separation. Save doesn't mean publish.
-Content authors preview drafts, then explicitly publish. Some have version history with
-rollback.
+**Why this isn't needed:** Gazetta's multi-target model already provides draft/publish
+separation. The local target IS the draft. Save writes to local, publish promotes to
+staging/production. Authors can have as many targets as they need — one for drafting,
+one for review, one for production.
 
-**Gazetta today:** Save writes to disk (the source of truth). Publish pushes to target.
-No draft state between them — saving is effectively "publishing to source."
+This is the stateless CMS paradigm: targets replace draft states. What other CMSes
+model as a per-document workflow (draft → review → published), Gazetta models as
+per-target promotion (local → staging → production). The author's local target is
+always a "draft" until they publish.
 
-**Design consideration:** Gazetta is stateless — adding draft state means either:
-- Git branches (TinaCMS approach — draft branch, merge = publish)
-- Draft storage in target (Sanity approach — draft alongside published)
-- Local-only drafts (in-memory until explicit save, current behavior is close)
+No additional feature needed.
 
 ### SEO metadata
 
