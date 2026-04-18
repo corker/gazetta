@@ -1,0 +1,314 @@
+---
+paths:
+  - "packages/gazetta/src/renderer.ts"
+  - "packages/gazetta/src/types.ts"
+  - "packages/gazetta/src/publish-rendered.ts"
+  - "packages/gazetta/src/sitemap.ts"
+  - "packages/gazetta/src/seo.ts"
+  - "packages/gazetta/src/manifest.ts"
+  - "apps/admin/src/client/stores/selection.ts"
+  - "apps/admin/src/client/components/ComponentTree.vue"
+  - "apps/admin/src/client/components/SiteTree.vue"
+  - "**/i18n*"
+  - "**/locale*"
+---
+
+# i18n Plan
+
+File-suffix localization: `page.json` (default locale), `page.fr.json` (French),
+`page.en-gb.json` (British English). Same pattern for fragments: `fragment.fr.json`.
+Zero template changes, zero schema changes. Opt-in via `locales` in site.yaml.
+
+**Status legend:** ☐ todo · ◐ in progress · ✓ done
+
+---
+
+## Design principles
+
+1. **File suffix, not folders.** Translations live next to the page they translate —
+   `page.json` and `page.fr.json` in the same directory. Co-location IS the link.
+   No translation keys, no junction tables, no ID linking.
+
+2. **Each locale file is a complete manifest.** French `page.fr.json` is a standalone
+   page with its own template, components, content, metadata, and route. Locales can
+   have different structure, different fragments, different component ordering.
+
+3. **Templates are locale-agnostic.** Templates receive `content.title` (a string),
+   not `content.title.fr` (a locale map). If a template needs "Read more" text, it's
+   a content field — not hardcoded. The template contract is unchanged.
+
+4. **Fallback chain.** `pt-BR` → `pt` → default locale. Configurable per locale in
+   site.yaml. Applies to both pages and fragments.
+
+5. **Opt-in.** No `locales` in site.yaml = no i18n. Existing sites work unchanged.
+   `page.json` is the only manifest. Adding `locales` enables the feature —
+   existing `page.json` files become the default locale automatically.
+
+6. **Subpath routing.** `/about` (default locale, no prefix), `/fr/about` (French).
+   Google's recommended approach. Default locale prefix is configurable.
+
+---
+
+## Configuration
+
+```yaml
+# site.yaml
+name: "My Site"
+locale: en                    # existing field — becomes the default locale
+locales:                      # new (optional) — enables i18n
+  supported: [en, fr, de, pt-BR]
+  fallbacks:                  # optional — locale-specific fallback chains
+    pt-BR: pt                 # pt-BR falls back to pt before default
+  defaultPrefix: false        # optional — default locale has no URL prefix (default: false)
+```
+
+When `locales` is absent, the site is single-locale. `locale: en` is used for
+`<html lang>` and sitemap, same as today.
+
+---
+
+## File structure
+
+```
+pages/about/
+  page.json          ← default locale (en)
+  page.fr.json       ← French
+  page.de.json       ← German
+  page.pt-br.json    ← Brazilian Portuguese (lowercase in filename)
+  hero/              ← inline components (shared across locales via manifest)
+
+fragments/header/
+  fragment.json      ← default locale
+  fragment.fr.json   ← French header
+  logo/
+  nav/
+```
+
+**Naming convention:** Locale codes lowercase in filenames: `page.fr.json`,
+`page.en-gb.json`. The parser normalizes before lookup. BCP 47 codes are
+case-insensitive but file systems may not be.
+
+**Rule:** `page.json` is the default locale. `page.en.json` is NOT allowed when
+`en` is the default — it would be ambiguous. `gazetta validate` catches this.
+
+---
+
+## Route generation
+
+| File | Route |
+|------|-------|
+| `pages/about/page.json` | `/about` |
+| `pages/about/page.fr.json` | `/fr/about` |
+| `pages/about/page.de.json` | `/de/about` |
+| `pages/about/page.pt-br.json` | `/pt-br/about` |
+
+Default locale has no prefix (configurable via `defaultPrefix: true`).
+
+Dynamic routes: `pages/blog/[slug]/page.json` → `/blog/:slug`,
+`page.fr.json` → `/fr/blog/:slug`. Same slug across locales (simplest).
+Locale-specific slugs are a future enhancement (via `slug` field in manifest).
+
+---
+
+## Fragment locale resolution
+
+When the renderer resolves `@header` for a French page:
+
+1. Look for `fragment.fr.json` in `fragments/header/`
+2. If not found, check fallback chain: `fragment.pt.json` for `pt-BR`
+3. If no fallback, use `fragment.json` (default locale)
+
+This applies at both render time (dev server, publish) and request time
+(edge composition for static targets).
+
+### Static targets (pre-rendered)
+
+Publishing `@header` produces one rendered HTML per locale:
+- `fragments/header/rendered.html` (default)
+- `fragments/header/rendered.fr.html` (French)
+- `fragments/header/rendered.de.html` (German)
+
+The edge runtime knows the page's locale from the URL prefix. When
+assembling a French page, it fetches `rendered.fr.html` for `@header`,
+falling back to `rendered.html` if the French version doesn't exist.
+
+### Dynamic targets (SSR)
+
+The runtime SSRs the fragment using the locale-specific manifest
+(`fragment.fr.json`), falling back through the chain.
+
+---
+
+## SEO: hreflang
+
+The renderer injects hreflang `<link>` tags into `<head>` for pages that
+exist in 2+ locales:
+
+```html
+<link rel="alternate" hreflang="en" href="https://example.com/about" />
+<link rel="alternate" hreflang="fr" href="https://example.com/fr/about" />
+<link rel="alternate" hreflang="x-default" href="https://example.com/about" />
+```
+
+- Only emitted when sibling `page.*.json` files exist (2+ locales)
+- `x-default` points to the default locale page
+- Locale variants with `metadata.robots: "noindex"` are excluded from hreflang
+- Single-locale pages get no hreflang tags
+
+Discovery: the renderer scans the page directory for `page.*.json` siblings
+at publish time. The resolved alternates are stored in sidecars for the
+edge runtime.
+
+---
+
+## Sitemap
+
+One `sitemap.xml` per target containing all locales. Each locale URL gets
+its own `<url>` entry with bidirectional hreflang cross-links:
+
+```xml
+<url>
+  <loc>https://example.com/about</loc>
+  <lastmod>2026-04-18</lastmod>
+  <xhtml:link rel="alternate" hreflang="en" href="https://example.com/about"/>
+  <xhtml:link rel="alternate" hreflang="fr" href="https://example.com/fr/about"/>
+  <xhtml:link rel="alternate" hreflang="x-default" href="https://example.com/about"/>
+</url>
+<url>
+  <loc>https://example.com/fr/about</loc>
+  <lastmod>2026-04-19</lastmod>
+  <xhtml:link rel="alternate" hreflang="en" href="https://example.com/about"/>
+  <xhtml:link rel="alternate" hreflang="fr" href="https://example.com/fr/about"/>
+  <xhtml:link rel="alternate" hreflang="x-default" href="https://example.com/about"/>
+</url>
+```
+
+Rules:
+- Only emit hreflang when a page exists in 2+ locales
+- Exclude noindex variants from hreflang groups
+- Each locale has its own `<lastmod>` from its sidecar
+- `x-default` points to the default locale
+
+Robots.txt: no locale-specific changes. Sitemap line already points to
+`sitemap.xml` which contains all locales.
+
+---
+
+## Admin UI
+
+### Page list (SiteTree)
+
+Pages shown once with locale badges: `about [EN] [FR]`. Not shown as
+separate entries per locale. Badge indicates which translations exist.
+
+Filter: "show pages missing French translation" — surfaces translation gaps.
+
+### Editor
+
+Locale picker in the editor toolbar — switches between `page.json` and
+`page.fr.json` for the same page. Same editor form, different content.
+
+URL encoding: `?locale=fr` query param alongside `?target=` and `#hash`.
+Example: `/pages/about/edit?locale=fr#hero`
+
+Switching locale reloads the component tree from the locale-specific
+manifest. Components, ordering, and content can differ per locale.
+
+### "Translate" action
+
+"Translate to French" on the about page:
+1. Copies `page.json` to `page.fr.json` (same template, same components)
+2. Opens the French version in the editor
+3. Author edits the French content
+
+Only creates the page locale file. Fragments are NOT auto-translated —
+they fall back to the default locale independently.
+
+### Preview
+
+Preview renders the active locale. Route: `/preview/fr/about`.
+The dev server resolves fragments using the same locale fallback chain.
+
+### Fragment blast radius
+
+"used on 5 pages" counts distinct pages, not locale variants.
+
+---
+
+## Compare and publish
+
+Each locale file is an independent publish item:
+- `pages/about/page.json` → published as the English "about" page
+- `pages/about/page.fr.json` → published as the French "about" page
+
+Compare shows locale-specific changes: "about (fr) is ahead of staging."
+
+Publishing a subset of locales is supported — author can publish only the
+3 pages that have French translations without touching the others.
+
+---
+
+## Edge cases
+
+| Case | Resolution |
+|------|------------|
+| `page.json` + `page.en.json` when default is `en` | Validation error — `page.json` IS the default |
+| Page exists in `fr` only (no default) | Valid — French-only pages are allowed |
+| Fragment has no locale file for the page's locale | Falls back through chain → default |
+| French page references different fragment than English | Works — each locale manifest is independent |
+| Dynamic route `:slug` shared across locales | Same slug, locale prefix only: `/fr/blog/hello-world` |
+| Template has hardcoded text | Templates should be content-driven — "Read more" is a content field |
+| Site name localization | Site name stays global. Use a content field if locale-specific needed |
+| `pt-BR` fallback to `pt` | Configured in site.yaml `locales.fallbacks` |
+| noindex on one locale but not another | Excluded from hreflang group; only visible locale gets hreflang |
+| Sitemap with 500 pages × 20 locales | Single sitemap for now; add index splitting when needed |
+| Locale-specific slugs (/fr/blog/bonjour) | Future — `slug` field in manifest. Same directory slug for now |
+
+---
+
+## What does NOT change
+
+- **Templates** — receive `content.title` (string), not locale maps
+- **Zod schemas** — `z.object({ title: z.string() })` unchanged
+- **The editor form** — @rjsf renders from schema, no locale awareness needed
+- **The save pipeline** — writes to `page.fr.json` same as `page.json`
+- **The storage providers** — files are files
+- **The target model** — targets are environments, not locales
+
+---
+
+## Implementation sequence
+
+| Step | Scope | Effort |
+|------|-------|--------|
+| 1 | `locales` config in site.yaml + type | Small |
+| 2 | Page discovery: scan `page.*.json` siblings | Small |
+| 3 | Fragment discovery: scan `fragment.*.json` | Small |
+| 4 | Route generation with locale prefix | Medium |
+| 5 | Renderer: locale param, fragment locale resolution | Medium |
+| 6 | Renderer: hreflang injection | Medium |
+| 7 | Sitemap: hreflang cross-links | Medium |
+| 8 | Publish: per-locale fragment rendering | Medium |
+| 9 | Edge runtime: locale-aware fragment fetch | Medium |
+| 10 | Admin: locale badges on pages | Small |
+| 11 | Admin: locale picker in editor | Medium |
+| 12 | Admin: "Translate to..." action | Small |
+| 13 | Admin: `?locale=` in URL | Small |
+| 14 | CLI: `gazetta translate about --to fr` | Small |
+| 15 | `gazetta validate`: locale file validation | Small |
+
+---
+
+## Research sources
+
+- [Google: localized versions (hreflang)](https://developers.google.com/search/docs/specialty/international/localized-versions)
+- [Google: managing multi-regional sites](https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites)
+- [Hugo multilingual mode](https://gohugo.io/content-management/multilingual/)
+- [Astro i18n routing](https://docs.astro.build/en/guides/internationalization/)
+- [Decap CMS i18n](https://decapcms.org/docs/i18n/)
+- [Sanity localization](https://www.sanity.io/docs/studio/localization)
+- [Contentful locales](https://www.contentful.com/developers/docs/tutorials/general/setting-locales/)
+- [Storyblok i18n](https://www.storyblok.com/docs/concepts/internationalization)
+- [Strapi 5 i18n](https://strapi.io/blog/strapi-5-i18n-complete-guide)
+- [Payload CMS localization](https://payloadcms.com/docs/configuration/localization)
+- [BCP 47 language tags](https://www.rfc-editor.org/info/bcp47)
