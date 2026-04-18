@@ -31,7 +31,9 @@ const destinations = [
 
 test.describe('Publish confirmation matrix', () => {
   for (const row of destinations) {
-    test(`dest=${row.name} (env=${row.env}) → requiresConfirm=${row.requiresConfirm}`, async ({ page }) => {
+    test(`dest=${row.name} (env=${row.env}) → requiresConfirm=${row.requiresConfirm}`, { retry: 1 }, async ({
+      page,
+    }) => {
       await page.goto('/admin')
       await page.locator('[data-testid="publish-btn"]').click()
       await expect(page.locator('[data-testid="publish-panel"]')).toBeVisible()

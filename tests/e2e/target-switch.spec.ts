@@ -144,3 +144,52 @@ test.describe('Target switch with unsaved edits', () => {
     await expect(titleField).toHaveValue(original + ' — dirty')
   })
 })
+
+test.describe('Target in URL', () => {
+  test('default target has no ?target= in URL', async ({ page }) => {
+    await page.goto('/admin/pages/home')
+    await page.waitForSelector('[data-testid="active-target-indicator"]', { timeout: 10000 })
+    // Default target (local) — URL should be clean, no ?target=
+    const url = page.url()
+    expect(url).not.toContain('?target=')
+  })
+
+  test('switching to non-default target adds ?target= to URL', async ({ page, testSite }) => {
+    // Seed staging so the target has content
+    const res = await fetch(`${testSite.baseURL}/admin/api/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: ['pages/home'], targets: ['staging'] }),
+    })
+    if (!res.ok) throw new Error(`seed failed: ${res.status}`)
+
+    await page.goto('/admin/pages/home')
+    await page.waitForSelector('[data-testid="active-target-indicator"]', { timeout: 10000 })
+
+    // Click the target indicator to open the menu
+    await page.click('[data-testid="active-target-indicator"]')
+    await page.waitForSelector('.p-menu', { timeout: 5000 })
+    // Click staging in the menu — use role to find the menu item
+    const stagingItem = page.locator('.p-menu').locator('[role="menuitem"]').filter({ hasText: 'staging' }).first()
+    await stagingItem.click()
+
+    // Wait for target switch and URL update
+    await expect(page.locator('[data-testid="active-target-indicator"]')).toContainText('staging', { timeout: 5000 })
+    await expect(page).toHaveURL(/target=staging/, { timeout: 5000 })
+    await expect(page.locator('[data-testid="active-target-indicator"]')).toContainText('staging')
+  })
+
+  test('?target= in URL switches active target on page load', async ({ page, testSite }) => {
+    // Seed staging
+    const res = await fetch(`${testSite.baseURL}/admin/api/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: ['pages/home'], targets: ['staging'] }),
+    })
+    if (!res.ok) throw new Error(`seed failed: ${res.status}`)
+
+    await page.goto('/admin/pages/home?target=staging')
+    await page.waitForSelector('[data-testid="active-target-indicator"]', { timeout: 10000 })
+    await expect(page.locator('[data-testid="active-target-indicator"]')).toContainText('staging')
+  })
+})

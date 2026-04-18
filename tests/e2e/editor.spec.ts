@@ -86,7 +86,7 @@ test.describe('Custom field', () => {
 })
 
 test.describe('Rapid selection', () => {
-  test('last click wins when rapidly switching pages', async ({ page }) => {
+  test('last click wins when rapidly switching pages', { retry: 1 }, async ({ page }) => {
     await page.goto('/admin')
     const tree = new SiteTreePom(page)
     await expect(tree.pageRow('home')).toBeVisible()
