@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { onKeyStroke } from '@vueuse/core'
 import { useEditingStore } from '../stores/editing.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useThemeStore } from '../stores/theme.js'
+import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 import { useEditorMount } from '../composables/useEditorMount.js'
 import { createEditorMount } from 'gazetta/editor'
 import type { EditorMount } from 'gazetta/types'
@@ -13,7 +15,22 @@ import PageMetadataEditor from './PageMetadataEditor.vue'
 const editing = useEditingStore()
 const selection = useSelectionStore()
 const theme = useThemeStore()
+const unsavedGuard = useUnsavedGuardStore()
+const router = useRouter()
 const containerRef = ref<HTMLElement | null>(null)
+
+async function goToFragment() {
+  const fragName = editing.fragmentLink
+  if (!fragName) return
+  if (editing.hasPendingEdits) {
+    const result = await unsavedGuard.guard()
+    if (result === 'cancel') return
+    if (result === 'save') await editing.save()
+  }
+  editing.clear()
+  await router.push(`/fragments/${fragName}/edit`)
+  editing.openFragment(fragName)
+}
 
 // Show blast radius when the selected root item is a fragment, regardless
 // of which sub-component is currently in the editor. The badge is about
@@ -70,6 +87,11 @@ onKeyStroke('s', e => {
       <i class="pi pi-exclamation-triangle" />
       <p>{{ editing.loadError }}</p>
     </div>
+    <div v-else-if="editing.fragmentLink" class="editor-fragment-link" data-testid="editor-fragment-link">
+      <i class="pi pi-share-alt" />
+      <p>This is part of a shared fragment.</p>
+      <a class="fragment-go-link" @click="goToFragment">Edit @{{ editing.fragmentLink }}</a>
+    </div>
     <div v-else-if="!editing.path" class="editor-empty" data-testid="editor-empty">
       <i class="pi pi-pencil" style="font-size: 2rem; opacity: 0.3; margin-bottom: 0.5rem;" />
       <p>Select a component to edit</p>
@@ -93,6 +115,10 @@ onKeyStroke('s', e => {
 .editor-error .pi { font-size: 2rem; }
 .editor-error p { max-width: 300px; line-height: 1.5; }
 .editor-empty { color: var(--color-muted); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; }
+.editor-fragment-link { color: var(--color-muted); font-size: 0.875rem; display: flex; flex-direction: column; align-items: center; padding-top: 3rem; gap: 0.5rem; }
+.editor-fragment-link .pi { font-size: 2rem; opacity: 0.3; }
+.fragment-go-link { color: var(--color-primary); cursor: pointer; font-weight: 500; }
+.fragment-go-link:hover { text-decoration: underline; }
 .editor-container { font-size: 0.875rem; }
 .editor-no-schema { color: var(--color-muted); font-size: 0.875rem; }
 </style>

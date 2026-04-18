@@ -40,6 +40,8 @@ export const useEditingStore = defineStore('editing', () => {
   const loadError = ref<string | null>(null)
   const mountVersion = ref(0)
   const customEditorMount = ref<EditorMount | null>(null)
+  /** Set when the user clicks a fragment or its child from page context */
+  const fragmentLink = ref<string | null>(null)
   let retryTimer: ReturnType<typeof setInterval> | null = null
   const pendingEdits = reactive<Map<string, StashedEdit>>(new Map())
 
@@ -86,9 +88,24 @@ export const useEditingStore = defineStore('editing', () => {
     return { schema, hasEditor: !!hasEditor, editorUrl, fieldsBaseUrl }
   }
 
+  /**
+   * Show a "go to fragment" link instead of the editor.
+   * Accepts a fragment name or a treePath like `@header/logo`.
+   */
+  function showFragmentLink(nameOrPath: string) {
+    stashCurrent()
+    clearRetry()
+    loadError.value = null
+    target.value = null
+    content.value = null
+    saved.value = null
+    fragmentLink.value = nameOrPath.startsWith('@') ? nameOrPath.split('/')[0].slice(1) : nameOrPath
+  }
+
   async function open(t: EditingTarget, editedContent?: Record<string, unknown>) {
     clearRetry()
     loadError.value = null
+    fragmentLink.value = null
     target.value = t
     content.value = editedContent ? deepClone(editedContent) : deepClone(t.content)
     saved.value = deepClone(t.content)
@@ -285,6 +302,7 @@ export const useEditingStore = defineStore('editing', () => {
   function clear() {
     clearRetry()
     loadError.value = null
+    fragmentLink.value = null
     target.value = null
     content.value = null
     saved.value = null
@@ -419,10 +437,12 @@ export const useEditingStore = defineStore('editing', () => {
     pendingCount,
     hasPendingEdits,
     allOverrides,
+    fragmentLink,
     open,
     openComponent,
     openPageRoot,
     openFragment,
+    showFragmentLink,
     clear,
     markDirty,
     discard,

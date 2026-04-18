@@ -194,6 +194,136 @@ describe('ComponentTree', () => {
     expect(w.find('[data-testid="component-logo"]').exists()).toBe(true)
   })
 
+  it('clicking a fragment root in page context calls showFragmentLink', async () => {
+    const getFragment = vi.fn(
+      async (): Promise<FragmentDetail> => ({
+        name: 'header',
+        template: 'header-layout',
+        dir: 'fragments/header',
+        components: [{ name: 'logo', template: 'logo' }],
+      }),
+    )
+    setPageSelection({
+      name: 'home',
+      route: '/',
+      template: 'page-default',
+      dir: 'pages/home',
+      components: ['@header'],
+    })
+    const editing = useEditingStore()
+    const spy = vi.spyOn(editing, 'showFragmentLink')
+    const w = mountTree(fakeFragmentsApi({ getFragment }))
+    await flushMicrotasks()
+    await w.find('[data-testid="component-header"]').trigger('click')
+    expect(spy).toHaveBeenCalledWith('header')
+    expect(editing.fragmentLink).toBe('header')
+  })
+
+  it('clicking a fragment child in page context calls showFragmentLink with treePath', async () => {
+    const getFragment = vi.fn(
+      async (): Promise<FragmentDetail> => ({
+        name: 'header',
+        template: 'header-layout',
+        dir: 'fragments/header',
+        components: [{ name: 'logo', template: 'logo' }],
+      }),
+    )
+    setPageSelection({
+      name: 'home',
+      route: '/',
+      template: 'page-default',
+      dir: 'pages/home',
+      components: ['@header'],
+    })
+    const editing = useEditingStore()
+    const spy = vi.spyOn(editing, 'showFragmentLink')
+    const w = mountTree(fakeFragmentsApi({ getFragment }))
+    await flushMicrotasks()
+    await w.find('[data-testid="component-logo"]').trigger('click')
+    expect(spy).toHaveBeenCalledWith('@header/logo')
+    expect(editing.fragmentLink).toBe('header')
+  })
+
+  it('clicking a fragment root in fragment context calls openFragment', async () => {
+    const getFragment = vi.fn(
+      async (): Promise<FragmentDetail> => ({
+        name: 'nav',
+        template: 'nav',
+        dir: 'fragments/nav',
+        components: [],
+      }),
+    )
+    setFragmentSelection({
+      name: 'header',
+      template: 'header-layout',
+      dir: 'fragments/header',
+      components: ['@nav'],
+    })
+    const editing = useEditingStore()
+    const spy = vi.spyOn(editing, 'openFragment')
+    const w = mountTree(fakeFragmentsApi({ getFragment }))
+    await flushMicrotasks()
+    await w.find('[data-testid="component-nav"]').trigger('click')
+    expect(spy).toHaveBeenCalledWith('nav')
+  })
+
+  it('showFragmentLink stashes dirty edits before clearing', () => {
+    const editing = useEditingStore()
+    // Simulate a dirty editor state
+    editing.$patch({
+      target: { path: 'hero', template: 'hero', content: { title: 'old' }, save: async () => {} },
+      content: { title: 'changed' },
+      saved: { title: 'old' },
+    })
+    expect(editing.dirty).toBe(true)
+    editing.showFragmentLink('footer')
+    // Dirty edits should be stashed in pendingEdits
+    expect(editing.pendingEdits.has('hero')).toBe(true)
+    expect(editing.pendingEdits.get('hero')!.editedContent).toEqual({ title: 'changed' })
+    // Editor should be cleared
+    expect(editing.target).toBeNull()
+    expect(editing.fragmentLink).toBe('footer')
+  })
+
+  it('showFragmentLink extracts fragment name from treePath', () => {
+    const editing = useEditingStore()
+    editing.showFragmentLink('@header/logo')
+    expect(editing.fragmentLink).toBe('header')
+  })
+
+  it('clears selectedNodeKey when tree rebuilds for new selection', async () => {
+    const getFragment = vi.fn(
+      async (): Promise<FragmentDetail> => ({
+        name: 'header',
+        template: 'header-layout',
+        dir: 'fragments/header',
+        components: [{ name: 'logo', template: 'logo' }],
+      }),
+    )
+    setPageSelection({
+      name: 'home',
+      route: '/',
+      template: 'page-default',
+      dir: 'pages/home',
+      components: ['@header'],
+    })
+    const w = mountTree(fakeFragmentsApi({ getFragment }))
+    await flushMicrotasks()
+    // Click logo to select it
+    await w.find('[data-testid="component-logo"]').trigger('click')
+    expect(w.find('[data-testid="component-logo"].selected').exists()).toBe(true)
+    // Switch to fragment selection — tree rebuilds
+    setFragmentSelection({
+      name: 'header',
+      template: 'header-layout',
+      dir: 'fragments/header',
+      components: [{ name: 'logo', template: 'logo' }],
+    })
+    await flushMicrotasks()
+    // No node should be selected after rebuild
+    expect(w.find('.selected').exists()).toBe(false)
+  })
+
   it('reuses the FragmentsApi for nested fragment references', async () => {
     const getFragment = vi.fn(async (name: string): Promise<FragmentDetail> => {
       if (name === 'header') {
