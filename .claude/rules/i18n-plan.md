@@ -54,12 +54,16 @@ Zero template changes, zero schema changes. Opt-in via `locales` in site.yaml.
 ```yaml
 # site.yaml
 name: "My Site"
-locale: en                    # existing field — becomes the site-level default locale
+locale: en                    # optional — default locale (falls back to first in supported)
 locales:                      # new (optional) — enables i18n
   supported: [en, fr, de, pt-BR]
   fallbacks:                  # optional — locale-specific fallback chains
     pt-BR: pt                 # pt-BR falls back to pt before default
 ```
+
+`locale` is optional. When omitted, the first entry in `locales.supported`
+is the default. `locale: en` and `locales.supported: [en, fr]` are
+equivalent to just `locales.supported: [en, fr]`.
 
 When `locales` is absent, the site is single-locale. `locale: en` is used for
 `<html lang>` and sitemap, same as today. Adding `locales.supported` is the
