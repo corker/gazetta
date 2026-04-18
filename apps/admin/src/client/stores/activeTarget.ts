@@ -6,21 +6,13 @@
  * be editable (author can save) or read-only (author can inspect). Switching
  * is cheap and reversible — never a commitment.
  *
- * Today this store is a pure in-browser model: API calls still go through
- * the single admin app (which is already bound to the default editable
- * target server-side). Later, API calls can pass ?target=<name> once the
- * admin API routes support per-target reads; this store is the client-side
- * source of truth for "which target is the author focused on right now."
- *
- * Persistence: activeTargetName is saved to localStorage so the author's
- * choice survives reloads.
+ * Persistence: the URL query param `?target=<name>` is the source of truth.
+ * The router guard syncs the URL → store on every navigation. No localStorage.
  */
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api, type TargetInfo } from '../api/client.js'
-
-const STORAGE_KEY = 'gazetta_active_target'
 
 /**
  * How the store obtains its list of targets. Injected so tests (and any
@@ -29,40 +21,9 @@ const STORAGE_KEY = 'gazetta_active_target'
  */
 export type LoadTargets = () => Promise<TargetInfo[]>
 
-/**
- * How the store persists the active target across reloads. Injected so
- * tests (and non-browser environments) can stub without touching globals.
- */
-export interface ActiveTargetPersistence {
-  get(): string | null
-  set(name: string): void
-}
-
-/** Default persistence backed by window.localStorage. No-op outside a browser. */
-const defaultPersistence: ActiveTargetPersistence = {
-  get() {
-    if (typeof window === 'undefined') return null
-    try {
-      return window.localStorage.getItem(STORAGE_KEY)
-    } catch {
-      return null
-    }
-  },
-  set(name: string) {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(STORAGE_KEY, name)
-    } catch {
-      /* private mode */
-    }
-  },
-}
-
 export interface ActiveTargetStoreOptions {
   /** Override how the store loads its target list. Defaults to `api.getTargets()`. */
   loadTargets?: LoadTargets
-  /** Override persistence of the active target name. Defaults to localStorage. */
-  persistence?: ActiveTargetPersistence
 }
 
 /**
@@ -79,12 +40,10 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
   // Injected dependencies. Default to production wiring; tests (and any
   // future alternative backend) call configure() before load().
   let loadTargetsFn: LoadTargets = () => api.getTargets()
-  let persistence: ActiveTargetPersistence = defaultPersistence
 
-  /** Override the loader and/or persistence — call before load(). */
+  /** Override the loader — call before load(). */
   function configure(opts: ActiveTargetStoreOptions) {
     if (opts.loadTargets) loadTargetsFn = opts.loadTargets
-    if (opts.persistence) persistence = opts.persistence
   }
 
   /** The full TargetInfo for the active target, or null if not loaded / not found. */
@@ -120,13 +79,8 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
       const list = await loadTargetsFn()
       targets.value = list
 
-      // Prefer a persisted choice if it's still valid; otherwise pick default.
-      const saved = persistence.get()
-      if (saved && list.some(t => t.name === saved)) {
-        activeTargetName.value = saved
-      } else {
-        activeTargetName.value = pickDefault(list)
-      }
+      // Pick default — the router guard will override with ?target= if present.
+      activeTargetName.value = pickDefault(list)
     } catch (err) {
       error.value = (err as Error).message
       targets.value = []
@@ -136,13 +90,12 @@ export const useActiveTargetStore = defineStore('activeTarget', () => {
     }
   }
 
-  /** Change the active target. Persists the choice via the configured persistence. */
+  /** Change the active target. Called by the router guard when ?target= changes. */
   function setActiveTarget(name: string) {
     if (!targets.value.some(t => t.name === name)) {
       throw new Error(`Unknown target: ${name}`)
     }
     activeTargetName.value = name
-    persistence.set(name)
   }
 
   /** Clear the store (e.g., on logout or site switch). */
