@@ -2,12 +2,17 @@ import type { ResolvedComponent, ComponentEntry, InlineComponent } from './types
 import { loadTemplate } from './template-loader.js'
 import { processContent } from './content.js'
 import type { Site } from './site-loader.js'
+import { resolveLocaleFallback, resolveSiteLocales, type ResolvedLocales } from './locale.js'
 
 interface ResolveContext {
   site: Site
   templatesDir: string
   visited: Set<string>
   path: string[]
+  /** When set, fragment references resolve the locale-specific variant first. */
+  locale?: string
+  /** Resolved site locales — cached for fallback resolution. */
+  resolvedLocales?: ResolvedLocales
 }
 
 export async function resolveComponent(entry: ComponentEntry, ctx: ResolveContext): Promise<ResolvedComponent> {
@@ -33,7 +38,17 @@ async function resolveFragmentRef(fragmentName: string, ctx: ResolveContext): Pr
   ctx.visited.add(key)
   ctx.path.push(key)
 
-  const fragment = ctx.site.fragments.get(fragmentName)
+  // Resolve locale-specific fragment variant, falling back through the chain
+  let fragment = ctx.site.fragments.get(fragmentName) ?? null
+  if (ctx.locale && ctx.resolvedLocales) {
+    const localeEntry = ctx.site.fragmentLocales.get(fragmentName)
+    if (localeEntry) {
+      const available = new Set(localeEntry.locales.keys())
+      const bestLocale = resolveLocaleFallback(ctx.locale, available, ctx.resolvedLocales)
+      const localeVariant = localeEntry.locales.get(bestLocale)
+      if (localeVariant) fragment = localeVariant
+    }
+  }
   if (!fragment) {
     const available = [...ctx.site.fragments.keys()]
     ctx.path.pop()
@@ -89,8 +104,19 @@ async function resolveInlineComponent(comp: InlineComponent, ctx: ResolveContext
   return { template: loaded.render, content: processContent(comp.content, loaded.schema), children, treePath }
 }
 
-export async function resolveFragment(fragmentName: string, site: Site): Promise<ResolvedComponent> {
-  const fragment = site.fragments.get(fragmentName)
+export async function resolveFragment(fragmentName: string, site: Site, locale?: string): Promise<ResolvedComponent> {
+  // Resolve locale-specific fragment variant
+  let fragment = site.fragments.get(fragmentName) ?? null
+  const resolvedLocales = locale ? (resolveSiteLocales(site.manifest) ?? undefined) : undefined
+  if (locale && resolvedLocales) {
+    const localeEntry = site.fragmentLocales.get(fragmentName)
+    if (localeEntry) {
+      const available = new Set(localeEntry.locales.keys())
+      const bestLocale = resolveLocaleFallback(locale, available, resolvedLocales)
+      const localeVariant = localeEntry.locales.get(bestLocale)
+      if (localeVariant) fragment = localeVariant
+    }
+  }
   if (!fragment) {
     const available = [...site.fragments.keys()]
     throw new Error(
@@ -100,7 +126,14 @@ export async function resolveFragment(fragmentName: string, site: Site): Promise
   }
 
   const templatesDir = site.templatesDir
-  const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: ['', `@${fragmentName}`] }
+  const ctx: ResolveContext = {
+    site,
+    templatesDir,
+    visited: new Set(),
+    path: ['', `@${fragmentName}`],
+    locale,
+    resolvedLocales,
+  }
 
   const loaded = await loadTemplate(site.storage, templatesDir, fragment.template)
   const children: ResolvedComponent[] = []
@@ -119,7 +152,7 @@ export async function resolveFragment(fragmentName: string, site: Site): Promise
   }
 }
 
-export async function resolvePage(pageName: string, site: Site): Promise<ResolvedComponent> {
+export async function resolvePage(pageName: string, site: Site, locale?: string): Promise<ResolvedComponent> {
   const page = site.pages.get(pageName)
   if (!page) {
     const available = [...site.pages.keys()]
@@ -130,7 +163,8 @@ export async function resolvePage(pageName: string, site: Site): Promise<Resolve
   }
 
   const templatesDir = site.templatesDir
-  const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: [pageName] }
+  const resolvedLocales = locale ? (resolveSiteLocales(site.manifest) ?? undefined) : undefined
+  const ctx: ResolveContext = { site, templatesDir, visited: new Set(), path: [pageName], locale, resolvedLocales }
 
   const loaded = await loadTemplate(site.storage, templatesDir, page.template)
   const children: ResolvedComponent[] = []
