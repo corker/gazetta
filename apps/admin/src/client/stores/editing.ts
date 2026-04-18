@@ -3,7 +3,7 @@ function deepClone<T>(obj: T): T {
 }
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useToastStore } from './toast.js'
 import { usePreviewStore } from './preview.js'
 import { useSelectionStore } from './selection.js'
@@ -12,48 +12,26 @@ import { useActiveTargetStore } from './activeTarget.js'
 import { useSiteStore } from './site.js'
 import { useEditorStashStore } from './editorStash.js'
 import { useEditorPersistenceStore } from './editorPersistence.js'
+import { useEditorContentStore } from './editorContent.js'
 import { api } from '../api/client.js'
-import type { EditorMount } from 'gazetta/types'
 
-export interface EditingTarget {
-  template: string
-  path: string
-  content: Record<string, unknown>
-  schema: Record<string, unknown>
-  hasEditor?: boolean
-  editorUrl?: string
-  fieldsBaseUrl?: string
-  save: (content: Record<string, unknown>) => Promise<void>
-}
+export type { EditingTarget } from './editorContent.js'
 
 export const useEditingStore = defineStore('editing', () => {
   const toast = useToastStore()
   const stash = useEditorStashStore()
   const persistence = useEditorPersistenceStore()
+  const ec = useEditorContentStore()
 
-  const target = ref<EditingTarget | null>(null)
-  const content = ref<Record<string, unknown> | null>(null)
-  const saved = ref<Record<string, unknown> | null>(null)
-  const loadError = ref<string | null>(null)
-  const mountVersion = ref(0)
-  const customEditorMount = ref<EditorMount | null>(null)
-  /** Set when the user clicks a fragment or its child from page context */
-  const fragmentLink = ref<string | null>(null)
   let retryTimer: ReturnType<typeof setInterval> | null = null
 
-  const template = computed(() => target.value?.template ?? null)
-  const path = computed(() => target.value?.path ?? null)
-  const schema = computed(() => target.value?.schema ?? null)
-  const dirty = computed(() => {
-    if (!content.value || !saved.value) return false
-    return JSON.stringify(content.value) !== JSON.stringify(saved.value)
-  })
-  const pendingCount = computed(() => stash.size + (dirty.value ? 1 : 0))
+  // Derived state that combines content + stash stores
+  const pendingCount = computed(() => stash.size + (ec.dirty ? 1 : 0))
   const hasPendingEdits = computed(() => pendingCount.value > 0)
   const allOverrides = computed(() => {
     const result: Record<string, Record<string, unknown>> = {}
     for (const entry of stash.entries) result[entry[0]] = entry[1].editedContent
-    if (path.value && content.value && dirty.value) result[path.value] = content.value
+    if (ec.path && ec.content && ec.dirty) result[ec.path] = ec.content
     return result
   })
 
@@ -69,8 +47,8 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   function stashCurrent() {
-    if (dirty.value && target.value && content.value) {
-      stash.stash(target.value.path, target.value, deepClone(content.value))
+    if (ec.dirty && ec.target && ec.content) {
+      stash.stash(ec.target.path, ec.target, deepClone(ec.content))
     }
   }
 
@@ -84,41 +62,17 @@ export const useEditingStore = defineStore('editing', () => {
     return { schema, hasEditor: !!hasEditor, editorUrl, fieldsBaseUrl }
   }
 
-  /**
-   * Show a "go to fragment" link instead of the editor.
-   * Accepts a fragment name or a treePath like `@header/logo`.
-   */
   function showFragmentLink(nameOrPath: string) {
     stashCurrent()
     clearRetry()
-    loadError.value = null
-    target.value = null
-    content.value = null
-    saved.value = null
-    fragmentLink.value = nameOrPath.startsWith('@') ? nameOrPath.split('/')[0].slice(1) : nameOrPath
+    ec.showFragmentLink(nameOrPath)
   }
 
-  async function open(t: EditingTarget, editedContent?: Record<string, unknown>) {
+  async function open(t: Parameters<typeof ec.open>[0], editedContent?: Parameters<typeof ec.open>[1]) {
     clearRetry()
-    loadError.value = null
-    fragmentLink.value = null
-    target.value = t
-    content.value = editedContent ? deepClone(editedContent) : deepClone(t.content)
-    saved.value = deepClone(t.content)
     persistence.saving = false
     persistence.lastSaveError = null
-    customEditorMount.value = null
-
-    if (t.hasEditor && t.editorUrl) {
-      try {
-        const mod = await import(/* @vite-ignore */ t.editorUrl)
-        customEditorMount.value = (mod.default ?? mod) as EditorMount
-      } catch (err) {
-        console.warn(`Custom editor for "${t.template}" failed to load:`, err)
-      }
-    }
-
-    mountVersion.value++
+    await ec.open(t, editedContent)
     usePreviewStore().invalidateDraft()
   }
 
@@ -129,7 +83,6 @@ export const useEditingStore = defineStore('editing', () => {
       const detail = sel.detail
       if (!detail || !sel.selection) return
 
-      // Deep clone the components array and update the target component's content
       const updatedComponents = deepClone(detail.components ?? [])
       const parts = resolveComponentPath(namePath).split('/')
       let components = updatedComponents as Array<
@@ -160,13 +113,6 @@ export const useEditingStore = defineStore('editing', () => {
     }
   }
 
-  /**
-   * Resolve a tree path to a component-relative path. The component tree
-   * prefixes fragment children with `@{fragmentName}/` (e.g. `@header/logo`)
-   * for preview click-to-select, but the fragment's components list uses
-   * plain names (`logo`). Strip the prefix so lookups and saves navigate
-   * the correct tree.
-   */
   function resolveComponentPath(namePath: string): string {
     const sel = useSelectionStore()
     if (sel.type === 'fragment' && sel.name && namePath.startsWith(`@${sel.name}/`)) {
@@ -175,7 +121,6 @@ export const useEditingStore = defineStore('editing', () => {
     return namePath
   }
 
-  /** Find an inline component by name path (e.g., "hero", "features/fast") in the selection detail */
   function findComponentByNamePath(namePath: string): { template: string; content: Record<string, unknown> } | null {
     const sel = useSelectionStore()
     const detail = sel.detail
@@ -219,8 +164,7 @@ export const useEditingStore = defineStore('editing', () => {
         save: buildSaveFn(namePath),
       })
     } catch (err) {
-      target.value = null
-      loadError.value = `Failed to load "${templateName}": ${(err as Error).message}`
+      ec.setLoadError(`Failed to load "${templateName}": ${(err as Error).message}`)
       retryTimer = setInterval(() => openComponent(namePath, templateName), 3000)
     }
   }
@@ -256,8 +200,7 @@ export const useEditingStore = defineStore('editing', () => {
         save: saveFn,
       })
     } catch (err) {
-      target.value = null
-      loadError.value = `Failed to load "${d.template}": ${(err as Error).message}`
+      ec.setLoadError(`Failed to load "${d.template}": ${(err as Error).message}`)
       retryTimer = setInterval(() => openPageRoot(), 3000)
     }
   }
@@ -286,19 +229,14 @@ export const useEditingStore = defineStore('editing', () => {
         save: c => api.updateFragment(fragName, { content: c }).then(() => {}),
       })
     } catch (err) {
-      target.value = null
-      loadError.value = `Failed to load fragment "${fragName}": ${(err as Error).message}`
+      ec.setLoadError(`Failed to load fragment "${fragName}": ${(err as Error).message}`)
       retryTimer = setInterval(() => openFragment(fragName), 3000)
     }
   }
 
   function clear() {
     clearRetry()
-    loadError.value = null
-    fragmentLink.value = null
-    target.value = null
-    content.value = null
-    saved.value = null
+    ec.clear()
     persistence.saving = false
     persistence.lastSaveError = null
     stash.clearAll()
@@ -315,7 +253,7 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   function markDirty(newContent: Record<string, unknown>) {
-    content.value = newContent
+    ec.markDirty(newContent)
     usePreviewStore().invalidateDraft()
   }
 
@@ -325,25 +263,12 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   function discard() {
-    if (!target.value || !saved.value) return
-    content.value = deepClone(saved.value)
-    mountVersion.value++
+    ec.discard()
     usePreviewStore().invalidateDraft()
   }
 
-  /**
-   * Post-restore refresh — used after any undo or rollback that
-   * touches the current active target. Clears in-memory edit state,
-   * reloads site + selection, and re-opens the same editor against
-   * the restored content.
-   *
-   * Without this the editor form shows pre-restore content and a
-   * subsequent save would silently reintroduce what was just undone.
-   * Takes a snapshot of the current editing target at call time so
-   * the re-open lands on the same component/page/fragment.
-   */
   async function refreshAfterRestore(): Promise<void> {
-    const targetSnapshot = target.value ? { template: target.value.template, path: target.value.path } : null
+    const targetSnapshot = ec.target ? { template: ec.target.template, path: ec.target.path } : null
     clear()
     await useSiteStore().reload()
     await useSelectionStore().reload()
@@ -360,14 +285,6 @@ export const useEditingStore = defineStore('editing', () => {
     usePublishStatusStore().refresh()
   }
 
-  /**
-   * Build the "Undo" toast action for a just-completed save. Captures
-   * the active target at save time — if the user switches targets
-   * before clicking Undo, the action still targets the right place.
-   *
-   * Returns undefined when there's no active target (shouldn't happen
-   * during a save, but guards the null case).
-   */
   function buildUndoAction(): { label: string; handler: () => Promise<void> } | undefined {
     const active = useActiveTargetStore().activeTargetName
     if (!active) return undefined
@@ -386,10 +303,10 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   async function save() {
-    const current = target.value && content.value ? { target: target.value, content: content.value } : null
+    const current = ec.target && ec.content ? { target: ec.target, content: ec.content } : null
     const result = await persistence.save(current, [...stash.values()])
     if (result.success) {
-      if (current) saved.value = deepClone(content.value!)
+      ec.markSaved()
       stash.clearAll()
       usePreviewStore().invalidate()
       usePublishStatusStore().refresh()
@@ -400,22 +317,26 @@ export const useEditingStore = defineStore('editing', () => {
   }
 
   return {
-    target,
-    content,
-    saved,
+    // Passthrough from editorContent
+    target: computed(() => ec.target),
+    content: computed(() => ec.content),
+    saved: computed(() => ec.saved),
+    template: computed(() => ec.template),
+    path: computed(() => ec.path),
+    schema: computed(() => ec.schema),
+    dirty: computed(() => ec.dirty),
+    loadError: computed(() => ec.loadError),
+    mountVersion: computed(() => ec.mountVersion),
+    customEditorMount: computed(() => ec.customEditorMount),
+    fragmentLink: computed(() => ec.fragmentLink),
+    // Passthrough from editorPersistence
     saving: computed(() => persistence.saving),
     lastSaveError: computed(() => persistence.lastSaveError),
-    template,
-    path,
-    schema,
-    dirty,
-    loadError,
-    mountVersion,
-    customEditorMount,
+    // Derived from stash + content
     pendingCount,
     hasPendingEdits,
     allOverrides,
-    fragmentLink,
+    // Methods
     open,
     openComponent,
     openPageRoot,

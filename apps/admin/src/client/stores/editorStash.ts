@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, computed } from 'vue'
-import type { EditingTarget } from './editing.js'
+import type { EditingTarget } from './editorContent.js'
 
 export interface StashedEdit {
   target: EditingTarget

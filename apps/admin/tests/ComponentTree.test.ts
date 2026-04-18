@@ -25,6 +25,7 @@ import { FRAGMENTS_API, type FragmentsApi } from '../src/client/composables/api.
 import { useSelectionStore } from '../src/client/stores/selection.js'
 import { useEditingStore } from '../src/client/stores/editing.js'
 import { useEditorStashStore } from '../src/client/stores/editorStash.js'
+import { useEditorContentStore } from '../src/client/stores/editorContent.js'
 import type { PageDetail, FragmentDetail } from '../src/client/api/client.js'
 
 /** Minimal FragmentsApi fake — each method throws unless the test provides an impl. */
@@ -269,14 +270,12 @@ describe('ComponentTree', () => {
     expect(spy).toHaveBeenCalledWith('nav')
   })
 
-  it('showFragmentLink stashes dirty edits before clearing', () => {
+  it('showFragmentLink stashes dirty edits before clearing', async () => {
     const editing = useEditingStore()
-    // Simulate a dirty editor state
-    editing.$patch({
-      target: { path: 'hero', template: 'hero', content: { title: 'old' }, save: async () => {} },
-      content: { title: 'changed' },
-      saved: { title: 'old' },
-    })
+    const ec = useEditorContentStore()
+    // Use open() to set up state correctly (sets savedJson internally)
+    await ec.open({ path: 'hero', template: 'hero', content: { title: 'old' }, schema: {}, save: async () => {} })
+    ec.markDirty({ title: 'changed' })
     expect(editing.dirty).toBe(true)
     editing.showFragmentLink('footer')
     // Dirty edits should be stashed in editorStash

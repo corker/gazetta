@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { EditingTarget } from './editing.js'
+import type { EditingTarget } from './editorContent.js'
 import type { StashedEdit } from './editorStash.js'
 
 export interface SaveResult {
