@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { StorageProvider, PurgeStrategy, CacheConfig } from './types.js'
 import type { Site } from './site-loader.js'
 import { loadSite } from './site-loader.js'
-import { resolvePage, resolveComponent } from './resolver.js'
+import { resolvePage, resolveComponent, resolveFragment } from './resolver.js'
 import { renderComponent, renderPage } from './renderer.js'
 import { writeSidecars, collectFragmentRefs } from './sidecars.js'
 import { createContentRoot, type ContentRoot } from './content-root.js'
@@ -56,6 +56,8 @@ export async function publishPageRendered(
   preloadedSite?: Site,
   /** SEO context for the fallback chain — caller builds from manifest + target config. */
   seo?: import('./seo.js').SeoContext,
+  /** Locale for this render pass. When set, resolves locale-specific fragments. */
+  locale?: string,
 ): Promise<{ files: number; removed: number }> {
   // Reuse a preloaded site when the caller already has one (runPublish loops
   // over N items; loading per-item was quadratic). loadSite is idempotent.
@@ -64,7 +66,7 @@ export async function publishPageRendered(
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
   // Scope IDs are now deterministic (hash-based), no reset needed
-  const resolved = await resolvePage(pageName, site)
+  const resolved = await resolvePage(pageName, site, locale)
 
   // Render each child — fragments become ESI placeholders, local components baked in
   const bodyParts: string[] = []
@@ -79,7 +81,8 @@ export async function publishPageRendered(
 
     if (isFragment) {
       const fragName = childEntry.slice(1)
-      const fragPath = `fragments/${fragName}/index.html`
+      const fragFile = locale ? `index.${locale}.html` : 'index.html'
+      const fragPath = `fragments/${fragName}/${fragFile}`
       esiHeadTags.push(`<!--esi-head:/${fragPath}-->`)
       bodyParts.push(`<!--esi:/${fragPath}-->`)
     } else {
@@ -259,13 +262,14 @@ export async function publishFragmentRendered(
   templatesDir?: string,
   manifestHash?: string,
   preloadedSite?: Site,
+  /** Locale for this render pass. When set, resolves locale-specific content and writes to index.{locale}.html. */
+  locale?: string,
 ): Promise<{ files: number; removed: number }> {
   const site = preloadedSite ?? (await loadSite({ contentRoot: sourceRoot, templatesDir }))
   const fragment = site.fragments.get(fragmentName)
   if (!fragment) throw new Error(`Fragment "${fragmentName}" not found`)
 
-  const ctx = { site, templatesDir: site.templatesDir, visited: new Set<string>(), path: [`@${fragmentName}`] }
-  const resolved = await resolveComponent(`@${fragmentName}`, ctx)
+  const resolved = await resolveFragment(fragmentName, site, locale)
 
   // Scope IDs are now deterministic (hash-based), no reset needed
   const rendered = await renderComponent(resolved)
@@ -306,8 +310,9 @@ export async function publishFragmentRendered(
   const headSection = headParts.length ? `<head>\n${headParts.join('\n')}\n</head>\n` : ''
   const fragmentHtml = `${headSection}${rendered.html}`
 
+  const indexFile = locale ? `index.${locale}.html` : 'index.html'
   await targetStorage.mkdir(fragDir)
-  await targetStorage.writeFile(`${fragDir}/index.html`, fragmentHtml)
+  await targetStorage.writeFile(`${fragDir}/${indexFile}`, fragmentHtml)
   fileCount++
 
   // Write content-hash sidecar + reverse-dep sidecars for compare/dependents
