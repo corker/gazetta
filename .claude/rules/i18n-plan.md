@@ -59,43 +59,126 @@ locales:                      # new (optional) — enables i18n
   supported: [en, fr, de, pt-BR]
   fallbacks:                  # optional — locale-specific fallback chains
     pt-BR: pt                 # pt-BR falls back to pt before default
-  defaultPrefix: false        # optional — default locale has no URL prefix (default: false)
+```
 
+When `locales` is absent, the site is single-locale. `locale: en` is used for
+`<html lang>` and sitemap, same as today.
+
+### Deployment strategies
+
+Two strategies for serving localized content. Same content files, different
+target configurations. Both can coexist in the same site.
+
+#### Strategy 1: Subpath — one target, all locales in URL
+
+```yaml
 targets:
   local:
     storage: { type: filesystem }
-    # no locales override — serves all site-level locales, default = en
+    # inherits all site-level locales, default = en
+
+  production:
+    storage: { type: s3, bucket: site }
+    environment: production
+    siteUrl: https://example.com
+    # → /about (en), /fr/about, /de/about, /pt-br/about
+```
+
+Default locale has no prefix. Other locales get `/{locale}/` prefix.
+Google's recommended approach — inherits domain authority.
+
+#### Strategy 2: Per-domain — one target per locale
+
+```yaml
+targets:
+  local:
+    storage: { type: filesystem }
+    # dev serves all locales with subpath (convenient for development)
+
+  production-en:
+    storage: { type: s3, bucket: site-en }
+    environment: production
+    siteUrl: https://example.com
+    locales: [en]              # single locale — no prefix, no hreflang on this domain
+    # → /about (en only)
+
+  production-fr:
+    storage: { type: s3, bucket: site-fr }
+    environment: production
+    siteUrl: https://example.fr
+    locales: [fr]              # single locale
+    # → /about (fr only)
 
   production-de:
     storage: { type: s3, bucket: site-de }
     environment: production
     siteUrl: https://example.de
-    locales: [de, en]          # only German and English
-    locale: de                 # German is this target's default (no /de/ prefix)
+    locales: [de, en]          # two locales — German default, English secondary
+    locale: de                 # overrides default for this target
     # → /about (de), /en/about (en)
+```
 
-  production-global:
-    storage: { type: s3, bucket: site-global }
+Each target serves one domain with its own locale subset. hreflang
+cross-links point across domains using each target's `siteUrl`.
+
+#### Strategy 3: Hybrid — subpath for dev, per-domain for production
+
+```yaml
+targets:
+  local:
+    storage: { type: filesystem }
+    # all locales via subpath — author previews everything locally
+
+  production-en:
+    storage: { type: s3, bucket: site-en }
     environment: production
     siteUrl: https://example.com
-    # no locales override — serves all, default = en
-    # → /about (en), /fr/about, /de/about, /pt-br/about
+    locales: [en]
+
+  production-fr:
+    storage: { type: s3, bucket: site-fr }
+    environment: production
+    siteUrl: https://example.fr
+    locales: [fr]
 ```
+
+Author works in subpath mode locally (one server, all locales). Publishes
+to separate per-domain production targets. Same content files, different
+URL structure per target.
 
 ### Target locale rules
 
 - Target inherits site-level `locales.supported` and `locale` (default) unless
   it declares its own.
 - `locales: [de, en]` on a target restricts which locales are published/served.
-  Pages without a matching locale file are skipped.
+  Pages without a matching locale file are skipped for that target.
 - `locale: de` on a target overrides the default locale for that target. The
   default locale has no URL prefix; other locales get prefixed.
-- A target with a single locale (e.g., `locales: [de]`) treats it as the
-  default — no URL prefix, no hreflang, no locale switching. The target is
-  effectively single-language.
+- A target with a single locale (e.g., `locales: [fr]`) is single-language —
+  no URL prefix, no locale switching. hreflang still generated if other targets
+  serve the same pages in different locales (cross-domain hreflang).
+- No locale config on a target → inherits all site-level locales.
 
-When `locales` is absent from both site and target, the site is single-locale. `locale: en` is used for
-`<html lang>` and sitemap, same as today.
+### Cross-domain hreflang
+
+When the same page exists across per-domain targets, hreflang cross-links
+use each target's `siteUrl`:
+
+```html
+<!-- On example.com/about (en target) -->
+<link rel="alternate" hreflang="en" href="https://example.com/about" />
+<link rel="alternate" hreflang="fr" href="https://example.fr/about" />
+<link rel="alternate" hreflang="x-default" href="https://example.com/about" />
+
+<!-- On example.fr/about (fr target) -->
+<link rel="alternate" hreflang="en" href="https://example.com/about" />
+<link rel="alternate" hreflang="fr" href="https://example.fr/about" />
+<link rel="alternate" hreflang="x-default" href="https://example.com/about" />
+```
+
+The publisher resolves cross-domain alternates at publish time by scanning
+all targets for the same page in different locales. This requires publishing
+all locale targets in one pass (or a post-publish hreflang reconciliation).
 
 ---
 
@@ -302,6 +385,12 @@ Publishing a subset of locales is supported — author can publish only the
 | Publish to target with locale subset | Only renders locale files matching the target's locales |
 | hreflang on target with locale subset | Only includes the target's locales, not all site-level locales |
 | Target with no `locales` override | Inherits all site-level locales and default |
+| Per-domain: hreflang across targets | Cross-domain hreflang using each target's `siteUrl` |
+| Per-domain: publish order for hreflang | Publish all locale targets together, or reconcile hreflang post-publish |
+| Per-domain: single-locale target hreflang | Still gets hreflang if other targets serve the same page in other locales |
+| Subpath + per-domain mixed | Valid — local uses subpath, production uses per-domain |
+| Per-domain: sitemap per target | Each target gets its own sitemap with its own locale subset |
+| Per-domain: x-default across domains | x-default points to the site-level default locale's target siteUrl |
 
 ---
 
