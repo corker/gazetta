@@ -87,4 +87,38 @@ describe('generateSitemap', () => {
     expect(xml).not.toContain('[slug]')
     expect(xml).not.toContain('[...path]')
   })
+
+  it('includes hreflang cross-links when 2+ alternates exist', () => {
+    const pages = new Map([page('about', '2026-04-19T00:00:00Z')])
+    const hreflangGroups = new Map([
+      [
+        'about',
+        [
+          { locale: 'en', url: 'https://example.com/about' },
+          { locale: 'fr', url: 'https://example.com/fr/about' },
+        ],
+      ],
+    ])
+    const xml = generateSitemap({ siteUrl: 'https://example.com', pages, hreflangGroups, defaultLocale: 'en' })!
+    expect(xml).toContain('xmlns:xhtml=')
+    expect(xml).toContain('hreflang="en"')
+    expect(xml).toContain('hreflang="fr"')
+    expect(xml).toContain('href="https://example.com/about"')
+    expect(xml).toContain('href="https://example.com/fr/about"')
+    expect(xml).toContain('hreflang="x-default"')
+  })
+
+  it('omits hreflang when only one alternate', () => {
+    const pages = new Map([page('about')])
+    const hreflangGroups = new Map([['about', [{ locale: 'en', url: 'https://example.com/about' }]]])
+    const xml = generateSitemap({ siteUrl: 'https://example.com', pages, hreflangGroups })!
+    expect(xml).not.toContain('hreflang')
+    expect(xml).not.toContain('xmlns:xhtml')
+  })
+
+  it('omits hreflang when no groups provided', () => {
+    const pages = new Map([page('about')])
+    const xml = generateSitemap({ siteUrl: 'https://example.com', pages })!
+    expect(xml).not.toContain('hreflang')
+  })
 })
