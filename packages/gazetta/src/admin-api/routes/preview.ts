@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono'
 import type { ResolvedComponent } from '../../types.js'
-import { loadSite } from '../../site-loader.js'
+import { loadSite, allPageEntries } from '../../site-loader.js'
 import { resolveFragment, resolvePage } from '../../resolver.js'
 import { renderFragment, renderPage } from '../../renderer.js'
 import type { SourceContext, SourceContextResolver } from '../source-context.js'
@@ -54,11 +54,19 @@ async function renderPreview(
   }
   const requestPath = c.req.path.replace(/^.*\/preview/, '') || '/'
 
-  // Fragment preview: /preview/@fragmentName
-  if (requestPath.startsWith('/@')) {
-    const fragmentName = requestPath.slice(2)
+  // Fragment preview: /preview/@fragmentName or /preview/fr/@fragmentName
+  // Extract locale prefix if present before the @
+  let previewLocale: string | undefined
+  let fragRequestPath = requestPath
+  const localeFragMatch = requestPath.match(/^\/([a-z]{2}(?:-[a-z]+)?)\/(@.+)$/)
+  if (localeFragMatch) {
+    previewLocale = localeFragMatch[1]
+    fragRequestPath = `/${localeFragMatch[2]}`
+  }
+  if (fragRequestPath.startsWith('/@')) {
+    const fragmentName = fragRequestPath.slice(2)
     try {
-      const resolved = await resolveFragment(fragmentName, site)
+      const resolved = await resolveFragment(fragmentName, site, previewLocale)
       if (overrides) applyOverrides(resolved, overrides)
       return c.html(await renderFragment(resolved))
     } catch (err) {
@@ -72,11 +80,11 @@ async function renderPreview(
     }
   }
 
-  for (const [pageName, page] of site.pages) {
+  for (const { name: pageName, page, locale: pageLocale } of allPageEntries(site)) {
     const params = matchRoute(page.route, requestPath)
     if (params) {
       try {
-        const resolved = await resolvePage(pageName, site)
+        const resolved = await resolvePage(pageName, site, pageLocale)
         if (overrides) applyOverrides(resolved, overrides)
         return c.html(
           await renderPage(resolved, {
@@ -85,7 +93,7 @@ async function renderPreview(
             route: page.route,
             seo: {
               siteName: site.manifest.name,
-              locale: site.manifest.locale,
+              locale: pageLocale ?? site.manifest.locale,
               defaultOgImage: site.manifest.defaultOgImage,
             },
           }),
