@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 236 use cases — 108 verified, 9 bugs, 119 gaps.
+**Summary:** 246 use cases — 108 verified, 12 bugs, 126 gaps.
 
 ---
 
@@ -356,7 +356,32 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 - [ ] Each locale URL has its own `<lastmod>` from publish timestamp
 - [ ] Dynamic routes excluded even with locale variants
 
-## 40. Locale normalization consistency (2 cases)
+## 40. Client save/update doesn't pass locale (3 cases)
+
+- [!] `api.updatePage()` has no locale param — **BUG: client never sends ?locale= on PUT**
+- [!] `api.updateFragment()` has no locale param — **BUG: same**
+- [!] `buildSaveFn` closure captures no locale — save always hits default file even when fixed server-side
+
+## 41. ESI assembly with locale fragments (2 cases)
+
+- [ ] `<!--esi:/fragments/header/index.fr.html-->` replaced correctly by assembleEsi
+- [ ] `findEsiPaths` extracts locale-suffixed fragment paths
+
+## 42. Template loader cache isolation (2 cases)
+
+- [ ] Same template renders EN then FR — no state leak between renders
+- [ ] Template with module-level mutable state — no cross-locale interference
+
+## 43. Admin API locale query param validation (2 cases)
+
+- [ ] `?locale=invalid` — should reject or fall back gracefully, not crash
+- [ ] `?locale=` (empty) — should be treated as no locale (default)
+
+## 44. Hash divergence per locale (1 case)
+
+- [ ] Same page with different locale content produces different manifest hashes
+
+## 45. Locale normalization consistency (2 cases)
 
 - [ ] All entry points normalize: config, CLI --to, ?locale=, URL prefix, filenames
 - [ ] BCP 47 region codes: pt-BR/en-GB consistent across API, CLI, URL, filesystem
@@ -369,22 +394,25 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 |---|-----|------|------|----------|
 | 1 | PUT pages writes to page.json ignoring ?locale= | pages.ts | 124 | Critical |
 | 2 | PUT fragments writes to fragment.json ignoring ?locale= | fragments.ts | ~95 | Critical |
-| 3 | DELETE pages doesn't delete locale files | pages.ts | 155 | High |
-| 4 | DELETE fragments doesn't delete locale files | fragments.ts | ~127 | High |
-| 5 | hreflang alternates never populated in publish | publish-rendered.ts | — | High |
-| 6 | Sitemap hreflangGroups never computed | publish/sitemap | — | High |
-| 7 | Compare ignores locale variants | compare.ts | — | Medium |
-| 8 | Progress stream missing locale field | publish.ts | — | Low |
-| 9 | History doesn't record save locale | history-recorder.ts | — | Low |
+| 3 | Client api.updatePage() never sends ?locale= param | client.ts | 208 | Critical |
+| 4 | Client api.updateFragment() never sends ?locale= param | client.ts | 222 | Critical |
+| 5 | buildSaveFn closure captures no locale context | useEditorActions.ts | 99 | Critical |
+| 6 | DELETE pages doesn't delete locale files | pages.ts | 155 | High |
+| 7 | DELETE fragments doesn't delete locale files | fragments.ts | ~127 | High |
+| 8 | hreflang alternates never populated in publish | publish-rendered.ts | — | High |
+| 9 | Sitemap hreflangGroups never computed | publish/sitemap | — | High |
+| 10 | Compare ignores locale variants | compare.ts | — | Medium |
+| 11 | Progress stream missing locale field | publish.ts | — | Low |
+| 12 | History doesn't record save locale | history-recorder.ts | — | Low |
 
 ## Gap summary by severity
 
 | Priority | Count | Examples |
 |----------|-------|---------|
-| Critical (blocks editor use) | 4 | Save to wrong file, delete orphans locale files |
+| Critical (blocks editor use) | 7 | Save to wrong file (server + client), delete orphans locale files |
 | High (incorrect SEO output) | 2 | hreflang never wired, sitemap hreflang empty |
 | High (feature interactions) | 12 | Component ops independence, metadata per locale, multi-target subset |
 | Medium (compare/publish/history) | 10 | Compare ignores locales, target locale subset, history locale |
 | Medium (error/edge cases) | 15 | URL edge cases, migration, concurrent ops, error handling |
-| Low (polish) | 18 | Progress stream, editor mount locale, watcher, normalization, performance |
-| Test-only (code works, needs test) | 58 | File discovery, resolver chains, worker paths |
+| Low (polish) | 18 | Progress stream, editor mount locale, watcher, normalization |
+| Test-only (code works, needs test) | 62 | File discovery, resolver chains, worker paths, ESI assembly, hash |
