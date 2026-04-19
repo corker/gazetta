@@ -25,6 +25,18 @@ export interface ResolvedLocales {
   fallbacks: Record<string, string>
 }
 
+/** BCP 47 locale code pattern: 2-letter language, optional region subtag. */
+const LOCALE_PATTERN = /^[a-z]{2}(-[a-z]{2,8})?$/
+
+/**
+ * Validate a locale code against BCP 47 pattern.
+ * Rejects path traversal (../), dots (fr.json), scripts, empty strings,
+ * and anything that isn't a simple language or language-region code.
+ */
+export function isValidLocale(locale: string): boolean {
+  return LOCALE_PATTERN.test(locale.toLowerCase())
+}
+
 /** Normalize a BCP 47 locale code to lowercase for filenames. */
 export function normalizeLocale(locale: string): string {
   return locale.toLowerCase()

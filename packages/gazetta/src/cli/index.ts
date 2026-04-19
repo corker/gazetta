@@ -1841,7 +1841,11 @@ async function main() {
         console.error('  Example: gazetta translate pages/about --to fr')
         process.exit(1)
       }
-      const { normalizeLocale, localeFilename } = await import('../locale.js')
+      const { normalizeLocale, localeFilename, isValidLocale } = await import('../locale.js')
+      if (!isValidLocale(localeArg)) {
+        console.error(`  Error: invalid locale code "${localeArg}". Use BCP 47 format (e.g. fr, en-gb, pt-br)`)
+        process.exit(1)
+      }
       const locale = normalizeLocale(localeArg)
       const isPage = itemArg.startsWith('pages/')
       const isFragment = itemArg.startsWith('fragments/')
