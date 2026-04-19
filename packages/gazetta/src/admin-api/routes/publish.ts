@@ -313,31 +313,46 @@ export function publishRoutes(
 
         const renderItem = async (item: string): Promise<{ files: number }> => {
           if (item.startsWith('pages/')) {
-            const pageName = item.replace('pages/', '')
+            const raw = item.replace('pages/', '')
+            // Support locale-qualified items: pages/home:fr → publish only FR
+            const [pageName, itemLocale] = raw.includes(':') ? raw.split(':') : [raw, undefined]
             const page = site.pages.get(pageName)
             const manifestHash = page ? hashManifest(page, pageHashOpts) : undefined
             if (isStatic) {
-              return publishPageStatic(pageName, source.contentRoot, targetStorage, tdir, manifestHash, site, seo)
+              return publishPageStatic(
+                pageName,
+                source.contentRoot,
+                targetStorage,
+                tdir,
+                manifestHash,
+                site,
+                seo,
+                itemLocale,
+              )
             }
+            // When a specific locale is requested, only publish that one
+            const onlyLocales = itemLocale ? [itemLocale] : undefined
             const { files } = await publishPageAllLocales(
               pageName,
               source.contentRoot,
               targetStorage,
               site,
               pageHashOpts,
-              { cache: config?.cache, templatesDir: tdir, seo, targetLocales: config?.locales },
+              { cache: config?.cache, templatesDir: tdir, seo, targetLocales: onlyLocales ?? config?.locales },
             )
             return { files }
           }
           if (item.startsWith('fragments/') && !isStatic) {
-            const fragName = item.replace('fragments/', '')
+            const raw = item.replace('fragments/', '')
+            const [fragName, itemLocale] = raw.includes(':') ? raw.split(':') : [raw, undefined]
+            const onlyLocales = itemLocale ? [itemLocale] : undefined
             const { files } = await publishFragmentAllLocales(
               fragName,
               source.contentRoot,
               targetStorage,
               site,
               { templateHashes },
-              { templatesDir: tdir, targetLocales: config?.locales },
+              { templatesDir: tdir, targetLocales: onlyLocales ?? config?.locales },
             )
             return { files }
           }
