@@ -1,0 +1,28 @@
+{
+  "template": "page-default",
+  "metadata": {
+    "title": "À Propos — Gazetta",
+    "description": "Découvrez Gazetta, le CMS sans état construit sur des fragments composables."
+  },
+  "components": [
+    "@header",
+    {
+      "name": "about-text",
+      "template": "text-block",
+      "content": {
+        "heading": "À Propos de Gazetta",
+        "body": "Gazetta est un CMS sans état qui structure les sites web en composants composables. Pas de base de données, pas d'étape de build — juste des templates, des fragments et des pages composées au moment du service."
+      }
+    },
+    {
+      "name": "testimonial",
+      "template": "quote-card",
+      "content": {
+        "quote": "Gazetta nous permet de mettre à jour les composants partagés une seule fois et chaque page le reflète instantanément. Plus besoin de reconstruire tout le site.",
+        "author": "Développeur Web",
+        "role": "Exemple de template Vue SSR"
+      }
+    },
+    "@footer"
+  ]
+}
