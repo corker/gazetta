@@ -93,8 +93,10 @@ export function createRouter() {
       const type = to.name?.toString().startsWith('page') ? 'page' : 'fragment'
       const isEdit = to.name?.toString().endsWith('-edit')
 
-      // Select page/fragment if different from current
-      if (selection.type !== type || selection.name !== name) {
+      // Select page/fragment if different from current, or if locale changed
+      const fromLocale = from.query.locale as string | undefined
+      const toLocale = to.query.locale as string | undefined
+      if (selection.type !== type || selection.name !== name || fromLocale !== toLocale) {
         if (type === 'page') await selection.selectPage(name)
         else await selection.selectFragment(name)
       }
