@@ -84,8 +84,9 @@ export function createRouter() {
       const toEdit = to.name?.toString().endsWith('-edit')
       const leavingPage = !isEditorRoute || fromName !== toName || fromType !== toType
       const leavingEdit = fromEdit && !toEdit
+      const switchingLocale = (from.query.locale as string | undefined) !== (to.query.locale as string | undefined)
 
-      if ((leavingPage || leavingEdit) && editing.hasPendingEdits) {
+      if ((leavingPage || leavingEdit || switchingLocale) && editing.hasPendingEdits) {
         const guard = useUnsavedGuardStore()
         const result = await guard.guard()
         if (result === 'cancel') return false
