@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 287 use cases — 108 verified, 16 bugs, 163 gaps.
+**Summary:** 295 use cases — 108 verified, 19 bugs, 168 gaps.
 
 ---
 
@@ -330,13 +330,17 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 - [ ] Noindex on one locale only — sitemap excludes FR, keeps EN
 - [ ] Canonical URL per locale — each renders correct canonical
 
-## 36. URL edge cases (5 cases)
+## 36. URL edge cases (9 cases)
 
-- [ ] Trailing slash: /fr/ vs /fr — consistent behavior
-- [ ] Double locale prefix: /fr/fr/about → 404
+- [!] **BUG: /fr/ (trailing slash) → 404** but /fr → 200. Trailing slash not normalized.
+- [!] **BUG: /fr/about/ (trailing slash) → 404** but /fr/about → 200.
+- [ ] Double locale prefix: /fr/fr/about → 404 (confirmed)
 - [ ] Locale code collides with page name — /fr resolves as locale prefix, not page
-- [ ] Mixed-case locale in URL: /pt-BR/about → normalize or 404
-- [ ] Query param locale /about?lang=fr — not supported, no false match
+- [ ] Mixed-case locale in URL: /FR → 404, not normalized to /fr (confirmed)
+- [ ] Query param locale /about?locale=fr on public site — ignored (correct, path-based)
+- [!] **BUG: /fr/blog/hello-world → 404** — dynamic route fallback missing for locale prefix on dev server
+- [ ] /admin/preview/fr/ (trailing slash) → 404 (confirmed)
+- [ ] /admin/preview/FR (uppercase) → 404 (confirmed)
 
 ## 37. Migration & config changes (3 cases)
 
@@ -372,10 +376,12 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 - [ ] Same template renders EN then FR — no state leak between renders
 - [ ] Template with module-level mutable state — no cross-locale interference
 
-## 43. Admin API locale query param validation (2 cases)
+## 43. Admin API locale query param validation (4 cases)
 
-- [ ] `?locale=invalid` — should reject or fall back gracefully, not crash
-- [ ] `?locale=` (empty) — should be treated as no locale (default)
+- [!] **BUG: `?locale=FR` (uppercase) not normalized** — returns `locale: "FR"`, should normalize to `"fr"`
+- [!] **BUG: `?locale=xx` (invalid) silently accepted** — returns `locale: "xx"` with default content
+- [!] **BUG: `?locale=` (empty) returns `locale: ""`** — empty string not stripped
+- [ ] `?locale=en` (default locale explicitly) — returns content with `locale: "en"` (OK but wasteful)
 
 ## 44. Hash divergence per locale (1 case)
 
@@ -503,8 +509,11 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 | 12 | Compare ignores locale variants | compare.ts | — | Medium |
 | 13 | renderFragment hardcodes lang="en" | renderer.ts | 33 | Medium |
 | 14 | publishPageAllLocales ignores target locale subset | publish-locale.ts | 61 | High |
-| 15 | Progress stream missing locale field | publish.ts | — | Low |
-| 16 | History doesn't record save locale | history-recorder.ts | — | Low |
+| 15 | /fr/ trailing slash → 404 (inconsistent with /fr → 200) | cli/index.ts | — | Medium |
+| 16 | /fr/blog/hello-world → 404 (dynamic route locale fallback missing on dev server) | cli/index.ts | — | Medium |
+| 17 | ?locale=FR not normalized, ?locale=xx silently accepted, ?locale= empty not stripped | pages.ts | — | Medium |
+| 18 | Progress stream missing locale field | publish.ts | — | Low |
+| 19 | History doesn't record save locale | history-recorder.ts | — | Low |
 
 ## Gap summary by severity
 
