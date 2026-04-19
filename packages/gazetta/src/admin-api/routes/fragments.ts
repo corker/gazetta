@@ -92,11 +92,18 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
 
   app.put('/api/fragments/:name', async c => {
     const name = c.req.param('name')
+    const rawLocale = c.req.query('locale')
+    const locale = rawLocale && isValidLocale(rawLocale) ? rawLocale.toLowerCase() : undefined
+    if (rawLocale && !locale) return c.json({ error: `Invalid locale code: "${rawLocale}"` }, 400)
+
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
     const site = await loadSiteFromSource(source)
-    const fragment = site.fragments.get(name)
-    if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
+
+    const defaultFragment = site.fragments.get(name)
+    if (!defaultFragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
+    const localeVariant = locale ? site.fragmentLocales.get(name)?.locales.get(locale) : undefined
+    const fragment = localeVariant ?? defaultFragment
 
     const body = await c.req.json()
     const manifest = {
@@ -105,7 +112,8 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
       components: body.components ?? fragment.components,
     }
 
-    const manifestPath = join(fragment.dir, 'fragment.json')
+    const filename = locale ? `fragment.${locale}.json` : 'fragment.json'
+    const manifestPath = join(defaultFragment.dir, filename)
     const serialized = JSON.stringify(manifest, null, 2) + '\n'
 
     // History first — see pages.ts PUT handler rationale (baseline must
