@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 192 use cases — 108 verified, 9 bugs, 75 gaps.
+**Summary:** 236 use cases — 108 verified, 9 bugs, 119 gaps.
 
 ---
 
@@ -281,6 +281,88 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 ---
 
+## 29. Custom editors & fields with locale (5 cases)
+
+- [ ] EditorMount.mount() has no locale param — custom editors can't adapt to locale
+- [ ] FieldMount.mount() has no locale — locale-aware fields impossible
+- [ ] Locale switch doesn't trigger editor remount — stale undo/redo stack
+- [ ] Editor form state not isolated per locale — partial EN edits lost on FR switch + back
+- [ ] Dev playground doesn't pass `?locale=` to preview
+
+## 30. Multi-target locale interactions (4 cases)
+
+- [ ] Locale persists across target switch — `?locale=fr` survives active target change
+- [ ] Compare with different locale subsets — target A has [en,fr,de], target B has [en,fr]
+- [ ] Publish to target with locale subset — skip pages outside target's locales
+- [ ] Fetch (reverse publish) with locale files — recovers page.fr.json
+
+## 31. Concurrent operations (3 cases)
+
+- [ ] Two authors save different locales simultaneously — no overwrite race
+- [ ] Locale switch with unsaved edits — unsaved dialog fires
+- [ ] Save EN while FR preview loads — no stale render
+
+## 32. File watcher & SSE with locale (3 cases)
+
+- [ ] Template change during locale preview — SSE reloads FR preview
+- [ ] Locale file created externally — site tree updates with badge
+- [ ] Fragment locale file added — SiteTree shows badge
+
+## 33. Error handling with locale (4 cases)
+
+- [ ] Template missing for locale page — skip with error, don't crash
+- [ ] Template SSR crash on locale content — skip that locale's render
+- [ ] Storage read fails on locale file mid-publish — error handling
+- [ ] Schema validation error in locale file — validate/publish catches it
+
+## 34. Component operations with locale independence (4 cases)
+
+- [ ] Move component in FR doesn't affect EN page.json
+- [ ] Add component to FR only — EN unchanged
+- [ ] Remove component from FR — EN still has it
+- [ ] Template switch on locale page — content mapping/loss
+
+## 35. Metadata per locale (5 cases)
+
+- [ ] Locale-specific metadata.title → different `<title>` per locale
+- [ ] Locale-specific metadata.description → different meta description
+- [ ] Locale-specific og:image → each locale uses own image
+- [ ] Noindex on one locale only — sitemap excludes FR, keeps EN
+- [ ] Canonical URL per locale — each renders correct canonical
+
+## 36. URL edge cases (5 cases)
+
+- [ ] Trailing slash: /fr/ vs /fr — consistent behavior
+- [ ] Double locale prefix: /fr/fr/about → 404
+- [ ] Locale code collides with page name — /fr resolves as locale prefix, not page
+- [ ] Mixed-case locale in URL: /pt-BR/about → normalize or 404
+- [ ] Query param locale /about?lang=fr — not supported, no false match
+
+## 37. Migration & config changes (3 cases)
+
+- [ ] Add i18n to existing site — page.json becomes default locale
+- [ ] Remove i18n config — orphaned locale files warned by validate
+- [ ] Change default locale en→fr — routes remap, content resolves correctly
+
+## 38. History with locale (3 cases)
+
+- [ ] Save EN then save FR then undo — restores page.fr.json only
+- [ ] History panel shows locale of each revision
+- [ ] Rollback locale-specific revision — only that locale file restored
+
+## 39. Sitemap locale URLs (3 cases)
+
+- [ ] Sitemap has both /about and /fr/about as separate `<url>` entries
+- [ ] Each locale URL has its own `<lastmod>` from publish timestamp
+- [ ] Dynamic routes excluded even with locale variants
+
+## 40. Locale normalization consistency (2 cases)
+
+- [ ] All entry points normalize: config, CLI --to, ?locale=, URL prefix, filenames
+- [ ] BCP 47 region codes: pt-BR/en-GB consistent across API, CLI, URL, filesystem
+
+---
+
 ## Bug summary
 
 | # | Bug | File | Line | Severity |
@@ -301,6 +383,8 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 |----------|-------|---------|
 | Critical (blocks editor use) | 4 | Save to wrong file, delete orphans locale files |
 | High (incorrect SEO output) | 2 | hreflang never wired, sitemap hreflang empty |
-| Medium (compare/publish) | 4 | Compare ignores locales, target locale subset |
-| Low (polish) | 7 | Progress stream, history locale, edge cases |
+| High (feature interactions) | 12 | Component ops independence, metadata per locale, multi-target subset |
+| Medium (compare/publish/history) | 10 | Compare ignores locales, target locale subset, history locale |
+| Medium (error/edge cases) | 15 | URL edge cases, migration, concurrent ops, error handling |
+| Low (polish) | 18 | Progress stream, editor mount locale, watcher, normalization, performance |
 | Test-only (code works, needs test) | 58 | File discovery, resolver chains, worker paths |
