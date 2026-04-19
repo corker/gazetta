@@ -11,7 +11,6 @@ import { useUiModeStore } from '../stores/uiMode.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { useLocaleStore } from '../stores/locale.js'
 import { useRouter } from 'vue-router'
-import { useNavigation } from '../composables/useNavigation.js'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
 
 /** FNV-1a hash — same function as in packages/gazetta/src/scope.ts */
@@ -33,7 +32,6 @@ const uiMode = useUiModeStore()
 const activeTarget = useActiveTargetStore()
 const locale = useLocaleStore()
 const router = useRouter()
-const { navigateTo } = useNavigation()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let currentHtml = ''
@@ -397,7 +395,7 @@ async function handleMessage(e: MessageEvent) {
     focus.setPending(e.data.gzId)
     if (selection.name) {
       const prefix = selection.type === 'page' ? '/pages' : '/fragments'
-      navigateTo(`${prefix}/${selection.name}/edit`)
+      router.push(`${prefix}/${selection.name}/edit`)
     }
     iframeRef.value?.blur()
   }
@@ -409,7 +407,7 @@ async function handleMessage(e: MessageEvent) {
       // drop the author into browse. Router guard reads `-edit` route
       // suffix to set mode (router.ts), so we choose the matching path.
       const suffix = uiMode.mode === 'edit' ? '/edit' : ''
-      navigateTo(`/pages/${page.name}${suffix}`)
+      router.push(`/pages/${page.name}${suffix}`)
     } else {
       toast.show(`No page found for route ${e.data.route}`, { type: 'error' })
     }

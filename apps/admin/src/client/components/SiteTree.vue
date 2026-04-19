@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useNavigation } from '../composables/useNavigation.js'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useSiteStore } from '../stores/site.js'
 import { useSelectionStore } from '../stores/selection.js'
@@ -21,7 +21,7 @@ interface SiteNode {
   locales?: string[]
 }
 
-const { navigateTo } = useNavigation()
+const router = useRouter()
 const site = useSiteStore()
 const selection = useSelectionStore()
 const editing = useEditingStore()
@@ -99,7 +99,7 @@ const fragments = computed<SiteNode[]>(() =>
 
 function onSelect(node: SiteNode) {
   const prefix = node.type === 'page' ? '/pages' : '/fragments'
-  navigateTo(`${prefix}/${node.name}`)
+  router.push(`${prefix}/${node.name}`)
 }
 
 async function handleDelete(node: SiteNode, e: Event) {

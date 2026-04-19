@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useNavigation } from '../composables/useNavigation.js'
 import { onKeyStroke } from '@vueuse/core'
 import { useEditingStore } from '../stores/editing.js'
 import { useSelectionStore } from '../stores/selection.js'
@@ -20,7 +19,6 @@ const theme = useThemeStore()
 const unsavedGuard = useUnsavedGuardStore()
 const route = useRoute()
 const router = useRouter()
-const { navigateTo } = useNavigation()
 const containerRef = ref<HTMLElement | null>(null)
 
 async function goToFragment() {
@@ -36,7 +34,7 @@ async function goToFragment() {
     if (result === 'save') await editing.save()
   }
   editing.clear()
-  navigateTo(`/fragments/${fragName}/edit`, hash)
+  await router.push({ path: `/fragments/${fragName}/edit`, hash })
 }
 
 // Show blast radius when the selected root item is a fragment, regardless
