@@ -67,6 +67,7 @@ export function compareRoutes(
         projectRoot,
         type,
         scanTemplates: scanTemplatesInjected,
+        manifest: source.manifest,
       })
       return c.json(result)
     } catch (err) {

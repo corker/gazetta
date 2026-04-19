@@ -27,6 +27,8 @@ export interface CompareOptions {
   target: StorageProvider
   templatesDir: string
   projectRoot: string
+  /** Project-level manifest — passed to loadSite so targets don't need site.yaml. */
+  manifest?: import('./types.js').SiteManifest
   /**
    * Target's rendering type. In static mode fragments are baked into pages, so
    * they're not published as separate items — omit them from compare to avoid
@@ -73,7 +75,7 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   // target, absent from source), matching the logical diff semantics.
   let site: Awaited<ReturnType<typeof loadSite>>
   try {
-    site = await loadSite({ contentRoot: sourceRoot, templatesDir: opts.templatesDir })
+    site = await loadSite({ contentRoot: sourceRoot, templatesDir: opts.templatesDir, manifest: opts.manifest })
   } catch (err) {
     if ((err as Error).message.includes('No site.yaml found')) {
       site = {

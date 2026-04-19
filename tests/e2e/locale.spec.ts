@@ -106,10 +106,11 @@ test.describe('Locale URL persistence', () => {
 test.describe('SiteTree locale badges', () => {
   test('pages with translations show locale badges', async ({ page }) => {
     await page.goto('/admin')
-    // home and about should have FR badges
     const homeRow = page.locator('.site-tree .node-item', { hasText: 'home' })
-    await expect(homeRow.locator('.locale-badge')).toBeVisible()
-    await expect(homeRow.locator('.locale-badge')).toContainText('FR')
+    const badges = homeRow.locator('.locale-badge')
+    await expect(badges.first()).toBeVisible()
+    // Starter has AR, FR, JA locales for home
+    await expect(badges).toHaveCount(3)
   })
 
   test('pages without translations have no badges', async ({ page }) => {

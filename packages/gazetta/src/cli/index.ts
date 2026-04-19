@@ -590,6 +590,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
         projectRoot,
         type: targetType,
         scanTemplates: async () => templateInfos,
+        manifest,
       })
       for (const item of cmp.unchanged) unchanged.add(item)
     }
