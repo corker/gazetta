@@ -515,6 +515,18 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 ---
 
+## Future work (architectural — not in this PR)
+
+These require design changes or infrastructure that doesn't exist yet:
+
+| Item | Why deferred |
+|------|-------------|
+| Cross-domain hreflang (per-domain targets link to each other's sitemaps) | Needs post-publish orchestration across targets |
+| Templates receive locale param | Breaks template contract — every existing template would need updating |
+| Cloudflare Worker runtime test | Needs deployed Worker + R2 — code is written and tested at unit level |
+
+---
+
 ## Bug summary
 
 | # | Bug | File | Line | Severity |

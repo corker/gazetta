@@ -1260,6 +1260,51 @@ async function runValidate(siteDir: string) {
     }
   }
 
+  // 7. Locale validation
+  const { defaultLocaleFor } = await import('../locale.js')
+  const defLoc = defaultLocaleFor(site.manifest)
+  const hasI18n = !!site.manifest.locales?.supported?.length
+
+  // 7a. Warn about orphaned locale files when i18n is disabled
+  if (!hasI18n && (site.pageLocales.size > 0 || site.fragmentLocales.size > 0)) {
+    const orphanCount = site.pageLocales.size + site.fragmentLocales.size
+    console.log(
+      `  ${c.yellow('⚠')} ${orphanCount} locale file${orphanCount > 1 ? 's' : ''} found but i18n is disabled ${c.dim('— add locales.supported to site.yaml or remove *.locale.json files')}`,
+    )
+  }
+
+  // 7b. Warn about ambiguous page.en.json when en is default
+  if (hasI18n) {
+    for (const [name, entry] of site.pageLocales) {
+      if (entry.locales.has(defLoc)) {
+        console.log(
+          `  ${c.yellow('⚠')} page.${defLoc}.json in ${name} is ambiguous ${c.dim(`— "${defLoc}" is the default locale, use page.json instead`)}`,
+        )
+      }
+    }
+    for (const [name, entry] of site.fragmentLocales) {
+      if (entry.locales.has(defLoc)) {
+        console.log(
+          `  ${c.yellow('⚠')} fragment.${defLoc}.json in ${name} is ambiguous ${c.dim(`— "${defLoc}" is the default locale, use fragment.json instead`)}`,
+        )
+      }
+    }
+  }
+
+  // 7c. Validate locale variant template/fragment refs
+  if (hasI18n) {
+    for (const [pageName, entry] of site.pageLocales) {
+      for (const [locale] of entry.locales) {
+        try {
+          await resolvePage(pageName, site, locale)
+        } catch (err) {
+          console.error(`  ${c.red('✗')} ${pageName} (${locale}) ${c.dim(`— ${(err as Error).message}`)}`)
+          errors++
+        }
+      }
+    }
+  }
+
   console.log()
   if (errors > 0) {
     console.error(`  ${errors} error${errors > 1 ? 's' : ''} found.\n`)

@@ -128,7 +128,13 @@ async function handleDelete(node: SiteNode, e: Event) {
       <i :class="node.icon" class="node-icon" />
       <span class="node-label">{{ node.label }}</span>
       <span v-if="node.locales?.length" class="node-locales">
-        <span v-for="loc in node.locales" :key="loc" class="locale-badge">{{ loc.toUpperCase() }}</span>
+        <template v-if="node.locales.length <= 3">
+          <span v-for="loc in node.locales" :key="loc" class="locale-badge">{{ loc.toUpperCase() }}</span>
+        </template>
+        <template v-else>
+          <span class="locale-badge">{{ node.locales[0].toUpperCase() }}</span>
+          <span class="locale-badge locale-count" :title="node.locales.map(l => l.toUpperCase()).join(', ')">+{{ node.locales.length - 1 }}</span>
+        </template>
       </span>
       <span v-if="isDirty(node)" class="node-dirty-dot" :title="dirtyTitle()"
         :data-testid="`dirty-${node.type}-${node.name}`" />
