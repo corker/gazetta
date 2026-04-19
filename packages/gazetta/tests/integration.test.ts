@@ -3,7 +3,11 @@ import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { loadSite } from '../src/site-loader.js'
 import { resolvePage } from '../src/resolver.js'
 import { renderComponent, renderPage } from '../src/renderer.js'
-import { starterTargetDir as siteDir, starterTemplatesDir as templatesDir, starterManifest } from './_helpers/starter.js'
+import {
+  starterTargetDir as siteDir,
+  starterTemplatesDir as templatesDir,
+  starterManifest,
+} from './_helpers/starter.js'
 
 const storage = createFilesystemProvider()
 
