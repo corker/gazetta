@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 295 use cases — 108 verified, 19 bugs, 168 gaps.
+**Summary:** 302 use cases — 108 verified, 20 bugs, 174 gaps.
 
 ---
 
@@ -143,13 +143,20 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 - [ ] Click EN → editor returns to English content
 - [ ] Unsaved changes guard fires when switching locale with dirty form
 
-## 14. Admin UI — URL persistence (5 cases)
+## 14. Admin UI — URL persistence (12 cases)
 
 - [x] `?locale=fr` persists on page refresh
-- [x] `?locale=fr` persists when navigating between pages
-- [x] `?locale=fr` combined with `?target=staging`
+- [!] **BUG: `?locale=fr` dropped when clicking page in SiteTree** — `onSelect` uses string push
+- [!] **BUG: `?locale=fr` dropped when clicking back-to-browse in CmsToolbar** — string push
+- [!] **BUG: `?locale=fr` dropped when clicking back-to-browse in EditorView** — string push
+- [!] **BUG: `?locale=fr` dropped when clicking fragment link in EditorPanel** — object push but no query
+- [!] **BUG: `?locale=fr` dropped when clicking component in PreviewPanel** — string push (edit mode)
+- [!] **BUG: `?locale=fr` dropped when clicking page link in PreviewPanel** — string push (fragment host)
+- [!] **BUG: `?locale=fr` dropped when switching target in ActiveTargetIndicator** — query has target but not locale
+- [x] `?locale=fr` combined with `?target=staging` (when both set manually in URL)
 - [x] `#hash` preserved when switching locale
 - [x] `?locale=fr` + `#hero` in URL at same time
+- [ ] Browser back/forward preserves `?locale=fr`
 
 ## 15. Publish — ESI mode (7 cases)
 
@@ -512,8 +519,9 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 | 15 | /fr/ trailing slash → 404 (inconsistent with /fr → 200) | cli/index.ts | — | Medium |
 | 16 | /fr/blog/hello-world → 404 (dynamic route locale fallback missing on dev server) | cli/index.ts | — | Medium |
 | 17 | ?locale=FR not normalized, ?locale=xx silently accepted, ?locale= empty not stripped | pages.ts | — | Medium |
-| 18 | Progress stream missing locale field | publish.ts | — | Low |
-| 19 | History doesn't record save locale | history-recorder.ts | — | Low |
+| 18 | ?locale= dropped by 7 router.push() calls across admin UI | SiteTree, CmsToolbar, EditorView, EditorPanel, PreviewPanel, ActiveTargetIndicator | — | High |
+| 19 | Progress stream missing locale field | publish.ts | — | Low |
+| 20 | History doesn't record save locale | history-recorder.ts | — | Low |
 
 ## Gap summary by severity
 
