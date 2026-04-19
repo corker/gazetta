@@ -400,7 +400,12 @@ function selectByGzId(gzId: string) {
         childPath: parts.length > 1 ? parts.slice(1).join('/') : null,
       }
     } else {
-      sel = { kind: 'component', path: entry.path, template: entry.template }
+      // On a fragment page, strip the @fragName/ prefix so the hash stores
+      // the path relative to the fragment (e.g. "copyright" not "@footer/copyright").
+      const fragPrefix = selection.type === 'fragment' && selection.name ? `@${selection.name}/` : ''
+      const relativePath =
+        fragPrefix && entry.path.startsWith(fragPrefix) ? entry.path.slice(fragPrefix.length) : entry.path
+      sel = { kind: 'component', path: relativePath, template: entry.template }
     }
   }
   // Write hash — the watcher opens the editor

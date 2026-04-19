@@ -394,8 +394,8 @@ async function handleMessage(e: MessageEvent) {
     iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:showSelect', gzId: e.data.gzId }, '*')
     if (selection.name) {
       const prefix = selection.type === 'page' ? '/pages' : '/fragments'
-      // Set pending AFTER push — otherwise consumePending fires synchronously
-      // on the current route, writing the hash before the /edit navigation.
+      // Navigate to edit first, then set pending. The ComponentTree's
+      // pendingGzId watcher picks it up after the tree rebuilds.
       await router.push(`${prefix}/${selection.name}/edit`)
       focus.setPending(e.data.gzId)
     }
