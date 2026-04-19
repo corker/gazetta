@@ -141,7 +141,7 @@ function printHelp() {
     gazetta serve [target] [site]   Serve published pages from target storage
     gazetta deploy [target] [site]  Deploy worker to hosting (one-time setup)
     gazetta validate [site]         Check site for broken references
-    gazetta translate <item> --to <locale>
+    gazetta translate <item> --to <locale> [target]
                                     Create a locale copy of a page or fragment
     gazetta history [target] [site] List revisions on a target
     gazetta undo [target] [site]    Restore the previous revision (soft undo)
@@ -200,6 +200,10 @@ function parseArgs(input: string[]): ParsedArgs {
       yes = true
     } else if (input[i] === '--limit') {
       limit = parseInt(input[++i], 10)
+    } else if (input[i] === '--to') {
+      i++ // consume the locale value — translate command reads it from raw args
+    } else if (input[i].startsWith('--to=')) {
+      // consumed by translate command directly
     } else if (!input[i].startsWith('-')) {
       positional.push(input[i])
     }
@@ -1776,6 +1780,13 @@ async function main() {
     }
   } else if (siteOnlyCommands.has(command)) {
     siteDir = await resolveSiteDir(parsed.positional[0])
+  } else if (command === 'translate') {
+    // gazetta translate <item> --to <locale> [target]
+    // positional args after the item are the optional target name
+    siteDir = await resolveSiteDir(undefined)
+    // Find the target arg — skip the item (pages/... or fragments/...) and --to/locale flags
+    const translatePositionals = parsed.positional.filter(p => !p.startsWith('pages/') && !p.startsWith('fragments/'))
+    if (translatePositionals.length > 0) targetName = translatePositionals[0]
   } else {
     console.error(`  Unknown command: ${command}\n`)
     printHelp()
@@ -1835,9 +1846,27 @@ async function main() {
         console.error(`  Error: item must start with pages/ or fragments/ (got "${itemArg}")`)
         process.exit(1)
       }
-      const itemName = itemArg.replace(/^(pages|fragments)\//, '')
+      // Resolve the content directory — translate operates on a target's filesystem.
+      // Uses the specified target or falls back to the first editable target.
+      const siteYaml = yaml.load(
+        readFileSync(join(siteDir, 'site.yaml'), 'utf-8'),
+      ) as import('../types.js').SiteManifest
+      const { isEditable } = await import('../types.js')
+      const resolvedTarget =
+        targetName ?? Object.entries(siteYaml.targets ?? {}).find(([, cfg]) => isEditable(cfg))?.[0]
+      if (!resolvedTarget) {
+        console.error('  Error: no editable target found')
+        process.exit(1)
+      }
+      const targetConfig = siteYaml.targets![resolvedTarget]
+      if (!targetConfig) {
+        console.error(`  Error: target "${resolvedTarget}" not found in site.yaml`)
+        process.exit(1)
+      }
+      const storagePath = targetConfig.storage.path ?? join('targets', resolvedTarget)
+      const contentDir = resolve(siteDir, storagePath)
       const baseName = isPage ? 'page' : 'fragment'
-      const dir = join(siteDir, itemArg)
+      const dir = join(contentDir, itemArg)
       const sourceFile = join(dir, `${baseName}.json`)
       const destFile = join(dir, localeFilename(baseName, locale))
       const fs = await import('node:fs/promises')

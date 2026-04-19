@@ -254,6 +254,49 @@ describe('runValidate', () => {
   })
 })
 
+describe('translate', () => {
+  const starterDir = resolve(import.meta.dirname, '../../../examples/starter')
+  const targetDir = join(starterDir, 'sites/main/targets/local')
+
+  it('copies page.json to page.de.json', { timeout: 60000 }, async () => {
+    const destFile = join(targetDir, 'pages/home/page.de.json')
+    if (existsSync(destFile)) await rm(destFile)
+
+    const { execSync } = await import('node:child_process')
+    const output = execSync(
+      `node ${resolve(import.meta.dirname, '../dist/cli/index.js')} translate pages/home --to de`,
+      { cwd: starterDir, stdio: 'pipe' },
+    ).toString()
+    expect(output).toContain('page.de.json')
+
+    expect(existsSync(destFile)).toBe(true)
+    const content = JSON.parse(await import('node:fs').then(fs => fs.readFileSync(destFile, 'utf-8')))
+    expect(content.template).toBeDefined()
+
+    await rm(destFile)
+  })
+
+  it('refuses to overwrite existing locale file', { timeout: 60000 }, async () => {
+    const { execSync } = await import('node:child_process')
+    expect(() => {
+      execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} translate pages/home --to fr`, {
+        cwd: starterDir,
+        stdio: 'pipe',
+      })
+    }).toThrow()
+  })
+
+  it('errors on missing source file', { timeout: 60000 }, async () => {
+    const { execSync } = await import('node:child_process')
+    expect(() => {
+      execSync(`node ${resolve(import.meta.dirname, '../dist/cli/index.js')} translate pages/nonexistent --to fr`, {
+        cwd: starterDir,
+        stdio: 'pipe',
+      })
+    }).toThrow()
+  })
+})
+
 describe('findCmsDir (dev mode detection)', () => {
   function findCmsDir(): string | null {
     const candidates = [

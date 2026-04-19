@@ -176,8 +176,9 @@ ${bodyContent}
 </body>
 </html>`
 
+  const indexFile = locale ? `index.${locale}.html` : 'index.html'
   await targetStorage.mkdir(pageDir)
-  await targetStorage.writeFile(`${pageDir}/index.html`, html)
+  await targetStorage.writeFile(`${pageDir}/${indexFile}`, html)
   fileCount++
 
   // Write content-hash sidecar + reverse-dep sidecars for compare/dependents
@@ -213,13 +214,15 @@ export async function publishPageStatic(
   preloadedSite?: Site,
   /** SEO context for the fallback chain — caller builds from manifest + target config. */
   seo?: import('./seo.js').SeoContext,
+  /** Locale for this render pass. When set, resolves locale-specific content and writes to locale-prefixed path. */
+  locale?: string,
 ): Promise<{ files: number }> {
   const site = preloadedSite ?? (await loadSite({ contentRoot: sourceRoot, templatesDir }))
   const page = site.pages.get(pageName)
   if (!page) throw new Error(`Page "${pageName}" not found`)
 
   // Scope IDs are now deterministic (hash-based), no reset needed
-  const resolved = await resolvePage(pageName, site)
+  const resolved = await resolvePage(pageName, site, locale)
   const html = await renderPage(resolved, {
     metadata: page.metadata,
     route: page.route,
@@ -227,7 +230,9 @@ export async function publishPageStatic(
   })
 
   // URL path: / → index.html, /about → about/index.html
-  const urlPath = page.route === '/' ? '' : page.route.replace(/^\//, '')
+  // Locale prefix: /fr/about → fr/about/index.html
+  const baseUrlPath = page.route === '/' ? '' : page.route.replace(/^\//, '')
+  const urlPath = locale ? (baseUrlPath ? `${locale}/${baseUrlPath}` : locale) : baseUrlPath
   const outputPath = urlPath ? `${urlPath}/index.html` : 'index.html'
   const outputDir = urlPath || '.'
 

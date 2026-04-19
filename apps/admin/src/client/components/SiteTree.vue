@@ -92,6 +92,7 @@ const fragments = computed<SiteNode[]>(() =>
       type: 'fragment' as const,
       name: f.name,
       icon: 'pi pi-share-alt',
+      locales: f.locales,
     }))
     .sort((a, b) => a.label.localeCompare(b.label)),
 )
