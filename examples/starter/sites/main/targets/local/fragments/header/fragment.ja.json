@@ -1,0 +1,24 @@
+{
+  "template": "header-layout",
+  "components": [
+    {
+      "name": "logo",
+      "template": "logo",
+      "content": {
+        "text": "Gazetta",
+        "href": "/ja"
+      }
+    },
+    {
+      "name": "nav",
+      "template": "nav",
+      "content": {
+        "links": [
+          { "label": "ホーム", "href": "/ja" },
+          { "label": "概要", "href": "/ja/about" },
+          { "label": "ブログ", "href": "/ja/blog/hello-world" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "template": "page-default",
+  "metadata": {
+    "title": "Gazetta — コンポーザブルCMS",
+    "description": "コンポーザブルなフラグメントでウェブサイトを構築するステートレスCMS。すべての状態はターゲットに保存されます。"
+  },
+  "components": [
+    "@header",
+    {
+      "name": "hero",
+      "template": "hero",
+      "content": {
+        "title": "Gazettaへようこそ",
+        "subtitle": "再利用可能なコンポーネントからページを構成するステートレスCMS"
+      }
+    },
+    {
+      "name": "features",
+      "template": "features-grid",
+      "content": {
+        "heading": "なぜGazetta？"
+      },
+      "components": [
+        {
+          "name": "fast",
+          "template": "feature-card",
+          "content": {
+            "icon": "⚡",
+            "title": "高速",
+            "description": "リクエスト時にエッジで合成。フルリビルド不要。"
+          }
+        },
+        {
+          "name": "composable",
+          "template": "feature-card",
+          "content": {
+            "icon": "🧩",
+            "title": "コンポーザブル",
+            "description": "再利用可能なフラグメントからページを構築。再帰的な合成。"
+          }
+        },
+        {
+          "name": "open-source",
+          "template": "feature-card",
+          "content": {
+            "icon": "🔓",
+            "title": "オープンソース",
+            "description": "ベンダーロックインなし。テンプレートに任意のフレームワークを使用。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "demo",
+      "template": "counter",
+      "content": {
+        "label": "クリック",
+        "start": 0
+      }
+    },
+    {
+      "name": "vue-demo",
+      "template": "vue-test",
+      "content": {
+        "heading": "Vue SSR 動作確認",
+        "body": "このコンポーネントはVue 3 SSRでレンダリングされています"
+      }
+    },
+    {
+      "name": "banner",
+      "template": "banner",
+      "content": {
+        "heading": "今すぐ始めよう",
+        "text": "コンポーザブルなフラグメントで美しいサイトを構築",
+        "buttonText": "詳しく見る",
+        "buttonUrl": "/about",
+        "background": "#667eea"
+      }
+    },
+    "@footer"
+  ]
+}

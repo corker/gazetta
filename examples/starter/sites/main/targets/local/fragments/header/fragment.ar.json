@@ -1,0 +1,24 @@
+{
+  "template": "header-layout",
+  "components": [
+    {
+      "name": "logo",
+      "template": "logo",
+      "content": {
+        "text": "Gazetta",
+        "href": "/ar"
+      }
+    },
+    {
+      "name": "nav",
+      "template": "nav",
+      "content": {
+        "links": [
+          { "label": "الرئيسية", "href": "/ar" },
+          { "label": "حول", "href": "/ar/about" },
+          { "label": "المدونة", "href": "/ar/blog/hello-world" }
+        ]
+      }
+    }
+  ]
+}

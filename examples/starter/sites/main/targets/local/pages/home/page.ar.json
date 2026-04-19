@@ -1,0 +1,82 @@
+{
+  "template": "page-default",
+  "metadata": {
+    "title": "Gazetta — نظام إدارة محتوى قابل للتركيب",
+    "description": "نظام إدارة محتوى بلا حالة يبني المواقع من أجزاء قابلة للتركيب. جميع البيانات تعيش في الأهداف."
+  },
+  "components": [
+    "@header",
+    {
+      "name": "hero",
+      "template": "hero",
+      "content": {
+        "title": "مرحباً بك في Gazetta",
+        "subtitle": "نظام إدارة محتوى بلا حالة يركّب الصفحات من مكونات قابلة لإعادة الاستخدام"
+      }
+    },
+    {
+      "name": "features",
+      "template": "features-grid",
+      "content": {
+        "heading": "لماذا Gazetta؟"
+      },
+      "components": [
+        {
+          "name": "fast",
+          "template": "feature-card",
+          "content": {
+            "icon": "⚡",
+            "title": "سريع",
+            "description": "تركيب على الحافة وقت الطلب. لا إعادة بناء كاملة."
+          }
+        },
+        {
+          "name": "composable",
+          "template": "feature-card",
+          "content": {
+            "icon": "🧩",
+            "title": "قابل للتركيب",
+            "description": "ابنِ صفحات من أجزاء قابلة لإعادة الاستخدام. تركيب متكرر."
+          }
+        },
+        {
+          "name": "open-source",
+          "template": "feature-card",
+          "content": {
+            "icon": "🔓",
+            "title": "مفتوح المصدر",
+            "description": "لا قفل مورّد. استخدم أي إطار عمل للقوالب."
+          }
+        }
+      ]
+    },
+    {
+      "name": "demo",
+      "template": "counter",
+      "content": {
+        "label": "نقرات",
+        "start": 0
+      }
+    },
+    {
+      "name": "vue-demo",
+      "template": "vue-test",
+      "content": {
+        "heading": "Vue SSR يعمل",
+        "body": "هذا المكون يتم عرضه باستخدام Vue 3 SSR"
+      }
+    },
+    {
+      "name": "banner",
+      "template": "banner",
+      "content": {
+        "heading": "ابدأ اليوم",
+        "text": "ابنِ مواقع جميلة باستخدام أجزاء قابلة للتركيب",
+        "buttonText": "اعرف المزيد",
+        "buttonUrl": "/about",
+        "background": "#667eea"
+      }
+    },
+    "@footer"
+  ]
+}
