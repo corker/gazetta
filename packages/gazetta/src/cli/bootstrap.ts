@@ -118,6 +118,7 @@ export async function buildSourceContext(opts: BuildSourceContextOptions): Promi
     targetName,
     projectSiteDir: opts.projectSiteDir,
     sidecarWriter: opts.sidecarWriter,
+    manifest,
   })
 
   return { source, manifest, targetConfigs }

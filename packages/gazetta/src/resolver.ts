@@ -153,14 +153,18 @@ export async function resolveFragment(fragmentName: string, site: Site, locale?:
 }
 
 export async function resolvePage(pageName: string, site: Site, locale?: string): Promise<ResolvedComponent> {
-  const page = site.pages.get(pageName)
-  if (!page) {
+  const defaultPage = site.pages.get(pageName)
+  if (!defaultPage) {
     const available = [...site.pages.keys()]
     throw new Error(
       `Page "${pageName}" not found.\n` +
         `  Available pages: ${available.length > 0 ? available.join(', ') : '(none)'}`,
     )
   }
+
+  // Use locale variant's content/components when available, fall back to default
+  const localeEntry = locale ? site.pageLocales.get(pageName) : undefined
+  const page = localeEntry?.locales.get(locale!) ?? defaultPage
 
   const templatesDir = site.templatesDir
   const resolvedLocales = locale ? (resolveSiteLocales(site.manifest) ?? undefined) : undefined
