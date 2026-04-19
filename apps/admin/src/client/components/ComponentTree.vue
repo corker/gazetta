@@ -304,6 +304,12 @@ function onHoverEnd() {
 
 // --- Node selection ---
 
+/** Strip the @fragName/ prefix from a component path on fragment pages. */
+function stripFragmentPrefix(path: string): string {
+  const prefix = selection.type === 'fragment' && selection.name ? `@${selection.name}/` : ''
+  return prefix && path.startsWith(prefix) ? path.slice(prefix.length) : path
+}
+
 /** Derive a typed selection from a clicked tree node. */
 function nodeToSelection(node: ComponentNode): EditorSelection | null {
   if (!node.data) return null
@@ -329,12 +335,7 @@ function nodeToSelection(node: ComponentNode): EditorSelection | null {
       childPath: parts.length > 1 ? parts.slice(1).join('/') : null,
     }
   }
-  // On a fragment page, strip the @fragName/ prefix so the hash stores
-  // the path relative to the fragment (e.g. "logo" not "@header/logo").
-  const prefix = selection.type === 'fragment' && selection.name ? `@${selection.name}/` : ''
-  const relativePath =
-    prefix && node.data.path.startsWith(prefix) ? node.data.path.slice(prefix.length) : node.data.path
-  return { kind: 'component', path: relativePath, template: node.data.template ?? '' }
+  return { kind: 'component', path: stripFragmentPrefix(node.data.path), template: node.data.template ?? '' }
 }
 
 async function onSelect(node: ComponentNode) {
@@ -400,12 +401,7 @@ function selectByGzId(gzId: string) {
         childPath: parts.length > 1 ? parts.slice(1).join('/') : null,
       }
     } else {
-      // On a fragment page, strip the @fragName/ prefix so the hash stores
-      // the path relative to the fragment (e.g. "copyright" not "@footer/copyright").
-      const fragPrefix = selection.type === 'fragment' && selection.name ? `@${selection.name}/` : ''
-      const relativePath =
-        fragPrefix && entry.path.startsWith(fragPrefix) ? entry.path.slice(fragPrefix.length) : entry.path
-      sel = { kind: 'component', path: relativePath, template: entry.template }
+      sel = { kind: 'component', path: stripFragmentPrefix(entry.path), template: entry.template }
     }
   }
   // Write hash — the watcher opens the editor
