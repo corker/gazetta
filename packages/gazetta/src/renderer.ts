@@ -23,14 +23,15 @@ export async function renderComponent(
   }
 }
 
-export async function renderFragment(component: ResolvedComponent): Promise<string> {
+export async function renderFragment(component: ResolvedComponent, locale?: string): Promise<string> {
   const children = await Promise.all(component.children.map(c => renderComponent(c)))
   const output = await component.template({ content: component.content, children })
 
   const headContent = [...children.map(c => c.head).filter(Boolean), output.head].filter(Boolean).join('\n  ')
+  const lang = locale || 'en'
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

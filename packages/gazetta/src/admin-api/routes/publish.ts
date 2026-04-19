@@ -325,7 +325,7 @@ export function publishRoutes(
               targetStorage,
               site,
               pageHashOpts,
-              { cache: config?.cache, templatesDir: tdir, seo },
+              { cache: config?.cache, templatesDir: tdir, seo, targetLocales: config?.locales },
             )
             return { files }
           }
@@ -337,7 +337,7 @@ export function publishRoutes(
               targetStorage,
               site,
               { templateHashes },
-              { templatesDir: tdir },
+              { templatesDir: tdir, targetLocales: config?.locales },
             )
             return { files }
           }
@@ -403,13 +403,17 @@ export function publishRoutes(
               console.log(`    ${targetName}: cache purged (all)`)
             } else if (config?.siteUrl) {
               const siteForUrls = await loadSiteFromSource(source, { templatesDir })
-              const urls = targetItems
-                .filter(i => i.startsWith('pages/'))
-                .map(i => {
-                  const page = siteForUrls.pages.get(i.replace('pages/', ''))
-                  return page ? `${config.siteUrl}${page.route}` : null
-                })
-                .filter(Boolean) as string[]
+              const publishedPageNames = new Set(
+                targetItems.filter(i => i.startsWith('pages/')).map(i => i.replace('pages/', '')),
+              )
+              // Collect URLs for all published pages including locale variants
+              const urls: string[] = []
+              const { allPageEntries } = await import('../../site-loader.js')
+              for (const { name, page } of allPageEntries(siteForUrls)) {
+                if (publishedPageNames.has(name)) {
+                  urls.push(`${config.siteUrl}${page.route}`)
+                }
+              }
               if (urls.length > 0) {
                 await purge.purgeUrls(urls)
                 console.log(`    ${targetName}: cache purged (${urls.join(', ')})`)
