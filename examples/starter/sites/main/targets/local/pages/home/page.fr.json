@@ -1,0 +1,82 @@
+{
+  "template": "page-default",
+  "metadata": {
+    "title": "Gazetta — CMS Composable",
+    "description": "Un CMS sans état qui structure les sites web en fragments composables. Tout l'état vit dans les cibles."
+  },
+  "components": [
+    "@header",
+    {
+      "name": "hero",
+      "template": "hero",
+      "content": {
+        "title": "Bienvenue sur Gazetta",
+        "subtitle": "Un CMS sans état qui compose des pages à partir de composants réutilisables"
+      }
+    },
+    {
+      "name": "features",
+      "template": "features-grid",
+      "content": {
+        "heading": "Pourquoi Gazetta ?"
+      },
+      "components": [
+        {
+          "name": "fast",
+          "template": "feature-card",
+          "content": {
+            "icon": "⚡",
+            "title": "Rapide",
+            "description": "Composition en périphérie au moment de la requête. Pas de reconstruction complète."
+          }
+        },
+        {
+          "name": "composable",
+          "template": "feature-card",
+          "content": {
+            "icon": "🧩",
+            "title": "Composable",
+            "description": "Construisez des pages à partir de fragments réutilisables. Composition récursive."
+          }
+        },
+        {
+          "name": "open-source",
+          "template": "feature-card",
+          "content": {
+            "icon": "🔓",
+            "title": "Open Source",
+            "description": "Pas de verrouillage fournisseur. Utilisez n'importe quel framework pour les templates."
+          }
+        }
+      ]
+    },
+    {
+      "name": "demo",
+      "template": "counter",
+      "content": {
+        "label": "Clics",
+        "start": 0
+      }
+    },
+    {
+      "name": "vue-demo",
+      "template": "vue-test",
+      "content": {
+        "heading": "Vue SSR Fonctionne",
+        "body": "Ce composant est rendu avec Vue 3 SSR"
+      }
+    },
+    {
+      "name": "banner",
+      "template": "banner",
+      "content": {
+        "heading": "Commencez Aujourd'hui",
+        "text": "Construisez de beaux sites avec des fragments composables",
+        "buttonText": "En Savoir Plus",
+        "buttonUrl": "/about",
+        "background": "#667eea"
+      }
+    },
+    "@footer"
+  ]
+}
