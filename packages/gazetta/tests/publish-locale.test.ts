@@ -182,7 +182,7 @@ describe('publishPageRendered sidecar per locale', () => {
 
     // Record the sidecar state after default publish
     const entriesBefore = await target.readDir('pages/home')
-    const hashBefore = entriesBefore.find(e => e.name.endsWith('.hash'))!.name
+    const hashBefore = entriesBefore.find(e => e.name.match(/\.hash$/) && !e.name.includes('.hash.'))!.name
 
     // Publish FR — should NOT write sidecars (locale variant)
     await publishPageRendered(
@@ -203,12 +203,15 @@ describe('publishPageRendered sidecar per locale', () => {
     expect(htmlFiles).toContain('index.html')
     expect(htmlFiles).toContain('index.fr.html')
 
-    // Default sidecar unchanged — FR publish didn't touch it
-    const hashAfter = entries.find(e => e.name.endsWith('.hash'))!.name
-    expect(hashAfter).toBe(hashBefore)
+    // Default sidecar unchanged — FR publish wrote .hash.fr, not .hash
+    const defaultHashAfter = entries.find(e => e.name.match(/\.hash$/) && !e.name.includes('.hash.'))?.name
+    expect(defaultHashAfter).toBe(hashBefore)
+    // FR sidecar exists
+    const frHash = entries.find(e => e.name.endsWith('.hash.fr'))
+    expect(frHash).toBeDefined()
   })
 
-  it('locale-only publish creates HTML but no sidecars', async () => {
+  it('locale-only publish creates HTML with locale-scoped sidecars', async () => {
     const target = createFilesystemProvider(renderTargetDir)
     const root = createContentRoot(storage, starterTargetDir)
     const { hashManifest } = await import('../src/hash.js')
@@ -231,9 +234,13 @@ describe('publishPageRendered sidecar per locale', () => {
 
     const entries = await target.readDir('pages/home')
     expect(entries.some(e => e.name === 'index.fr.html')).toBe(true)
-    // No sidecars written for locale-only publish
-    expect(entries.filter(e => e.name.endsWith('.hash')).length).toBe(0)
-    expect(entries.filter(e => e.name.startsWith('.pub-')).length).toBe(0)
+    // Locale-scoped sidecars: .hash.fr and .pub-*.fr
+    const hashFiles = entries.filter(e => e.name.endsWith('.hash.fr'))
+    expect(hashFiles.length).toBe(1)
+    const pubFiles = entries.filter(e => e.name.startsWith('.pub-') && e.name.endsWith('.fr'))
+    expect(pubFiles.length).toBe(1)
+    // No default-locale sidecars (no .hash without suffix, no .pub without suffix)
+    expect(entries.filter(e => e.name.match(/\.hash$/) && !e.name.includes('.hash.')).length).toBe(0)
   })
 })
 

@@ -38,19 +38,22 @@ export async function publishPageAllLocales(
     seo?: SeoContext
     /** When set, only publish locales in this subset. */
     targetLocales?: string[]
+    /** Locale keys to skip (already up-to-date). null = default locale. */
+    unchangedLocales?: Set<string | null>
   },
 ): Promise<PublishLocaleResult> {
   const page = site.pages.get(pageName)
   if (!page) return { files: 0, removed: 0 }
 
   const localeFilter = opts.targetLocales ? new Set(opts.targetLocales) : null
+  const skipLocales = opts.unchangedLocales ?? new Set()
   const defaultLocale = defaultLocaleFor(site.manifest)
 
   let totalFiles = 0
   let totalRemoved = 0
 
-  // Default locale — skip if target doesn't include it
-  if (!localeFilter || localeFilter.has(defaultLocale)) {
+  // Default locale — skip if target doesn't include it or already up-to-date
+  if ((!localeFilter || localeFilter.has(defaultLocale)) && !skipLocales.has(null)) {
     const manifestHash = hashManifest(page, hashOpts)
     const { files, removed } = await publishPageRendered(
       pageName,
@@ -71,6 +74,7 @@ export async function publishPageAllLocales(
   if (localeEntry) {
     for (const [locale, localePage] of localeEntry.locales) {
       if (localeFilter && !localeFilter.has(locale)) continue
+      if (skipLocales.has(locale)) continue
       const localeHash = hashManifest(localePage, hashOpts)
       const localeSeo = opts.seo ? { ...opts.seo, locale } : undefined
       const { files: lf, removed: lr } = await publishPageRendered(
@@ -106,19 +110,22 @@ export async function publishFragmentAllLocales(
     templatesDir?: string
     /** When set, only publish locales in this subset. */
     targetLocales?: string[]
+    /** Locale keys to skip (already up-to-date). null = default locale. */
+    unchangedLocales?: Set<string | null>
   },
 ): Promise<PublishLocaleResult> {
   const frag = site.fragments.get(fragName)
   if (!frag) return { files: 0, removed: 0 }
 
   const localeFilter = opts.targetLocales ? new Set(opts.targetLocales) : null
+  const skipLocales = opts.unchangedLocales ?? new Set()
   const defaultLocale = defaultLocaleFor(site.manifest)
 
   let totalFiles = 0
   let totalRemoved = 0
 
-  // Default locale — skip if target doesn't include it
-  if (!localeFilter || localeFilter.has(defaultLocale)) {
+  // Default locale — skip if target doesn't include it or already up-to-date
+  if ((!localeFilter || localeFilter.has(defaultLocale)) && !skipLocales.has(null)) {
     const manifestHash = hashManifest(frag, hashOpts)
     const { files, removed } = await publishFragmentRendered(
       fragName,
@@ -137,6 +144,7 @@ export async function publishFragmentAllLocales(
   if (localeEntry) {
     for (const [locale, localeFrag] of localeEntry.locales) {
       if (localeFilter && !localeFilter.has(locale)) continue
+      if (skipLocales.has(locale)) continue
       const localeHash = hashManifest(localeFrag, hashOpts)
       const { files: lf, removed: lr } = await publishFragmentRendered(
         fragName,

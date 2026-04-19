@@ -1,18 +1,26 @@
 import { createHash } from 'node:crypto'
 import type { ComponentEntry, FragmentManifest, PageManifest } from './types.js'
 
-const SIDECAR_RE = /^\.([0-9a-f]{8})\.hash$/
+const SIDECAR_RE = /^\.([0-9a-f]{8})\.hash(?:\.([a-z]{2}(?:-[a-z]+)?))?$/
 const USES_SIDECAR_RE = /^\.uses-(.+)$/
 const TPL_SIDECAR_RE = /^\.tpl-(.+)$/
-const PUB_SIDECAR_RE = /^\.pub-(\d{8}T\d{6}Z)(-noindex)?$/
+const PUB_SIDECAR_RE = /^\.pub-(\d{8}T\d{6}Z)(-noindex)?(?:\.([a-z]{2}(?:-[a-z]+)?))?$/
 
-export function sidecarNameFor(hash: string): string {
-  return `.${hash}.hash`
+/** Build a hash sidecar filename, optionally locale-suffixed. */
+export function sidecarNameFor(hash: string, locale?: string): string {
+  return locale ? `.${hash}.hash.${locale}` : `.${hash}.hash`
 }
 
+/** Parse a hash sidecar filename. Returns { hash, locale? } or null. */
 export function parseSidecarName(entryName: string): string | null {
   const m = SIDECAR_RE.exec(entryName)
   return m ? m[1] : null
+}
+
+/** Parse locale from a hash sidecar filename. */
+export function parseSidecarLocale(entryName: string): string | undefined {
+  const m = SIDECAR_RE.exec(entryName)
+  return m?.[2] ?? undefined
 }
 
 /**
@@ -84,9 +92,10 @@ export interface PubSidecar {
   noindex: boolean
 }
 
-/** `.pub-20260417T220000Z` or `.pub-20260417T220000Z-noindex` */
-export function pubSidecarNameFor(date: Date = new Date(), noindex = false): string {
-  return `.pub-${compactTimestamp(date)}${noindex ? '-noindex' : ''}`
+/** `.pub-20260417T220000Z`, `.pub-20260417T220000Z-noindex`, or `.pub-20260417T220000Z.fr` */
+export function pubSidecarNameFor(date: Date = new Date(), noindex = false, locale?: string): string {
+  const base = `.pub-${compactTimestamp(date)}${noindex ? '-noindex' : ''}`
+  return locale ? `${base}.${locale}` : base
 }
 
 export function parsePubSidecarName(entryName: string): PubSidecar | null {
@@ -96,6 +105,12 @@ export function parsePubSidecarName(entryName: string): PubSidecar | null {
     lastPublished: parseCompactTimestamp(m[1]),
     noindex: !!m[2],
   }
+}
+
+/** Parse locale from a pub sidecar filename. */
+export function parsePubSidecarLocale(entryName: string): string | undefined {
+  const m = PUB_SIDECAR_RE.exec(entryName)
+  return m?.[3] ?? undefined
 }
 
 /**
