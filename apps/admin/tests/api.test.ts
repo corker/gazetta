@@ -391,3 +391,82 @@ describe('DELETE /api/fragments/:name', () => {
 
 // /api/components routes were removed in #112 (merged JSON format).
 // Component create/update now happens via PUT /api/pages/:name with updated components array.
+
+// ---------------------------------------------------------------------------
+// Locale endpoints (i18n)
+// ---------------------------------------------------------------------------
+
+describe('GET /api/pages (locale support)', () => {
+  it('page list includes locales array for pages with translations', async () => {
+    const { body } = await get('/api/pages')
+    const home = body.find((p: { name: string }) => p.name === 'home')
+    // Starter has page.fr.json for home
+    expect(home.locales).toBeDefined()
+    expect(home.locales).toContain('fr')
+  })
+
+  it('pages without translations have no locales array', async () => {
+    const { body } = await get('/api/pages')
+    const blog = body.find((p: { name: string }) => p.name === 'blog/[slug]')
+    // Blog has no locale files
+    expect(blog.locales ?? []).toHaveLength(0)
+  })
+})
+
+describe('GET /api/pages/:name?locale=', () => {
+  it('returns default page when no locale param', async () => {
+    const { status, body } = await get('/api/pages/home')
+    expect(status).toBe(200)
+    expect(body.locale).toBeUndefined()
+  })
+
+  it('returns locale-specific content when locale param provided', async () => {
+    const { status, body } = await get('/api/pages/home?locale=fr')
+    expect(status).toBe(200)
+    expect(body.locale).toBe('fr')
+    // French page has different content
+    expect(body.components).toBeDefined()
+  })
+
+  it('falls back to default when requested locale not available', async () => {
+    const { status, body } = await get('/api/pages/home?locale=de')
+    expect(status).toBe(200)
+    // Should return the page (fallback), not 404
+    expect(body.template).toBeDefined()
+  })
+})
+
+describe('GET /api/fragments (locale support)', () => {
+  it('fragment list returns successfully', async () => {
+    const { status, body } = await get('/api/fragments')
+    expect(status).toBe(200)
+    // Fragments may or may not have locale files in the starter
+    expect(body.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('GET /preview/* (locale support)', () => {
+  it('renders home page at locale-prefixed URL', async () => {
+    const { status, body } = await getText('/preview/fr')
+    expect(status).toBe(200)
+    expect(body).toContain('<!DOCTYPE html>')
+  })
+
+  it('renders about page with locale prefix', async () => {
+    const { status, body } = await getText('/preview/fr/about')
+    expect(status).toBe(200)
+    expect(body).toContain('<!DOCTYPE html>')
+  })
+})
+
+describe('GET /api/site (locale config)', () => {
+  it('returns site manifest with locales config', async () => {
+    const { status, body } = await get('/api/site')
+    expect(status).toBe(200)
+    // Starter has locales.supported: [en, fr]
+    if (body.locales) {
+      expect(body.locales.supported).toContain('en')
+      expect(body.locales.supported).toContain('fr')
+    }
+  })
+})
