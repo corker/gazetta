@@ -95,8 +95,9 @@ export async function publishPageRendered(
   }
 
   // Render page-level template (layout CSS, head tags)
-  const childOutputs = await Promise.all(resolved.children.map(c => renderComponent(c)))
-  const pageOutput = await resolved.template({ content: resolved.content, children: childOutputs })
+  const lang = seo?.locale || locale || 'en'
+  const childOutputs = await Promise.all(resolved.children.map(c => renderComponent(c, undefined, lang)))
+  const pageOutput = await resolved.template({ content: resolved.content, children: childOutputs, locale: lang })
   if (pageOutput.css) localCssParts.unshift(pageOutput.css)
   if (pageOutput.head) localHeadParts.unshift(pageOutput.head)
 
@@ -159,7 +160,6 @@ export async function publishPageRendered(
     .join('\n  ')
 
   const bodyContent = bodyParts.join('\n')
-  const lang = seo?.locale || 'en'
 
   // Resolve cache config: page → target → defaults
   const browser = page.cache?.browser ?? targetCache?.browser ?? 0
