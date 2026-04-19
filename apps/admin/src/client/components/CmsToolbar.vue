@@ -10,7 +10,6 @@ import { useThemeStore } from '../stores/theme.js'
 import { useUiModeStore } from '../stores/uiMode.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
 import { saveButtonLabel, saveButtonSeverity } from '../composables/saveButtonBinding.js'
-import { useNavigation } from '../composables/useNavigation.js'
 import PublishPanel from './PublishPanel.vue'
 import ActiveTargetIndicator from './ActiveTargetIndicator.vue'
 import SyncIndicators from './SyncIndicators.vue'
@@ -18,7 +17,6 @@ import LocalePicker from './LocalePicker.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { navigateTo } = useNavigation()
 const isDevPage = computed(() => route.name === 'dev')
 
 const site = useSiteStore()
@@ -67,7 +65,7 @@ const saveSeverity = computed(() => saveButtonSeverity(activeTarget.activeTarget
 
 function handleBack() {
   const prefix = selection.type === 'page' ? '/pages' : '/fragments'
-  navigateTo(`${prefix}/${selection.name}`)
+  router.push(`${prefix}/${selection.name}`)
 }
 </script>
 

@@ -26,6 +26,44 @@ export function createRouter() {
     ],
   })
 
+  // --- Persistent query params (locale, target) ---
+  // Locale and target are navigation context that survives every route change.
+  // We wrap router.push/replace to auto-inject the current values. Callers
+  // use plain string pushes ('/pages/home/edit') and the context follows.
+  // To REMOVE a param: pass it in the query object (LocalePicker sets
+  // locale: undefined; ActiveTargetIndicator sets target explicitly).
+  const PERSISTENT_KEYS = ['locale', 'target'] as const
+  const _push = router.push.bind(router)
+  const _replace = router.replace.bind(router)
+
+  function withPersistentQuery(to: any): any {
+    const current = router.currentRoute.value.query
+    const preserve: Record<string, string> = {}
+    for (const key of PERSISTENT_KEYS) {
+      if (current[key]) preserve[key] = current[key] as string
+    }
+    if (Object.keys(preserve).length === 0) return to
+
+    if (typeof to === 'string') {
+      const url = new URL(to, 'http://x')
+      for (const [k, v] of Object.entries(preserve)) {
+        if (!url.searchParams.has(k)) url.searchParams.set(k, v)
+      }
+      return url.pathname + url.search + (url.hash || '')
+    }
+    // Object form: { path, query, hash } or { name, params, query }
+    // Only inject keys the caller didn't explicitly provide.
+    const query = { ...preserve, ...(to.query ?? {}) }
+    // Remove keys explicitly set to undefined (intentional removal)
+    for (const k of Object.keys(query)) {
+      if (query[k] === undefined || query[k] === null) delete query[k]
+    }
+    return { ...to, query }
+  }
+
+  router.push = ((to: any) => _push(withPersistentQuery(to))) as typeof router.push
+  router.replace = ((to: any) => _replace(withPersistentQuery(to))) as typeof router.replace
+
   router.beforeEach(async (to, from) => {
     const site = useSiteStore()
     await site.ensureLoaded()

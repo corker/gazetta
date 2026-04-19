@@ -2,7 +2,7 @@
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import { onKeyStroke } from '@vueuse/core'
-import { useNavigation } from '../composables/useNavigation.js'
+import { useRouter } from 'vue-router'
 import SiteTree from './SiteTree.vue'
 import ComponentTree from './ComponentTree.vue'
 import EditorPanel from './EditorPanel.vue'
@@ -11,7 +11,7 @@ import { useUiModeStore } from '../stores/uiMode.js'
 import { useSelectionStore } from '../stores/selection.js'
 import { useUnsavedGuardStore } from '../stores/unsavedGuard.js'
 
-const { navigateTo } = useNavigation()
+const router = useRouter()
 const uiMode = useUiModeStore()
 const selection = useSelectionStore()
 const unsavedGuard = useUnsavedGuardStore()
@@ -36,7 +36,7 @@ onKeyStroke('Escape', () => {
   }
   if (!selection.name) return
   const prefix = selection.type === 'page' ? '/pages' : '/fragments'
-  navigateTo(`${prefix}/${selection.name}`)
+  router.push(`${prefix}/${selection.name}`)
 })
 </script>
 
