@@ -109,11 +109,19 @@ export function pageRoutes(resolve: SourceContextResolver) {
 
   app.put('/api/pages/:name{.+}', async c => {
     const name = c.req.param('name')
+    const rawLocale = c.req.query('locale')
+    const locale = rawLocale && isValidLocale(rawLocale) ? rawLocale.toLowerCase() : undefined
+    if (rawLocale && !locale) return c.json({ error: `Invalid locale code: "${rawLocale}"` }, 400)
+
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
     const site = await loadSiteFromSource(source)
-    const page = site.pages.get(name)
-    if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
+
+    // Resolve the page to update — locale variant or default
+    const defaultPage = site.pages.get(name)
+    if (!defaultPage) return c.json({ error: `Page "${name}" not found` }, 404)
+    const localeVariant = locale ? site.pageLocales.get(name)?.locales.get(locale) : undefined
+    const page = localeVariant ?? defaultPage
 
     const body = await c.req.json()
     const manifest: Record<string, unknown> = {
@@ -123,8 +131,11 @@ export function pageRoutes(resolve: SourceContextResolver) {
     }
     if (body.metadata !== undefined) manifest.metadata = body.metadata
     else if (page.metadata) manifest.metadata = page.metadata
+    // Locale variants store their route for preview resolution
+    if (locale && page.route) manifest.route = page.route
 
-    const manifestPath = join(page.dir, 'page.json')
+    const filename = locale ? `page.${locale}.json` : 'page.json'
+    const manifestPath = join(defaultPage.dir, filename)
     const serialized = JSON.stringify(manifest, null, 2) + '\n'
 
     // Record the history revision BEFORE the disk write. recordWrite's

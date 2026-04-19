@@ -205,8 +205,10 @@ export const api = {
   createPage: (data: CreatePageRequest) =>
     request<CreatePageResponse>('/pages', { method: 'POST', body: JSON.stringify(data) }),
   deletePage: (name: string) => request<{ ok: boolean }>(`/pages/${name}`, { method: 'DELETE' }),
-  updatePage: (name: string, data: Partial<PageDetail>) =>
-    request<{ ok: boolean }>(`/pages/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updatePage: (name: string, data: Partial<PageDetail>, opts?: { locale?: string }) => {
+    const qs = opts?.locale ? `?locale=${encodeURIComponent(opts.locale)}` : ''
+    return request<{ ok: boolean }>(`/pages/${name}${qs}`, { method: 'PUT', body: JSON.stringify(data) })
+  },
   /** List fragments. See getPages for the `target` option. */
   getFragments: (opts?: { target?: string }) =>
     request<FragmentSummary[]>(opts?.target ? `/fragments?target=${encodeURIComponent(opts.target)}` : '/fragments'),
@@ -219,8 +221,10 @@ export const api = {
   createFragment: (data: CreateFragmentRequest) =>
     request<CreateFragmentResponse>('/fragments', { method: 'POST', body: JSON.stringify(data) }),
   deleteFragment: (name: string) => request<{ ok: boolean }>(`/fragments/${name}`, { method: 'DELETE' }),
-  updateFragment: (name: string, data: Partial<FragmentDetail>) =>
-    request<{ ok: boolean }>(`/fragments/${name}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateFragment: (name: string, data: Partial<FragmentDetail>, opts?: { locale?: string }) => {
+    const qs = opts?.locale ? `?locale=${encodeURIComponent(opts.locale)}` : ''
+    return request<{ ok: boolean }>(`/fragments/${name}${qs}`, { method: 'PUT', body: JSON.stringify(data) })
+  },
   getTemplates: () => request<TemplateSummary[]>('/templates'),
   getTemplateSchema: (name: string, options?: RequestInit) =>
     request<Record<string, unknown>>(`/templates/${name}/schema`, options),

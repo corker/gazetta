@@ -14,6 +14,7 @@ import { useEditorPersistenceStore } from '../stores/editorPersistence.js'
 import { useEditorContentStore, type EditingTarget } from '../stores/editorContent.js'
 import { type EditorSelection, selectionToStashKey, selectionToErrorLabel } from './editorSelection.js'
 import { api } from '../api/client.js'
+import { useLocaleStore } from '../stores/locale.js'
 
 const MAX_RETRY_ATTEMPTS = 3
 const BASE_RETRY_DELAY = 3000
@@ -124,10 +125,11 @@ export function useEditorActions() {
         }
       }
 
+      const localeOpts = { locale: useLocaleStore().effectiveLocale ?? undefined }
       if (sel.selection.type === 'page') {
-        await api.updatePage(sel.selection.name, { components: updatedComponents })
+        await api.updatePage(sel.selection.name, { components: updatedComponents }, localeOpts)
       } else {
-        await api.updateFragment(sel.selection.name, { components: updatedComponents })
+        await api.updateFragment(sel.selection.name, { components: updatedComponents }, localeOpts)
       }
     }
   }
@@ -145,8 +147,18 @@ export function useEditorActions() {
         const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(d.template, signal)
         const saveFn =
           selection.type === 'page'
-            ? (c: Record<string, unknown>) => api.updatePage(selection.name, { content: c }).then(() => {})
-            : (c: Record<string, unknown>) => api.updateFragment(selection.name, { content: c }).then(() => {})
+            ? (c: Record<string, unknown>) =>
+                api
+                  .updatePage(selection.name, { content: c }, { locale: useLocaleStore().effectiveLocale ?? undefined })
+                  .then(() => {})
+            : (c: Record<string, unknown>) =>
+                api
+                  .updateFragment(
+                    selection.name,
+                    { content: c },
+                    { locale: useLocaleStore().effectiveLocale ?? undefined },
+                  )
+                  .then(() => {})
         return {
           template: d.template,
           path: '_root',
@@ -187,7 +199,14 @@ export function useEditorActions() {
           hasEditor,
           editorUrl,
           fieldsBaseUrl,
-          save: c => api.updateFragment(sel.fragmentName, { content: c }).then(() => {}),
+          save: c =>
+            api
+              .updateFragment(
+                sel.fragmentName,
+                { content: c },
+                { locale: useLocaleStore().effectiveLocale ?? undefined },
+              )
+              .then(() => {}),
         }
       }
       case 'fragmentLink':
