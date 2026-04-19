@@ -145,6 +145,7 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
       registry,
       projectSiteDir: source.projectSiteDir,
       sidecarWriter,
+      manifest: source.manifest,
       // The registry's filesystem targets are already content-rooted
       // (path=./targets/<key>); siteDir on the resolved context is empty.
       siteDir: '',

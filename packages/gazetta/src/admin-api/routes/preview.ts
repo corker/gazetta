@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono'
 import type { ResolvedComponent } from '../../types.js'
-import { loadSite, allPageEntries } from '../../site-loader.js'
+import { allPageEntries } from '../../site-loader.js'
+import { loadSiteFromSource } from '../source-context.js'
 import { resolveFragment, resolvePage } from '../../resolver.js'
 import { renderFragment, renderPage } from '../../renderer.js'
 import type { SourceContext, SourceContextResolver } from '../source-context.js'
@@ -37,9 +38,9 @@ async function renderPreview(
   // Empty target (no site.yaml) — preview returns a friendly placeholder
   // so the admin can still show the iframe. Happens when the active
   // target is a never-published publish-target.
-  let site: Awaited<ReturnType<typeof loadSite>>
+  let site: Awaited<ReturnType<typeof loadSiteFromSource>>
   try {
-    site = await loadSite({ contentRoot: source.contentRoot, templatesDir })
+    site = await loadSiteFromSource(source, { templatesDir })
   } catch (err) {
     if ((err as Error).message.includes('No site.yaml found')) {
       return c.html(

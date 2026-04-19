@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest'
 import { join, resolve } from 'node:path'
 import { writeFile, mkdir, rm, readdir } from 'node:fs/promises'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { publishItems, resolveDependencies } from '../src/publish.js'
 import { publishPageRendered, publishPageStatic, publishFragmentRendered } from '../src/publish-rendered.js'
 import { createContentRoot } from '../src/content-root.js'
+import { loadSite, type Site } from '../src/site-loader.js'
 import { tempDir } from './_helpers/temp.js'
+import { starterManifest, starterTargetDir, starterTemplatesDir } from './_helpers/starter.js'
 
 const testDir = tempDir('publish-test-' + Date.now())
 const sourceDir = join(testDir, 'source')
@@ -234,12 +236,16 @@ describe('resolveDependencies', () => {
 })
 
 describe('publishRendered', () => {
-  const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
-  // Content lives under the local target (post-transformation layout).
-  const starterDir = resolve(projectRoot, 'sites/main/targets/local')
-  const templatesDir = resolve(projectRoot, 'templates')
+  const starterDir = starterTargetDir
+  const templatesDir = starterTemplatesDir
   const storage = createFilesystemProvider()
   const renderTargetDir = tempDir('render-test-' + Date.now())
+  let site: Site
+
+  beforeAll(async () => {
+    const manifest = await starterManifest()
+    site = await loadSite({ siteDir: starterDir, storage, templatesDir, manifest })
+  })
 
   afterEach(async () => {
     await rm(renderTargetDir, { recursive: true, force: true })
@@ -253,6 +259,8 @@ describe('publishRendered', () => {
       target,
       undefined,
       templatesDir,
+      undefined,
+      site,
     )
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
@@ -280,6 +288,8 @@ describe('publishRendered', () => {
       createContentRoot(storage, starterDir),
       target,
       templatesDir,
+      undefined,
+      site,
     )
     expect(files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
@@ -298,7 +308,14 @@ describe('publishRendered', () => {
 
     // First publish
 
-    await publishFragmentRendered('header', createContentRoot(storage, starterDir), target, templatesDir)
+    await publishFragmentRendered(
+      'header',
+      createContentRoot(storage, starterDir),
+      target,
+      templatesDir,
+      undefined,
+      site,
+    )
     const entries1 = await target.readDir('fragments/header')
     const css1 = entries1.find(e => e.name.endsWith('.css'))!.name
 
@@ -309,7 +326,14 @@ describe('publishRendered', () => {
 
     // Publish again — same content, same hash
 
-    await publishFragmentRendered('header', createContentRoot(storage, starterDir), target, templatesDir)
+    await publishFragmentRendered(
+      'header',
+      createContentRoot(storage, starterDir),
+      target,
+      templatesDir,
+      undefined,
+      site,
+    )
     const entriesAfter = await target.readDir('fragments/header')
     const cssAfter = entriesAfter.filter(e => e.name.endsWith('.css'))
 
@@ -322,14 +346,30 @@ describe('publishRendered', () => {
     const target = createFilesystemProvider(renderTargetDir)
 
     // First publish
-    await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
+    await publishPageRendered(
+      'home',
+      createContentRoot(storage, starterDir),
+      target,
+      undefined,
+      templatesDir,
+      undefined,
+      site,
+    )
 
     // Write fake old files
     await target.writeFile('pages/home/styles.00000000.css', '.old {}')
     await target.writeFile('pages/home/script.00000000.js', '// old')
 
     // Publish again
-    await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
+    await publishPageRendered(
+      'home',
+      createContentRoot(storage, starterDir),
+      target,
+      undefined,
+      templatesDir,
+      undefined,
+      site,
+    )
     const entries = await target.readDir('pages/home')
     const oldCss = entries.filter(e => e.name === 'styles.00000000.css')
     const oldJs = entries.filter(e => e.name === 'script.00000000.js')
@@ -339,7 +379,15 @@ describe('publishRendered', () => {
 
   it('bakes cache config comment into page HTML with defaults', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
+    await publishPageRendered(
+      'home',
+      createContentRoot(storage, starterDir),
+      target,
+      undefined,
+      templatesDir,
+      undefined,
+      site,
+    )
     const html = await target.readFile('pages/home/index.html')
     expect(html).toMatch(/^<!--cache:browser=0,edge=86400-->/)
     expect(html).toContain('<!DOCTYPE html>')
@@ -353,6 +401,8 @@ describe('publishRendered', () => {
       target,
       { browser: 120, edge: 3600 },
       templatesDir,
+      undefined,
+      site,
     )
     const html = await target.readFile('pages/home/index.html')
     expect(html).toMatch(/^<!--cache:browser=120,edge=3600-->/)
@@ -360,7 +410,15 @@ describe('publishRendered', () => {
 
   it('cache comment is on first line before DOCTYPE', async () => {
     const target = createFilesystemProvider(renderTargetDir)
-    await publishPageRendered('home', createContentRoot(storage, starterDir), target, undefined, templatesDir)
+    await publishPageRendered(
+      'home',
+      createContentRoot(storage, starterDir),
+      target,
+      undefined,
+      templatesDir,
+      undefined,
+      site,
+    )
     const html = await target.readFile('pages/home/index.html')
     const lines = html.split('\n')
     expect(lines[0]).toMatch(/^<!--cache:/)
@@ -374,6 +432,12 @@ describe('publishPageStatic', () => {
   const templatesDir = resolve(projectRoot2, 'templates')
   const storage = createFilesystemProvider()
   const staticTargetDir = tempDir('static-test-' + Date.now())
+  let site: Site
+
+  beforeAll(async () => {
+    const manifest = await starterManifest()
+    site = await loadSite({ siteDir: starterDir, storage, templatesDir, manifest })
+  })
 
   afterEach(async () => {
     await rm(staticTargetDir, { recursive: true, force: true })
@@ -382,7 +446,7 @@ describe('publishPageStatic', () => {
   it('publishes fully assembled HTML at URL path', async () => {
     const target = createFilesystemProvider(staticTargetDir)
 
-    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
+    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir, undefined, site)
     const html = await target.readFile('index.html')
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('Welcome to Gazetta')
@@ -399,7 +463,7 @@ describe('publishPageStatic', () => {
   it('publishes about page at /about/index.html', async () => {
     const target = createFilesystemProvider(staticTargetDir)
 
-    await publishPageStatic('about', createContentRoot(storage, starterDir), target, templatesDir)
+    await publishPageStatic('about', createContentRoot(storage, starterDir), target, templatesDir, undefined, site)
     const html = await target.readFile('about/index.html')
     expect(html).toContain('About Gazetta')
     expect(html).not.toContain('<!--esi')
@@ -408,7 +472,7 @@ describe('publishPageStatic', () => {
   it('includes inline CSS and JS', async () => {
     const target = createFilesystemProvider(staticTargetDir)
 
-    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
+    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir, undefined, site)
     const html = await target.readFile('index.html')
     expect(html).toContain('<style>')
     // Counter JS should be inline
@@ -418,7 +482,7 @@ describe('publishPageStatic', () => {
   it('no separate CSS/JS files', async () => {
     const target = createFilesystemProvider(staticTargetDir)
 
-    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir)
+    await publishPageStatic('home', createContentRoot(storage, starterDir), target, templatesDir, undefined, site)
     const entries = await target.readDir('.')
     const cssOrJs = entries.filter(e => e.name.endsWith('.css') || e.name.endsWith('.js'))
     expect(cssOrJs.length).toBe(0)
@@ -549,6 +613,11 @@ describe('SEO publish integration', () => {
   const templatesDir = resolve(projectRoot2, 'templates')
   const storage = createFilesystemProvider()
   const seoTargetDir = tempDir('seo-publish-test-' + Date.now())
+  let seoManifest: Awaited<ReturnType<typeof starterManifest>>
+
+  beforeAll(async () => {
+    seoManifest = await starterManifest()
+  })
 
   beforeEach(async () => {
     await mkdir(seoTargetDir, { recursive: true })
@@ -564,7 +633,7 @@ describe('SEO publish integration', () => {
     const { scanTemplates, templateHashesFrom } = await import('../src/templates-scan.js')
 
     const contentRoot = createContentRoot(storage, starterDir)
-    const site = await loadSite({ contentRoot, templatesDir })
+    const site = await loadSite({ contentRoot, templatesDir, manifest: seoManifest })
     const templateInfos = await scanTemplates(templatesDir, projectRoot2)
     const templateHashes = templateHashesFrom(templateInfos)
     const page = site.pages.get('home')!
@@ -614,7 +683,7 @@ describe('SEO publish integration', () => {
     const { scanTemplates, templateHashesFrom } = await import('../src/templates-scan.js')
 
     const contentRoot = createContentRoot(createFilesystemProvider(), noindexSourceDir)
-    const site = await loadSite({ contentRoot, templatesDir })
+    const site = await loadSite({ contentRoot, templatesDir, manifest: seoManifest })
     const templateInfos = await scanTemplates(templatesDir, projectRoot2)
     const templateHashes = templateHashesFrom(templateInfos)
     const page = site.pages.get('secret')!
@@ -643,7 +712,7 @@ describe('SEO publish integration', () => {
     const { generateSitemap } = await import('../src/sitemap.js')
 
     const contentRoot = createContentRoot(storage, starterDir)
-    const site = await loadSite({ contentRoot, templatesDir })
+    const site = await loadSite({ contentRoot, templatesDir, manifest: seoManifest })
     const templateInfos = await scanTemplates(templatesDir, projectRoot2)
     const templateHashes = templateHashesFrom(templateInfos)
 

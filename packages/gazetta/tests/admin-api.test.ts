@@ -5,6 +5,7 @@ import type { Hono } from 'hono'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { createAdminApp } from '../src/admin-api/index.js'
 import { createSourceContext } from '../src/admin-api/source-context.js'
+import { parseSiteManifest } from '../src/manifest.js'
 import { tempDir } from './_helpers/temp.js'
 
 // Copy the starter into .tmp/ so admin API tests can mutate pages/fragments
@@ -23,12 +24,17 @@ beforeAll(async () => {
     recursive: true,
     filter: src => !src.includes('/dist') && !src.includes('/node_modules') && !src.includes('/.tmp'),
   })
+  // Read the project-level manifest — routes use it instead of reading
+  // from the target's storage (targets don't have site.yaml).
+  const projectStorage = createFilesystemProvider(projectSiteDir)
+  const manifest = await parseSiteManifest(projectStorage, 'site.yaml')
   // Target-rooted source: storage points at targets/local, siteDir is '',
   // projectSiteDir is the actual project site directory.
   const source = createSourceContext({
     storage,
     siteDir: '',
     projectSiteDir,
+    manifest,
   })
   app = createAdminApp({
     source,

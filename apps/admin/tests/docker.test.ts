@@ -5,15 +5,32 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { resolve } from 'node:path'
 import { DockerComposeEnvironment, type StartedDockerComposeEnvironment } from 'testcontainers'
-import { createFilesystemProvider, createS3Provider, createAzureBlobProvider, createContentRoot } from 'gazetta'
+import {
+  createFilesystemProvider,
+  createS3Provider,
+  createAzureBlobProvider,
+  createContentRoot,
+  loadSite,
+  type Site,
+} from 'gazetta'
 import { publishItems, resolveDependencies } from 'gazetta'
 import { publishPageRendered, publishFragmentRendered, publishSiteManifest, publishFragmentIndex } from 'gazetta'
 import { runProviderConformance } from './_helpers/provider-conformance.js'
 
 const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
+const starterSiteDir = resolve(projectRoot, 'sites/main')
 // Content lives under the local target (post-transformation layout).
-const starterDir = resolve(projectRoot, 'sites/main/targets/local')
+const starterDir = resolve(starterSiteDir, 'targets/local')
 const templatesDir = resolve(projectRoot, 'templates')
+
+let _site: Site | null = null
+async function getStarterSite(): Promise<Site> {
+  if (_site) return _site
+  const s = createFilesystemProvider()
+  const { manifest } = await loadSite({ siteDir: starterSiteDir, storage: s })
+  _site = await loadSite({ siteDir: starterDir, storage: createFilesystemProvider(), templatesDir, manifest })
+  return _site
+}
 const composeDir = resolve(import.meta.dirname, '../../..')
 
 let env: StartedDockerComposeEnvironment
@@ -126,20 +143,29 @@ describe('Azure Blob publish (Azurite)', () => {
 describe('Rendered publish (MinIO)', () => {
   const source = createFilesystemProvider()
   let target: ReturnType<typeof createS3Provider>
+  let site: Site
 
   beforeAll(async () => {
     target = s3('publish-rendered-test')
     await target.init()
+    site = await getStarterSite()
   })
 
   it('publishes site manifest', async () => {
-    await publishSiteManifest(createContentRoot(source, starterDir), target)
+    await publishSiteManifest(createContentRoot(source, starterDir), target, site)
     const json = JSON.parse(await target.readFile('site.json'))
     expect(json.name).toBe('Gazetta Starter')
   })
 
   it('publishes a fragment as HTML with hashed CSS', async () => {
-    const result = await publishFragmentRendered('header', createContentRoot(source, starterDir), target, templatesDir)
+    const result = await publishFragmentRendered(
+      'header',
+      createContentRoot(source, starterDir),
+      target,
+      templatesDir,
+      undefined,
+      site,
+    )
     expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
     const html = await target.readFile('fragments/header/index.html')
     expect(html).toContain('<head>')
@@ -148,13 +174,22 @@ describe('Rendered publish (MinIO)', () => {
   })
 
   it('publishes a page as HTML with ESI placeholders', async () => {
-    await publishFragmentRendered('footer', createContentRoot(source, starterDir), target, templatesDir)
+    await publishFragmentRendered(
+      'footer',
+      createContentRoot(source, starterDir),
+      target,
+      templatesDir,
+      undefined,
+      site,
+    )
     const result = await publishPageRendered(
       'home',
       createContentRoot(source, starterDir),
       target,
       undefined,
       templatesDir,
+      undefined,
+      site,
     )
     expect(result.files).toBeGreaterThanOrEqual(2) // index.html + styles.{hash}.css
 
@@ -166,7 +201,7 @@ describe('Rendered publish (MinIO)', () => {
   })
 
   it('builds reverse fragment index', async () => {
-    const index = await publishFragmentIndex(createContentRoot(source, starterDir), target)
+    const index = await publishFragmentIndex(createContentRoot(source, starterDir), target, site)
     expect(index['@header']).toContain('/')
     expect(index['@footer']).toContain('/')
     const stored = JSON.parse(await target.readFile('index/fragments.json'))
@@ -185,11 +220,12 @@ describe('Edge composition caching (MinIO)', () => {
 
     const source = createFilesystemProvider()
     const sourceRoot = createContentRoot(source, starterDir)
-    await publishSiteManifest(sourceRoot, target)
-    await publishFragmentRendered('header', sourceRoot, target, templatesDir)
-    await publishFragmentRendered('footer', sourceRoot, target, templatesDir)
-    await publishPageRendered('home', sourceRoot, target, undefined, templatesDir)
-    await publishPageRendered('about', sourceRoot, target, undefined, templatesDir)
+    const starterSite = await getStarterSite()
+    await publishSiteManifest(sourceRoot, target, starterSite)
+    await publishFragmentRendered('header', sourceRoot, target, templatesDir, undefined, starterSite)
+    await publishFragmentRendered('footer', sourceRoot, target, templatesDir, undefined, starterSite)
+    await publishPageRendered('home', sourceRoot, target, undefined, templatesDir, undefined, starterSite)
+    await publishPageRendered('about', sourceRoot, target, undefined, templatesDir, undefined, starterSite)
 
     // Build a test app with ESI assembly (same logic as the Cloudflare Worker)
     const { Hono } = await import('hono')
