@@ -1,7 +1,5 @@
 name: "Gazetta Starter"
 version: "1.0.0"
 locale: en
-locales:
-  supported: [en, fr]
 systemPages:
   - "404"
