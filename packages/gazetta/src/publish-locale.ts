@@ -15,7 +15,7 @@ import type { ContentRoot } from './content-root.js'
 import type { SeoContext } from './seo.js'
 import { publishPageRendered, publishFragmentRendered } from './publish-rendered.js'
 import { hashManifest, type HashManifestOptions } from './hash.js'
-import { defaultLocaleFor } from './locale.js'
+import { defaultLocaleFor, localeRoutePrefix, resolveSiteLocales } from './locale.js'
 
 export interface PublishLocaleResult {
   files: number
@@ -49,12 +49,30 @@ export async function publishPageAllLocales(
   const skipLocales = opts.unchangedLocales ?? new Set()
   const defaultLocale = defaultLocaleFor(site.manifest)
 
+  // Build hreflang alternates for subpath targets (2+ locales on same domain).
+  // Each locale variant of this page gets a map of all sibling locale URLs.
+  const resolvedLocales = resolveSiteLocales(site.manifest)
+  let hreflangAlternates: Record<string, string> | undefined
+  const localeEntry = site.pageLocales.get(pageName)
+  if (opts.seo?.siteUrl && resolvedLocales && localeEntry && localeEntry.locales.size > 0) {
+    const activeLocales = localeFilter ? [...localeFilter] : [defaultLocale, ...localeEntry.locales.keys()]
+    if (activeLocales.length > 1) {
+      hreflangAlternates = {}
+      for (const loc of activeLocales) {
+        const prefix = localeRoutePrefix(loc, resolvedLocales)
+        const route = page.route === '/' ? prefix || '/' : `${prefix}${page.route}`
+        hreflangAlternates[loc] = `${opts.seo.siteUrl}${route}`
+      }
+    }
+  }
+
   let totalFiles = 0
   let totalRemoved = 0
 
   // Default locale — skip if target doesn't include it or already up-to-date
   if ((!localeFilter || localeFilter.has(defaultLocale)) && !skipLocales.has(null)) {
     const manifestHash = hashManifest(page, hashOpts)
+    const seoWithHreflang = opts.seo ? { ...opts.seo, hreflangAlternates, defaultLocale } : undefined
     const { files, removed } = await publishPageRendered(
       pageName,
       sourceRoot,
@@ -63,20 +81,19 @@ export async function publishPageAllLocales(
       opts.templatesDir,
       manifestHash,
       site,
-      opts.seo,
+      seoWithHreflang,
     )
     totalFiles += files
     totalRemoved += removed
   }
 
   // Locale variants — filter by target subset when configured
-  const localeEntry = site.pageLocales.get(pageName)
   if (localeEntry) {
     for (const [locale, localePage] of localeEntry.locales) {
       if (localeFilter && !localeFilter.has(locale)) continue
       if (skipLocales.has(locale)) continue
       const localeHash = hashManifest(localePage, hashOpts)
-      const localeSeo = opts.seo ? { ...opts.seo, locale } : undefined
+      const localeSeo = opts.seo ? { ...opts.seo, locale, hreflangAlternates, defaultLocale } : undefined
       const { files: lf, removed: lr } = await publishPageRendered(
         pageName,
         sourceRoot,

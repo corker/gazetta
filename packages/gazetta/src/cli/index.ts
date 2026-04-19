@@ -714,10 +714,36 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       const { generateRobotsTxt } = await import('../robots.js')
 
       const targetPageSidecars = await listSidecars(targetStorage, 'pages')
+      const { resolveSiteLocales, defaultLocaleFor } = await import('../locale.js')
+
+      // Build hreflang groups from page locale info
+      const resolvedLoc = resolveSiteLocales(manifest)
+      const defLoc = defaultLocaleFor(manifest)
+      const hreflangGroups = new Map<string, { locale: string; url: string }[]>()
+      if (resolvedLoc) {
+        for (const [pageName, page] of site.pages) {
+          if (pageName.includes('[')) continue // skip dynamic routes
+          const localeEntry = site.pageLocales.get(pageName)
+          if (!localeEntry || localeEntry.locales.size === 0) continue
+          const alternates: { locale: string; url: string }[] = []
+          // Default locale
+          alternates.push({ locale: defLoc, url: `${siteUrl}${page.route}` })
+          // Locale variants
+          for (const [loc, localePage] of localeEntry.locales) {
+            alternates.push({ locale: loc, url: `${siteUrl}${localePage.route}` })
+          }
+          if (alternates.length > 1) {
+            hreflangGroups.set(pageName, alternates)
+          }
+        }
+      }
+
       const sitemapXml = generateSitemap({
         siteUrl,
         pages: targetPageSidecars,
         systemPages: site.manifest.systemPages,
+        hreflangGroups: hreflangGroups.size > 0 ? hreflangGroups : undefined,
+        defaultLocale: defLoc,
       })
       if (sitemapXml) {
         await targetStorage.writeFile('sitemap.xml', sitemapXml)
