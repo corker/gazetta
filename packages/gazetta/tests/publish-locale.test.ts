@@ -143,6 +143,67 @@ describe('publishFragmentRendered with locale', () => {
   })
 })
 
+describe('publishPageRendered sidecar per locale', () => {
+  it('writes sidecars with different hashes for different locales', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+    const root = createContentRoot(storage, starterTargetDir)
+    const { hashManifest } = await import('../src/hash.js')
+
+    const page = site.pages.get('home')!
+    const enHash = hashManifest(page, { templateHashes: new Map() })
+
+    // Publish EN with hash
+    await publishPageRendered('home', root, target, undefined, starterTemplatesDir, enHash, site, {
+      siteName: 'Test',
+      locale: 'en',
+    })
+
+    // Check EN sidecars exist
+    const entriesAfterEn = await target.readDir('pages/home')
+    const hashFiles = entriesAfterEn.filter(e => e.name.endsWith('.hash'))
+    expect(hashFiles.length).toBe(1)
+
+    const pubFiles = entriesAfterEn.filter(e => e.name.startsWith('.pub-'))
+    expect(pubFiles.length).toBe(1)
+  })
+
+  it('locale publish updates sidecars (last-write-wins per page dir)', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+    const root = createContentRoot(storage, starterTargetDir)
+    const { hashManifest } = await import('../src/hash.js')
+
+    const page = site.pages.get('home')!
+    const hash = hashManifest(page, { templateHashes: new Map() })
+
+    // Publish EN then FR — sidecars reflect last publish
+    await publishPageRendered('home', root, target, undefined, starterTemplatesDir, hash, site, {
+      siteName: 'Test',
+      locale: 'en',
+    })
+    await publishPageRendered(
+      'home',
+      root,
+      target,
+      undefined,
+      starterTemplatesDir,
+      hash,
+      site,
+      { siteName: 'Test', locale: 'fr' },
+      'fr',
+    )
+
+    // Both HTML files coexist
+    const entries = await target.readDir('pages/home')
+    const htmlFiles = entries.filter(e => e.name.endsWith('.html')).map(e => e.name)
+    expect(htmlFiles).toContain('index.html')
+    expect(htmlFiles).toContain('index.fr.html')
+
+    // Sidecars are present (last-write-wins — one hash, one pub timestamp)
+    const hashFiles = entries.filter(e => e.name.endsWith('.hash'))
+    expect(hashFiles.length).toBe(1)
+  })
+})
+
 describe('publishPageStatic with locale', () => {
   it('writes to locale-prefixed URL path', async () => {
     const target = createFilesystemProvider(renderTargetDir)

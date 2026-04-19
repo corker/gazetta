@@ -5,7 +5,8 @@
  *
  * Reads pre-rendered pages and fragments from an R2 bucket,
  * assembles them using ESI-style composition, and serves with
- * Cache API + ETag support.
+ * Cache API + ETag support. Locale-aware: extracts locale prefix
+ * from URL, reads locale-suffixed files, falls back to default.
  *
  * Usage: import and re-export from your worker entry point:
  *
@@ -15,7 +16,11 @@
  * Or customize:
  *
  *   import { createWorker } from 'gazetta/workers/cloudflare-r2'
- *   const worker = createWorker({ bucketBinding: 'SITE_BUCKET' })
+ *   const worker = createWorker({
+ *     bucketBinding: 'SITE_BUCKET',
+ *     locales: ['en', 'fr', 'de'],
+ *     defaultLocale: 'en',
+ *   })
  *   export default worker
  */
 
@@ -25,12 +30,106 @@ import { assembleEsi, parseCacheComment, splitFragment, findEsiPaths } from '../
 export interface CloudflareR2WorkerOptions {
   /** R2 bucket binding name (default: 'SITE_BUCKET') */
   bucketBinding?: string
+  /** Supported locale codes (lowercase). Enables locale-prefix routing. */
+  locales?: string[]
+  /** Default locale — no URL prefix. Falls back to first in `locales`. */
+  defaultLocale?: string
   /** Custom middleware to add before page serving */
   middleware?: (app: Hono<{ Bindings: Record<string, R2Bucket> }>) => void
 }
 
+// ---------------------------------------------------------------------------
+// Locale extraction (same logic as serve.ts — SRP)
+// ---------------------------------------------------------------------------
+
+function extractLocale(requestPath: string, locales: string[]): { locale: string | undefined; path: string } {
+  if (locales.length === 0) return { locale: undefined, path: requestPath }
+  const parts = requestPath.split('/').filter(Boolean)
+  if (parts.length > 0 && locales.includes(parts[0])) {
+    return { locale: parts[0], path: '/' + parts.slice(1).join('/') || '/' }
+  }
+  return { locale: undefined, path: requestPath }
+}
+
+// ---------------------------------------------------------------------------
+// Fragment fetching with locale fallback (SRP)
+// ---------------------------------------------------------------------------
+
+async function fetchFragment(bucket: R2Bucket, path: string): Promise<[string, { head: string; body: string }]> {
+  const key = path.slice(1)
+  const obj = await bucket.get(key)
+  if (obj) return [path, splitFragment(await obj.text())]
+
+  // Locale fallback: index.fr.html → index.html
+  const localeFallback = key.replace(/\/index\.[a-z-]+\.html$/, '/index.html')
+  if (localeFallback !== key) {
+    const fallbackObj = await bucket.get(localeFallback)
+    if (fallbackObj) return [path, splitFragment(await fallbackObj.text())]
+  }
+
+  return [path, { head: '', body: `<!-- fragment not found: ${path} -->` }]
+}
+
+// ---------------------------------------------------------------------------
+// Page lookup with locale support (SRP)
+// ---------------------------------------------------------------------------
+
+async function findPage(
+  bucket: R2Bucket,
+  requestPath: string,
+  locales?: string[],
+): Promise<{ html: string; locale: string | undefined } | null> {
+  const { locale, path: resolvedPath } = locales?.length
+    ? extractLocale(requestPath, locales)
+    : { locale: undefined, path: requestPath }
+  const indexFile = locale ? `index.${locale}.html` : 'index.html'
+
+  // Try exact page path
+  const pagePath = resolvedPath === '/' ? `pages/home/${indexFile}` : `pages${resolvedPath}/${indexFile}`
+  const obj = await bucket.get(pagePath)
+  if (obj) return { html: await obj.text(), locale }
+
+  // Locale fallback to default
+  if (locale) {
+    const fallback = resolvedPath === '/' ? 'pages/home/index.html' : `pages${resolvedPath}/index.html`
+    const fallbackObj = await bucket.get(fallback)
+    if (fallbackObj) return { html: await fallbackObj.text(), locale }
+  }
+
+  // Dynamic segments — list parent directory, find [param] entries
+  const parts = resolvedPath.split('/').filter(Boolean)
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const parentDir = parts.slice(0, i).join('/')
+    const prefix = parentDir ? `pages/${parentDir}/` : 'pages/'
+    const listed = await bucket.list({ prefix, delimiter: '/' })
+    for (const item of listed.delimitedPrefixes) {
+      const segment = item.replace(prefix, '').replace(/\/$/, '')
+      if (segment.startsWith('[') && segment.endsWith(']')) {
+        const dynamicParts = [...parts]
+        dynamicParts[i] = segment
+        const dynamicPath = `pages/${dynamicParts.join('/')}/${indexFile}`
+        const dynObj = await bucket.get(dynamicPath)
+        if (dynObj) return { html: await dynObj.text(), locale }
+        // Dynamic route locale fallback
+        if (locale) {
+          const dynFallback = await bucket.get(`pages/${dynamicParts.join('/')}/index.html`)
+          if (dynFallback) return { html: await dynFallback.text(), locale }
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Worker composition
+// ---------------------------------------------------------------------------
+
 export function createWorker(options?: CloudflareR2WorkerOptions) {
   const bindingName = options?.bucketBinding ?? 'SITE_BUCKET'
+  const locales = options?.locales
+  const nonDefaultLocales = locales?.filter(l => l !== (options?.defaultLocale ?? locales?.[0])) ?? []
 
   const app = new Hono<{ Bindings: Record<string, R2Bucket> }>()
 
@@ -60,39 +159,22 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
     const bucket = c.env[bindingName]
     const requestPath = new URL(c.req.url).pathname
 
-    const pageHtml = await findPage(bucket, requestPath)
-    if (!pageHtml) {
-      const notFoundHtml = await findPage(bucket, '/404')
-      if (notFoundHtml) {
-        const { html: raw404 } = parseCacheComment(notFoundHtml)
-        const fragPaths = findEsiPaths(raw404)
-        const fragEntries = await Promise.all(
-          fragPaths.map(async p => {
-            const obj = await bucket.get(p.slice(1))
-            if (!obj) return [p, { head: '', body: '' }] as const
-            return [p, splitFragment(await obj.text())] as const
-          }),
-        )
+    const result = await findPage(bucket, requestPath, locales)
+    if (!result) {
+      const notFound = await findPage(bucket, '/404')
+      if (notFound) {
+        const { html: raw404 } = parseCacheComment(notFound.html)
+        const fragEntries = await Promise.all(findEsiPaths(raw404).map(p => fetchFragment(bucket, p)))
         return c.html(assembleEsi(raw404, new Map(fragEntries)), 404)
       }
       return c.html('<h1>404 — Page not found</h1>', 404)
     }
 
-    const { html: rawHtml, browser, edge } = parseCacheComment(pageHtml)
+    const { html: rawHtml, browser, edge } = parseCacheComment(result.html)
 
-    // Read all fragments in parallel
-    const fragmentPaths = findEsiPaths(rawHtml)
-    const fragmentEntries = await Promise.all(
-      fragmentPaths.map(async path => {
-        const key = path.slice(1)
-        const obj = await bucket.get(key)
-        if (!obj) return [path, { head: '', body: `<!-- fragment not found: ${path} -->` }] as const
-        return [path, splitFragment(await obj.text())] as const
-      }),
-    )
-    const fragments = new Map(fragmentEntries)
-
-    const assembled = assembleEsi(rawHtml, fragments)
+    // Read all fragments in parallel (with locale fallback)
+    const fragEntries = await Promise.all(findEsiPaths(rawHtml).map(p => fetchFragment(bucket, p)))
+    const assembled = assembleEsi(rawHtml, new Map(fragEntries))
 
     // Compute ETag
     const encoder = new TextEncoder()
@@ -135,31 +217,4 @@ async function serveStatic(c: any, bucket: R2Bucket) {
       'Cache-Control': 'public, max-age=31536000, immutable',
     },
   })
-}
-
-async function findPage(bucket: R2Bucket, requestPath: string): Promise<string | null> {
-  const pagePath = requestPath === '/' ? 'pages/home/index.html' : `pages${requestPath}/index.html`
-
-  const obj = await bucket.get(pagePath)
-  if (obj) return await obj.text()
-
-  // Try dynamic segments — list parent directory, find [param] entries
-  const parts = requestPath.split('/').filter(Boolean)
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const parentDir = parts.slice(0, i).join('/')
-    const prefix = parentDir ? `pages/${parentDir}/` : 'pages/'
-    const listed = await bucket.list({ prefix, delimiter: '/' })
-    for (const item of listed.delimitedPrefixes) {
-      const segment = item.replace(prefix, '').replace(/\/$/, '')
-      if (segment.startsWith('[') && segment.endsWith(']')) {
-        const dynamicParts = [...parts]
-        dynamicParts[i] = segment
-        const dynamicPath = `pages/${dynamicParts.join('/')}/index.html`
-        const dynObj = await bucket.get(dynamicPath)
-        if (dynObj) return await dynObj.text()
-      }
-    }
-  }
-
-  return null
 }
