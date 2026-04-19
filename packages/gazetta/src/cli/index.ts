@@ -1304,6 +1304,17 @@ async function runDev(siteDir: string, port: number) {
     })
   })
 
+  // ---- Trailing slash normalization ----
+  // Redirect /fr/ → /fr, /fr/about/ → /fr/about. Browsers and crawlers
+  // often append trailing slashes; without this, locale routes 404.
+  app.use(async (c, next) => {
+    const path = new URL(c.req.url).pathname
+    if (path !== '/' && path.endsWith('/')) {
+      return c.redirect(path.slice(0, -1), 301)
+    }
+    return next()
+  })
+
   // ---- Site page routes (default + locale variants) ----
   const { allPageEntries } = await import('../site-loader.js')
   for (const { name: pageName, page, locale: pageLocale } of allPageEntries(site)) {
@@ -1329,6 +1340,43 @@ async function runDev(siteDir: string, port: number) {
         return c.html(renderErrorOverlay(err as Error), 500)
       }
     })
+  }
+
+  // ---- Locale fallback routes for pages without locale variants ----
+  // When a page exists in the default locale but has no page.fr.json,
+  // register /fr{route} that renders the default content with FR locale context.
+  // This prevents 404s on locale-prefixed URLs for untranslated pages.
+  const { resolveSiteLocales } = await import('../locale.js')
+  const resolvedLocales = resolveSiteLocales(manifest)
+  if (resolvedLocales) {
+    const nonDefaultLocales = resolvedLocales.supported.filter(l => l !== resolvedLocales.default)
+    for (const loc of nonDefaultLocales) {
+      for (const [pageName, page] of site.pages) {
+        const hasLocaleVariant = site.pageLocales.get(pageName)?.locales.has(loc)
+        if (hasLocaleVariant) continue // already registered by allPageEntries
+        const localeRoute = `/${loc}${page.route === '/' ? '' : page.route}`
+        app.get(localeRoute, async c => {
+          try {
+            const freshSite = await loadSite({ contentRoot: source.contentRoot, templatesDir, manifest })
+            const resolved = await resolvePage(pageName, freshSite, loc)
+            const freshPage = freshSite.pages.get(pageName)
+            const html = await renderPage(resolved, {
+              routeParams: c.req.param(),
+              metadata: freshPage?.metadata,
+              route: freshPage?.route,
+              seo: {
+                siteName: freshSite.manifest.name,
+                locale: loc,
+                defaultOgImage: freshSite.manifest.defaultOgImage,
+              },
+            })
+            return c.html(html.replace('</body>', `${RELOAD_SCRIPT}\n</body>`))
+          } catch (err) {
+            return c.html(renderErrorOverlay(err as Error), 500)
+          }
+        })
+      }
+    }
   }
 
   // ---- Detect mode: dev (monorepo with apps/admin source) vs production (pre-built) ----
