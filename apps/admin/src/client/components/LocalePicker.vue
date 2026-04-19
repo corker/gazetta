@@ -13,11 +13,12 @@ const useDropdown = computed(() => (locale.siteLocales?.length ?? 0) > 4)
 function switchLocale(loc: string) {
   const isDefault = loc === locale.defaultLocale
   const current = route.query
+  const hash = route.hash
   if (isDefault) {
     const { locale: _, ...rest } = current
-    router.push({ query: rest })
+    router.push({ query: rest, hash })
   } else {
-    router.push({ query: { ...current, locale: loc } })
+    router.push({ query: { ...current, locale: loc }, hash })
   }
 }
 </script>
