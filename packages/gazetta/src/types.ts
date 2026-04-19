@@ -11,6 +11,8 @@ export type TemplateFunction<T extends Record<string, unknown> = Record<string, 
   content?: T
   children?: RenderOutput[]
   params?: Record<string, string>
+  /** Active locale code (e.g. 'fr', 'en'). Always provided by the renderer — defaults to site's locale or 'en'. */
+  locale: string
 }) => RenderOutput | Promise<RenderOutput>
 
 /** Mount function for framework-agnostic custom editors */

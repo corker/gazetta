@@ -7,9 +7,10 @@ export { type SeoContext } from './seo.js'
 export async function renderComponent(
   component: ResolvedComponent,
   routeParams?: Record<string, string>,
+  locale = 'en',
 ): Promise<RenderOutput> {
-  const children = await Promise.all(component.children.map(c => renderComponent(c, routeParams)))
-  const output = await component.template({ content: component.content, children, params: routeParams })
+  const children = await Promise.all(component.children.map(c => renderComponent(c, routeParams, locale)))
+  const output = await component.template({ content: component.content, children, params: routeParams, locale })
 
   const scopeId = hashPath(component.treePath ?? '')
 
@@ -24,11 +25,11 @@ export async function renderComponent(
 }
 
 export async function renderFragment(component: ResolvedComponent, locale?: string): Promise<string> {
-  const children = await Promise.all(component.children.map(c => renderComponent(c)))
-  const output = await component.template({ content: component.content, children })
+  const lang = locale || 'en'
+  const children = await Promise.all(component.children.map(c => renderComponent(c, undefined, lang)))
+  const output = await component.template({ content: component.content, children, locale: lang })
 
   const headContent = [...children.map(c => c.head).filter(Boolean), output.head].filter(Boolean).join('\n  ')
-  const lang = locale || 'en'
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -64,8 +65,13 @@ export async function renderPage(
       : { routeParams: optsOrParams as Record<string, string> | undefined }
   const seo = opts.seo ?? {}
   const lang = seo.locale || 'en'
-  const children = await Promise.all(component.children.map(c => renderComponent(c, opts.routeParams)))
-  const output = await component.template({ content: component.content, children, params: opts.routeParams })
+  const children = await Promise.all(component.children.map(c => renderComponent(c, opts.routeParams, lang)))
+  const output = await component.template({
+    content: component.content,
+    children,
+    params: opts.routeParams,
+    locale: lang,
+  })
 
   const templateHead = [...children.map(c => c.head).filter(Boolean), output.head].filter(Boolean).join('\n  ')
   const seoHead = resolveSeoTags({

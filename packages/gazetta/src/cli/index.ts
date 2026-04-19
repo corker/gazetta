@@ -716,22 +716,49 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       const targetPageSidecars = await listSidecars(targetStorage, 'pages')
       const { resolveSiteLocales, defaultLocaleFor } = await import('../locale.js')
 
-      // Build hreflang groups from page locale info
+      // Build hreflang groups — two strategies:
+      // 1. Subpath: same siteUrl, multiple locales → locale-prefixed routes
+      // 2. Cross-domain: other targets with different siteUrl → cross-link
       const resolvedLoc = resolveSiteLocales(manifest)
       const defLoc = defaultLocaleFor(manifest)
       const hreflangGroups = new Map<string, { locale: string; url: string }[]>()
       if (resolvedLoc) {
+        const { localeRoutePrefix } = await import('../locale.js')
+        const thisTargetLocales = targetConfig?.locales ?? resolvedLoc.supported
+        const thisTargetDefault = targetConfig?.locale ?? defLoc
+
         for (const [pageName, page] of site.pages) {
-          if (pageName.includes('[')) continue // skip dynamic routes
-          const localeEntry = site.pageLocales.get(pageName)
-          if (!localeEntry || localeEntry.locales.size === 0) continue
+          if (pageName.includes('[')) continue
           const alternates: { locale: string; url: string }[] = []
-          // Default locale
-          alternates.push({ locale: defLoc, url: `${siteUrl}${page.route}` })
-          // Locale variants
-          for (const [loc, localePage] of localeEntry.locales) {
-            alternates.push({ locale: loc, url: `${siteUrl}${localePage.route}` })
+
+          // Subpath alternates on this target
+          if (thisTargetLocales.length > 1) {
+            for (const loc of thisTargetLocales) {
+              const prefix = localeRoutePrefix(loc, { ...resolvedLoc, default: thisTargetDefault })
+              const route = page.route === '/' ? prefix || '/' : `${prefix}${page.route}`
+              alternates.push({ locale: loc, url: `${siteUrl}${route}` })
+            }
+          } else {
+            // Single-locale target — add self
+            alternates.push({ locale: thisTargetLocales[0] ?? defLoc, url: `${siteUrl}${page.route}` })
           }
+
+          // Cross-domain alternates from other targets
+          for (const [otherName, otherConfig] of Object.entries(siteYaml.targets ?? {})) {
+            if (otherName === name) continue // skip self
+            if (!otherConfig.siteUrl) continue
+            const otherLocales = otherConfig.locales ?? resolvedLoc.supported
+            const otherDefault = otherConfig.locale ?? defLoc
+            for (const loc of otherLocales) {
+              // Skip locales already covered by this target
+              if (alternates.some(a => a.locale === loc)) continue
+              const otherResolved = { ...resolvedLoc, default: otherDefault }
+              const prefix = localeRoutePrefix(loc, otherResolved)
+              const route = page.route === '/' ? prefix || '/' : `${prefix}${page.route}`
+              alternates.push({ locale: loc, url: `${otherConfig.siteUrl}${route}` })
+            }
+          }
+
           if (alternates.length > 1) {
             hreflangGroups.set(pageName, alternates)
           }
