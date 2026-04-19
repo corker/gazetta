@@ -355,17 +355,11 @@ async function onSelect(node: ComponentNode) {
       applyHashSelection()
     }
   } else {
-    // Browse mode — no hash, open directly
-    switch (sel.kind) {
-      case 'fragmentLink':
-        editing.showFragmentLink(sel.treePath)
-        break
-      case 'fragmentEdit':
-        editing.openFragment(sel.fragmentName)
-        break
-      default:
-        break
-    }
+    // Browse mode — clicking a component enters edit mode.
+    // Write the hash and navigate to the edit URL.
+    const hash = selectionToHash(sel)
+    const prefix = selection.type === 'page' ? '/pages' : '/fragments'
+    router.push({ path: `${prefix}/${selection.name}/edit`, hash })
   }
 }
 
