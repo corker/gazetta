@@ -58,21 +58,28 @@ export function createS3Provider(options: S3ProviderOptions): StorageProvider & 
       const prefixWithSlash = prefix ? `${prefix}/` : ''
       const entries = new Map<string, boolean>()
 
-      const response = await client.send(
-        new ListObjectsV2Command({
-          Bucket: bucket,
-          Prefix: prefixWithSlash,
-        }),
-      )
+      // Paginate — S3/R2 returns max 1000 keys per call
+      let continuationToken: string | undefined
+      do {
+        const response = await client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefixWithSlash,
+            ContinuationToken: continuationToken,
+          }),
+        )
 
-      for (const obj of response.Contents ?? []) {
-        const relativeName = obj.Key!.slice(prefixWithSlash.length)
-        const firstSegment = relativeName.split('/')[0]
-        if (!firstSegment) continue
-        const isDirectory = relativeName.includes('/')
-        if (entries.has(firstSegment) && entries.get(firstSegment)) continue
-        entries.set(firstSegment, isDirectory)
-      }
+        for (const obj of response.Contents ?? []) {
+          const relativeName = obj.Key!.slice(prefixWithSlash.length)
+          const firstSegment = relativeName.split('/')[0]
+          if (!firstSegment) continue
+          const isDirectory = relativeName.includes('/')
+          if (entries.has(firstSegment) && entries.get(firstSegment)) continue
+          entries.set(firstSegment, isDirectory)
+        }
+
+        continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined
+      } while (continuationToken)
 
       return [...entries.entries()].map(([name, isDirectory]) => ({ name, isDirectory }))
     },
