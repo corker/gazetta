@@ -207,7 +207,7 @@ describe('ComponentTree', () => {
     expect(w.find('[data-testid="component-logo"]').exists()).toBe(true)
   })
 
-  it('clicking a fragment root in page context calls showFragmentLink', async () => {
+  it('clicking a fragment root in page context navigates to edit mode', async () => {
     const getFragment = vi.fn(
       async (): Promise<FragmentDetail> => ({
         name: 'header',
@@ -223,16 +223,14 @@ describe('ComponentTree', () => {
       dir: 'pages/home',
       components: ['@header'],
     })
-    const editing = useEditingStore()
-    const spy = vi.spyOn(editing, 'showFragmentLink')
+    const spy = vi.spyOn(testRouter, 'push')
     const w = mountTree(fakeFragmentsApi({ getFragment }))
     await flushMicrotasks()
     await w.find('[data-testid="component-header"]').trigger('click')
-    expect(spy).toHaveBeenCalledWith('@header')
-    expect(editing.fragmentLink).toBe('header')
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ path: '/pages/home/edit' }))
   })
 
-  it('clicking a fragment child in page context calls showFragmentLink with treePath', async () => {
+  it('clicking a fragment child in page context navigates to edit with hash', async () => {
     const getFragment = vi.fn(
       async (): Promise<FragmentDetail> => ({
         name: 'header',
@@ -248,16 +246,14 @@ describe('ComponentTree', () => {
       dir: 'pages/home',
       components: ['@header'],
     })
-    const editing = useEditingStore()
-    const spy = vi.spyOn(editing, 'showFragmentLink')
+    const spy = vi.spyOn(testRouter, 'push')
     const w = mountTree(fakeFragmentsApi({ getFragment }))
     await flushMicrotasks()
     await w.find('[data-testid="component-logo"]').trigger('click')
-    expect(spy).toHaveBeenCalledWith('@header/logo')
-    expect(editing.fragmentLink).toBe('header')
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ path: '/pages/home/edit', hash: '#@header/logo' }))
   })
 
-  it('clicking a fragment root in fragment context calls openFragment', async () => {
+  it('clicking a fragment root in fragment context navigates to edit mode', async () => {
     const getFragment = vi.fn(
       async (): Promise<FragmentDetail> => ({
         name: 'nav',
@@ -272,12 +268,11 @@ describe('ComponentTree', () => {
       dir: 'fragments/header',
       components: ['@nav'],
     })
-    const editing = useEditingStore()
-    const spy = vi.spyOn(editing, 'openFragment')
+    const spy = vi.spyOn(testRouter, 'push')
     const w = mountTree(fakeFragmentsApi({ getFragment }))
     await flushMicrotasks()
     await w.find('[data-testid="component-nav"]').trigger('click')
-    expect(spy).toHaveBeenCalledWith('nav')
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ path: '/fragments/header/edit' }))
   })
 
   it('showFragmentLink stashes dirty edits before clearing', async () => {
