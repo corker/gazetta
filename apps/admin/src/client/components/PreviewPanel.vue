@@ -392,10 +392,12 @@ async function handleMessage(e: MessageEvent) {
   }
   if (e.data?.type === 'gazetta:select' && e.data.gzId) {
     iframeRef.value?.contentWindow?.postMessage({ type: 'gazetta:showSelect', gzId: e.data.gzId }, '*')
-    focus.setPending(e.data.gzId)
     if (selection.name) {
       const prefix = selection.type === 'page' ? '/pages' : '/fragments'
-      router.push(`${prefix}/${selection.name}/edit`)
+      // Set pending AFTER push — otherwise consumePending fires synchronously
+      // on the current route, writing the hash before the /edit navigation.
+      await router.push(`${prefix}/${selection.name}/edit`)
+      focus.setPending(e.data.gzId)
     }
     iframeRef.value?.blur()
   }
