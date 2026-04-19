@@ -18,6 +18,7 @@ interface SiteNode {
   type: 'page' | 'fragment'
   name: string
   icon: string
+  locales?: string[]
 }
 
 const router = useRouter()
@@ -66,7 +67,14 @@ const contentPages = computed<SiteNode[]>(() =>
   [...site.pages]
     .filter(p => !systemPageNames.value.has(p.name))
     .sort((a, b) => a.route.localeCompare(b.route))
-    .map(p => ({ key: `page:${p.name}`, label: p.name, type: 'page' as const, name: p.name, icon: 'pi pi-file' })),
+    .map(p => ({
+      key: `page:${p.name}`,
+      label: p.name,
+      type: 'page' as const,
+      name: p.name,
+      icon: 'pi pi-file',
+      locales: p.locales,
+    })),
 )
 
 const systemPages = computed<SiteNode[]>(() =>
@@ -118,6 +126,9 @@ async function handleDelete(node: SiteNode, e: Event) {
       @click="onSelect(node)">
       <i :class="node.icon" class="node-icon" />
       <span class="node-label">{{ node.label }}</span>
+      <span v-if="node.locales?.length" class="node-locales">
+        <span v-for="loc in node.locales" :key="loc" class="locale-badge">{{ loc.toUpperCase() }}</span>
+      </span>
       <span v-if="isDirty(node)" class="node-dirty-dot" :title="dirtyTitle()"
         :data-testid="`dirty-${node.type}-${node.name}`" />
       <Button icon="pi pi-trash" text rounded size="small" severity="danger"
@@ -196,4 +207,6 @@ async function handleDelete(node: SiteNode, e: Event) {
 .node-delete { opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .node-item:hover .node-delete { opacity: 1; }
 .new-btns { display: flex; gap: 0.5rem; margin-top: 8px; padding: 0 6px; }
+.node-locales { display: flex; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.locale-badge { font-size: 0.5rem; font-weight: 700; letter-spacing: 0.05em; color: var(--color-muted); border: 1px solid var(--color-border); border-radius: 2px; padding: 0 3px; line-height: 1.4; }
 </style>

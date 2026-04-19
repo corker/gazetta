@@ -13,6 +13,7 @@ import { saveButtonLabel, saveButtonSeverity } from '../composables/saveButtonBi
 import PublishPanel from './PublishPanel.vue'
 import ActiveTargetIndicator from './ActiveTargetIndicator.vue'
 import SyncIndicators from './SyncIndicators.vue'
+import LocalePicker from './LocalePicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -83,6 +84,7 @@ function handleBack() {
       </span>
       <span v-if="site.manifest" class="cms-site-name">{{ site.manifest.name }}</span>
       <ActiveTargetIndicator />
+      <LocalePicker />
       <SyncIndicators @select="openPublishFor" />
     </template>
     <template #center>
