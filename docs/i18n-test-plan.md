@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 246 use cases — 108 verified, 12 bugs, 126 gaps.
+**Summary:** 260 use cases — 108 verified, 14 bugs, 138 gaps.
 
 ---
 
@@ -381,7 +381,42 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 - [ ] Same page with different locale content produces different manifest hashes
 
-## 45. Locale normalization consistency (2 cases)
+## 45. Cache purge with locales (2 cases)
+
+- [!] **BUG: Cache purge only purges default locale URLs** — `/about` purged but `/fr/about` not
+- [ ] Fragment publish purges all (correct) — but page publish misses locale URLs
+
+## 46. Validate with locales (3 cases)
+
+- [ ] Validate doesn't check locale files for broken template/fragment refs
+- [ ] Validate doesn't warn about page.en.json when en is default (ambiguous)
+- [ ] Validate doesn't warn about orphaned locale files when i18n disabled
+
+## 47. Incremental publish with locale changes (2 cases)
+
+- [!] **BUG: Locale file change not detected by incremental publish** — hash is per-page, not per-locale
+- [ ] page.fr.json modified, page.json unchanged → should still re-render FR variant
+
+## 48. Publish partial failure with locales (2 cases)
+
+- [ ] Default locale publish fails → locale variants still attempted or skipped?
+- [ ] One locale variant fails mid-publish → others still published (partial state)?
+
+## 49. Static mode serve with locale paths (2 cases)
+
+- [ ] Static mode: /fr/about → serves fr/about/index.html
+- [ ] Static mode: locale detection not available (no runtime)
+
+## 50. Page name conflicts with locale code (2 cases)
+
+- [ ] Page named "fr" + locale "fr" → /fr resolves as locale prefix, not page
+- [ ] Page named "en" with defaultPrefix: true → /en is ambiguous
+
+## 51. Robots.txt with locales (1 case)
+
+- [ ] robots.txt Sitemap directive doesn't reference per-locale sitemaps
+
+## 52. Locale normalization consistency (2 cases)
 
 - [ ] All entry points normalize: config, CLI --to, ?locale=, URL prefix, filenames
 - [ ] BCP 47 region codes: pt-BR/en-GB consistent across API, CLI, URL, filesystem
@@ -401,16 +436,18 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 | 7 | DELETE fragments doesn't delete locale files | fragments.ts | ~127 | High |
 | 8 | hreflang alternates never populated in publish | publish-rendered.ts | — | High |
 | 9 | Sitemap hreflangGroups never computed | publish/sitemap | — | High |
-| 10 | Compare ignores locale variants | compare.ts | — | Medium |
-| 11 | Progress stream missing locale field | publish.ts | — | Low |
-| 12 | History doesn't record save locale | history-recorder.ts | — | Low |
+| 10 | Cache purge only purges default locale URLs | publish.ts | 409 | High |
+| 11 | Incremental publish doesn't detect locale file changes | compare.ts | — | High |
+| 12 | Compare ignores locale variants | compare.ts | — | Medium |
+| 13 | Progress stream missing locale field | publish.ts | — | Low |
+| 14 | History doesn't record save locale | history-recorder.ts | — | Low |
 
 ## Gap summary by severity
 
 | Priority | Count | Examples |
 |----------|-------|---------|
 | Critical (blocks editor use) | 7 | Save to wrong file (server + client), delete orphans locale files |
-| High (incorrect SEO output) | 2 | hreflang never wired, sitemap hreflang empty |
+| High (incorrect output) | 4 | hreflang never wired, cache purge misses locales, incremental publish blind to locale changes |
 | High (feature interactions) | 12 | Component ops independence, metadata per locale, multi-target subset |
 | Medium (compare/publish/history) | 10 | Compare ignores locales, target locale subset, history locale |
 | Medium (error/edge cases) | 15 | URL edge cases, migration, concurrent ops, error handling |
