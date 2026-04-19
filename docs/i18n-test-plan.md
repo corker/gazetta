@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 308 use cases — 108 verified, 20 bugs, 180 gaps.
+**Summary:** 313 use cases — 108 verified, 22 bugs, 183 gaps.
 
 ---
 
@@ -500,7 +500,15 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 - [ ] Publish 100 pages × 15 locales = 1500 renders — sequential, could timeout
 - [ ] allPageEntries iteration with 1500 entries — O(n) per preview request
 
-## 66. Locale normalization consistency (2 cases)
+## 66. Locale param security (5 cases)
+
+- [!] **BUG: ?locale=../etc → path traversal** — localeFilename produces `page.../etc.json`, join() resolves to parent dir
+- [!] **BUG: ?locale=fr.json → double extension** — localeFilename produces `page.fr.json.json`
+- [ ] ?locale=\<script\> — JSON response safe, but verify Vue doesn't render unescaped
+- [ ] ?locale= with 128+ chars — no length validation, could cause filesystem errors
+- [ ] ?locale= with null bytes — needs sanitization
+
+## 67. Locale normalization consistency (2 cases)
 
 - [ ] All entry points normalize: config, CLI --to, ?locale=, URL prefix, filenames
 - [ ] BCP 47 region codes: pt-BR/en-GB consistent across API, CLI, URL, filesystem
@@ -529,8 +537,10 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 | 16 | /fr/blog/hello-world → 404 (dynamic route locale fallback missing on dev server) | cli/index.ts | — | Medium |
 | 17 | ?locale=FR not normalized, ?locale=xx silently accepted, ?locale= empty not stripped | pages.ts | — | Medium |
 | 18 | ?locale= dropped by 7 router.push() calls across admin UI | SiteTree, CmsToolbar, EditorView, EditorPanel, PreviewPanel, ActiveTargetIndicator | — | High |
-| 19 | Progress stream missing locale field | publish.ts | — | Low |
-| 20 | History doesn't record save locale | history-recorder.ts | — | Low |
+| 19 | ?locale=../etc → path traversal in localeFilename | locale.ts, pages.ts | — | Critical |
+| 20 | ?locale=fr.json → double extension page.fr.json.json | locale.ts | — | Medium |
+| 21 | Progress stream missing locale field | publish.ts | — | Low |
+| 22 | History doesn't record save locale | history-recorder.ts | — | Low |
 
 ## Gap summary by severity
 
