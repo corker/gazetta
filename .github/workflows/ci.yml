@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5]
 
     steps:
       - uses: actions/checkout@v6
@@ -68,7 +68,7 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - run: npx playwright test --project=dev --shard=${{ matrix.shard }}/3
+      - run: npx playwright test --project=dev --shard=${{ matrix.shard }}/5
 
       - name: Upload test-results on failure
         if: failure()
