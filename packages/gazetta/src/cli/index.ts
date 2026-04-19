@@ -1304,20 +1304,23 @@ async function runDev(siteDir: string, port: number) {
     })
   })
 
-  // ---- Site page routes ----
-  for (const [pageName, page] of site.pages) {
+  // ---- Site page routes (default + locale variants) ----
+  const { allPageEntries } = await import('../site-loader.js')
+  for (const { name: pageName, page, locale: pageLocale } of allPageEntries(site)) {
     app.get(page.route, async c => {
       try {
         const freshSite = await loadSite({ contentRoot: source.contentRoot, templatesDir, manifest })
-        const freshPage = freshSite.pages.get(pageName)
-        const resolved = await resolvePage(pageName, freshSite)
+        const resolved = await resolvePage(pageName, freshSite, pageLocale)
+        const freshPage = pageLocale
+          ? freshSite.pageLocales.get(pageName)?.locales.get(pageLocale)
+          : freshSite.pages.get(pageName)
         const html = await renderPage(resolved, {
           routeParams: c.req.param(),
-          metadata: freshPage?.metadata,
-          route: freshPage?.route,
+          metadata: freshPage?.metadata ?? page.metadata,
+          route: freshPage?.route ?? page.route,
           seo: {
             siteName: freshSite.manifest.name,
-            locale: freshSite.manifest.locale,
+            locale: pageLocale ?? freshSite.manifest.locale,
             defaultOgImage: freshSite.manifest.defaultOgImage,
           },
         })
