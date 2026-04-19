@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 260 use cases — 108 verified, 14 bugs, 138 gaps.
+**Summary:** 275 use cases — 108 verified, 14 bugs, 153 gaps.
 
 ---
 
@@ -416,7 +416,44 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 - [ ] robots.txt Sitemap directive doesn't reference per-locale sitemaps
 
-## 52. Locale normalization consistency (2 cases)
+## 52. Fetch (reverse publish) with locales (2 cases)
+
+- [ ] Fetch pages/home from target copies both page.json and page.fr.json
+- [ ] Fetch from single-locale target (locales: [fr]) copies only French files
+
+## 53. Create page in non-default locale (2 cases)
+
+- [ ] POST /api/pages with ?locale=fr — unsupported, should error or create page.fr.json
+- [ ] Create page.fr.json without page.json existing — French-only page
+
+## 54. Dependents API with locales (2 cases)
+
+- [ ] GET /api/dependents doesn't count locale variant pages using @header
+- [ ] Fragment blast radius undercount on multi-locale sites
+
+## 55. Locale picker vs target locale subset (2 cases)
+
+- [ ] Single-locale target active — picker still shows all site locales (gap)
+- [ ] Picker should disable/hide locales not in active target's subset
+
+## 56. System pages (404) with locale (2 cases)
+
+- [ ] /fr/nonexistent → should serve French 404 page if page.fr.json exists
+- [ ] /fr/nonexistent → fallback to English 404 if no French 404
+
+## 57. Preview POST overrides with locale (1 case)
+
+- [ ] POST /preview/fr/ with overrides applies to French manifest, not English
+
+## 58. SEO metadata editor locale isolation (1 case)
+
+- [ ] Switch locale in metadata editor — dirty flag resets, French metadata loads
+
+## 59. Non-ASCII content in locale files (1 case)
+
+- [ ] French accents, CJK characters in content fields — publish renders UTF-8 correctly
+
+## 60. Locale normalization consistency (2 cases)
 
 - [ ] All entry points normalize: config, CLI --to, ?locale=, URL prefix, filenames
 - [ ] BCP 47 region codes: pt-BR/en-GB consistent across API, CLI, URL, filesystem
