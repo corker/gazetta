@@ -1434,12 +1434,14 @@ async function runDev(siteDir: string, port: number) {
   })
 
   // ---- Trailing slash normalization ----
-  // Redirect /fr/ → /fr, /fr/about/ → /fr/about. Browsers and crawlers
-  // often append trailing slashes; without this, locale routes 404.
+  // Strip trailing slashes so /fr/ resolves as /fr and /fr/about/ as
+  // /fr/about. Re-dispatches through the Hono router with the clean URL.
+  // No redirect — preserves POST body and avoids round-trips.
   app.use(async (c, next) => {
-    const path = new URL(c.req.url).pathname
-    if (path !== '/' && path.endsWith('/')) {
-      return c.redirect(path.slice(0, -1), 301)
+    const url = new URL(c.req.url)
+    if (url.pathname !== '/' && url.pathname.endsWith('/')) {
+      url.pathname = url.pathname.slice(0, -1)
+      return app.fetch(new Request(url, c.req.raw), c.env)
     }
     return next()
   })

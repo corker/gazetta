@@ -63,7 +63,9 @@ const previewPath = computed(() => {
   if (!previewRoute.value) return null
   const target = activeTarget.activeTargetName
   const qs = target ? `?target=${encodeURIComponent(target)}` : ''
-  return `${basePath}/preview${previewRoute.value}${qs}`
+  // Strip trailing slash to avoid POST redirect (which loses body)
+  const route = previewRoute.value === '/' ? '' : previewRoute.value
+  return `${basePath}/preview${route}${qs}`
 })
 
 // Fragment scope — gzId of the fragment root for dimming
