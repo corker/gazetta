@@ -634,7 +634,18 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
     } else {
       // ESI mode — fragments separate, pages with placeholders
       for (const [fragName] of site.fragments) {
-        if (unchanged.has(`fragments/${fragName}`)) {
+        // Build per-locale unchanged set: null = default, 'fr' = French
+        const fragUnchanged = new Set<string | null>()
+        if (unchanged.has(`fragments/${fragName}`)) fragUnchanged.add(null)
+        const fragLocales = site.fragmentLocales.get(fragName)
+        if (fragLocales) {
+          for (const loc of fragLocales.locales.keys()) {
+            if (unchanged.has(`fragments/${fragName}:${loc}`)) fragUnchanged.add(loc)
+          }
+        }
+        // Skip entirely if all locales unchanged
+        const totalFragLocales = 1 + (fragLocales?.locales.size ?? 0)
+        if (fragUnchanged.size >= totalFragLocales) {
           skipped++
           continue
         }
@@ -644,14 +655,26 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
           targetStorage,
           site,
           { templateHashes },
-          { templatesDir, targetLocales: targetConfig?.locales },
+          { templatesDir, targetLocales: targetConfig?.locales, unchangedLocales: fragUnchanged },
         )
         totalFiles += files
         totalRemoved += removed
-        console.log(`    ${c.green('✓')} @${fragName}`)
+        const skippedCount =
+          fragUnchanged.size > 0 ? ` (${fragUnchanged.size} locale${fragUnchanged.size > 1 ? 's' : ''} skipped)` : ''
+        console.log(`    ${c.green('✓')} @${fragName}${skippedCount}`)
       }
       for (const [pageName] of site.pages) {
-        if (unchanged.has(`pages/${pageName}`)) {
+        // Build per-locale unchanged set
+        const pageUnchanged = new Set<string | null>()
+        if (unchanged.has(`pages/${pageName}`)) pageUnchanged.add(null)
+        const pageLocales = site.pageLocales.get(pageName)
+        if (pageLocales) {
+          for (const loc of pageLocales.locales.keys()) {
+            if (unchanged.has(`pages/${pageName}:${loc}`)) pageUnchanged.add(loc)
+          }
+        }
+        const totalPageLocales = 1 + (pageLocales?.locales.size ?? 0)
+        if (pageUnchanged.size >= totalPageLocales) {
           skipped++
           continue
         }
@@ -661,11 +684,19 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
           targetStorage,
           site,
           { templateHashes },
-          { cache: targetConfig?.cache, templatesDir, seo, targetLocales: targetConfig?.locales },
+          {
+            cache: targetConfig?.cache,
+            templatesDir,
+            seo,
+            targetLocales: targetConfig?.locales,
+            unchangedLocales: pageUnchanged,
+          },
         )
         totalFiles += files
         totalRemoved += removed
-        console.log(`    ${c.green('✓')} ${pageName}`)
+        const skippedCount =
+          pageUnchanged.size > 0 ? ` (${pageUnchanged.size} locale${pageUnchanged.size > 1 ? 's' : ''} skipped)` : ''
+        console.log(`    ${c.green('✓')} ${pageName}${skippedCount}`)
       }
     }
     if (skipped > 0) console.log(`    ${c.dim(`· ${skipped} unchanged (skipped)`)}`)

@@ -182,19 +182,23 @@ ${bodyContent}
   fileCount++
 
   // Write content-hash sidecar + reverse-dep sidecars for compare/dependents.
-  // Skip for locale variants — sidecars track the default locale's structural
-  // identity (template, fragment refs). Locale variants share the same structure;
-  // per-locale sidecar tracking is a future enhancement.
-  if (manifestHash && !locale) {
-    await writeSidecars(targetStorage, pageDir, {
-      hash: manifestHash,
-      uses: collectFragmentRefs(page.components),
-      template: page.template,
-      pub: {
-        lastPublished: new Date().toISOString(),
-        noindex: !!page.metadata?.robots?.includes('noindex'),
+  // Locale variants get locale-suffixed sidecars (.hash.fr, .pub.fr);
+  // structural sidecars (.uses-*, .tpl-*) are shared (written only for default).
+  if (manifestHash) {
+    await writeSidecars(
+      targetStorage,
+      pageDir,
+      {
+        hash: manifestHash,
+        uses: collectFragmentRefs(page.components),
+        template: page.template,
+        pub: {
+          lastPublished: new Date().toISOString(),
+          noindex: !!page.metadata?.robots?.includes('noindex'),
+        },
       },
-    })
+      locale,
+    )
   }
 
   // Clean up old hashed files
@@ -324,14 +328,20 @@ export async function publishFragmentRendered(
   fileCount++
 
   // Write content-hash sidecar + reverse-dep sidecars for compare/dependents.
-  // Skip for locale variants — same rationale as publishPageRendered.
-  if (manifestHash && !locale) {
-    await writeSidecars(targetStorage, fragDir, {
-      hash: manifestHash,
-      uses: collectFragmentRefs(fragment.components),
-      template: fragment.template,
-      pub: null,
-    })
+  // Locale variants get locale-suffixed sidecars (.hash.fr);
+  // structural sidecars (.uses-*, .tpl-*) are shared (written only for default).
+  if (manifestHash) {
+    await writeSidecars(
+      targetStorage,
+      fragDir,
+      {
+        hash: manifestHash,
+        uses: collectFragmentRefs(fragment.components),
+        template: fragment.template,
+        pub: null,
+      },
+      locale,
+    )
   }
 
   // Clean up old hashed files
