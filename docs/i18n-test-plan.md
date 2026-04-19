@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 283 use cases — 108 verified, 16 bugs, 159 gaps.
+**Summary:** 287 use cases — 108 verified, 16 bugs, 163 gaps.
 
 ---
 
@@ -471,7 +471,14 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 - [ ] Starter has no language switcher template — visitors must type /fr/ URL manually
 
-## 64. Locale normalization consistency (2 cases)
+## 64. Internal links and locale prefixes (4 cases)
+
+- [ ] Fragment fallback: English header on French page has `/about` links (not `/fr/about`)
+- [ ] French header fragment with `/fr/about` links — must exist for correct navigation
+- [ ] Templates receive no locale context — can't auto-prefix internal links
+- [ ] Starter missing French header/footer fragments — fallback links break locale navigation
+
+## 65. Locale normalization consistency (2 cases)
 
 - [ ] All entry points normalize: config, CLI --to, ?locale=, URL prefix, filenames
 - [ ] BCP 47 region codes: pt-BR/en-GB consistent across API, CLI, URL, filesystem
