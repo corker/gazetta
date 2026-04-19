@@ -227,6 +227,28 @@ export function createServer(options: ServeOptions) {
 
   // ESI mode — assemble fragments at request time
 
+  // Root-level files (sitemap.xml, robots.txt) — served from storage
+  app.get('/sitemap.xml', async c => {
+    try {
+      const content = await storage.readFile('sitemap.xml')
+      return new Response(content, {
+        headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+      })
+    } catch {
+      return c.notFound()
+    }
+  })
+  app.get('/robots.txt', async c => {
+    try {
+      const content = await storage.readFile('robots.txt')
+      return new Response(content, {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+      })
+    } catch {
+      return c.notFound()
+    }
+  })
+
   // Hashed CSS/JS — immutable cache
   app.get('/pages/*', async c => serveAsset(c, storage))
   app.get('/fragments/*', async c => serveAsset(c, storage))

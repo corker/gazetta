@@ -144,6 +144,22 @@ export function createWorker(options?: CloudflareR2WorkerOptions) {
     return c.json({ ok: true, pages: pages.delimitedPrefixes.length, fragments: fragments.delimitedPrefixes.length })
   })
 
+  // Root-level files (sitemap.xml, robots.txt) — served from R2
+  app.get('/sitemap.xml', async c => {
+    const obj = await c.env[bindingName].get('sitemap.xml')
+    if (!obj) return c.notFound()
+    return new Response(obj.body as ReadableStream, {
+      headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+    })
+  })
+  app.get('/robots.txt', async c => {
+    const obj = await c.env[bindingName].get('robots.txt')
+    if (!obj) return c.notFound()
+    return new Response(obj.body as ReadableStream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+    })
+  })
+
   // Static assets (CSS, JS) — immutable cache
   app.get('/pages/*', async c => serveStatic(c, c.env[bindingName]))
   app.get('/fragments/*', async c => serveStatic(c, c.env[bindingName]))
