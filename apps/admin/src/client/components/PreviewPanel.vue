@@ -400,12 +400,16 @@ async function handleMessage(e: MessageEvent) {
     iframeRef.value?.blur()
   }
   if (e.data?.type === 'gazetta:navigate' && e.data.route) {
-    const page = site.pages.find(p => p.route === e.data.route)
+    // Match against default routes first, then try locale-prefixed routes.
+    // Locale nav links (e.g. /fr/about) won't match site.pages routes
+    // (which are /about) — strip the locale prefix and retry.
+    let page = site.pages.find(p => p.route === e.data.route)
+    if (!page && locale.effectiveLocale) {
+      const prefix = `/${locale.effectiveLocale}`
+      const stripped = e.data.route === prefix ? '/' : e.data.route.replace(prefix, '')
+      page = site.pages.find(p => p.route === stripped)
+    }
     if (page) {
-      // Preserve the current ui mode — clicking a link in preview while
-      // editing should land on the destination page in edit mode, not
-      // drop the author into browse. Router guard reads `-edit` route
-      // suffix to set mode (router.ts), so we choose the matching path.
       const suffix = uiMode.mode === 'edit' ? '/edit' : ''
       router.push(`/pages/${page.name}${suffix}`)
     } else {
