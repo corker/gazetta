@@ -190,6 +190,18 @@ export function createServer(options: ServeOptions) {
   const app = new Hono()
 
   app.use(logger())
+
+  // Strip trailing slashes — normalize /fr/ to /fr, /about/ to /about.
+  // Re-dispatches through Hono router. No redirect — preserves POST body.
+  app.use(async (c, next) => {
+    const url = new URL(c.req.url)
+    if (url.pathname !== '/' && url.pathname.endsWith('/')) {
+      url.pathname = url.pathname.slice(0, -1)
+      return app.fetch(new Request(url, c.req.raw), c.env)
+    }
+    return next()
+  })
+
   app.get('/health', c => c.json({ ok: true }))
 
   if (type === 'static') {
