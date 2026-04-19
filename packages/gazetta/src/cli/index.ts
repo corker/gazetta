@@ -715,6 +715,35 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
       const { generateRobotsTxt } = await import('../robots.js')
 
       const targetPageSidecars = await listSidecars(targetStorage, 'pages')
+
+      // Merge source-side knowledge — listSidecars may miss just-written
+      // entries on R2 due to eventual list-after-write consistency. Every
+      // page we just published gets an entry even if the listing missed it.
+      const now = new Date().toISOString()
+      for (const [pageName, page] of site.pages) {
+        if (!targetPageSidecars.has(pageName)) {
+          targetPageSidecars.set(pageName, {
+            hash: '',
+            uses: [],
+            template: page.template,
+            pub: { lastPublished: now, noindex: !!page.metadata?.robots?.includes('noindex') },
+          })
+        }
+      }
+      for (const [pageName, localeEntry] of site.pageLocales) {
+        for (const [loc, localePage] of localeEntry.locales) {
+          const key = `${pageName}:${loc}`
+          if (!targetPageSidecars.has(key)) {
+            targetPageSidecars.set(key, {
+              hash: '',
+              uses: [],
+              template: localePage.template,
+              pub: { lastPublished: now, noindex: !!localePage.metadata?.robots?.includes('noindex') },
+            })
+          }
+        }
+      }
+
       const { resolveSiteLocales, defaultLocaleFor } = await import('../locale.js')
 
       // Build hreflang groups — two strategies:
