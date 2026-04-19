@@ -9,6 +9,7 @@ import { useToastStore } from '../stores/toast.js'
 import { useSiteStore } from '../stores/site.js'
 import { useUiModeStore } from '../stores/uiMode.js'
 import { useActiveTargetStore } from '../stores/activeTarget.js'
+import { useLocaleStore } from '../stores/locale.js'
 import { useRouter } from 'vue-router'
 import { useNavigation } from '../composables/useNavigation.js'
 import { useComponentFocusStore } from '../stores/componentFocus.js'
@@ -30,6 +31,7 @@ const toast = useToastStore()
 const site = useSiteStore()
 const uiMode = useUiModeStore()
 const activeTarget = useActiveTargetStore()
+const locale = useLocaleStore()
 const router = useRouter()
 const { navigateTo } = useNavigation()
 const iframeRef = ref<HTMLIFrameElement | null>(null)
@@ -63,8 +65,20 @@ const previewPath = computed(() => {
   if (!previewRoute.value) return null
   const target = activeTarget.activeTargetName
   const qs = target ? `?target=${encodeURIComponent(target)}` : ''
+  let route = previewRoute.value
+
+  // For pages, the locale route already includes the prefix (e.g., /fr/about).
+  // For fragments (/@header or host-page route /), we need to prepend the
+  // locale prefix so the preview resolves the locale-specific content.
+  const loc = locale.effectiveLocale
+  if (loc && !route.startsWith(`/${loc}`)) {
+    // Fragment standalone: /@header → /fr/@header
+    // Fragment on host page: / → /fr
+    route = route === '/' ? `/${loc}` : `/${loc}${route}`
+  }
+
   // Strip trailing slash to avoid POST redirect (which loses body)
-  const route = previewRoute.value === '/' ? '' : previewRoute.value
+  if (route === '/') route = ''
   return `${basePath}/preview${route}${qs}`
 })
 
@@ -529,6 +543,13 @@ watch(
 // Route change = fresh iframe load (srcdoc replaced). Scroll position
 // resets — the author navigated to a different page, so that's expected.
 watch(previewRoute, () => fetchPreview(false), { immediate: true })
+// Locale change = fresh iframe load (different content language).
+// For pages, previewRoute already changes (route includes locale prefix).
+// For fragments, previewRoute stays the same but previewPath changes.
+watch(
+  () => locale.effectiveLocale,
+  () => fetchPreview(false),
+)
 // Target change on the same route = morphed swap. Preserves scroll,
 // zoom, and iframe focus — that's the point of preview tabs per
 // design-editor-ux.md ("feels like flipping tabs, not navigating").
