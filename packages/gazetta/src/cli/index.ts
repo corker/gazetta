@@ -309,10 +309,6 @@ async function runInit(dir: string) {
   const files: Record<string, string> = {
     'sites/main/site.yaml': `name: ${name}\nversion: 1.0.0\nsystemPages:\n  - "404"\ntargets:\n  local:\n    storage:\n      type: filesystem\n    # environment=local, editable=true (defaults); path=./targets/local (default)\n`,
 
-    // Target-level site.yaml — what gazetta publish would write. The local
-    // target is just another target; its content lives here.
-    'sites/main/targets/local/site.yaml': `name: ${name}\nversion: 1.0.0\nsystemPages:\n  - "404"\n`,
-
     'templates/page-layout/index.ts': `import { z } from 'zod'
 import type { TemplateFunction } from 'gazetta'
 

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Hono } from 'hono'
-import { createFilesystemProvider, createSourceContext } from 'gazetta'
+import { createFilesystemProvider, createSourceContext, loadSite } from 'gazetta'
 import { createAdminApp } from '../src/server/index.js'
 
 const projectSiteDir = resolve(import.meta.dirname, '../../../examples/starter/sites/main')
@@ -12,8 +12,11 @@ const templatesDir = resolve(import.meta.dirname, '../../../examples/starter/tem
 const storage = createFilesystemProvider(contentDir)
 let app: Hono
 
-beforeAll(() => {
-  const source = createSourceContext({ storage, siteDir: '', projectSiteDir })
+beforeAll(async () => {
+  // Load project-level manifest so target storage doesn't need site.yaml
+  const projStorage = createFilesystemProvider()
+  const { manifest } = await loadSite({ siteDir: projectSiteDir, storage: projStorage })
+  const source = createSourceContext({ storage, siteDir: '', projectSiteDir, manifest })
   app = createAdminApp({ source, siteDir: projectSiteDir, templatesDir })
 })
 

@@ -8,11 +8,27 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { cp, rm, readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Hono } from 'hono'
-import { createFilesystemProvider, createSourceContext, createHistoryProvider, type SourceContext } from 'gazetta'
+import {
+  createFilesystemProvider,
+  createSourceContext,
+  createHistoryProvider,
+  loadSite,
+  type SourceContext,
+  type SiteManifest,
+} from 'gazetta'
 import { createAdminApp } from '../src/server/index.js'
 
 const starterSiteDir = resolve(import.meta.dirname, '../../../examples/starter/sites/main')
 const templatesDir = resolve(import.meta.dirname, '../../../examples/starter/templates')
+
+let _manifest: SiteManifest | null = null
+async function getManifest(): Promise<SiteManifest> {
+  if (_manifest) return _manifest
+  const s = createFilesystemProvider()
+  const site = await loadSite({ siteDir: starterSiteDir, storage: s })
+  _manifest = site.manifest
+  return _manifest
+}
 
 /**
  * Spin up an isolated copy of the starter's local target. We snapshot
@@ -35,7 +51,8 @@ describe('History on save', () => {
     contentDir = await setupWorkingCopy('history-save-test')
     const storage = createFilesystemProvider(contentDir)
     const history = createHistoryProvider({ storage })
-    source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history })
+    const manifest = await getManifest()
+    source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history, manifest })
     app = createAdminApp({
       source,
       siteDir: starterSiteDir,
@@ -137,7 +154,8 @@ describe('History disabled on save', () => {
     contentDir = await setupWorkingCopy('history-disabled-test')
     const storage = createFilesystemProvider(contentDir)
     // No history provider → source.history is undefined → no revisions.
-    const source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir })
+    const manifest = await getManifest()
+    const source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, manifest })
     app = createAdminApp({ source, siteDir: starterSiteDir, templatesDir })
   })
 
@@ -166,7 +184,8 @@ describe('Retention', () => {
     contentDir = await setupWorkingCopy('history-retention-test')
     const storage = createFilesystemProvider(contentDir)
     const history = createHistoryProvider({ storage, retention: 2 })
-    const source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history })
+    const manifest = await getManifest()
+    const source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history, manifest })
     app = createAdminApp({ source, siteDir: starterSiteDir, templatesDir })
   })
 
@@ -202,7 +221,8 @@ describe('History HTTP endpoints', () => {
     contentDir = await setupWorkingCopy('history-http-test')
     const storage = createFilesystemProvider(contentDir)
     const history = createHistoryProvider({ storage })
-    const source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history })
+    const manifest = await getManifest()
+    const source = createSourceContext({ storage, siteDir: '', projectSiteDir: starterSiteDir, history, manifest })
     app = createAdminApp({
       source,
       siteDir: starterSiteDir,

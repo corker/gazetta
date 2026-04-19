@@ -1,18 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { resolve } from 'node:path'
 import { createFilesystemProvider } from '../src/providers/filesystem.js'
 import { loadSite } from '../src/site-loader.js'
 import { resolvePage } from '../src/resolver.js'
 import { renderComponent, renderPage } from '../src/renderer.js'
+import { starterTargetDir as siteDir, starterTemplatesDir as templatesDir, starterManifest } from './_helpers/starter.js'
 
-const projectRoot = resolve(import.meta.dirname, '../../../examples/starter')
-const siteDir = resolve(projectRoot, 'sites/main/targets/local')
-const templatesDir = resolve(projectRoot, 'templates')
 const storage = createFilesystemProvider()
 
 describe('starter site', () => {
   it('loads the site', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     expect(site.manifest.name).toBe('Gazetta Starter')
     expect(site.pages.size).toBeGreaterThanOrEqual(3)
     expect(site.fragments.size).toBe(2)
@@ -24,7 +21,7 @@ describe('starter site', () => {
   })
 
   it('resolves and renders the home page', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const page = site.pages.get('home')!
     const resolved = await resolvePage('home', site)
     const html = await renderPage(resolved, { metadata: page.metadata, route: page.route })
@@ -40,7 +37,7 @@ describe('starter site', () => {
   })
 
   it('resolves and renders the about page', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const page = site.pages.get('about')!
     const resolved = await resolvePage('about', site)
     const html = await renderPage(resolved, { metadata: page.metadata, route: page.route })
@@ -52,7 +49,7 @@ describe('starter site', () => {
   })
 
   it('shared fragments produce identical output across pages', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const homeResolved = await resolvePage('home', site)
     const aboutResolved = await resolvePage('about', site)
 
@@ -70,7 +67,7 @@ describe('starter site', () => {
   })
 
   it('page has correct component tree structure', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const resolved = await resolvePage('home', site)
 
     // @header, hero, features, demo, vue-demo, banner, @footer
@@ -105,7 +102,7 @@ describe('starter site', () => {
   })
 
   it('renders React SSR templates (feature cards)', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const resolved = await resolvePage('home', site)
     const html = await renderPage(resolved)
 
@@ -118,14 +115,14 @@ describe('starter site', () => {
   })
 
   it('discovers nested dynamic route pages', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const blogPage = site.pages.get('blog/[slug]')
     expect(blogPage).toBeDefined()
     expect(blogPage!.route).toBe('/blog/:slug')
   })
 
   it('resolves and renders blog page with route params', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const page = site.pages.get('blog/[slug]')!
     const resolved = await resolvePage('blog/[slug]', site)
     const html = await renderPage(resolved, {
@@ -141,7 +138,7 @@ describe('starter site', () => {
   })
 
   it('renders valid HTML document with scoped CSS', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const resolved = await resolvePage('home', site)
     const html = await renderPage(resolved)
 
@@ -155,7 +152,7 @@ describe('starter site', () => {
   })
 
   it('renders unique data-gz IDs per component on all pages', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     for (const pageName of site.pages.keys()) {
       const resolved = await resolvePage(pageName, site)
       const html = await renderPage(resolved)
@@ -166,7 +163,7 @@ describe('starter site', () => {
   })
 
   it('fragment children have unique IDs (nested components)', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const resolved = await resolvePage('home', site)
     const html = await renderPage(resolved)
     const divIds = [...html.matchAll(/<div data-gz="([^"]+)">/g)].map(m => m[1])
@@ -178,7 +175,7 @@ describe('starter site', () => {
   })
 
   it('same fragment on different pages gets same IDs', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const homeHtml = await renderPage(await resolvePage('home', site))
     const aboutHtml = await renderPage(await resolvePage('about', site))
 
@@ -190,7 +187,7 @@ describe('starter site', () => {
   })
 
   it('data-gz IDs are deterministic across renders', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const resolved = await resolvePage('home', site)
     const html1 = await renderPage(resolved)
     const html2 = await renderPage(resolved)
@@ -200,7 +197,7 @@ describe('starter site', () => {
   })
 
   it('validates all pages resolve without errors', async () => {
-    const site = await loadSite({ siteDir, storage, templatesDir })
+    const site = await loadSite({ siteDir, storage, templatesDir, manifest: await starterManifest() })
     const errors: string[] = []
     for (const pageName of site.pages.keys()) {
       try {

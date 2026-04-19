@@ -102,7 +102,8 @@ describe('runInit', () => {
     expect(existsSync(join(testDir, 'templates/text-block/index.ts'))).toBe(true)
     expect(existsSync(join(testDir, 'admin/.gitkeep'))).toBe(true)
     expect(existsSync(join(testDir, 'sites/main/site.yaml'))).toBe(true)
-    expect(existsSync(join(testDir, 'sites/main/targets/local/site.yaml'))).toBe(true)
+    // No target-level site.yaml — project-level site.yaml is the single source of truth.
+    expect(existsSync(join(testDir, 'sites/main/targets/local/site.yaml'))).toBe(false)
     expect(existsSync(join(testDir, 'sites/main/targets/local/pages/home/page.json'))).toBe(true)
     expect(existsSync(join(testDir, 'sites/main/targets/local/fragments/header/fragment.json'))).toBe(true)
     expect(existsSync(join(testDir, 'sites/main/targets/local/pages/404/page.json'))).toBe(true)

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
-import { loadSite } from '../../site-loader.js'
+import { loadSiteFromSource } from '../source-context.js'
 import { recordWrite } from '../../history-recorder.js'
 import type { SourceContextResolver } from '../source-context.js'
 import { CreateFragmentRequestSchema } from '../schemas/fragments.js'
@@ -12,7 +12,7 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     const source = await resolve(c.req.query('target'))
     // Empty target → empty list. See pages.ts for rationale.
     try {
-      const site = await loadSite({ contentRoot: source.contentRoot })
+      const site = await loadSiteFromSource(source)
       const fragments = [...site.fragments.entries()].map(([name, frag]) => {
         const localeEntry = site.fragmentLocales.get(name)
         return {
@@ -64,7 +64,7 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     const name = c.req.param('name')
     const locale = c.req.query('locale')
     const source = await resolve(c.req.query('target'))
-    const site = await loadSite({ contentRoot: source.contentRoot })
+    const site = await loadSiteFromSource(source)
 
     let fragment = site.fragments.get(name)
     if (locale) {
@@ -91,7 +91,7 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
-    const site = await loadSite({ contentRoot: source.contentRoot })
+    const site = await loadSiteFromSource(source)
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
 
@@ -124,7 +124,7 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const { storage } = source
-    const site = await loadSite({ contentRoot: source.contentRoot })
+    const site = await loadSiteFromSource(source)
     const fragment = site.fragments.get(name)
     if (!fragment) return c.json({ error: `Fragment "${name}" not found` }, 404)
 

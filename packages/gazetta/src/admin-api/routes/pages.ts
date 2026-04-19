@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { join } from 'node:path'
-import { loadSite } from '../../site-loader.js'
+import { loadSiteFromSource } from '../source-context.js'
 import { recordWrite } from '../../history-recorder.js'
 import type { SourceContextResolver } from '../source-context.js'
 import { CreatePageRequestSchema } from '../schemas/pages.js'
@@ -18,7 +18,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     // open" (wrong, reports items as present) and "fail closed" (wrong,
     // hides legitimate targets the user might want to switch to).
     try {
-      const site = await loadSite({ contentRoot: source.contentRoot })
+      const site = await loadSiteFromSource(source)
       const pages = [...site.pages.entries()].map(([name, page]) => {
         const localeEntry = site.pageLocales.get(name)
         return {
@@ -78,7 +78,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     const name = c.req.param('name')
     const locale = c.req.query('locale')
     const source = await resolve(c.req.query('target'))
-    const site = await loadSite({ contentRoot: source.contentRoot })
+    const site = await loadSiteFromSource(source)
 
     // If a locale is requested, return the locale variant
     let page = site.pages.get(name)
@@ -108,7 +108,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const { storage, sidecarWriter } = source
-    const site = await loadSite({ contentRoot: source.contentRoot })
+    const site = await loadSiteFromSource(source)
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
 
@@ -148,7 +148,7 @@ export function pageRoutes(resolve: SourceContextResolver) {
     const name = c.req.param('name')
     const source = await resolve(c.req.query('target'))
     const { storage } = source
-    const site = await loadSite({ contentRoot: source.contentRoot })
+    const site = await loadSiteFromSource(source)
     const page = site.pages.get(name)
     if (!page) return c.json({ error: `Page "${name}" not found` }, 404)
 

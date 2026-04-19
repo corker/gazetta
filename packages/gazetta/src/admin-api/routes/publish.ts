@@ -15,7 +15,7 @@ import {
   createCloudflarePurge,
   lookupCloudflareZoneId,
 } from '../../publish-rendered.js'
-import { loadSite } from '../../site-loader.js'
+import { loadSiteFromSource } from '../source-context.js'
 import { publishPageAllLocales, publishFragmentAllLocales } from '../../publish-locale.js'
 import { resolveEnvVars } from '../../targets.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from '../../templates-scan.js'
@@ -218,7 +218,7 @@ export function publishRoutes(
       return
     }
     const templateHashes = templateHashesFrom(templateInfos)
-    const site = await loadSite({ contentRoot: source.contentRoot, templatesDir: tdir })
+    const site = await loadSiteFromSource(source, { templatesDir: tdir })
 
     yield { kind: 'start', targets: targetNames, itemsPerTarget: allItems.length }
 
@@ -402,7 +402,7 @@ export function publishRoutes(
               await purge.purgeAll()
               console.log(`    ${targetName}: cache purged (all)`)
             } else if (config?.siteUrl) {
-              const siteForUrls = await loadSite({ contentRoot: source.contentRoot, templatesDir })
+              const siteForUrls = await loadSiteFromSource(source, { templatesDir })
               const urls = targetItems
                 .filter(i => i.startsWith('pages/'))
                 .map(i => {
