@@ -69,7 +69,7 @@ async function renderPreview(
     try {
       const resolved = await resolveFragment(fragmentName, site, previewLocale)
       if (overrides) applyOverrides(resolved, overrides)
-      return c.html(await renderFragment(resolved))
+      return c.html(await renderFragment(resolved, previewLocale))
     } catch (err) {
       const e = err as Error
       const msg = e.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')

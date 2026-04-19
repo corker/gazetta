@@ -43,6 +43,14 @@ export function normalizeLocale(locale: string): string {
 }
 
 /**
+ * Resolve the default locale for a site manifest.
+ * Chain: explicit `locale` field → first in `locales.supported` → 'en'.
+ */
+export function defaultLocaleFor(site: SiteManifest): string {
+  return site.locale ?? site.locales?.supported?.[0] ?? 'en'
+}
+
+/**
  * Resolve site-level locale settings.
  * Returns null if i18n is not enabled (no `locales` config).
  */
@@ -50,7 +58,7 @@ export function resolveSiteLocales(site: SiteManifest): ResolvedLocales | null {
   if (!site.locales) return null
   const supported = site.locales.supported.map(normalizeLocale)
   if (supported.length === 0) return null
-  const defaultLocale = normalizeLocale(site.locale ?? supported[0])
+  const defaultLocale = normalizeLocale(defaultLocaleFor(site))
   return {
     supported,
     default: defaultLocale,

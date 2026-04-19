@@ -644,7 +644,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
           targetStorage,
           site,
           { templateHashes },
-          { templatesDir },
+          { templatesDir, targetLocales: targetConfig?.locales },
         )
         totalFiles += files
         totalRemoved += removed
@@ -661,7 +661,7 @@ async function runPublish(siteDir: string, targetName?: string, opts: { force?: 
           targetStorage,
           site,
           { templateHashes },
-          { cache: targetConfig?.cache, templatesDir, seo },
+          { cache: targetConfig?.cache, templatesDir, seo, targetLocales: targetConfig?.locales },
         )
         totalFiles += files
         totalRemoved += removed
