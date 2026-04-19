@@ -262,10 +262,16 @@ export function createServer(options: ServeOptions) {
       return new Response(null, { status: 304, headers: { ETag: etag } })
     }
 
-    return c.html(html, 200, {
+    const headers: Record<string, string> = {
       'Cache-Control': `public, max-age=${browser}, s-maxage=${edge}`,
       ETag: etag,
-    })
+    }
+    // Set locale cookie when visiting a locale-prefixed URL — persists the
+    // author's language choice so Accept-Language detection doesn't override it.
+    if (result.locale && nonDefaultLocales.length > 0) {
+      headers['Set-Cookie'] = `locale=${result.locale}; Path=/; SameSite=Lax; Max-Age=31536000`
+    }
+    return c.html(html, 200, headers)
   })
 
   return app

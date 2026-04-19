@@ -1,0 +1,12 @@
+{
+  "template": "footer-layout",
+  "components": [
+    {
+      "name": "copyright",
+      "template": "copyright",
+      "content": {
+        "text": "© 2026 Gazetta. Construit avec des composants composables."
+      }
+    }
+  ]
+}
