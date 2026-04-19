@@ -48,6 +48,8 @@ export interface SourceSidecarWriterOptions {
    *  manifest so it knows which items need sidecars. Without this,
    *  `ensureBackfilled` throws. */
   templatesDir?: string
+  /** Project-level manifest — passed to loadSite so targets don't need site.yaml. */
+  manifest?: import('./types.js').SiteManifest
 }
 
 export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): SourceSidecarWriter {
@@ -75,7 +77,7 @@ export function createSourceSidecarWriter(opts: SourceSidecarWriterOptions): Sou
     if (!opts.templatesDir) {
       throw new Error('SourceSidecarWriter.ensureBackfilled requires `templatesDir` in options')
     }
-    const site = await loadSite({ contentRoot: root, templatesDir: opts.templatesDir })
+    const site = await loadSite({ contentRoot: root, templatesDir: opts.templatesDir, manifest: opts.manifest })
     const [pagesList, fragmentsList] = await Promise.all([
       listSidecars(root.storage, root.path('pages')),
       listSidecars(root.storage, root.path('fragments')),

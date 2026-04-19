@@ -98,6 +98,7 @@ export function createAdminApp(opts: AdminAppOptions): AdminApp {
         contentRoot: opts.source.contentRoot,
         scanTemplates: () => cachedScan.get(),
         templatesDir,
+        manifest: opts.source.manifest,
       })
     // Backfill history on the source if the caller didn't supply one —
     // dev bootstrap builds a bare SourceContext and relies on admin-api

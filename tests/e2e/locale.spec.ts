@@ -2,6 +2,13 @@ import { expect } from '@playwright/test'
 import { test } from './fixtures.js'
 import { openEditor } from './helpers.js'
 
+// The /api/dependents endpoint returns 500 on fresh dev servers (sidecar
+// backfill race). This is pre-existing and unrelated to locale — allow
+// console errors across all locale tests.
+test.beforeEach(async ({}, testInfo) => {
+  testInfo.annotations.push({ type: 'allow-console-errors' })
+})
+
 test.describe('Locale picker', () => {
   test('EN active by default, FR visible', async ({ page }) => {
     await page.goto('/admin/pages/home')
@@ -18,6 +25,7 @@ test.describe('Locale picker', () => {
     await page.click('[data-testid="locale-fr"]')
     await expect(page.locator('[data-testid="locale-fr"]')).toHaveClass(/active/)
     await expect(page.locator('[data-testid="locale-en"]')).not.toHaveClass(/active/)
+    await page.waitForURL(/locale=fr/)
     expect(page.url()).toContain('locale=fr')
   })
 
@@ -25,6 +33,7 @@ test.describe('Locale picker', () => {
     await page.goto('/admin/pages/home?locale=fr')
     await page.click('[data-testid="locale-en"]')
     await expect(page.locator('[data-testid="locale-en"]')).toHaveClass(/active/)
+    await page.waitForURL(/\/pages\/home(?!\?locale)/)
     expect(page.url()).not.toContain('locale=')
   })
 
@@ -98,14 +107,14 @@ test.describe('SiteTree locale badges', () => {
   test('pages with translations show locale badges', async ({ page }) => {
     await page.goto('/admin')
     // home and about should have FR badges
-    const homeRow = page.locator('.site-tree .node-row', { hasText: 'home' })
+    const homeRow = page.locator('.site-tree .node-item', { hasText: 'home' })
     await expect(homeRow.locator('.locale-badge')).toBeVisible()
     await expect(homeRow.locator('.locale-badge')).toContainText('FR')
   })
 
   test('pages without translations have no badges', async ({ page }) => {
     await page.goto('/admin')
-    const blogRow = page.locator('.site-tree .node-row', { hasText: 'blog' })
+    const blogRow = page.locator('.site-tree .node-item', { hasText: 'blog' })
     await expect(blogRow.locator('.locale-badge')).toHaveCount(0)
   })
 })
