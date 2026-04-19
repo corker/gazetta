@@ -188,7 +188,10 @@ export function useEditorActions() {
         }
       }
       case 'fragmentEdit': {
-        const frag = await api.getFragment(sel.fragmentName, { signal })
+        const frag = await api.getFragment(sel.fragmentName, {
+          signal,
+          locale: useLocaleStore().effectiveLocale ?? undefined,
+        })
         const fragContent = (frag.content as Record<string, unknown>) ?? {}
         const { schema, hasEditor, editorUrl, fieldsBaseUrl } = await fetchSchema(frag.template, signal)
         return {
