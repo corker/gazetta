@@ -9,8 +9,9 @@
  * TargetRegistry's selected editable target with no changes to routes.
  */
 
-import type { StorageProvider } from '../types.js'
+import type { StorageProvider, SiteManifest } from '../types.js'
 import { createContentRoot, type ContentRoot } from '../content-root.js'
+import { loadSite, type Site, type LoadSiteOptions } from '../site-loader.js'
 import type { SourceSidecarWriter } from '../source-sidecars.js'
 import type { TargetRegistry } from '../targets.js'
 import type { HistoryProvider } from '../history.js'
@@ -53,6 +54,20 @@ export interface SourceContext {
    * presence before recording — no-op if absent.
    */
   readonly history?: HistoryProvider
+  /**
+   * Project-level site manifest — read once from sites/{name}/site.yaml
+   * at boot. Routes pass this to loadSite({ manifest }) so content
+   * discovery works without a target-level site.yaml.
+   */
+  readonly manifest?: SiteManifest
+}
+
+/**
+ * Load a site from a SourceContext. Passes the project-level manifest
+ * so loadSite doesn't need a target-level site.yaml.
+ */
+export function loadSiteFromSource(source: SourceContext, opts?: Partial<LoadSiteOptions>): Promise<Site> {
+  return loadSite({ contentRoot: source.contentRoot, manifest: source.manifest, ...opts })
 }
 
 export interface CreateSourceContextOptions {
@@ -63,6 +78,8 @@ export interface CreateSourceContextOptions {
   projectSiteDir?: string
   sidecarWriter?: SourceSidecarWriter
   history?: HistoryProvider
+  /** Project-level site manifest — passed to loadSite so targets don't need site.yaml. */
+  manifest?: SiteManifest
 }
 
 export function createSourceContext(opts: CreateSourceContextOptions): SourceContext {
@@ -73,6 +90,7 @@ export function createSourceContext(opts: CreateSourceContextOptions): SourceCon
     contentRoot: createContentRoot(opts.storage, opts.siteDir),
     sidecarWriter: opts.sidecarWriter,
     history: opts.history,
+    manifest: opts.manifest,
   }
 }
 
@@ -103,6 +121,8 @@ export interface SourceContextFromRegistryOptions {
   sidecarWriter?: SourceSidecarWriter
   /** See BuildHistory — callable decides per-target history provider. */
   buildHistory?: BuildHistory
+  /** Project-level site manifest. */
+  manifest?: SiteManifest
 }
 
 /**
@@ -120,6 +140,7 @@ export function createSourceContextFromRegistry(opts: SourceContextFromRegistryO
       projectSiteDir: opts.projectSiteDir,
       sidecarWriter: opts.sidecarWriter,
       history: opts.buildHistory?.(name, storage),
+      manifest: opts.manifest,
     }),
     targetName: name,
   }
@@ -170,6 +191,8 @@ export interface RegistrySourceResolverOptions {
   lazyInit?: (targetName: string) => Promise<void>
   /** See BuildHistory — callable decides per-target history provider. */
   buildHistory?: BuildHistory
+  /** Project-level site manifest. */
+  manifest?: SiteManifest
 }
 
 /**
@@ -204,6 +227,7 @@ export function registrySourceResolver(opts: RegistrySourceResolverOptions): Sou
       buildHistory: opts.buildHistory,
       siteDir: opts.siteDir,
       sidecarWriter: opts.sidecarWriter,
+      manifest: opts.manifest,
     })
     cache.set(name, ctx)
     return ctx
