@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 302 use cases — 108 verified, 20 bugs, 174 gaps.
+**Summary:** 308 use cases — 108 verified, 20 bugs, 180 gaps.
 
 ---
 
@@ -491,7 +491,16 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 - [ ] Templates receive no locale context — can't auto-prefix internal links
 - [ ] Starter missing French header/footer fragments — fallback links break locale navigation
 
-## 65. Locale normalization consistency (2 cases)
+## 65. Many locales (10+) scalability (6 cases)
+
+- [ ] Locale picker with 15 locales — buttons overflow toolbar, needs dropdown or collapse
+- [ ] SiteTree badge with 14 locale badges — overflows row width, needs truncation
+- [ ] Dev server with 100 pages × 15 locales = 1500 route registrations — startup time
+- [ ] 404 page "Available routes" doesn't list locale variants — could be huge with many locales
+- [ ] Publish 100 pages × 15 locales = 1500 renders — sequential, could timeout
+- [ ] allPageEntries iteration with 1500 entries — O(n) per preview request
+
+## 66. Locale normalization consistency (2 cases)
 
 - [ ] All entry points normalize: config, CLI --to, ?locale=, URL prefix, filenames
 - [ ] BCP 47 region codes: pt-BR/en-GB consistent across API, CLI, URL, filesystem
