@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import { loadSite } from './site-loader.js'
 import { hashManifest } from './hash.js'
 import { scanTemplates, templateHashesFrom, type TemplateInfo } from './templates-scan.js'
@@ -107,17 +108,41 @@ export async function compareTargets(opts: CompareOptions): Promise<CompareResul
   const local = new Map<string, string>()
   const pageHashOpts = opts.type === 'static' ? { templateHashes, fragmentHashes } : { templateHashes }
   for (const [name, page] of site.pages) {
+    // Base hash from the default locale manifest.
     // Source sidecars are written without fragmentHashes (source doesn't
     // know target's type). For static targets we must re-hash.
     const cached = opts.type === 'static' ? null : sourcePagesSidecars.get(name)?.hash
-    local.set(`pages/${name}`, cached ?? hashManifest(page, pageHashOpts))
+    let pageHash = cached ?? hashManifest(page, pageHashOpts)
+
+    // Combine locale variant hashes — if any locale file changes, the
+    // combined hash changes and the page gets republished (all locales).
+    const localeEntry = site.pageLocales.get(name)
+    if (localeEntry) {
+      const parts = [pageHash]
+      for (const [locale, localePage] of localeEntry.locales) {
+        parts.push(`${locale}:${hashManifest(localePage, pageHashOpts)}`)
+      }
+      pageHash = createHash('md5').update(parts.join('|')).digest('hex').slice(0, 8)
+    }
+
+    local.set(`pages/${name}`, pageHash)
   }
   // Static targets bake fragments into pages — no fragment sidecars exist
   // on the target, and publishing @header/@footer is a no-op server-side. Omit
   // them from local so they don't appear as perpetually "added".
   if (opts.type !== 'static') {
-    for (const [name, hash] of fragmentHashes) {
-      local.set(`fragments/${name}`, hash)
+    for (const [name] of site.fragments) {
+      // Combine default + locale variant hashes for fragments too.
+      let fragHash = fragmentHashes.get(name)!
+      const localeEntry = site.fragmentLocales.get(name)
+      if (localeEntry) {
+        const parts = [fragHash]
+        for (const [locale, localeFrag] of localeEntry.locales) {
+          parts.push(`${locale}:${hashManifest(localeFrag, { templateHashes })}`)
+        }
+        fragHash = createHash('md5').update(parts.join('|')).digest('hex').slice(0, 8)
+      }
+      local.set(`fragments/${name}`, fragHash)
     }
   }
 
