@@ -5,7 +5,7 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 **Status legend:** [ ] not tested · [x] verified · [~] partial · [!] bug
 
-**Summary:** 275 use cases — 108 verified, 14 bugs, 153 gaps.
+**Summary:** 283 use cases — 108 verified, 16 bugs, 159 gaps.
 
 ---
 
@@ -453,7 +453,25 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 
 - [ ] French accents, CJK characters in content fields — publish renders UTF-8 correctly
 
-## 60. Locale normalization consistency (2 cases)
+## 60. renderFragment hardcodes lang="en" (1 case)
+
+- [!] **BUG: `renderFragment` outputs `<html lang="en">` regardless of locale** — fragment preview always English lang
+
+## 61. Locale cookie never set (2 cases)
+
+- [ ] **GAP: serve.ts reads `locale` cookie but never sets it** — per design, visiting /fr/about should set `Set-Cookie: locale=fr`
+- [ ] **GAP: Worker reads cookie but never sets it** — same issue
+
+## 62. publishPageAllLocales ignores target locale subset (2 cases)
+
+- [!] **BUG: publishes ALL site locales, not filtered by target's `locales` config**
+- [ ] Target with `locales: [fr]` still gets English + French published (should be French only)
+
+## 63. No language switcher on public site (1 case)
+
+- [ ] Starter has no language switcher template — visitors must type /fr/ URL manually
+
+## 64. Locale normalization consistency (2 cases)
 
 - [ ] All entry points normalize: config, CLI --to, ?locale=, URL prefix, filenames
 - [ ] BCP 47 region codes: pt-BR/en-GB consistent across API, CLI, URL, filesystem
@@ -476,15 +494,17 @@ deployment strategies, all runtime modes, edge cases, and known bugs.
 | 10 | Cache purge only purges default locale URLs | publish.ts | 409 | High |
 | 11 | Incremental publish doesn't detect locale file changes | compare.ts | — | High |
 | 12 | Compare ignores locale variants | compare.ts | — | Medium |
-| 13 | Progress stream missing locale field | publish.ts | — | Low |
-| 14 | History doesn't record save locale | history-recorder.ts | — | Low |
+| 13 | renderFragment hardcodes lang="en" | renderer.ts | 33 | Medium |
+| 14 | publishPageAllLocales ignores target locale subset | publish-locale.ts | 61 | High |
+| 15 | Progress stream missing locale field | publish.ts | — | Low |
+| 16 | History doesn't record save locale | history-recorder.ts | — | Low |
 
 ## Gap summary by severity
 
 | Priority | Count | Examples |
 |----------|-------|---------|
 | Critical (blocks editor use) | 7 | Save to wrong file (server + client), delete orphans locale files |
-| High (incorrect output) | 4 | hreflang never wired, cache purge misses locales, incremental publish blind to locale changes |
+| High (incorrect output) | 5 | hreflang never wired, cache purge misses locales, incremental publish blind, target subset ignored |
 | High (feature interactions) | 12 | Component ops independence, metadata per locale, multi-target subset |
 | Medium (compare/publish/history) | 10 | Compare ignores locales, target locale subset, history locale |
 | Medium (error/edge cases) | 15 | URL edge cases, migration, concurrent ops, error handling |
