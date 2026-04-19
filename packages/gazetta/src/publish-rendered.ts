@@ -181,8 +181,11 @@ ${bodyContent}
   await targetStorage.writeFile(`${pageDir}/${indexFile}`, html)
   fileCount++
 
-  // Write content-hash sidecar + reverse-dep sidecars for compare/dependents
-  if (manifestHash) {
+  // Write content-hash sidecar + reverse-dep sidecars for compare/dependents.
+  // Skip for locale variants — sidecars track the default locale's structural
+  // identity (template, fragment refs). Locale variants share the same structure;
+  // per-locale sidecar tracking is a future enhancement.
+  if (manifestHash && !locale) {
     await writeSidecars(targetStorage, pageDir, {
       hash: manifestHash,
       uses: collectFragmentRefs(page.components),
@@ -320,8 +323,9 @@ export async function publishFragmentRendered(
   await targetStorage.writeFile(`${fragDir}/${indexFile}`, fragmentHtml)
   fileCount++
 
-  // Write content-hash sidecar + reverse-dep sidecars for compare/dependents
-  if (manifestHash) {
+  // Write content-hash sidecar + reverse-dep sidecars for compare/dependents.
+  // Skip for locale variants — same rationale as publishPageRendered.
+  if (manifestHash && !locale) {
     await writeSidecars(targetStorage, fragDir, {
       hash: manifestHash,
       uses: collectFragmentRefs(fragment.components),

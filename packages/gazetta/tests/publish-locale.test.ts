@@ -144,7 +144,7 @@ describe('publishFragmentRendered with locale', () => {
 })
 
 describe('publishPageRendered sidecar per locale', () => {
-  it('writes sidecars with different hashes for different locales', async () => {
+  it('default locale publish writes sidecars', async () => {
     const target = createFilesystemProvider(renderTargetDir)
     const root = createContentRoot(storage, starterTargetDir)
     const { hashManifest } = await import('../src/hash.js')
@@ -152,22 +152,21 @@ describe('publishPageRendered sidecar per locale', () => {
     const page = site.pages.get('home')!
     const enHash = hashManifest(page, { templateHashes: new Map() })
 
-    // Publish EN with hash
+    // Publish default (no locale param) with hash
     await publishPageRendered('home', root, target, undefined, starterTemplatesDir, enHash, site, {
       siteName: 'Test',
       locale: 'en',
     })
 
-    // Check EN sidecars exist
-    const entriesAfterEn = await target.readDir('pages/home')
-    const hashFiles = entriesAfterEn.filter(e => e.name.endsWith('.hash'))
+    const entries = await target.readDir('pages/home')
+    const hashFiles = entries.filter(e => e.name.endsWith('.hash'))
     expect(hashFiles.length).toBe(1)
 
-    const pubFiles = entriesAfterEn.filter(e => e.name.startsWith('.pub-'))
+    const pubFiles = entries.filter(e => e.name.startsWith('.pub-'))
     expect(pubFiles.length).toBe(1)
   })
 
-  it('locale publish updates sidecars (last-write-wins per page dir)', async () => {
+  it('locale variant publish does not overwrite default sidecars', async () => {
     const target = createFilesystemProvider(renderTargetDir)
     const root = createContentRoot(storage, starterTargetDir)
     const { hashManifest } = await import('../src/hash.js')
@@ -175,11 +174,17 @@ describe('publishPageRendered sidecar per locale', () => {
     const page = site.pages.get('home')!
     const hash = hashManifest(page, { templateHashes: new Map() })
 
-    // Publish EN then FR — sidecars reflect last publish
+    // Publish default first
     await publishPageRendered('home', root, target, undefined, starterTemplatesDir, hash, site, {
       siteName: 'Test',
       locale: 'en',
     })
+
+    // Record the sidecar state after default publish
+    const entriesBefore = await target.readDir('pages/home')
+    const hashBefore = entriesBefore.find(e => e.name.endsWith('.hash'))!.name
+
+    // Publish FR — should NOT write sidecars (locale variant)
     await publishPageRendered(
       'home',
       root,
@@ -198,9 +203,37 @@ describe('publishPageRendered sidecar per locale', () => {
     expect(htmlFiles).toContain('index.html')
     expect(htmlFiles).toContain('index.fr.html')
 
-    // Sidecars are present (last-write-wins — one hash, one pub timestamp)
-    const hashFiles = entries.filter(e => e.name.endsWith('.hash'))
-    expect(hashFiles.length).toBe(1)
+    // Default sidecar unchanged — FR publish didn't touch it
+    const hashAfter = entries.find(e => e.name.endsWith('.hash'))!.name
+    expect(hashAfter).toBe(hashBefore)
+  })
+
+  it('locale-only publish creates HTML but no sidecars', async () => {
+    const target = createFilesystemProvider(renderTargetDir)
+    const root = createContentRoot(storage, starterTargetDir)
+    const { hashManifest } = await import('../src/hash.js')
+
+    const page = site.pages.get('home')!
+    const hash = hashManifest(page, { templateHashes: new Map() })
+
+    // Publish ONLY FR (no default first)
+    await publishPageRendered(
+      'home',
+      root,
+      target,
+      undefined,
+      starterTemplatesDir,
+      hash,
+      site,
+      { siteName: 'Test', locale: 'fr' },
+      'fr',
+    )
+
+    const entries = await target.readDir('pages/home')
+    expect(entries.some(e => e.name === 'index.fr.html')).toBe(true)
+    // No sidecars written for locale-only publish
+    expect(entries.filter(e => e.name.endsWith('.hash')).length).toBe(0)
+    expect(entries.filter(e => e.name.startsWith('.pub-')).length).toBe(0)
   })
 })
 
