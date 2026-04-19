@@ -62,6 +62,7 @@ export type { HistoryConfig, LocalesConfig, PageMetadata } from './types.js'
 
 // Locale resolution
 export {
+  isValidLocale,
   normalizeLocale,
   resolveSiteLocales,
   resolveTargetLocales,

@@ -124,7 +124,8 @@ async function switchTo(name: string) {
   if (missingCheck === 'missing' && focused && prevName) {
     // Item doesn't exist on the destination — navigate to site root
     // with the new target in the query. The router guard applies it.
-    router.push({ path: '/', query: { target: name } })
+    const current = router.currentRoute.value
+    router.push({ path: '/', query: { ...current.query, target: name } })
     const itemLabel = focused.type === 'page' ? `pages/${focused.name}` : `@${focused.name}`
     toast.show(`${itemLabel} isn't on ${name} — showing site root`, {
       type: 'info',
@@ -132,7 +133,8 @@ async function switchTo(name: string) {
         label: `back to ${itemLabel} on ${prevName}`,
         handler: async () => {
           const prefix = focused.type === 'page' ? '/pages' : '/fragments'
-          router.push({ path: `${prefix}/${focused.name}`, query: { target: prevName } })
+          const cur = router.currentRoute.value
+          router.push({ path: `${prefix}/${focused.name}`, query: { ...cur.query, target: prevName } })
         },
       },
     })

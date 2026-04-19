@@ -4,6 +4,7 @@ import { loadSiteFromSource } from '../source-context.js'
 import { recordWrite } from '../../history-recorder.js'
 import type { SourceContextResolver } from '../source-context.js'
 import { CreateFragmentRequestSchema } from '../schemas/fragments.js'
+import { isValidLocale } from '../../locale.js'
 
 export function fragmentRoutes(resolve: SourceContextResolver) {
   const app = new Hono()
@@ -62,7 +63,9 @@ export function fragmentRoutes(resolve: SourceContextResolver) {
 
   app.get('/api/fragments/:name', async c => {
     const name = c.req.param('name')
-    const locale = c.req.query('locale')
+    const rawLocale = c.req.query('locale')
+    const locale = rawLocale && isValidLocale(rawLocale) ? rawLocale.toLowerCase() : undefined
+    if (rawLocale && !locale) return c.json({ error: `Invalid locale code: "${rawLocale}"` }, 400)
     const source = await resolve(c.req.query('target'))
     const site = await loadSiteFromSource(source)
 

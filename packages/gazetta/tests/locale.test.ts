@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  isValidLocale,
   normalizeLocale,
   resolveSiteLocales,
   resolveTargetLocales,
@@ -10,6 +11,61 @@ import {
 } from '../src/locale.js'
 import { resolveSeoTags, type SeoContext } from '../src/seo.js'
 import type { SiteManifest, TargetConfig } from '../src/types.js'
+
+describe('isValidLocale', () => {
+  it('accepts simple locale codes', () => {
+    expect(isValidLocale('fr')).toBe(true)
+    expect(isValidLocale('en')).toBe(true)
+    expect(isValidLocale('de')).toBe(true)
+  })
+
+  it('accepts region codes', () => {
+    expect(isValidLocale('en-gb')).toBe(true)
+    expect(isValidLocale('pt-br')).toBe(true)
+    expect(isValidLocale('zh-hans')).toBe(true)
+  })
+
+  it('accepts uppercase (case-insensitive check)', () => {
+    expect(isValidLocale('FR')).toBe(true)
+    expect(isValidLocale('EN-GB')).toBe(true)
+    expect(isValidLocale('pt-BR')).toBe(true)
+  })
+
+  it('rejects path traversal', () => {
+    expect(isValidLocale('../etc')).toBe(false)
+    expect(isValidLocale('fr/../en')).toBe(false)
+    expect(isValidLocale('..')).toBe(false)
+  })
+
+  it('rejects dots', () => {
+    expect(isValidLocale('fr.json')).toBe(false)
+    expect(isValidLocale('en.gb')).toBe(false)
+  })
+
+  it('rejects scripts and special chars', () => {
+    expect(isValidLocale('<script>')).toBe(false)
+    expect(isValidLocale('fr;drop')).toBe(false)
+    expect(isValidLocale('fr/en')).toBe(false)
+  })
+
+  it('rejects empty and whitespace', () => {
+    expect(isValidLocale('')).toBe(false)
+    expect(isValidLocale(' ')).toBe(false)
+    expect(isValidLocale('  fr  ')).toBe(false)
+  })
+
+  it('rejects single char', () => {
+    expect(isValidLocale('f')).toBe(false)
+  })
+
+  it('rejects overly long codes', () => {
+    expect(isValidLocale('a'.repeat(128))).toBe(false)
+  })
+
+  it('rejects null bytes', () => {
+    expect(isValidLocale('fr\x00xx')).toBe(false)
+  })
+})
 
 describe('normalizeLocale', () => {
   it('lowercases simple codes', () => {
