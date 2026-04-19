@@ -62,11 +62,20 @@ export function generateSitemap(opts: GenerateSitemapOptions): string | null {
   // Sort by page name for deterministic output across runs.
   const sorted = [...opts.pages.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   for (const [name, state] of sorted) {
-    if (systemSet.has(name)) continue
-    if (state.pub?.noindex) continue
-    if (name.includes('[')) continue // dynamic routes — can't sitemap template patterns
+    // Locale-qualified entries (home:fr) are handled as separate <url> entries
+    // with their locale-prefixed route. The base page name is before the colon.
+    const isLocaleEntry = name.includes(':')
+    const baseName = isLocaleEntry ? name.split(':')[0] : name
+    const locale = isLocaleEntry ? name.split(':')[1] : null
 
-    const route = deriveRoute(name)
+    if (systemSet.has(baseName)) continue
+    if (state.pub?.noindex) continue
+    if (baseName.includes('[')) continue // dynamic routes — can't sitemap template patterns
+
+    // For locale entries, use the locale-prefixed route (e.g. /fr/about).
+    // For default entries, use the standard route (e.g. /about).
+    const baseRoute = deriveRoute(baseName)
+    const route = locale ? (baseRoute === '/' ? `/${locale}` : `/${locale}${baseRoute}`) : baseRoute
     const loc = `${base}${route}`
     const lastmod = state.pub?.lastPublished
 
@@ -75,8 +84,9 @@ export function generateSitemap(opts: GenerateSitemapOptions): string | null {
       // Sitemap spec wants YYYY-MM-DD or full ISO — use date only
       parts.push(`    <lastmod>${lastmod.slice(0, 10)}</lastmod>`)
     }
-    // hreflang cross-links — only when 2+ locale variants exist
-    const alternates = opts.hreflangGroups?.get(name)
+    // hreflang cross-links — only when 2+ locale variants exist.
+    // Locale entries share the same hreflang group as their base page.
+    const alternates = opts.hreflangGroups?.get(baseName)
     if (alternates && alternates.length > 1) {
       for (const alt of alternates) {
         parts.push(
